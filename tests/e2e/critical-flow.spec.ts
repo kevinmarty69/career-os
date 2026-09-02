@@ -26,18 +26,111 @@ async function openApplications(page: Page) {
     .click();
 }
 
+async function useDemo(page: Page) {
+  const button = page.getByRole('button', {
+    name: 'Explorer avec des données fictives',
+  });
+  if (await button.isVisible()) await button.click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     if (
       location.pathname === '/' &&
-      !sessionStorage.getItem('preserve-career-os-demo')
-    )
+      !sessionStorage.getItem('career-os-test-initialized')
+    ) {
       localStorage.removeItem('career-os-demo');
+      sessionStorage.removeItem('career-os-onboarding:anonymous');
+      sessionStorage.setItem('career-os-test-initialized', '1');
+    }
   });
   await page.goto('/');
 });
 
+test('starts honestly and restores a local CV review after reload', async ({
+  page,
+}) => {
+  await expect(
+    page.getByRole('heading', {
+      name: 'Construisons votre mémoire professionnelle.',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Alex Morgan')).toHaveCount(0);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'kevin-cv.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
+      [
+        'Kévin Marty',
+        'Senior Product Engineer',
+        'Produit shippé en solo, de l’idée à la production.',
+      ].join('\n'),
+    ),
+  });
+  await expect(
+    page.getByRole('heading', {
+      name: 'Gardez seulement ce qui vous ressemble.',
+    }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('.import-candidate-list article')
+      .first()
+      .getByRole('checkbox'),
+  ).toBeChecked();
+  await page
+    .getByLabel('Affirmation 1')
+    .fill('Produit shippé en solo, avec une revue humaine avant production.');
+  await page.reload();
+  await expect(page.getByLabel('Affirmation 1')).toHaveValue(
+    'Produit shippé en solo, avec une revue humaine avant production.',
+  );
+});
+
+test('expires and discards a temporary CV review', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'Covered by the desktop flow.');
+  await page.getByRole('button', { name: /Coller le texte de mon CV/ }).click();
+  await page
+    .getByLabel('Contenu du CV')
+    .fill(
+      'Kévin Marty\nSenior Product Engineer\nBuilt and operated a production agent platform.',
+    );
+  await page.getByRole('button', { name: 'Relire les informations' }).click();
+  await page.evaluate(() => {
+    const key = 'career-os-onboarding:anonymous';
+    const review = JSON.parse(sessionStorage.getItem(key)!);
+    review.expiresAt = Date.now() + 50;
+    sessionStorage.setItem(key, JSON.stringify(review));
+  });
+  await page.reload();
+  await expect(page.locator('p[role="alert"]')).toContainText(
+    'Cette revue a expiré après 30 minutes.',
+  );
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem('career-os-onboarding:anonymous'),
+    ),
+  ).toBeNull();
+
+  await page.getByRole('button', { name: /Coller le texte de mon CV/ }).click();
+  await page
+    .getByLabel('Contenu du CV')
+    .fill(
+      'Kévin Marty\nSenior Product Engineer\nBuilt and operated a production agent platform.',
+    );
+  await page.getByRole('button', { name: 'Relire les informations' }).click();
+  await page.getByRole('button', { name: 'Recommencer' }).click();
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem('career-os-onboarding:anonymous'),
+    ),
+  ).toBeNull();
+});
+
 test('restores an anonymous draft after reload', async ({ page }) => {
+  await useDemo(page);
   await openApplications(page);
   await page.getByRole('button', { name: 'Générer la page' }).click();
   await expect(
@@ -78,21 +171,61 @@ test('builds, reviews, approves and issues one private capability', async ({
   await page.getByRole('button', { name: 'Create Workspace' }).click();
   await expect(
     page.getByRole('heading', {
-      name: 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.',
+      name: 'Construisons votre mémoire professionnelle.',
     }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Ouvrir la mémoire pro' }).click();
+  await page.getByRole('button', { name: /Coller le texte de mon CV/ }).click();
   await page
-    .getByLabel('Positionnement')
-    .fill('Evidence-backed product engineer');
-  await page.getByRole('button', { name: 'Enregistrer' }).click();
+    .getByLabel('Contenu du CV')
+    .fill(
+      [
+        'Alex Morgan',
+        'Evidence-backed Product Engineer',
+        'Reduced a fictional deployment workflow from 40 to 12 minutes.',
+        'Enjoys turning ambiguous requirements into small, operated product slices.',
+        'Publishes a monthly reading list for friends and former colleagues.',
+      ].join('\n'),
+    );
+  await page.getByRole('button', { name: 'Relire les informations' }).click();
+  await expect(page.getByLabel('Affirmation 2')).toBeEnabled();
+  await expect(page.getByLabel('Affirmation 2')).toHaveAttribute(
+    'readonly',
+    '',
+  );
+  const excluded = page
+    .locator('.import-candidate-list article')
+    .filter({ has: page.getByRole('textbox', { name: 'Affirmation 3' }) });
+  await excluded.getByRole('checkbox').first().uncheck();
+  await page.getByLabel(/Je valide les .* affirmations sélectionnées/).check();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.getByRole('button', { name: 'Enregistrer ma mémoire' }).click();
   await expect(page.getByRole('status')).toContainText(
     'Mémoire professionnelle enregistrée dans cet espace.',
   );
+  await expect(
+    page.getByRole('heading', { name: 'Votre mémoire est prête.' }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await page
+    .getByRole('button', { name: 'Créer ma première candidature' })
+    .click();
+  await expect(page.getByLabel('Entreprise', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Poste', { exact: true })).toHaveValue('');
+  await page
+    .getByLabel('Entreprise', { exact: true })
+    .fill('Northstar Labs');
+  await page
+    .getByLabel('Poste', { exact: true })
+    .fill('Senior Product Engineer');
+  await page
+    .getByLabel('Description du poste')
+    .fill(
+      'Build dependable customer-facing workflows with a small product team.',
+    );
   await page.reload();
   await page.getByRole('button', { name: 'Ouvrir la mémoire pro' }).click();
   await expect(page.getByLabel('Positionnement')).toHaveValue(
-    'Evidence-backed product engineer',
+    'Evidence-backed Product Engineer',
   );
   await openApplications(page);
   await page.getByRole('button', { name: 'Générer la page' }).click();
@@ -170,11 +303,9 @@ test('builds, reviews, approves and issues one private capability', async ({
     freshPage.getByRole('heading', { name: 'Alex Morgan × Northstar Labs' }),
   ).toBeVisible();
   await freshPage.locator('details').first().locator('summary').click();
+  await expect(freshPage.getByText('CV collé').first()).toBeVisible();
   await expect(
-    freshPage.getByText('Synthetic launch postmortem').first(),
-  ).toBeVisible();
-  await expect(
-    freshPage.getByText(/Enjoys turning ambiguous requirements/),
+    freshPage.getByText(/Publishes a monthly reading list/),
   ).toHaveCount(0);
   expect(freshPage.url()).not.toContain('#');
   await expect(freshPage.locator('nav')).toHaveCount(0);
@@ -238,7 +369,9 @@ test('requires an explicit workspace choice when several are available', async (
   ).toBeVisible();
   await page.getByRole('button', { name: 'Use Workspace Two' }).click();
   await expect(
-    page.getByRole('button', { name: /Northstar Labs/ }).first(),
+    page.getByRole('heading', {
+      name: 'Construisons votre mémoire professionnelle.',
+    }),
   ).toBeVisible();
   const activeOrganizationId = await page.evaluate(async () => {
     const session = await fetch('/api/auth/get-session').then((response) =>
@@ -252,6 +385,7 @@ test('requires an explicit workspace choice when several are available', async (
 test('records a declared claim and exposes provenance progressively', async ({
   page,
 }) => {
+  await useDemo(page);
   await page.getByRole('button', { name: 'Ouvrir la mémoire pro' }).click();
   await page.getByText('Ajouter une affirmation').click();
   await page.getByLabel('Titre de la source').fill('Synthetic interview notes');
@@ -269,6 +403,7 @@ test('records a declared claim and exposes provenance progressively', async ({
 test('fits 375, 768, and 1440 widths without horizontal overflow', async ({
   page,
 }) => {
+  await useDemo(page);
   await openApplications(page);
   await page.getByRole('button', { name: 'Retour aux candidatures' }).click();
   await expect(
@@ -292,6 +427,7 @@ test('fits 375, 768, and 1440 widths without horizontal overflow', async ({
 test('preserves the opportunity and offers retry when evidence does not match', async ({
   page,
 }) => {
+  await useDemo(page);
   await openApplications(page);
   await page.getByLabel('Poste', { exact: true }).fill('Astrophysicist');
   await page
@@ -308,6 +444,7 @@ test('preserves the opportunity and offers retry when evidence does not match', 
 });
 
 test('keeps run mechanics in Activity details', async ({ page }) => {
+  await useDemo(page);
   await openApplications(page);
   await page.getByRole('button', { name: 'Générer la page' }).click();
   await page.getByRole('button', { name: 'À trancher' }).click();

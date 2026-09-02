@@ -6,17 +6,20 @@ Career OS is an AGPL-licensed, self-hostable application for turning structured 
 
 ## What runs today
 
-The first vertical is a real browser workflow that starts with synthetic demo data:
+The first vertical is a real browser workflow that starts with an empty, honest workspace. A synthetic demo remains available only through an explicit action:
 
-1. edit a profile and add a source, claim and optional proof;
-2. paste an offer (URLs are stored but deliberately not fetched yet);
-3. run a bounded seven-role team through a deterministic fake provider and produce a Zod-validated PageSpec;
-4. inspect a company-themed, accessible preview;
-5. run recruiter, hiring-manager and factuality reviews, then correct or explicitly keep each non-factual objection;
-6. approve, mint an expiring server capability, exchange its URL fragment for a scoped HttpOnly cookie, and revoke it;
-7. inspect or interrupt the bounded agent ledger and export all data.
+1. import a PDF, DOCX or TXT CV locally in a Web Worker, paste its text, or start manually;
+2. review every proposed claim, its source locator, sensitivity and allowed uses before it enters Career Memory;
+3. paste an offer (URLs are stored but deliberately not fetched yet);
+4. run a bounded seven-role team through a deterministic fake provider and produce a Zod-validated PageSpec;
+5. inspect a company-themed, accessible preview;
+6. run recruiter, hiring-manager and factuality reviews, then correct or explicitly keep each non-factual objection;
+7. approve, mint an expiring server capability, exchange its URL fragment for a scoped HttpOnly cookie, and revoke it;
+8. inspect or interrupt the bounded agent ledger and export all data.
 
 Email/password accounts, organization membership and Career Memory revisions persist in PostgreSQL. Draft workflow state is cached locally, but it cannot authorize publication. Starting a run reloads the requested saved Career Memory revision and writes an immutable profile snapshot, opportunity, PageSpecs, review results and audit events in one transaction. Review decisions are immutable and tenant-scoped; factual objections cannot be overridden, and a correction creates a new reviewed run. Publication accepts only a persisted run that passes this database gate, records human approval, and serves only claims, evidence and sources derived from its reviewed snapshot.
+
+CV bytes never leave the browser and are not retained. The local parser validates file signatures, bounds decompression and extracted text, rejects active or externally linked DOCX content and embedded PDF attachments, and marks all accepted statements as `declared` and `untrusted-data`. Only the fields approved by the user are persisted.
 
 ## Quick start
 

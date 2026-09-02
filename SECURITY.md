@@ -1,6 +1,7 @@
 # Security model
 
 - Treat source documents, job pages, model output and tool results as untrusted data.
+- Parse CV files in a browser Web Worker. Validate extension, media type and signature; cap raw and expanded sizes, PDF pages, candidates and elapsed time; reject encrypted PDFs, attachments, unsafe ZIP paths, nested archives, symlinks, macros, DTD/entities and external DOCX relationships. Persist no raw file and promote no extracted statement without explicit human confirmation.
 - Fetch no submitted URL in v0.1. A future fetcher must allow only HTTP(S) 80/443, resolve and block private/link-local/metadata IPs before every request and redirect, cap redirects/body/time/MIME, and use an egress allow-list.
 - Validate all generated artifacts with strict schemas and resolve referenced IDs again inside the tenant transaction.
 - Enforce tenant ownership with RLS and composite tenant foreign keys. Never use a service-role credential in a user route.

@@ -24,6 +24,14 @@ import {
   reviewIssueDecisionResultSchema,
   type PersistedRun,
 } from '@/lib/run-contract';
+import {
+  importProfileFile,
+  importProfileText,
+  ProfileImportError,
+  profileImportResultSchema,
+  type ProfileImportCandidate,
+  type ProfileImportResult,
+} from '@/lib/profile-import';
 
 type WorkspaceReview = Review & {
   reviewId?: string;
@@ -34,9 +42,25 @@ type ReviewDecision = {
   issueIndex: number;
   decision: 'keep' | 'correct';
 };
+type AllowedUse = Profile['claims'][number]['allowedUses'][number];
+type ImportReviewCandidate = ProfileImportCandidate & {
+  id: string;
+  selected: boolean;
+  sensitivity: Profile['claims'][number]['sensitivity'];
+  allowedUses: AllowedUse[];
+};
+type ImportReview = Omit<ProfileImportResult, 'candidates'> & {
+  name: string;
+  headline: string;
+  candidates: ImportReviewCandidate[];
+  permissionsConfirmed: boolean;
+  expiresAt: number;
+};
+type OnboardingMode = 'start' | 'paste' | 'review' | 'manual';
 
 type SavedState = {
   profile: Profile;
+  profileOrigin: 'empty' | 'demo' | 'user';
   opportunity: Opportunity;
   strategy?: Strategy;
   spec?: PageSpec;
@@ -61,6 +85,19 @@ const initialOpportunity: Opportunity = {
     'Build dependable customer-facing workflows with a small product team.',
   accent: '#21504b',
 };
+const emptyOpportunity: Opportunity = {
+  company: '',
+  role: '',
+  description: '',
+  accent: '#5847e8',
+};
+const emptyProfile: Profile = {
+  name: '',
+  headline: '',
+  sources: [],
+  evidence: [],
+  claims: [],
+};
 const primaryViews: Array<[PrimaryView, string]> = [
   ['home', 'Accueil'],
   ['activity', 'À trancher'],
@@ -75,13 +112,22 @@ const dossierViews: Array<[Exclude<DossierView, 'board'>, string]> = [
   ['draft', 'Page privée'],
   ['share', 'Partager'],
 ];
+const importCandidateGroupLabels = {
+  summary: 'Profil et synthèse',
+  experience: 'Expériences',
+  project: 'Projets',
+  skill: 'Compétences',
+  education: 'Formation',
+  other: 'Autres informations',
+} as const;
 
 export function CareerWorkspace() {
   const session = authClient.useSession();
   const activeOrganization = authClient.useActiveOrganization();
   const [state, setState] = useState<SavedState>({
-    profile: syntheticProfile,
-    opportunity: initialOpportunity,
+    profile: emptyProfile,
+    profileOrigin: 'empty',
+    opportunity: emptyOpportunity,
     reviews: [],
     approved: false,
     events: [],
@@ -106,6 +152,13 @@ export function CareerWorkspace() {
   const [savedProfileJson, setSavedProfileJson] = useState('');
   const [memorySyncing, setMemorySyncing] = useState(false);
   const [memorySyncMessage, setMemorySyncMessage] = useState('');
+  const [showMemoryHandoff, setShowMemoryHandoff] = useState(false);
+  const [onboardingMode, setOnboardingMode] = useState<OnboardingMode>('start');
+  const [importReview, setImportReview] = useState<ImportReview>();
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [pasteText, setPasteText] = useState('');
+  const [manualConfirmed, setManualConfirmed] = useState(false);
   const [resolvedScope, setResolvedScope] = useState('anonymous');
   const [memoryDraft, setMemoryDraft] = useState({
     source: '',
@@ -118,10 +171,14 @@ export function CareerWorkspace() {
     undefined,
   );
   const pendingDecisions = useRef(new Map<string, string>());
+  const pendingImport = useRef<AbortController | undefined>(undefined);
   const activeTenantId = session.data?.session.activeOrganizationId;
   const storageKey = activeTenantId
     ? `career-os-workspace:${activeTenantId}`
     : 'career-os-demo';
+  const onboardingStorageKey = activeTenantId
+    ? `career-os-onboarding:${activeTenantId}`
+    : 'career-os-onboarding:anonymous';
 
   useEffect(() => {
     if (session.isPending) return;
@@ -134,10 +191,15 @@ export function CareerWorkspace() {
       if (controller.signal.aborted) return;
       setShareUrl('');
       setMemorySyncMessage('');
+      setShowMemoryHandoff(false);
+      setOnboardingMode('start');
+      setImportReview(undefined);
+      setImportError('');
       const saved = localStorage.getItem(storageKey);
       let nextState: SavedState = {
-        profile: syntheticProfile,
-        opportunity: initialOpportunity,
+        profile: emptyProfile,
+        profileOrigin: 'empty',
+        opportunity: emptyOpportunity,
         reviews: [],
         approved: false,
         events: [],
@@ -148,6 +210,13 @@ export function CareerWorkspace() {
           const parsed = JSON.parse(saved) as SavedState;
           nextState = {
             ...parsed,
+            profileOrigin:
+              parsed.profileOrigin ??
+              (parsed.profile.sources.some((source) =>
+                source.id.startsWith('source-demo-'),
+              )
+                ? 'empty'
+                : 'user'),
             events: parsed.events ?? [],
             paused: parsed.paused ?? false,
           };
@@ -167,7 +236,18 @@ export function CareerWorkspace() {
             profile: Profile | null;
             revision: number;
           };
-          if (result.profile) nextState.profile = result.profile;
+          if (result.profile)
+            nextState = {
+              ...nextState,
+              profile: result.profile,
+              profileOrigin: 'user',
+            };
+          else if (nextState.profileOrigin === 'demo')
+            nextState = {
+              ...nextState,
+              profile: emptyProfile,
+              profileOrigin: 'empty',
+            };
           revision = result.revision;
         } catch {
           if (controller.signal.aborted) return;
@@ -176,6 +256,15 @@ export function CareerWorkspace() {
           );
         }
       }
+      if (nextState.profileOrigin === 'empty') {
+        const restored = restoreImportReview(
+          sessionStorage.getItem(onboardingStorageKey),
+        );
+        if (restored) {
+          setImportReview(restored);
+          setOnboardingMode('review');
+        } else sessionStorage.removeItem(onboardingStorageKey);
+      } else sessionStorage.removeItem(onboardingStorageKey);
       if (controller.signal.aborted || requestedScope.current !== scope) return;
       setState(nextState);
       setMemoryRevision(revision);
@@ -185,13 +274,55 @@ export function CareerWorkspace() {
     })();
 
     return () => controller.abort();
-  }, [activeTenantId, session.isPending, storageKey]);
+  }, [activeTenantId, onboardingStorageKey, session.isPending, storageKey]);
 
   useEffect(() => {
     const scope = activeTenantId ?? 'anonymous';
     if (loaded && resolvedScope === scope)
       localStorage.setItem(storageKey, JSON.stringify(state));
   }, [activeTenantId, loaded, resolvedScope, state, storageKey]);
+
+  useEffect(() => {
+    const scope = activeTenantId ?? 'anonymous';
+    if (!loaded || resolvedScope !== scope) return;
+    if (state.profileOrigin === 'empty' && importReview)
+      sessionStorage.setItem(
+        onboardingStorageKey,
+        JSON.stringify(importReview),
+      );
+    else if (state.profileOrigin !== 'empty')
+      sessionStorage.removeItem(onboardingStorageKey);
+  }, [
+    activeTenantId,
+    importReview,
+    loaded,
+    onboardingStorageKey,
+    resolvedScope,
+    state.profileOrigin,
+  ]);
+
+  const importReviewExpiresAt = importReview?.expiresAt;
+  useEffect(() => {
+    if (!importReviewExpiresAt) return;
+    const expiresIn = importReviewExpiresAt - Date.now();
+    const expire = () => {
+      pendingImport.current?.abort();
+      pendingImport.current = undefined;
+      sessionStorage.removeItem(onboardingStorageKey);
+      setImportReview(undefined);
+      setImporting(false);
+      setOnboardingMode('start');
+      setImportError(
+        'Cette revue a expiré après 30 minutes. Relancez l’import pour continuer.',
+      );
+    };
+    if (expiresIn <= 0) {
+      expire();
+      return;
+    }
+    const timeout = window.setTimeout(expire, expiresIn);
+    return () => window.clearTimeout(timeout);
+  }, [importReviewExpiresAt, onboardingStorageKey]);
 
   const workspaceReady =
     loaded && resolvedScope === (activeTenantId ?? 'anonymous');
@@ -223,7 +354,12 @@ export function CareerWorkspace() {
             : 'Offre prête';
 
   async function generate() {
-    if (activeTenantId && JSON.stringify(state.profile) !== savedProfileJson) {
+    const persistedWorkspace =
+      Boolean(activeTenantId) && state.profileOrigin === 'user';
+    if (
+      persistedWorkspace &&
+      JSON.stringify(state.profile) !== savedProfileJson
+    ) {
       setGenerateError(
         'Enregistrez la mémoire professionnelle avant de générer la page.',
       );
@@ -245,7 +381,7 @@ export function CareerWorkspace() {
       let spec: PageSpec | undefined;
       let publicationEligible = false;
 
-      if (activeTenantId) {
+      if (persistedWorkspace) {
         if (pendingRun.current?.input !== persistedInput)
           pendingRun.current = {
             input: persistedInput,
@@ -530,12 +666,12 @@ export function CareerWorkspace() {
     );
   }
 
-  async function saveCareerMemory() {
+  async function saveCareerMemory(profile = state.profile) {
     if (!activeTenantId) {
       setMemorySyncMessage(
         'Connectez-vous pour enregistrer la mémoire professionnelle dans un espace.',
       );
-      return;
+      return false;
     }
     setMemorySyncing(true);
     setMemorySyncMessage('');
@@ -544,7 +680,7 @@ export function CareerWorkspace() {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          profile: state.profile,
+          profile,
           expectedRevision: memoryRevision,
         }),
       });
@@ -559,6 +695,7 @@ export function CareerWorkspace() {
       setState((current) => ({
         ...current,
         profile: result.profile,
+        profileOrigin: 'user',
         strategy: undefined,
         spec: undefined,
         runId: undefined,
@@ -571,15 +708,251 @@ export function CareerWorkspace() {
       setMemorySyncMessage(
         'Mémoire professionnelle enregistrée dans cet espace.',
       );
+      return true;
     } catch (error) {
       setMemorySyncMessage(
         error instanceof Error && error.message === 'PROFILE_CONFLICT'
           ? 'La mémoire professionnelle a changé dans une autre session. Actualisez avant de l’enregistrer à nouveau.'
           : 'La mémoire professionnelle n’a pas pu être enregistrée. Vos changements locaux sont conservés.',
       );
+      return false;
     } finally {
       setMemorySyncing(false);
     }
+  }
+
+  function prepareImport(result: ProfileImportResult) {
+    const selectedByGroup = new Map<ProfileImportCandidate['group'], number>();
+    const review: ImportReview = {
+      ...result,
+      name: result.suggestedName?.value ?? '',
+      headline: result.suggestedHeadline?.value ?? '',
+      candidates: result.candidates.map((candidate) => {
+        const groupCount = selectedByGroup.get(candidate.group) ?? 0;
+        const groupLimit = candidate.group === 'experience' ? 6 : 2;
+        const selected =
+          groupCount < groupLimit && isStrongImportCandidate(candidate);
+        if (selected) selectedByGroup.set(candidate.group, groupCount + 1);
+        return {
+          ...candidate,
+          id: crypto.randomUUID(),
+          selected,
+          sensitivity: 'private',
+          allowedUses: ['application'],
+        };
+      }),
+      permissionsConfirmed: false,
+      expiresAt: Date.now() + 30 * 60 * 1000,
+    };
+    updateImportReview(review);
+    setOnboardingMode('review');
+    setImportError('');
+  }
+
+  function updateImportReview(review: ImportReview) {
+    setImportReview(review);
+    if (state.profileOrigin === 'empty')
+      sessionStorage.setItem(onboardingStorageKey, JSON.stringify(review));
+  }
+
+  function discardImportReview(message = '') {
+    pendingImport.current?.abort();
+    pendingImport.current = undefined;
+    sessionStorage.removeItem(onboardingStorageKey);
+    setImportReview(undefined);
+    setImporting(false);
+    setOnboardingMode('start');
+    setImportError(message);
+  }
+
+  async function importFile(file: File) {
+    pendingImport.current?.abort();
+    const controller = new AbortController();
+    pendingImport.current = controller;
+    setImporting(true);
+    setImportError('');
+    try {
+      prepareImport(await importProfileFile(file, controller.signal));
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setImportError(importErrorMessage(error));
+    } finally {
+      if (pendingImport.current === controller)
+        pendingImport.current = undefined;
+      setImporting(false);
+    }
+  }
+
+  async function importPastedText() {
+    setImporting(true);
+    setImportError('');
+    try {
+      prepareImport(await importProfileText(pasteText, 'CV collé'));
+    } catch (error) {
+      setImportError(importErrorMessage(error));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function acceptImport() {
+    if (!importReview) return;
+    const selected = importReview.candidates.filter((item) => item.selected);
+    if (
+      importReview.name.trim().length < 2 ||
+      importReview.headline.trim().length < 2 ||
+      selected.length === 0 ||
+      !importReview.permissionsConfirmed
+    ) {
+      setImportError(
+        'Renseignez votre identité, gardez au moins une affirmation et confirmez ses usages avant de continuer.',
+      );
+      return;
+    }
+    const sourceId = `source-${crypto.randomUUID()}`;
+    const allowedUses = [
+      ...new Set(selected.flatMap((item) => item.allowedUses)),
+    ];
+    const profileResult = profileSchema.safeParse({
+      name: importReview.name.trim(),
+      headline: importReview.headline.trim(),
+      sources: [
+        {
+          id: sourceId,
+          kind: 'document',
+          title: importReview.source.displayName,
+          locator: `sha256:${importReview.source.sha256}`,
+          sensitivity: 'private',
+          allowedUses,
+          trust: 'untrusted-data',
+        },
+      ],
+      evidence: selected.map((candidate) => ({
+        id: `evidence-${candidate.id}`,
+        sourceId,
+        label: candidate.locator,
+        excerpt: candidate.excerpt,
+      })),
+      claims: selected.map((candidate) => ({
+        id: `claim-${candidate.id}`,
+        statement: candidate.statement,
+        level: 'declared',
+        evidenceIds: [`evidence-${candidate.id}`],
+        sensitivity: candidate.sensitivity,
+        allowedUses: candidate.allowedUses,
+      })),
+    });
+    if (!profileResult.success) {
+      setImportError(
+        'Certaines informations sont incomplètes. Corrigez les champs signalés avant de continuer.',
+      );
+      return;
+    }
+    await installProfile(profileResult.data);
+  }
+
+  async function acceptManualProfile() {
+    const evidenceId = `evidence-${crypto.randomUUID()}`;
+    const sourceId = `source-${crypto.randomUUID()}`;
+    if (!manualConfirmed) {
+      setImportError(
+        'Confirmez que cette information peut être utilisée pour vos candidatures.',
+      );
+      return;
+    }
+    const result = profileSchema.safeParse({
+      name: state.profile.name.trim(),
+      headline: state.profile.headline.trim(),
+      sources: [
+        {
+          id: sourceId,
+          kind: 'manual',
+          title: memoryDraft.source.trim(),
+          sensitivity: 'private',
+          allowedUses: ['application'],
+          trust: 'untrusted-data',
+        },
+      ],
+      evidence: memoryDraft.evidence.trim()
+        ? [
+            {
+              id: evidenceId,
+              sourceId,
+              label: 'Extrait saisi manuellement',
+              excerpt: memoryDraft.evidence.trim(),
+            },
+          ]
+        : [],
+      claims: [
+        {
+          id: `claim-${crypto.randomUUID()}`,
+          statement: memoryDraft.claim.trim(),
+          level: 'declared',
+          evidenceIds: memoryDraft.evidence.trim() ? [evidenceId] : [],
+          sensitivity: 'private',
+          allowedUses: ['application'],
+        },
+      ],
+    });
+    if (!result.success) {
+      setImportError(
+        'Renseignez votre nom, votre positionnement, une source et une première affirmation.',
+      );
+      return;
+    }
+    await installProfile(result.data);
+  }
+
+  async function installProfile(profile: Profile) {
+    setState((current) => ({
+      ...current,
+      profile,
+      profileOrigin: 'user',
+      opportunity:
+        current.profileOrigin === 'empty'
+          ? emptyOpportunity
+          : current.opportunity,
+      strategy: undefined,
+      spec: undefined,
+      runId: undefined,
+      runProfile: undefined,
+      reviews: [],
+      reviewDecisions: [],
+      publicationEligible: undefined,
+      approved: false,
+      capability: undefined,
+      events: [],
+    }));
+    sessionStorage.removeItem(onboardingStorageKey);
+    setImportReview(undefined);
+    setOnboardingMode('start');
+    setPasteText('');
+    setManualConfirmed(false);
+    setPrimaryView('memory');
+    setShowMemoryHandoff(true);
+    window.scrollTo(0, 0);
+    if (activeTenantId) await saveCareerMemory(profile);
+    else
+      setMemorySyncMessage(
+        'Votre mémoire reste dans ce navigateur. Connectez-vous pour l’enregistrer.',
+      );
+  }
+
+  function useDemo() {
+    sessionStorage.removeItem(onboardingStorageKey);
+    setImportReview(undefined);
+    setImportError('');
+    setShowMemoryHandoff(false);
+    setState({
+      profile: syntheticProfile,
+      profileOrigin: 'demo',
+      opportunity: initialOpportunity,
+      reviews: [],
+      approved: false,
+      events: [],
+      paused: false,
+    });
+    setPrimaryView('home');
   }
 
   function addMemory() {
@@ -634,6 +1007,7 @@ export function CareerWorkspace() {
     setState((current) => ({
       ...current,
       profile,
+      profileOrigin: 'user',
       strategy: undefined,
       spec: undefined,
       runId: undefined,
@@ -663,6 +1037,38 @@ export function CareerWorkspace() {
     setDossierView(view);
     setPrimaryView('applications');
   }
+
+  if (state.profileOrigin === 'empty')
+    return (
+      <OnboardingView
+        error={importError}
+        importing={importing}
+        manualConfirmed={manualConfirmed}
+        memoryDraft={memoryDraft}
+        mode={onboardingMode}
+        pasteText={pasteText}
+        profile={state.profile}
+        review={importReview}
+        signedIn={Boolean(activeTenantId)}
+        onAcceptImport={() => void acceptImport()}
+        onAcceptManual={() => void acceptManualProfile()}
+        onCancel={() => discardImportReview()}
+        onFile={(file) => void importFile(file)}
+        onManualConfirmed={setManualConfirmed}
+        onMemoryDraftChange={setMemoryDraft}
+        onModeChange={(mode) => {
+          setImportError('');
+          setOnboardingMode(mode);
+        }}
+        onPasteTextChange={setPasteText}
+        onProfileChange={(profile) =>
+          setState((current) => ({ ...current, profile }))
+        }
+        onReviewChange={updateImportReview}
+        onSubmitPaste={() => void importPastedText()}
+        onUseDemo={useDemo}
+      />
+    );
 
   return (
     <main
@@ -1071,10 +1477,16 @@ export function CareerWorkspace() {
             signedIn={Boolean(activeTenantId)}
             syncing={memorySyncing}
             syncMessage={memorySyncMessage}
+            showHandoff={showMemoryHandoff}
             profile={state.profile}
             onAdd={addMemory}
             onDraftChange={setMemoryDraft}
             onSave={() => void saveCareerMemory()}
+            onCreateApplication={() => {
+              setShowMemoryHandoff(false);
+              openApplications('brief');
+            }}
+            onDismissHandoff={() => setShowMemoryHandoff(false)}
             onProfileChange={(profile) =>
               setState((current) => ({
                 ...current,
@@ -1108,7 +1520,7 @@ export function CareerWorkspace() {
             onReset={() => {
               if (
                 confirm(
-                  'Réinitialiser cette démo locale ? Les pages et changements de mémoire seront supprimés.',
+                  'Réinitialiser cet espace local ? La mémoire et les candidatures de ce navigateur seront supprimées.',
                 )
               ) {
                 localStorage.removeItem('career-os-demo');
@@ -1117,6 +1529,587 @@ export function CareerWorkspace() {
             }}
           />
         ) : null}
+      </section>
+    </main>
+  );
+}
+
+function OnboardingView({
+  error,
+  importing,
+  manualConfirmed,
+  memoryDraft,
+  mode,
+  onAcceptImport,
+  onAcceptManual,
+  onCancel,
+  onFile,
+  onManualConfirmed,
+  onMemoryDraftChange,
+  onModeChange,
+  onPasteTextChange,
+  onProfileChange,
+  onReviewChange,
+  onSubmitPaste,
+  onUseDemo,
+  pasteText,
+  profile,
+  review,
+  signedIn,
+}: {
+  error: string;
+  importing: boolean;
+  manualConfirmed: boolean;
+  memoryDraft: {
+    source: string;
+    claim: string;
+    evidence: string;
+    level: 'verified' | 'declared' | 'inferred';
+  };
+  mode: OnboardingMode;
+  onAcceptImport: () => void;
+  onAcceptManual: () => void;
+  onCancel: () => void;
+  onFile: (file: File) => void;
+  onManualConfirmed: (confirmed: boolean) => void;
+  onMemoryDraftChange: (draft: typeof memoryDraft) => void;
+  onModeChange: (mode: OnboardingMode) => void;
+  onPasteTextChange: (text: string) => void;
+  onProfileChange: (profile: Profile) => void;
+  onReviewChange: (review: ImportReview) => void;
+  onSubmitPaste: () => void;
+  onUseDemo: () => void;
+  pasteText: string;
+  profile: Profile;
+  review?: ImportReview;
+  signedIn: boolean;
+}) {
+  const selectedCount =
+    review?.candidates.filter((candidate) => candidate.selected).length ?? 0;
+  const reviewReady = Boolean(
+    review &&
+    review.name.trim().length >= 2 &&
+    review.headline.trim().length >= 2 &&
+    review.permissionsConfirmed &&
+    selectedCount > 0 &&
+    review.candidates
+      .filter((candidate) => candidate.selected)
+      .every((candidate) => candidate.allowedUses.length > 0),
+  );
+
+  return (
+    <main className="onboarding-shell" id="main-content">
+      <a className="skip-link" href="#onboarding-workspace">
+        Aller au contenu
+      </a>
+      <header className="onboarding-header">
+        <div className="brand">
+          <span className="brand-mark light" aria-hidden="true">
+            C
+          </span>
+          <span>
+            <strong>Career OS</strong>
+            <small>Mémoire professionnelle</small>
+          </span>
+        </div>
+        <span className="local-processing">Traitement local</span>
+      </header>
+
+      <section className="onboarding-workspace" id="onboarding-workspace">
+        <aside className="onboarding-intro">
+          <p className="section-label">Étape 1 sur 2</p>
+          <h1>Construisons votre mémoire professionnelle.</h1>
+          <p>
+            Career OS part de votre travail réel. Vous choisissez les sources,
+            relisez chaque affirmation et décidez de ce qui pourra être utilisé.
+          </p>
+          <ol>
+            <li className="active">Importer et relire</li>
+            <li>Créer votre première candidature</li>
+          </ol>
+          <div className="privacy-note">
+            <strong>Votre CV reste dans ce navigateur.</strong>
+            <span>
+              Le fichier brut n’est ni envoyé au serveur ni conservé. Seules les
+              informations que vous acceptez rejoignent votre mémoire.
+            </span>
+          </div>
+        </aside>
+
+        <div className="onboarding-panel">
+          {mode === 'start' ? (
+            <>
+              <div className="onboarding-panel-heading">
+                <p className="section-label">Point de départ</p>
+                <h2>Comment voulez-vous commencer ?</h2>
+                <p>
+                  Le CV est le chemin le plus rapide. Rien n’est ajouté sans
+                  votre validation.
+                </p>
+              </div>
+              <div className="onboarding-options">
+                <label className="onboarding-option primary-option">
+                  <input
+                    accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                    className="file-input"
+                    disabled={importing}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) onFile(file);
+                      event.currentTarget.value = '';
+                    }}
+                    type="file"
+                  />
+                  <span className="option-icon" aria-hidden="true">
+                    ↥
+                  </span>
+                  <span>
+                    <strong>
+                      {importing ? 'Lecture du CV…' : 'Importer mon CV'}
+                    </strong>
+                    <small>PDF, DOCX ou TXT · 4 Mo maximum</small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </label>
+                <button
+                  className="onboarding-option quiet"
+                  onClick={() => onModeChange('paste')}
+                  type="button"
+                >
+                  <span className="option-icon" aria-hidden="true">
+                    ≡
+                  </span>
+                  <span>
+                    <strong>Coller le texte de mon CV</strong>
+                    <small>Pratique si votre document est déjà ouvert</small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </button>
+                <button
+                  className="onboarding-option quiet"
+                  onClick={() => onModeChange('manual')}
+                  type="button"
+                >
+                  <span className="option-icon" aria-hidden="true">
+                    ＋
+                  </span>
+                  <span>
+                    <strong>Commencer manuellement</strong>
+                    <small>
+                      Ajoutez une première expérience à votre rythme
+                    </small>
+                  </span>
+                  <b aria-hidden="true">→</b>
+                </button>
+              </div>
+              {error ? (
+                <p className="inline-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <button className="demo-entry" onClick={onUseDemo} type="button">
+                Explorer avec des données fictives
+              </button>
+            </>
+          ) : null}
+
+          {mode === 'paste' ? (
+            <>
+              <div className="onboarding-panel-heading">
+                <p className="section-label">Import texte</p>
+                <h2>Collez votre CV</h2>
+                <p>
+                  Les titres, expériences et résultats seront proposés à la
+                  revue.
+                </p>
+              </div>
+              <label>
+                Contenu du CV
+                <textarea
+                  autoFocus
+                  maxLength={200_000}
+                  onChange={(event) => onPasteTextChange(event.target.value)}
+                  placeholder="Collez ici le texte complet de votre CV…"
+                  rows={14}
+                  value={pasteText}
+                />
+              </label>
+              {error ? (
+                <p className="inline-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <div className="onboarding-actions">
+                <button className="quiet" onClick={onCancel} type="button">
+                  Retour
+                </button>
+                <button
+                  disabled={importing || pasteText.trim().length < 40}
+                  onClick={onSubmitPaste}
+                  type="button"
+                >
+                  {importing ? 'Analyse locale…' : 'Relire les informations'}
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {mode === 'manual' ? (
+            <>
+              <div className="onboarding-panel-heading">
+                <p className="section-label">Saisie manuelle</p>
+                <h2>Posez une première base</h2>
+                <p>
+                  Vous pourrez enrichir et corriger cette mémoire à tout moment.
+                </p>
+              </div>
+              <div className="field-grid">
+                <label>
+                  Nom
+                  <input
+                    autoComplete="name"
+                    onChange={(event) =>
+                      onProfileChange({ ...profile, name: event.target.value })
+                    }
+                    value={profile.name}
+                  />
+                </label>
+                <label>
+                  Positionnement
+                  <input
+                    onChange={(event) =>
+                      onProfileChange({
+                        ...profile,
+                        headline: event.target.value,
+                      })
+                    }
+                    placeholder="Product Engineer, Applied AI…"
+                    value={profile.headline}
+                  />
+                </label>
+              </div>
+              <label>
+                Source
+                <input
+                  onChange={(event) =>
+                    onMemoryDraftChange({
+                      ...memoryDraft,
+                      source: event.target.value,
+                    })
+                  }
+                  placeholder="CV, entretien, bilan de projet…"
+                  value={memoryDraft.source}
+                />
+              </label>
+              <label>
+                Première affirmation
+                <textarea
+                  onChange={(event) =>
+                    onMemoryDraftChange({
+                      ...memoryDraft,
+                      claim: event.target.value,
+                    })
+                  }
+                  placeholder="Ce que vous avez réellement construit, amélioré ou opéré"
+                  rows={3}
+                  value={memoryDraft.claim}
+                />
+              </label>
+              <label>
+                Extrait associé <span>facultatif</span>
+                <textarea
+                  onChange={(event) =>
+                    onMemoryDraftChange({
+                      ...memoryDraft,
+                      evidence: event.target.value,
+                    })
+                  }
+                  placeholder="La phrase ou donnée qui permet de retrouver cette information"
+                  rows={3}
+                  value={memoryDraft.evidence}
+                />
+              </label>
+              <label className="permission-confirmation">
+                <input
+                  checked={manualConfirmed}
+                  onChange={(event) => onManualConfirmed(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  <strong>Privée · candidature uniquement</strong>
+                  J’autorise Career OS à utiliser cette information pour
+                  préparer mes candidatures.
+                </span>
+              </label>
+              {error ? (
+                <p className="inline-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <div className="onboarding-actions">
+                <button className="quiet" onClick={onCancel} type="button">
+                  Retour
+                </button>
+                <button onClick={onAcceptManual} type="button">
+                  {signedIn
+                    ? 'Enregistrer ma mémoire'
+                    : 'Créer ma mémoire locale'}
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {mode === 'review' && review ? (
+            <>
+              <div className="onboarding-panel-heading review-heading">
+                <div>
+                  <p className="section-label">Revue humaine</p>
+                  <h2>Gardez seulement ce qui vous ressemble.</h2>
+                  <p>
+                    {review.source.displayName} · {review.candidates.length}{' '}
+                    propositions
+                  </p>
+                </div>
+                <span className="source-digest" title={review.source.sha256}>
+                  {review.source.type.toUpperCase()} ·{' '}
+                  {review.source.sha256.slice(0, 8)}
+                </span>
+              </div>
+              <div className="field-grid">
+                <label>
+                  Nom
+                  <input
+                    onChange={(event) =>
+                      onReviewChange({ ...review, name: event.target.value })
+                    }
+                    value={review.name}
+                  />
+                </label>
+                <label>
+                  Positionnement
+                  <input
+                    onChange={(event) =>
+                      onReviewChange({
+                        ...review,
+                        headline: event.target.value,
+                      })
+                    }
+                    value={review.headline}
+                  />
+                </label>
+              </div>
+              <div className="import-candidate-groups">
+                {Object.entries(importCandidateGroupLabels).map(
+                  ([group, label]) => {
+                    const candidates = review.candidates
+                      .map((candidate, index) => ({ candidate, index }))
+                      .filter(({ candidate }) => candidate.group === group);
+                    if (!candidates.length) return null;
+                    const groupSelected = candidates.filter(
+                      ({ candidate }) => candidate.selected,
+                    ).length;
+                    return (
+                      <details
+                        className="import-candidate-group"
+                        key={group}
+                        open={review.candidates.length <= 8 ? true : undefined}
+                      >
+                        <summary>
+                          <strong>{label}</strong>
+                          <span>
+                            {groupSelected} sur {candidates.length} retenues
+                          </span>
+                        </summary>
+                        <div className="import-candidate-list">
+                          {candidates.map(({ candidate, index }) => (
+                            <article
+                              className={candidate.selected ? 'selected' : ''}
+                              key={candidate.id}
+                            >
+                              <label className="candidate-selection">
+                                <input
+                                  checked={candidate.selected}
+                                  onChange={(event) =>
+                                    onReviewChange({
+                                      ...review,
+                                      candidates: review.candidates.map(
+                                        (item) =>
+                                          item.id === candidate.id
+                                            ? {
+                                                ...item,
+                                                selected: event.target.checked,
+                                              }
+                                            : item,
+                                      ),
+                                    })
+                                  }
+                                  type="checkbox"
+                                />
+                                <span>
+                                  {String(index + 1).padStart(2, '0')}
+                                </span>
+                              </label>
+                              <div>
+                                <textarea
+                                  aria-label={`Affirmation ${index + 1}`}
+                                  readOnly={!candidate.selected}
+                                  onChange={(event) =>
+                                    onReviewChange({
+                                      ...review,
+                                      candidates: review.candidates.map(
+                                        (item) =>
+                                          item.id === candidate.id
+                                            ? {
+                                                ...item,
+                                                statement: event.target.value,
+                                              }
+                                            : item,
+                                      ),
+                                    })
+                                  }
+                                  rows={2}
+                                  value={candidate.statement}
+                                />
+                                <div className="candidate-meta">
+                                  <span>Déclarée</span>
+                                  <span>{candidate.locator}</span>
+                                </div>
+                                <details>
+                                  <summary>
+                                    Voir la source et les autorisations
+                                  </summary>
+                                  <blockquote>{candidate.excerpt}</blockquote>
+                                  <div className="candidate-permissions">
+                                    <label>
+                                      Confidentialité
+                                      <select
+                                        disabled={!candidate.selected}
+                                        onChange={(event) =>
+                                          onReviewChange({
+                                            ...review,
+                                            candidates: review.candidates.map(
+                                              (item) =>
+                                                item.id === candidate.id
+                                                  ? {
+                                                      ...item,
+                                                      sensitivity: event.target
+                                                        .value as typeof candidate.sensitivity,
+                                                    }
+                                                  : item,
+                                            ),
+                                          })
+                                        }
+                                        value={candidate.sensitivity}
+                                      >
+                                        <option value="private">Privée</option>
+                                        <option value="public">Publique</option>
+                                        <option value="restricted">
+                                          Restreinte
+                                        </option>
+                                      </select>
+                                    </label>
+                                    <fieldset>
+                                      <legend>Utilisations autorisées</legend>
+                                      {(
+                                        [
+                                          'application',
+                                          'resume',
+                                          'linkedin',
+                                          'interview',
+                                        ] as const
+                                      ).map((use) => (
+                                        <label key={use}>
+                                          <input
+                                            checked={candidate.allowedUses.includes(
+                                              use,
+                                            )}
+                                            disabled={!candidate.selected}
+                                            onChange={(event) =>
+                                              onReviewChange({
+                                                ...review,
+                                                candidates:
+                                                  review.candidates.map(
+                                                    (item) =>
+                                                      item.id === candidate.id
+                                                        ? {
+                                                            ...item,
+                                                            allowedUses: event
+                                                              .target.checked
+                                                              ? [
+                                                                  ...item.allowedUses,
+                                                                  use,
+                                                                ]
+                                                              : item.allowedUses.filter(
+                                                                  (value) =>
+                                                                    value !==
+                                                                    use,
+                                                                ),
+                                                          }
+                                                        : item,
+                                                  ),
+                                              })
+                                            }
+                                            type="checkbox"
+                                          />
+                                          {allowedUseLabel(use)}
+                                        </label>
+                                      ))}
+                                    </fieldset>
+                                  </div>
+                                </details>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  },
+                )}
+              </div>
+              <label className="permission-confirmation">
+                <input
+                  checked={review.permissionsConfirmed}
+                  onChange={(event) =>
+                    onReviewChange({
+                      ...review,
+                      permissionsConfirmed: event.target.checked,
+                    })
+                  }
+                  type="checkbox"
+                />
+                <span>
+                  <strong>
+                    Je valide les {selectedCount} affirmations sélectionnées.
+                  </strong>
+                  Elles resteront déclarées, reliées à ce document et limitées
+                  aux usages indiqués.
+                </span>
+              </label>
+              {error ? (
+                <p className="inline-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <div className="onboarding-actions sticky-actions">
+                <button className="quiet" onClick={onCancel} type="button">
+                  Recommencer
+                </button>
+                <span>
+                  {selectedCount} sur {review.candidates.length} retenues
+                </span>
+                <button
+                  disabled={!reviewReady}
+                  onClick={onAcceptImport}
+                  type="button"
+                >
+                  {signedIn
+                    ? 'Enregistrer ma mémoire'
+                    : 'Créer ma mémoire locale'}
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
       </section>
     </main>
   );
@@ -2448,11 +3441,14 @@ function CareerMemoryView({
   error,
   memoryDraft,
   onAdd,
+  onCreateApplication,
+  onDismissHandoff,
   onDraftChange,
   onProfileChange,
   onSave,
   profile,
   signedIn,
+  showHandoff,
   syncing,
   syncMessage,
 }: {
@@ -2465,11 +3461,14 @@ function CareerMemoryView({
     level: 'verified' | 'declared' | 'inferred';
   };
   onAdd: () => void;
+  onCreateApplication: () => void;
+  onDismissHandoff: () => void;
   onDraftChange: (draft: typeof memoryDraft) => void;
   onProfileChange: (profile: Profile) => void;
   onSave: () => void;
   profile: Profile;
   signedIn: boolean;
+  showHandoff: boolean;
   syncing: boolean;
   syncMessage: string;
 }) {
@@ -2510,7 +3509,38 @@ function CareerMemoryView({
           {syncMessage}
         </p>
       ) : null}
-      <div className="memory-layout">
+      {showHandoff ? (
+        <section
+          className="memory-handoff"
+          aria-labelledby="memory-ready-title"
+        >
+          <div>
+            <p className="section-label">Étape 2 sur 2</p>
+            <h2 id="memory-ready-title">Votre mémoire est prête.</h2>
+            <p>
+              {profile.sources.length} source
+              {profile.sources.length > 1 ? 's' : ''}, {profile.claims.length}{' '}
+              affirmation
+              {profile.claims.length > 1 ? 's' : ''} retenue
+              {profile.claims.length > 1 ? 's' : ''}, dont{' '}
+              {
+                profile.claims.filter((claim) => claim.level !== 'verified')
+                  .length
+              }{' '}
+              à étayer.
+            </p>
+          </div>
+          <div>
+            <button className="quiet" onClick={onDismissHandoff} type="button">
+              Relire ma mémoire
+            </button>
+            <button onClick={onCreateApplication} type="button">
+              Créer ma première candidature
+            </button>
+          </div>
+        </section>
+      ) : null}
+      <div className="memory-layout" id="career-memory-content">
         <section className="document memory-profile">
           <div className="memory-sources-list">
             <div className="list-heading">
@@ -2844,10 +3874,7 @@ function SettingsView({
         <div>
           <p className="section-label">Réglages</p>
           <h1>Espace local</h1>
-          <p>
-            Exportez ou réinitialisez les données de démonstration de ce
-            navigateur.
-          </p>
+          <p>Exportez ou réinitialisez les données locales de ce navigateur.</p>
         </div>
       </header>
       <section className="settings-row">
@@ -2861,19 +3888,17 @@ function SettingsView({
       </section>
       <section className="settings-row danger-zone">
         <div>
-          <h2>Réinitialiser la démo locale</h2>
+          <h2>Réinitialiser l’espace local</h2>
           <p>
-            Supprimez les changements locaux et restaurez les données de
-            démonstration.
+            Supprimez la mémoire, les candidatures et leurs pages de ce
+            navigateur.
           </p>
         </div>
         <button className="danger-link" onClick={onReset}>
           Réinitialiser
         </button>
       </section>
-      <p className="demo-footer">
-        Tout le contenu candidat visible est fictif.
-      </p>
+      <p className="demo-footer">Les fichiers CV bruts ne sont pas exportés.</p>
     </div>
   );
 }
@@ -2932,6 +3957,112 @@ function levelLabel(level: Profile['claims'][number]['level']) {
   if (level === 'verified') return 'Vérifiée';
   if (level === 'declared') return 'Déclarée';
   return 'Inférée';
+}
+
+function allowedUseLabel(use: AllowedUse) {
+  if (use === 'application') return 'Candidatures';
+  if (use === 'resume') return 'CV';
+  if (use === 'linkedin') return 'LinkedIn';
+  return 'Entretiens';
+}
+
+function isStrongImportCandidate(candidate: ProfileImportCandidate) {
+  return /^(?:(?:as|en tant que)\b.{0,60}[,:]\s*)?(?:independently\s+)?(?:built|created|design(?:ed)?|developed|implemented|improved|increased|launched|led|managed|operated|own(?:ed|s|ership)?|reduced|shipped|automated|construit|créé|conçu|développé|déployé|dirigé|géré|lancé|livré|mis en place|opéré|piloté|réduit|amélioré|augmenté|automatisé|ownership|produit\s+shippé|monitoring\s+automatisé|serveur\b.{0,80}\bexposant|first engineer\b.{0,100}\b(?:shippées?|posée))(?![\p{L}\p{N}_])/iu.test(
+    candidate.statement.slice(0, 240),
+  );
+}
+
+function importErrorMessage(error: unknown) {
+  if (error instanceof ProfileImportError) {
+    if (error.code === 'file_too_large')
+      return 'Ce fichier dépasse la limite de 4 Mo.';
+    if (error.code === 'unsupported_type' || error.code === 'type_mismatch')
+      return 'Choisissez un fichier PDF, DOCX ou TXT valide.';
+    if (error.code === 'pdf_encrypted')
+      return 'Ce PDF est protégé. Exportez une copie sans mot de passe puis réessayez.';
+    if (error.code === 'pdf_attachments')
+      return 'Ce PDF contient une pièce jointe. Exportez une copie simple puis réessayez.';
+    if (error.code === 'pdf_too_many_pages')
+      return 'Ce PDF dépasse la limite de 100 pages.';
+    if (
+      error.code === 'docx_external_relationship' ||
+      error.code === 'docx_unsafe_archive'
+    )
+      return 'Ce document Word contient des éléments externes ou actifs. Exportez-le en PDF puis réessayez.';
+    if (error.code === 'timeout')
+      return 'La lecture locale a pris trop de temps. Essayez une version plus légère du document.';
+    if (error.code === 'aborted') return 'Lecture annulée.';
+  }
+  return 'Ce document n’a pas pu être lu localement. Essayez un PDF, DOCX ou TXT plus simple.';
+}
+
+function restoreImportReview(raw: string | null): ImportReview | undefined {
+  if (!raw) return;
+  try {
+    const stored = JSON.parse(raw) as Partial<ImportReview>;
+    if (
+      typeof stored.expiresAt !== 'number' ||
+      stored.expiresAt <= Date.now() ||
+      typeof stored.name !== 'string' ||
+      typeof stored.headline !== 'string' ||
+      typeof stored.permissionsConfirmed !== 'boolean' ||
+      !Array.isArray(stored.candidates)
+    )
+      return;
+    const parsed = profileImportResultSchema.safeParse({
+      version: stored.version,
+      source: stored.source,
+      suggestedName: stored.suggestedName,
+      suggestedHeadline: stored.suggestedHeadline,
+      candidates: stored.candidates.map((candidate) => ({
+        statement: candidate.statement,
+        excerpt: candidate.excerpt,
+        locator: candidate.locator,
+        group: candidate.group,
+        provenance: candidate.provenance,
+        trust: candidate.trust,
+      })),
+    });
+    if (!parsed.success) return;
+    const candidates = stored.candidates.flatMap((candidate, index) => {
+      const allowedUses = Array.isArray(candidate.allowedUses)
+        ? candidate.allowedUses.filter(
+            (use): use is AllowedUse =>
+              use === 'application' ||
+              use === 'resume' ||
+              use === 'linkedin' ||
+              use === 'interview',
+          )
+        : [];
+      if (
+        typeof candidate.id !== 'string' ||
+        typeof candidate.selected !== 'boolean' ||
+        !candidate.sensitivity ||
+        !['public', 'private', 'restricted'].includes(candidate.sensitivity)
+      )
+        return [];
+      return [
+        {
+          ...parsed.data.candidates[index],
+          id: candidate.id,
+          selected: candidate.selected,
+          sensitivity: candidate.sensitivity,
+          allowedUses,
+        } satisfies ImportReviewCandidate,
+      ];
+    });
+    if (candidates.length !== parsed.data.candidates.length) return;
+    return {
+      ...parsed.data,
+      name: stored.name,
+      headline: stored.headline,
+      candidates,
+      permissionsConfirmed: stored.permissionsConfirmed,
+      expiresAt: stored.expiresAt,
+    };
+  } catch {
+    return;
+  }
 }
 
 function reviewerLabel(reviewer: Review['reviewer']) {
