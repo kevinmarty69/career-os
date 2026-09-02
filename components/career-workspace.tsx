@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { applicationSchema } from '@/lib/application-contract';
+import {
+  jobPostingImportResponseSchema,
+  type JobPostingImportResponse,
+} from '@/lib/job-posting-extractor';
 import { latestPageSpec, runAgentTeam } from '@/lib/agent-runtime';
 import { syntheticProfile } from '@/lib/fixture';
 import {
@@ -1486,6 +1490,8 @@ export function CareerWorkspace() {
               <div className="document-area">
                 {dossierView === 'brief' ? (
                   <BriefView
+                    key={state.id}
+                    canImportUrl={Boolean(activeTenantId)}
                     error={generateError}
                     generating={generating}
                     hasDraft={Boolean(state.spec)}
@@ -3135,6 +3141,7 @@ function CompanyView({ opportunity }: { opportunity: Opportunity }) {
 }
 
 function BriefView({
+  canImportUrl,
   error,
   generating,
   hasDraft,
@@ -3142,6 +3149,7 @@ function BriefView({
   onChange,
   onGenerate,
 }: {
+  canImportUrl: boolean;
   error: string;
   generating: boolean;
   hasDraft: boolean;
@@ -3149,6 +3157,155 @@ function BriefView({
   onChange: (opportunity: Opportunity) => void;
   onGenerate: () => void;
 }) {
+  const importController = useRef<AbortController | undefined>(undefined);
+  const importButton = useRef<HTMLButtonElement>(null);
+  const opportunityRef = useRef(opportunity);
+  opportunityRef.current = opportunity;
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importMessage, setImportMessage] = useState('');
+  const [missingFields, setMissingFields] = useState<
+    Array<'company' | 'role' | 'description'>
+  >([]);
+  const [pendingImport, setPendingImport] =
+    useState<JobPostingImportResponse>();
+
+  useEffect(
+    () => () => {
+      importController.current?.abort();
+    },
+    [],
+  );
+
+  async function importJob(event: React.FormEvent) {
+    event.preventDefault();
+    setImportError('');
+    setImportMessage('');
+    let url: URL;
+    try {
+      url = new URL(opportunity.url ?? '');
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+    } catch {
+      setImportError(
+        'Saisissez une URL publique complète, par exemple https://entreprise.com/jobs/…',
+      );
+      return;
+    }
+
+    importController.current?.abort();
+    const controller = new AbortController();
+    importController.current = controller;
+    setImporting(true);
+    try {
+      const response = await fetch('/api/applications/import-url', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url: url.href }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const preview = jobPostingImportResponseSchema.parse(
+        await response.json(),
+      );
+      const current = opportunityRef.current;
+      if (current.url !== url.href) {
+        setImportError(
+          'Le lien a changé pendant l’import. Relancez l’import avec la nouvelle URL.',
+        );
+        return;
+      }
+      const conflicts = ['company', 'role', 'description'].some((field) => {
+        const currentValue = current[field as keyof Opportunity];
+        const imported = preview[field as keyof JobPostingImportResponse];
+        return Boolean(currentValue && imported && currentValue !== imported);
+      });
+      if (conflicts) setPendingImport(preview);
+      else applyImport(preview, false);
+    } catch (importFailure) {
+      if (controller.signal.aborted) return;
+      const status =
+        importFailure instanceof Error ? importFailure.message : '';
+      setImportError(
+        status === '401'
+          ? 'Connectez-vous pour importer une annonce. La saisie manuelle reste disponible.'
+          : status === '429'
+            ? 'Trop d’imports rapprochés. Réessayez dans une minute.'
+            : 'Import impossible. Cette page ne permet pas la lecture automatique. Vos saisies ont été conservées ; complétez le brief manuellement.',
+      );
+    } finally {
+      if (importController.current === controller) {
+        importController.current = undefined;
+        setImporting(false);
+      }
+    }
+  }
+
+  function applyImport(preview: JobPostingImportResponse, overwrite: boolean) {
+    const current = opportunityRef.current;
+    const next = {
+      ...current,
+      company:
+        overwrite || !current.company
+          ? (preview.company ?? current.company)
+          : current.company,
+      role:
+        overwrite || !current.role
+          ? (preview.role ?? current.role)
+          : current.role,
+      description:
+        overwrite || !current.description
+          ? (preview.description ?? current.description)
+          : current.description,
+      url: preview.sourceUrl,
+    };
+    opportunityRef.current = next;
+    setPendingImport(undefined);
+    onChange(next);
+    const complete = opportunityReady(next);
+    const missing = (['company', 'role', 'description'] as const).filter(
+      (field) => !next[field],
+    );
+    setMissingFields(missing);
+    setImportMessage(
+      complete
+        ? 'Offre importée. Entreprise, poste et description ont été préremplis. Vérifiez-les avant de continuer.'
+        : 'Import partiel. Certaines informations n’ont pas été trouvées. Complétez les champs indiqués pour continuer.',
+    );
+    if (!complete)
+      requestAnimationFrame(() =>
+        document
+          .getElementById(
+            !next.company
+              ? 'job-company'
+              : !next.role
+                ? 'job-role'
+                : 'job-description',
+          )
+          ?.focus(),
+      );
+  }
+
+  function changeOpportunity(update: Partial<Opportunity>) {
+    const next = { ...opportunityRef.current, ...update };
+    opportunityRef.current = next;
+    onChange(next);
+  }
+
+  function changeRequiredField(
+    field: 'company' | 'role' | 'description',
+    value: string,
+  ) {
+    setMissingFields((current) =>
+      current.filter((candidate) => candidate !== field),
+    );
+    changeOpportunity({ [field]: value });
+  }
+
+  function cancelPendingImport() {
+    setPendingImport(undefined);
+    requestAnimationFrame(() => importButton.current?.focus());
+  }
+
   return (
     <section className="document brief-document" aria-labelledby="brief-title">
       <header className="document-heading">
@@ -3159,57 +3316,141 @@ function BriefView({
           le soutiennent réellement.
         </p>
       </header>
+      <div className="job-import-panel">
+        <div>
+          <strong>Importer l’offre</strong>
+          <p>
+            Collez le lien pour préremplir le brief, puis vérifiez le résultat.
+          </p>
+        </div>
+        <form
+          aria-busy={importing}
+          className="job-import-form"
+          onSubmit={importJob}
+        >
+          <label htmlFor="job-url">URL publique de l’offre</label>
+          <div>
+            <input
+              autoComplete="url"
+              id="job-url"
+              name="job-url"
+              placeholder="https://entreprise.com/jobs/role…"
+              type="url"
+              value={opportunity.url ?? ''}
+              onChange={(event) =>
+                changeOpportunity({ url: event.target.value })
+              }
+            />
+            <button
+              disabled={!canImportUrl || importing || !opportunity.url}
+              ref={importButton}
+              type="submit"
+            >
+              {importing ? 'Import en cours…' : 'Importer'}
+            </button>
+          </div>
+          {!canImportUrl ? (
+            <small>
+              Connexion requise pour lire une URL externe.{' '}
+              <Link href="/sign-in?next=/">Se connecter</Link>
+            </small>
+          ) : null}
+        </form>
+        {importing ? (
+          <p className="import-feedback" role="status">
+            Lecture de l’annonce et extraction des informations…
+          </p>
+        ) : null}
+        {importMessage ? (
+          <p className="import-feedback success" role="status">
+            {importMessage}
+          </p>
+        ) : null}
+        {importError ? (
+          <p className="import-feedback error" role="alert">
+            {importError}
+          </p>
+        ) : null}
+      </div>
+      <p className="manual-separator">ou remplir manuellement</p>
       <div className="field-grid">
         <label>
           Entreprise
           <input
+            aria-label="Entreprise"
+            aria-describedby={
+              missingFields.includes('company')
+                ? 'job-company-missing'
+                : undefined
+            }
+            aria-invalid={missingFields.includes('company') || undefined}
             autoComplete="organization"
+            id="job-company"
             name="company"
             value={opportunity.company}
             onChange={(event) =>
-              onChange({ ...opportunity, company: event.target.value })
+              changeRequiredField('company', event.target.value)
             }
           />
+          {missingFields.includes('company') ? (
+            <span className="missing-field" id="job-company-missing">
+              Entreprise non trouvée dans l’annonce. À compléter.
+            </span>
+          ) : null}
         </label>
         <label>
           Poste
           <input
+            aria-label="Poste"
+            aria-describedby={
+              missingFields.includes('role') ? 'job-role-missing' : undefined
+            }
+            aria-invalid={missingFields.includes('role') || undefined}
             autoComplete="organization-title"
+            id="job-role"
             name="role"
             value={opportunity.role}
             onChange={(event) =>
-              onChange({ ...opportunity, role: event.target.value })
+              changeRequiredField('role', event.target.value)
             }
           />
+          {missingFields.includes('role') ? (
+            <span className="missing-field" id="job-role-missing">
+              Intitulé non trouvé dans l’annonce. À compléter.
+            </span>
+          ) : null}
         </label>
       </div>
       <label>
         Description du poste
         <textarea
+          aria-label="Description du poste"
+          aria-describedby={
+            missingFields.includes('description')
+              ? 'job-description-missing'
+              : undefined
+          }
+          aria-invalid={missingFields.includes('description') || undefined}
           autoComplete="off"
+          id="job-description"
           name="job-description"
           rows={8}
           value={opportunity.description}
           onChange={(event) =>
-            onChange({ ...opportunity, description: event.target.value })
+            changeRequiredField('description', event.target.value)
           }
         />
+        {missingFields.includes('description') ? (
+          <span className="missing-field" id="job-description-missing">
+            Description non trouvée dans l’annonce. À compléter.
+          </span>
+        ) : null}
       </label>
-      <div className="field-grid compact">
-        <label>
-          URL de l’offre{' '}
-          <span>Facultative, conservée comme donnée non fiable</span>
-          <input
-            autoComplete="url"
-            name="job-url"
-            placeholder="https://company.example/jobs/role…"
-            type="url"
-            value={opportunity.url ?? ''}
-            onChange={(event) =>
-              onChange({ ...opportunity, url: event.target.value })
-            }
-          />
-        </label>
+      <div className="field-grid compact accent-field">
+        <p>
+          L’annonce importée reste une donnée non fiable. Aucun élément de votre
+          profil n’en est déduit sans preuve.
+        </p>
         <label>
           Couleur <span>Décorative uniquement</span>
           <input
@@ -3218,11 +3459,18 @@ function BriefView({
             type="color"
             value={opportunity.accent}
             onChange={(event) =>
-              onChange({ ...opportunity, accent: event.target.value })
+              changeOpportunity({ accent: event.target.value })
             }
           />
         </label>
       </div>
+      {pendingImport ? (
+        <ImportConflictDialog
+          onCancel={cancelPendingImport}
+          onComplete={() => applyImport(pendingImport, false)}
+          onReplace={() => applyImport(pendingImport, true)}
+        />
+      ) : null}
       {error ? (
         <div className="inline-error" role="alert">
           <strong>Page non générée</strong>
@@ -3245,6 +3493,43 @@ function BriefView({
         </button>
       </div>
     </section>
+  );
+}
+
+function ImportConflictDialog({
+  onCancel,
+  onComplete,
+  onReplace,
+}: {
+  onCancel: () => void;
+  onComplete: () => void;
+  onReplace: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => dialog.current?.showModal(), []);
+  return (
+    <dialog
+      className="import-conflict-dialog"
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+      ref={dialog}
+    >
+      <h3>L’offre contient des informations différentes</h3>
+      <p>Choisissez comment appliquer l’import à votre brief actuel.</p>
+      <div>
+        <button onClick={onComplete} type="button">
+          Compléter sans remplacer
+        </button>
+        <button onClick={onReplace} type="button">
+          Remplacer avec l’import
+        </button>
+        <button className="quiet" onClick={onCancel} type="button">
+          Annuler
+        </button>
+      </div>
+    </dialog>
   );
 }
 

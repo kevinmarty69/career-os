@@ -123,6 +123,25 @@ async function main() {
     401,
     'anonymous profile write',
   );
+  await expectStatus(
+    await anonymous.post('/api/applications/import-url', {
+      url: 'https://example.com/jobs/role',
+    }),
+    401,
+    'anonymous URL import',
+  );
+  await expectStatus(
+    await fetch(`${baseUrl}/api/applications/import-url`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://attacker.example',
+      },
+      body: JSON.stringify({ url: 'https://example.com/jobs/role' }),
+    }),
+    403,
+    'cross-origin URL import',
+  );
 
   const owner = new BrowserSession();
   await expectStatus(
@@ -153,6 +172,12 @@ async function main() {
   );
   await expectStatus(organizationResponse, 200, 'organization creation');
   const organization = (await organizationResponse.json()) as { id: string };
+
+  const privateImport = await owner.post('/api/applications/import-url', {
+    url: 'http://127.0.0.1/admin',
+  });
+  await expectStatus(privateImport, 400, 'private-network URL import');
+  assert.equal(privateImport.headers.get('cache-control'), 'private, no-store');
 
   const emptyProfile = await owner.get('/api/profile');
   await expectStatus(emptyProfile, 200, 'empty profile read');

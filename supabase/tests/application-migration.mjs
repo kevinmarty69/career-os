@@ -52,6 +52,9 @@ try {
   await target.query(
     await readFile('supabase/migrations/0009_applications.sql', 'utf8'),
   );
+  await target.query(
+    await readFile('supabase/migrations/0010_url_import_quota.sql', 'utf8'),
+  );
 
   const { rows } = await target.query(
     `select id, company, role, raw_text, url
@@ -76,7 +79,112 @@ try {
     raw_text: 'raw',
     url: 'https://example.com/jobs/1',
   });
-  console.log('application migration upgrade ok');
+
+  await target.query(
+    `select set_config('request.jwt.claim.sub', $1, false),
+      set_config('request.jwt.claim.tenant_id', $2, false)`,
+    ['00000000-0000-4000-8000-000000000002', tenantId],
+  );
+  await target.query('set role career_app');
+  const firstAttempt = await target.query(
+    'select app.reserve_url_import($1::uuid) as id',
+    [tenantId],
+  );
+  await assert.rejects(
+    target.query('select app.reserve_url_import($1::uuid)', [tenantId]),
+    /url import rate limited/,
+  );
+  await target.query('select app.finish_url_import($1::uuid, $2)', [
+    firstAttempt.rows[0].id,
+    'succeeded',
+  ]);
+  for (let index = 0; index < 4; index += 1) {
+    const attempt = await target.query(
+      'select app.reserve_url_import($1::uuid) as id',
+      [tenantId],
+    );
+    await target.query('select app.finish_url_import($1::uuid, $2)', [
+      attempt.rows[0].id,
+      'rejected',
+    ]);
+  }
+  await assert.rejects(
+    target.query('select app.reserve_url_import($1::uuid)', [tenantId]),
+    /url import rate limited/,
+  );
+  await target.query('reset role');
+
+  const secondTenantId = '00000000-0000-4000-8000-000000000003';
+  await target.query(
+    `insert into app.tenants (id, owner_id, name) values ($1, $2, 'Second workspace')`,
+    [secondTenantId, '00000000-0000-4000-8000-000000000002'],
+  );
+  await target.query(
+    `select set_config('request.jwt.claim.sub', $1, false),
+      set_config('request.jwt.claim.tenant_id', $2, false)`,
+    ['00000000-0000-4000-8000-000000000002', secondTenantId],
+  );
+  await target.query('set role career_app');
+  await assert.rejects(
+    target.query('select app.reserve_url_import($1::uuid)', [secondTenantId]),
+    /url import rate limited/,
+  );
+  await target.query('reset role');
+
+  const concurrentClients = [];
+  for (let index = 1; index <= 9; index += 1) {
+    const suffix = String(index).padStart(12, '0');
+    const owner = `10000000-0000-4000-8000-${suffix}`;
+    const tenant = `20000000-0000-4000-8000-${suffix}`;
+    await target.query(
+      `insert into app.tenants (id, owner_id, name) values ($1, $2, $3)`,
+      [tenant, owner, `Global ${index}`],
+    );
+    const client = new Client({ connectionString: testUrl.toString() });
+    await client.connect();
+    await client.query(
+      `select set_config('request.jwt.claim.sub', $1, false),
+        set_config('request.jwt.claim.tenant_id', $2, false)`,
+      [owner, tenant],
+    );
+    await client.query('set role career_app');
+    concurrentClients.push({ client, tenant });
+  }
+  try {
+    const reservations = await Promise.allSettled(
+      concurrentClients.map(({ client, tenant }) =>
+        client.query('select app.reserve_url_import($1::uuid) as id', [tenant]),
+      ),
+    );
+    const successful = reservations
+      .map((result, index) => ({ result, index }))
+      .filter(({ result }) => result.status === 'fulfilled');
+    const rejected = reservations.filter(
+      (result) => result.status === 'rejected',
+    );
+    assert.equal(successful.length, 8);
+    assert.equal(rejected.length, 1);
+    assert.match(String(rejected[0].reason), /url import rate limited/);
+
+    const ownerReservation = successful[0];
+    const attemptId = ownerReservation.result.value.rows[0].id;
+    const otherClient =
+      concurrentClients[(ownerReservation.index + 1) % 8].client;
+    await assert.rejects(
+      otherClient.query('select app.finish_url_import($1::uuid, $2)', [
+        attemptId,
+        'succeeded',
+      ]),
+      /url import attempt not found/,
+    );
+    await concurrentClients[ownerReservation.index].client.query(
+      'select app.finish_url_import($1::uuid, $2)',
+      [attemptId, 'succeeded'],
+    );
+  } finally {
+    await Promise.all(concurrentClients.map(({ client }) => client.end()));
+  }
+  console.log('application migration and URL import quotas ok');
 } finally {
   await target?.end();
   if (adminConnected) {

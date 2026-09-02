@@ -278,15 +278,107 @@ test('builds, reviews, approves and issues one private capability', async ({
     .click();
   await expect(page.getByLabel('Entreprise', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Poste', { exact: true })).toHaveValue('');
-  await page.getByLabel('Entreprise', { exact: true }).fill('Northstar Labs');
+  await page.route('**/api/applications/import-url', async (route) => {
+    const input = route.request().postDataJSON() as { url: string };
+    const atlas = input.url.includes('atlas');
+    const partial = input.url.includes('partial');
+    if (input.url.includes('delayed'))
+      await new Promise((resolve) => setTimeout(resolve, 700));
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        company: partial
+          ? 'Partial Systems'
+          : atlas
+            ? 'Atlas Health'
+            : 'Northstar Labs',
+        ...(partial
+          ? {}
+          : {
+              role: atlas ? 'Founding Engineer' : 'Senior Product Engineer',
+              description: atlas
+                ? 'Build a reliable patient-facing workflow.'
+                : 'Build dependable customer-facing workflows with a small product team.',
+            }),
+        sourceUrl: input.url,
+        provenance: {
+          requestedUrl: input.url,
+          finalUrl: input.url,
+          fetchedAt: new Date().toISOString(),
+          contentType: 'text/html',
+          bytes: 1_024,
+          trust: 'untrusted-data',
+        },
+      }),
+    });
+  });
   await page
-    .getByLabel('Poste', { exact: true })
-    .fill('Senior Product Engineer');
+    .getByLabel('URL publique de l’offre')
+    .fill('https://jobs.example.com/partial');
+  await page.getByRole('button', { name: 'Importer', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Import partiel.');
+  await expect(page.getByLabel('Poste', { exact: true })).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+  await expect(page.getByLabel('Description du poste')).toHaveAttribute(
+    'aria-invalid',
+    'true',
+  );
+
+  await page
+    .getByLabel('URL publique de l’offre')
+    .fill('https://jobs.example.com/delayed');
+  await page.getByRole('button', { name: 'Importer', exact: true }).click();
+  await page.getByLabel('Entreprise', { exact: true }).fill('Typed live');
+  await page.getByLabel('Poste', { exact: true }).fill('Live role');
   await page
     .getByLabel('Description du poste')
-    .fill(
-      'Build dependable customer-facing workflows with a small product team.',
-    );
+    .fill('Description typed while the import was still loading.');
+  await expect(
+    page.getByRole('heading', {
+      name: 'L’offre contient des informations différentes',
+    }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Annuler' }).click();
+  await expect(page.getByLabel('Entreprise', { exact: true })).toHaveValue(
+    'Typed live',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Importer', exact: true }),
+  ).toBeFocused();
+
+  await page.getByLabel('Entreprise', { exact: true }).fill('');
+  await page.getByLabel('Poste', { exact: true }).fill('');
+  await page.getByLabel('Description du poste').fill('');
+  await page
+    .getByLabel('URL publique de l’offre')
+    .fill('https://jobs.example.com/northstar');
+  await page.getByRole('button', { name: 'Importer', exact: true }).click();
+  await expect(page.getByLabel('Entreprise', { exact: true })).toHaveValue(
+    'Northstar Labs',
+  );
+  await expect(page.getByLabel('Poste', { exact: true })).toHaveValue(
+    'Senior Product Engineer',
+  );
+  await expect(page.getByRole('status')).toContainText('Offre importée.');
+
+  await page
+    .getByLabel('URL publique de l’offre')
+    .fill('https://jobs.example.com/atlas');
+  await page.getByRole('button', { name: 'Importer', exact: true }).click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'L’offre contient des informations différentes',
+    }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Compléter sans remplacer' }).click();
+  await expect(page.getByLabel('Entreprise', { exact: true })).toHaveValue(
+    'Northstar Labs',
+  );
+  await page
+    .getByLabel('URL publique de l’offre')
+    .fill('https://jobs.example.com/northstar');
   await page.reload();
   await openPrimary(page, 'Mémoire pro');
   await expect(page.getByLabel('Positionnement')).toHaveValue(

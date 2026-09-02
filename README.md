@@ -10,7 +10,7 @@ The first vertical is a real browser workflow that starts with an empty, honest 
 
 1. import a PDF, DOCX or TXT CV locally in a Web Worker, paste its text, or start manually;
 2. review every proposed claim, its source locator, sensitivity and allowed uses before it enters Career Memory;
-3. create and resume multiple applications from pasted offers (URLs are stored but deliberately not fetched yet);
+3. create and resume multiple applications from pasted offers or a bounded, SSRF-safe URL import that always requires human verification;
 4. run a bounded seven-role team through a deterministic fake provider and produce a Zod-validated PageSpec;
 5. inspect a company-themed, accessible preview;
 6. run recruiter, hiring-manager and factuality reviews, then correct or explicitly keep each non-factual objection;

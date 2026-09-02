@@ -16,6 +16,8 @@ The browser uses Better Auth organization sessions for tenant selection. Career 
 
 CV import runs entirely in a browser Web Worker. It keeps the raw file out of server routes, validates and bounds the document before extraction, stores a resumable review in sessionStorage for at most 30 minutes, and persists only the claims explicitly accepted by the user. Imported claims remain `declared` and linked to a source digest and page or line locator.
 
+Job URL import is a separate authenticated preview path. The server validates and pins each public destination, fetches only bounded HTML or plain text, extracts `JobPosting` JSON-LD with a conservative text fallback, and returns provenance without saving it. The candidate edits or confirms the brief before any application snapshot or agent run is created.
+
 PageSpec is data, not code. The renderer accepts only known blocks and bounded color tokens. Essential recruiter information is visible first; provenance details use native `details` elements for progressive disclosure.
 
 See [ADR-001](docs/ADR-001-agent-runtime.md) for agent runtime and isolation decisions.

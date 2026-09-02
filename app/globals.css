@@ -615,6 +615,127 @@ input[type='color'] {
   grid-template-columns: 1fr 100px;
 }
 
+.job-import-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 20px;
+  border: 1px solid #dedee6;
+  border-radius: 14px;
+  background: #f8f8fb;
+}
+
+.job-import-panel > div:first-child p,
+.job-import-form small,
+.accent-field > p {
+  margin: 4px 0 0;
+  color: #6c6c78;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.job-import-form {
+  display: grid;
+  gap: 7px;
+}
+
+.job-import-form > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.job-import-form button {
+  min-width: 116px;
+}
+
+.job-import-form small a {
+  color: var(--primary);
+  font-weight: 650;
+}
+
+input[aria-invalid='true'],
+textarea[aria-invalid='true'] {
+  border-color: #c54b3c;
+  box-shadow: 0 0 0 2px rgb(197 75 60 / 10%);
+}
+
+.missing-field {
+  color: #9a382c;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.import-feedback {
+  margin: 0;
+  padding: 11px 13px;
+  color: #4f4f5b;
+  border-radius: 9px;
+  background: #eeeef3;
+  font-size: 13px;
+}
+
+.import-feedback.success {
+  color: #176842;
+  background: #e7f6ee;
+}
+
+.import-feedback.error {
+  color: #8b2e21;
+  background: #fff0ed;
+}
+
+.manual-separator {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 20px;
+  color: #84848e;
+  font-size: 12px;
+}
+
+.manual-separator::before,
+.manual-separator::after {
+  height: 1px;
+  flex: 1;
+  background: #e2e2e8;
+  content: '';
+}
+
+.accent-field {
+  align-items: end;
+}
+
+.accent-field > p {
+  max-width: 560px;
+}
+
+.import-conflict-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 24px;
+  color: #1b1b21;
+  border: 1px solid #d9d9e1;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgb(20 20 28 / 24%);
+}
+
+.import-conflict-dialog::backdrop {
+  background: rgb(20 20 28 / 40%);
+  backdrop-filter: blur(3px);
+}
+
+.import-conflict-dialog h3,
+.import-conflict-dialog p {
+  margin-top: 0;
+}
+
+.import-conflict-dialog > div {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .inline-error {
   margin: 20px 0;
   padding: 14px 16px;
@@ -4654,6 +4775,15 @@ button,
   .applications-view {
     min-height: 100vh;
     padding: 20px 14px calc(94px + env(safe-area-inset-bottom));
+  }
+
+  .job-import-form > div {
+    grid-template-columns: 1fr;
+  }
+
+  .job-import-form button,
+  .import-conflict-dialog > div button {
+    width: 100%;
   }
 
   .applications-header,
