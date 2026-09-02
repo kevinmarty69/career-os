@@ -28,9 +28,30 @@ async function openApplications(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    if (location.pathname === '/') localStorage.removeItem('career-os-demo');
+    if (
+      location.pathname === '/' &&
+      !sessionStorage.getItem('preserve-career-os-demo')
+    )
+      localStorage.removeItem('career-os-demo');
   });
   await page.goto('/');
+});
+
+test('restores an anonymous draft after reload', async ({ page }) => {
+  await openApplications(page);
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Ouvrir la revue' }),
+  ).toBeVisible();
+
+  await page.evaluate(() =>
+    sessionStorage.setItem('preserve-career-os-demo', '1'),
+  );
+  await page.reload();
+
+  await expect(
+    page.getByRole('button', { name: 'Ouvrir la revue' }),
+  ).toBeVisible();
 });
 
 test('builds, reviews, approves and issues one private capability', async ({

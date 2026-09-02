@@ -28,11 +28,26 @@ const runStatusSchema = z.enum([
   'failed',
 ]);
 
-const reviewSchema = z
+export const runtimeReviewSchema = z
   .object({
     reviewer: z.enum(['recruiter', 'hiring-manager', 'factuality']),
     passed: z.boolean(),
     findings: z.array(z.string()),
+  })
+  .strict();
+
+const persistedReviewSchema = runtimeReviewSchema
+  .extend({
+    reviewId: z.string().uuid(),
+    issues: z.array(
+      z
+        .object({
+          section: z.string().min(1),
+          message: z.string().min(1),
+          blocking: z.boolean(),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
@@ -66,9 +81,47 @@ export const persistedRunSchema = z
     usedCostMicros: z.number().int().nonnegative(),
     profile: profileSchema,
     spec: pageSpecSchema.optional(),
-    reviews: z.array(reviewSchema),
+    reviews: z.array(persistedReviewSchema),
     events: z.array(eventSchema),
   })
   .strict();
 
 export type PersistedRun = z.infer<typeof persistedRunSchema>;
+
+export const reviewIssueDecisionInputSchema = z
+  .object({
+    reviewId: z.string().uuid(),
+    issueIndex: z.number().int().min(0).max(99),
+    decision: z.enum(['keep', 'correct']),
+  })
+  .strict();
+
+export const reviewIssueDecisionResultSchema = z
+  .object({
+    decisionId: z.string().uuid(),
+    runId: z.string().uuid(),
+    reviewId: z.string().uuid(),
+    issueIndex: z.number().int().nonnegative(),
+    decision: z.enum(['keep', 'correct']),
+    publicationEligible: z.boolean(),
+    correctedRun: persistedRunSchema.optional(),
+  })
+  .strict()
+  .superRefine((result, context) => {
+    if (result.decision === 'correct' && !result.correctedRun)
+      context.addIssue({
+        code: 'custom',
+        path: ['correctedRun'],
+        message: 'A correction must return its real corrected run.',
+      });
+    if (result.decision === 'keep' && result.correctedRun)
+      context.addIssue({
+        code: 'custom',
+        path: ['correctedRun'],
+        message: 'A keep decision cannot create a corrected run.',
+      });
+  });
+
+export type ReviewIssueDecisionResult = z.infer<
+  typeof reviewIssueDecisionResultSchema
+>;

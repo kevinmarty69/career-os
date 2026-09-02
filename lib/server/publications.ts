@@ -49,15 +49,13 @@ export async function mintPublication(
         order by version desc limit 1`;
       if (!pageSpec)
         throw new PublicationRejectedError('Run has no publishable PageSpec.');
-      const [reviewGate] = await tx<{ passing_reviews: string }[]>`
-        select count(*) filter (
-          where verdict = 'pass' and page_spec_hash = ${pageSpec.spec_hash}
-        ) as passing_reviews
-        from app.reviews where tenant_id = ${session.tenantId}
-          and page_spec_id = ${pageSpec.id}`;
-      if (Number(reviewGate.passing_reviews) !== 3)
+      const [reviewGate] = await tx<{ allowed: boolean }[]>`
+        select app.page_spec_review_gate(
+          ${session.tenantId}, ${pageSpec.id}, ${pageSpec.spec_hash}
+        ) as allowed`;
+      if (!reviewGate.allowed)
         throw new PublicationRejectedError(
-          'Publication requires three passing current reviews.',
+          'Publication review gate rejected this PageSpec.',
         );
 
       if (run.status === 'awaiting_approval')

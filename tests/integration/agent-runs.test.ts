@@ -93,6 +93,113 @@ async function createWorkspace(label: string) {
   };
 }
 
+type ReviewTarget = {
+  reviewId: string;
+  issueIndex: number;
+};
+
+async function injectReviewDisagreement(
+  pool: Pool,
+  runId: string,
+  reviewer: 'recruiter' | 'hiring_manager' | 'factuality',
+  message: string,
+): Promise<ReviewTarget> {
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const source = await client.query<{
+      id: string;
+      tenant_id: string;
+      version: number;
+      spec: unknown;
+      input_hash: string;
+    }>(
+      `select id, tenant_id, version, spec, input_hash
+       from app.page_specs
+       where workflow_run_id = $1 and invalidated_at is null
+       order by version desc limit 1
+       for update`,
+      [runId],
+    );
+    assert.equal(source.rowCount, 1);
+    const sourceSpec = source.rows[0];
+    const nextPageSpecId = randomUUID();
+    const inserted = await client.query<{ spec_hash: string }>(
+      `insert into app.page_specs (
+         id, tenant_id, workflow_run_id, version, spec, input_hash
+       ) values ($1, $2, $3, $4, $5, $6)
+       returning spec_hash`,
+      [
+        nextPageSpecId,
+        sourceSpec.tenant_id,
+        runId,
+        sourceSpec.version + 1,
+        sourceSpec.spec,
+        sourceSpec.input_hash,
+      ],
+    );
+    await client.query(
+      `insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id)
+       select tenant_id, $1, claim_id from app.page_spec_claims
+       where tenant_id = $2 and page_spec_id = $3`,
+      [nextPageSpecId, sourceSpec.tenant_id, sourceSpec.id],
+    );
+    const issue = {
+      section: reviewer === 'factuality' ? 'blocks.evidence' : 'hero.thesis',
+      message,
+      blocking: reviewer === 'factuality',
+    };
+    const reviews = [
+      {
+        id: randomUUID(),
+        reviewer: 'recruiter',
+        issues: reviewer === 'recruiter' ? [issue] : [],
+      },
+      {
+        id: randomUUID(),
+        reviewer: 'hiring_manager',
+        issues: reviewer === 'hiring_manager' ? [issue] : [],
+      },
+      {
+        id: randomUUID(),
+        reviewer: 'factuality',
+        issues: reviewer === 'factuality' ? [issue] : [],
+      },
+    ] as const;
+    for (const review of reviews)
+      await client.query(
+        `insert into app.reviews (
+           id, tenant_id, page_spec_id, reviewer, verdict, issues,
+           page_spec_hash
+         ) values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          review.id,
+          sourceSpec.tenant_id,
+          nextPageSpecId,
+          review.reviewer,
+          review.issues.length === 0 ? 'pass' : 'changes_required',
+          JSON.stringify(review.issues),
+          inserted.rows[0].spec_hash,
+        ],
+      );
+    await client.query(
+      `update app.workflow_runs set status = 'blocked', state = 'review'
+       where tenant_id = $1 and id = $2`,
+      [sourceSpec.tenant_id, runId],
+    );
+    await client.query('commit');
+    return {
+      reviewId: reviews.find((item) => item.reviewer === reviewer)!.id,
+      issueIndex: 0,
+    };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function main() {
   const anonymous = new BrowserSession();
   await expectStatus(
@@ -126,7 +233,7 @@ async function main() {
     usedCostMicros: number;
     profile: Profile;
     spec: PageSpec;
-    reviews: Array<{ passed: boolean }>;
+    reviews: Array<{ reviewId: string; passed: boolean }>;
     events: unknown[];
   };
   assert.equal(run.status, 'awaiting_approval');
@@ -140,6 +247,9 @@ async function main() {
   );
   assert.ok(run.spec);
   assert.equal(run.reviews.length, 3);
+  assert.ok(
+    run.reviews.every((review) => /^[0-9a-f-]{36}$/.test(review.reviewId)),
+  );
   assert.ok(run.reviews.every((review) => review.passed));
   assert.ok(run.events.length > 0);
 
@@ -167,13 +277,6 @@ async function main() {
   const read = await owner.browser.request(`/api/runs/${run.runId}`);
   await expectStatus(read, 200, 'run read');
   assert.deepEqual(await read.json(), run);
-
-  const other = await createWorkspace('RunOther');
-  await expectStatus(
-    await other.browser.request(`/api/runs/${run.runId}`),
-    404,
-    'cross-tenant run read',
-  );
 
   const pool = new Pool({ connectionString: databaseUrl });
   try {
@@ -203,6 +306,180 @@ async function main() {
     assert.equal(Number(stored.rows[0].page_spec_count), 2);
     assert.equal(Number(stored.rows[0].review_count), 6);
     assert.equal(Number(stored.rows[0].usage_count), 0);
+
+    const keepTarget = await injectReviewDisagreement(
+      pool,
+      run.runId,
+      'recruiter',
+      'The framing is too generic.',
+    );
+    const keepKeys = [randomUUID(), randomUUID()];
+    const keepResponses = await Promise.all(
+      keepKeys.map((key) =>
+        owner.browser.request(
+          `/api/runs/${run.runId}/review-decisions`,
+          'POST',
+          { ...keepTarget, decision: 'keep' },
+          { 'idempotency-key': key },
+        ),
+      ),
+    );
+    assert.deepEqual(
+      keepResponses.map((response) => response.status).sort(),
+      [200, 201],
+    );
+    const keepResults = await Promise.all(
+      keepResponses.map(
+        (response) =>
+          response.json() as Promise<{
+            decisionId: string;
+            publicationEligible: boolean;
+          }>,
+      ),
+    );
+    assert.equal(keepResults[0].decisionId, keepResults[1].decisionId);
+    assert.ok(keepResults.every((result) => result.publicationEligible));
+    const keepReplay = await owner.browser.request(
+      `/api/runs/${run.runId}/review-decisions`,
+      'POST',
+      { ...keepTarget, decision: 'keep' },
+      { 'idempotency-key': keepKeys[0] },
+    );
+    await expectStatus(keepReplay, 200, 'review decision replay');
+    assert.deepEqual(await keepReplay.json(), keepResults[0]);
+    await expectStatus(
+      await owner.browser.request(
+        `/api/runs/${run.runId}/review-decisions`,
+        'POST',
+        { ...keepTarget, decision: 'correct' },
+        { 'idempotency-key': keepKeys[0] },
+      ),
+      409,
+      'review decision key reused with another payload',
+    );
+    await expectStatus(
+      await owner.browser.request('/api/publications', 'POST', {
+        runId: run.runId,
+      }),
+      201,
+      'publication after explicit non-factual keep',
+    );
+
+    const correctionCreate = await owner.browser.request(
+      '/api/runs',
+      'POST',
+      { opportunity, profileRevision: savedProfile.revision },
+      { 'idempotency-key': randomUUID() },
+    );
+    await expectStatus(correctionCreate, 201, 'correction source run');
+    const correctionSource = (await correctionCreate.json()) as {
+      runId: string;
+    };
+    const correctionTarget = await injectReviewDisagreement(
+      pool,
+      correctionSource.runId,
+      'recruiter',
+      'State the role-specific operating outcome.',
+    );
+    const correctionResponse = await owner.browser.request(
+      `/api/runs/${correctionSource.runId}/review-decisions`,
+      'POST',
+      { ...correctionTarget, decision: 'correct' },
+      { 'idempotency-key': randomUUID() },
+    );
+    await expectStatus(correctionResponse, 201, 'targeted correction');
+    const correction = (await correctionResponse.json()) as {
+      publicationEligible: boolean;
+      correctedRun: {
+        runId: string;
+        status: string;
+        usedCostMicros: number;
+        spec: PageSpec;
+        reviews: Array<{
+          reviewId: string;
+          passed: boolean;
+          issues: Array<{
+            section: string;
+            message: string;
+            blocking: boolean;
+          }>;
+        }>;
+      };
+    };
+    assert.equal(correction.publicationEligible, false);
+    assert.notEqual(correction.correctedRun.runId, correctionSource.runId);
+    assert.equal(correction.correctedRun.status, 'awaiting_approval');
+    assert.equal(correction.correctedRun.usedCostMicros, 0);
+    assert.match(
+      correction.correctedRun.spec.hero.thesis,
+      /role-specific thesis foregrounds the operating outcome/i,
+    );
+    assert.doesNotMatch(correction.correctedRun.spec.hero.thesis, /State the/);
+    assert.equal(correction.correctedRun.reviews.length, 3);
+    assert.ok(
+      correction.correctedRun.reviews.every(
+        (review) => review.passed && review.issues.length === 0,
+      ),
+    );
+    const immutableCounts = await pool.query<{
+      decisions: string;
+      source_reviews: string;
+      corrected_reviews: string;
+    }>(
+      `select
+        (select count(*) from app.review_issue_decisions
+          where workflow_run_id = $1) decisions,
+        (select count(*) from app.reviews r join app.page_specs ps
+          on ps.id = r.page_spec_id where ps.workflow_run_id = $1) source_reviews,
+        (select count(*) from app.reviews r join app.page_specs ps
+          on ps.id = r.page_spec_id where ps.workflow_run_id = $2) corrected_reviews`,
+      [correctionSource.runId, correction.correctedRun.runId],
+    );
+    assert.equal(Number(immutableCounts.rows[0].decisions), 1);
+    assert.equal(Number(immutableCounts.rows[0].source_reviews), 9);
+    assert.equal(Number(immutableCounts.rows[0].corrected_reviews), 6);
+
+    const factualCreate = await owner.browser.request(
+      '/api/runs',
+      'POST',
+      { opportunity, profileRevision: savedProfile.revision },
+      { 'idempotency-key': randomUUID() },
+    );
+    await expectStatus(factualCreate, 201, 'factuality source run');
+    const factualSource = (await factualCreate.json()) as { runId: string };
+    const factualTarget = await injectReviewDisagreement(
+      pool,
+      factualSource.runId,
+      'factuality',
+      'Evidence does not support this claim.',
+    );
+    await expectStatus(
+      await owner.browser.request(
+        `/api/runs/${factualSource.runId}/review-decisions`,
+        'POST',
+        { ...factualTarget, decision: 'keep' },
+        { 'idempotency-key': randomUUID() },
+      ),
+      400,
+      'factuality keep',
+    );
+
+    const other = await createWorkspace('RunOther');
+    await expectStatus(
+      await other.browser.request(`/api/runs/${run.runId}`),
+      404,
+      'cross-tenant run read',
+    );
+    await expectStatus(
+      await other.browser.request(
+        `/api/runs/${correctionSource.runId}/review-decisions`,
+        'POST',
+        { ...correctionTarget, decision: 'correct' },
+        { 'idempotency-key': randomUUID() },
+      ),
+      400,
+      'cross-tenant review decision',
+    );
   } finally {
     await pool.end();
   }

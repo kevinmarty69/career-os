@@ -34,7 +34,7 @@ This is one product: self-hosters provide model keys or local endpoints; the man
 | Page Composer        | Strategy plus failed section issues    | model only                    | strict PageSpec JSON             | Maximum three versions            |
 | Fact Checker         | PageSpec, claims, evidence, provenance | read-only ledger              | structured factual issues        | Can block publication             |
 
-Agents never chat freely. Each run reads versioned artifacts and writes a schema-validated artifact or review issue. Only failed sections return to Page Composer, at most three versions. Human approval is required after all three reviews pass.
+Agents never chat freely. Each run reads versioned artifacts and writes a schema-validated artifact or review issue. Only failed sections return to Page Composer, at most three versions. Afterward, the human may explicitly keep a recruiter or hiring-manager objection, or request a supported targeted correction that creates a new reviewed run. Factual objections must pass and cannot be overridden. Publication still requires explicit human approval.
 
 ## Control plane / execution plane
 

@@ -153,6 +153,13 @@ const reviewSchema = z
     ),
   })
   .strict();
+const correctionConstraintSchema = z
+  .object({
+    section: z.literal('hero.thesis'),
+    intent: z.literal('foreground_role_specific_operating_outcome'),
+    feedback: z.string().min(1).max(1_000),
+  })
+  .strict();
 
 type ToolName =
   | 'read_offer'
@@ -254,9 +261,20 @@ export class FakeAgentProvider implements AgentProvider {
       case 'recruiter-strategist':
         output = request.input;
         break;
-      case 'page-composer':
-        output = request.input;
+      case 'page-composer': {
+        const composerInput = request.input as {
+          spec: PageSpec;
+          correction?: z.infer<typeof correctionConstraintSchema>;
+        };
+        output = composerInput.correction
+          ? applyCorrectionConstraint(
+              composerInput.spec,
+              composerInput.correction.section,
+              composerInput.correction.intent,
+            )
+          : composerInput.spec;
         break;
+      }
       case 'recruiter':
         output = { passed: true, issues: [] };
         break;
@@ -440,9 +458,13 @@ export async function runAgentTeam(input: {
   tokenBudget?: number;
   costBudgetMicros?: number;
   maxRevisions?: number;
+  correction?: z.infer<typeof correctionConstraintSchema>;
   signal?: AbortSignal;
 }): Promise<AgentRunState> {
   const profile = profileSchema.parse(input.profile);
+  const correction = input.correction
+    ? correctionConstraintSchema.parse(input.correction)
+    : undefined;
   const provider = input.provider ?? configuredAgentProvider();
   const state: AgentRunState = runStateSchema.parse({
     tenantId: input.tenantId,
@@ -531,7 +553,7 @@ export async function runAgentTeam(input: {
         provider,
         'page-composer',
         pageSpecSchema,
-        spec,
+        { spec, ...(correction ? { correction } : {}) },
         { read_strategy: () => strategyResult.output },
         input.signal,
       );
@@ -836,6 +858,30 @@ function reviseFailedSections(
     hero: {
       ...spec.hero,
       thesis: `${spec.hero.thesis} Revision ${version} foregrounds the operating outcome required by this role.`,
+    },
+  });
+}
+
+function applyCorrectionConstraint(
+  spec: PageSpec,
+  section: 'hero.thesis',
+  intent: 'foreground_role_specific_operating_outcome',
+) {
+  if (section !== 'hero.thesis')
+    throw new Error(`Correction is unsupported for ${section}.`);
+  if (intent !== 'foreground_role_specific_operating_outcome')
+    throw new Error(`Correction intent is unsupported: ${intent}.`);
+  if (
+    /role-specific thesis foregrounds the operating outcome/i.test(
+      spec.hero.thesis,
+    )
+  )
+    return spec;
+  return pageSpecSchema.parse({
+    ...spec,
+    hero: {
+      ...spec.hero,
+      thesis: `${spec.hero.thesis} This role-specific thesis foregrounds the operating outcome.`,
     },
   });
 }

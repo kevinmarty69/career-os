@@ -9,7 +9,11 @@ import {
 import {
   createRunInputSchema,
   persistedRunSchema,
+  reviewIssueDecisionInputSchema,
+  reviewIssueDecisionResultSchema,
+  runtimeReviewSchema,
   type PersistedRun,
+  type ReviewIssueDecisionResult,
 } from '../run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from '../schemas';
 
@@ -126,6 +130,287 @@ export async function readPersistedRun(session: RunSession, rawRunId: string) {
   } finally {
     await sql.end();
   }
+}
+
+export async function decideReviewIssue(
+  session: RunSession,
+  rawRunId: string,
+  rawInput: unknown,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+) {
+  const runId = idempotencyKeySchema(rawRunId);
+  const input = reviewIssueDecisionInputSchema.parse(rawInput);
+  const key = idempotencyKeySchema(idempotencyKey);
+  const inputHash = hashJson({ runId, ...input });
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await tx`select pg_advisory_xact_lock(
+        hashtextextended(${`${session.tenantId}:review-decision:${key}`}, 0)
+      )`;
+      await authorize(tx, session, 'career_app');
+      const [replay] = await tx<
+        Array<StoredReviewDecision>
+      >`select id, workflow_run_id, page_spec_id, review_id, issue_index, decision,
+          corrected_run_id, input_hash
+        from app.review_issue_decisions
+        where tenant_id = ${session.tenantId} and idempotency_key = ${key}`;
+      if (replay) {
+        if (replay.input_hash !== inputHash)
+          throw new RunConflictError(
+            'The idempotency key belongs to another review decision.',
+          );
+        return {
+          created: false,
+          decision: await reviewDecisionProjection(
+            tx,
+            session.tenantId,
+            replay,
+          ),
+        };
+      }
+
+      const [run] = await tx<
+        Array<{
+          profile_id: string;
+          opportunity_id: string;
+          source_profile_id: string | null;
+          source_profile_revision: string | null;
+          status: string;
+        }>
+      >`select profile_id, opportunity_id, source_profile_id,
+          source_profile_revision, status
+        from app.workflow_runs
+        where tenant_id = ${session.tenantId} and id = ${runId}
+        for update`;
+      if (!run || !['blocked', 'awaiting_approval'].includes(run.status))
+        throw new RunRejectedError('Run has no actionable review issue.');
+      const [pageSpec] = await tx<
+        Array<{ id: string; spec: unknown; spec_hash: string }>
+      >`select id, spec, spec_hash from app.page_specs
+        where tenant_id = ${session.tenantId} and workflow_run_id = ${runId}
+          and invalidated_at is null
+        order by version desc limit 1`;
+      if (!pageSpec) throw new RunRejectedError('Run has no current PageSpec.');
+      const [review] = await tx<
+        Array<{
+          id: string;
+          reviewer: 'recruiter' | 'hiring_manager' | 'factuality';
+          issues: unknown;
+        }>
+      >`select id, reviewer, issues from app.reviews
+        where tenant_id = ${session.tenantId} and id = ${input.reviewId}
+          and page_spec_id = ${pageSpec.id}
+          and page_spec_hash = ${pageSpec.spec_hash}`;
+      if (!review)
+        throw new RunRejectedError('Review is not current for this run.');
+      const issues = reviewIssues(review.issues);
+      const issue = issues[input.issueIndex];
+      if (!issue) throw new RunRejectedError('Review issue does not exist.');
+      const issueText = issue.message;
+      if (input.decision === 'keep' && review.reviewer === 'factuality')
+        throw new RunRejectedError('Factuality objections cannot be kept.');
+
+      const [existingIssue] = await tx<
+        Array<StoredReviewDecision>
+      >`select id, workflow_run_id, page_spec_id, review_id, issue_index, decision,
+          corrected_run_id, input_hash
+        from app.review_issue_decisions
+        where tenant_id = ${session.tenantId} and review_id = ${review.id}
+          and issue_index = ${input.issueIndex}`;
+      if (existingIssue) {
+        if (existingIssue.input_hash !== inputHash)
+          throw new RunConflictError('Review issue already has a decision.');
+        return {
+          created: false,
+          decision: await reviewDecisionProjection(
+            tx,
+            session.tenantId,
+            existingIssue,
+          ),
+        };
+      }
+
+      const decisionId = randomUUID();
+      let correctedRunId: string | undefined;
+      if (input.decision === 'correct') {
+        const correction = correctionConstraint(issue);
+        const [profileRow] = await tx<
+          Array<{ id: string; name: string; headline: string }>
+        >`select id, name, headline from app.profiles
+          where tenant_id = ${session.tenantId} and id = ${run.profile_id}`;
+        const [opportunity] = await tx<
+          Array<{
+            company: string;
+            role: string;
+            raw_text: string | null;
+            url: string | null;
+          }>
+        >`select company, role, raw_text, url from app.opportunities
+          where tenant_id = ${session.tenantId} and id = ${run.opportunity_id}`;
+        if (!profileRow || !opportunity?.raw_text)
+          throw new RunRejectedError('Correction input is unavailable.');
+        const profile = await readProfileGraph(
+          tx,
+          session.tenantId,
+          profileRow,
+        );
+        const currentSpec = pageSpecSchema.parse(pageSpec.spec);
+        correctedRunId = randomUUID();
+        await tx`insert into app.workflow_runs (
+          id, tenant_id, opportunity_id, profile_id, source_profile_id,
+          source_profile_revision, state, status, token_budget,
+          cost_budget_micros, deadline_at, input_hash
+        ) values (
+          ${correctedRunId}, ${session.tenantId}, ${run.opportunity_id},
+          ${run.profile_id}, ${run.source_profile_id},
+          ${run.source_profile_revision}, 'research', 'running', 10000, 0,
+          now() + interval '1 hour', ${inputHash}
+        )`;
+        const correctedState = await runAgentTeam({
+          tenantId: session.tenantId,
+          runId: correctedRunId,
+          profile,
+          opportunity: {
+            company: opportunity.company,
+            role: opportunity.role,
+            description: opportunity.raw_text,
+            ...(opportunity.url ? { url: opportunity.url } : {}),
+            accent: currentSpec.company.accent,
+          },
+          provider: new FakeAgentProvider(),
+          tokenBudget: 10_000,
+          costBudgetMicros: 0,
+          maxRevisions: 3,
+          correction,
+          signal,
+        });
+        if (
+          correctedState.status !== 'awaiting_approval' ||
+          correctedState.reviews.length !== 3 ||
+          correctedState.reviews.some((item) => !item.passed)
+        )
+          throw new RunRejectedError(
+            'The local correction did not pass real reviews.',
+          );
+        await persistState(tx, session, inputHash, correctedState);
+      }
+
+      await authorize(tx, session, 'career_app');
+      await tx`insert into app.review_issue_decisions (
+        id, tenant_id, workflow_run_id, page_spec_id, review_id, issue_index,
+        issue_text, decision, corrected_run_id, decided_by, idempotency_key,
+        input_hash
+      ) values (
+        ${decisionId}, ${session.tenantId}, ${runId}, ${pageSpec.id},
+        ${review.id}, ${input.issueIndex}, ${issueText}, ${input.decision},
+        ${correctedRunId ?? null}, ${session.userId}, ${key}, ${inputHash}
+      )`;
+      await authorize(tx, session, 'career_worker');
+      await tx`insert into app.workflow_events (
+        tenant_id, workflow_run_id, actor, event_type, summary, payload
+      ) values (
+        ${session.tenantId}, ${runId}, 'human', 'review_issue_decided',
+        ${`Human chose ${input.decision} for ${review.reviewer} issue ${input.issueIndex}.`},
+        ${tx.json({
+          decisionId,
+          reviewId: review.id,
+          issueIndex: input.issueIndex,
+          decision: input.decision,
+          ...(correctedRunId ? { correctedRunId } : {}),
+          costMicros: 0,
+        })}
+      )`;
+      await authorize(tx, session, 'career_app');
+      const publicationEligible =
+        input.decision === 'keep' &&
+        (await pageSpecReviewGate(
+          tx,
+          session.tenantId,
+          pageSpec.id,
+          pageSpec.spec_hash,
+        ));
+      if (publicationEligible)
+        await tx`update app.workflow_runs set status = 'awaiting_approval',
+          state = 'human_approval'
+          where tenant_id = ${session.tenantId} and id = ${runId}`;
+      const stored: StoredReviewDecision = {
+        id: decisionId,
+        workflow_run_id: runId,
+        page_spec_id: pageSpec.id,
+        review_id: review.id,
+        issue_index: input.issueIndex,
+        decision: input.decision,
+        corrected_run_id: correctedRunId ?? null,
+        input_hash: inputHash,
+      };
+      return {
+        created: true,
+        decision: await reviewDecisionProjection(tx, session.tenantId, stored),
+      };
+    });
+  } finally {
+    await sql.end();
+  }
+}
+
+type StoredReviewDecision = {
+  id: string;
+  workflow_run_id: string;
+  page_spec_id: string;
+  review_id: string;
+  issue_index: number;
+  decision: 'keep' | 'correct';
+  corrected_run_id: string | null;
+  input_hash: string;
+};
+
+async function reviewDecisionProjection(
+  tx: postgres.TransactionSql,
+  tenantId: string,
+  decision: StoredReviewDecision,
+): Promise<ReviewIssueDecisionResult> {
+  const [pageSpec] = await tx<
+    Array<{ spec_hash: string }>
+  >`select spec_hash from app.page_specs
+    where tenant_id = ${tenantId} and id = ${decision.page_spec_id}`;
+  const publicationEligible =
+    decision.decision === 'keep' &&
+    !!pageSpec &&
+    (await pageSpecReviewGate(
+      tx,
+      tenantId,
+      decision.page_spec_id,
+      pageSpec.spec_hash,
+    ));
+  const correctedRun = decision.corrected_run_id
+    ? await readRunProjection(tx, tenantId, decision.corrected_run_id)
+    : undefined;
+  if (decision.corrected_run_id && !correctedRun)
+    throw new RunRejectedError('Corrected run is missing.');
+  return reviewIssueDecisionResultSchema.parse({
+    decisionId: decision.id,
+    runId: decision.workflow_run_id,
+    reviewId: decision.review_id,
+    issueIndex: decision.issue_index,
+    decision: decision.decision,
+    publicationEligible,
+    ...(correctedRun ? { correctedRun } : {}),
+  });
+}
+
+async function pageSpecReviewGate(
+  tx: postgres.TransactionSql,
+  tenantId: string,
+  pageSpecId: string,
+  pageSpecHash: string,
+) {
+  const [result] = await tx<{ allowed: boolean }[]>`
+    select app.page_spec_review_gate(
+      ${tenantId}, ${pageSpecId}, ${pageSpecHash}
+    ) as allowed`;
+  return result.allowed;
 }
 
 async function readLivingProfile(
@@ -364,15 +649,27 @@ async function persistState(
       where tenant_id = ${session.tenantId} and id = ${pageSpecId}`;
     if (!pageSpec)
       throw new RunRejectedError('Review PageSpec was not persisted.');
-    for (const review of reviewArtifactSchema(artifact.body))
+    for (const review of reviewArtifactSchema(artifact.body)) {
+      const issues = state.issues
+        .filter(
+          (issue) =>
+            issue.openedAtVersion === artifact.version &&
+            issue.reviewer === review.reviewer,
+        )
+        .map((issue) => ({
+          section: issue.section,
+          message: issue.message,
+          blocking: issue.blocking,
+        }));
       await tx`insert into app.reviews (
         tenant_id, page_spec_id, reviewer, verdict, issues, page_spec_hash
       ) values (
         ${session.tenantId}, ${pageSpecId},
         ${review.reviewer === 'hiring-manager' ? 'hiring_manager' : review.reviewer},
         ${review.passed ? 'pass' : 'changes_required'},
-        ${tx.json(review.findings)}, ${pageSpec.spec_hash}
+        ${tx.json(issues)}, ${pageSpec.spec_hash}
       )`;
+    }
   }
 
   await authorize(tx, session, 'career_app');
@@ -418,11 +715,12 @@ async function readRunProjection(
   const reviews = pageSpec
     ? await tx<
         Array<{
+          id: string;
           reviewer: 'recruiter' | 'hiring_manager' | 'factuality';
           verdict: 'pass' | 'changes_required';
           issues: unknown;
         }>
-      >`select reviewer, verdict, issues from app.reviews
+      >`select id, reviewer, verdict, issues from app.reviews
         where tenant_id = ${tenantId} and page_spec_id = ${pageSpec.id}
         order by case reviewer when 'recruiter' then 1
           when 'hiring_manager' then 2 else 3 end`
@@ -448,12 +746,14 @@ async function readRunProjection(
     profile,
     ...(pageSpec ? { spec: pageSpecSchema.parse(pageSpec.spec) } : {}),
     reviews: reviews.map((review) => ({
+      reviewId: review.id,
       reviewer:
         review.reviewer === 'hiring_manager'
           ? ('hiring-manager' as const)
           : review.reviewer,
       passed: review.verdict === 'pass',
       findings: reviewFindings(review.issues),
+      issues: reviewIssues(review.issues),
     })),
     events: events.map((event) => ({
       actor: fromDatabaseActor(event.actor),
@@ -491,13 +791,64 @@ function idempotencyKeySchema(value: string) {
 }
 
 function reviewArtifactSchema(value: unknown) {
-  return persistedRunSchema.shape.reviews.parse(value);
+  return runtimeReviewSchema.array().parse(value);
 }
 
 function reviewFindings(value: unknown) {
-  const parsed =
-    persistedRunSchema.shape.reviews.element.shape.findings.safeParse(value);
-  return parsed.success ? parsed.data : [];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((issue) => {
+    if (typeof issue === 'string' && issue.length > 0) return [issue];
+    if (
+      issue &&
+      typeof issue === 'object' &&
+      'message' in issue &&
+      typeof issue.message === 'string' &&
+      issue.message.length > 0
+    )
+      return [issue.message];
+    return [];
+  });
+}
+
+function reviewIssues(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((issue) => {
+    if (
+      issue &&
+      typeof issue === 'object' &&
+      'section' in issue &&
+      typeof issue.section === 'string' &&
+      issue.section.length > 0 &&
+      'message' in issue &&
+      typeof issue.message === 'string' &&
+      issue.message.length > 0 &&
+      'blocking' in issue &&
+      typeof issue.blocking === 'boolean'
+    )
+      return [
+        {
+          section: issue.section,
+          message: issue.message,
+          blocking: issue.blocking,
+        },
+      ];
+    return [];
+  });
+}
+
+function correctionConstraint(issue: { message: string; section?: string }) {
+  if (
+    issue.section !== 'hero.thesis' ||
+    !/role-specific operating outcome/i.test(issue.message)
+  )
+    throw new RunRejectedError(
+      'The local provider cannot apply this correction honestly.',
+    );
+  return {
+    section: 'hero.thesis' as const,
+    intent: 'foreground_role_specific_operating_outcome' as const,
+    feedback: issue.message,
+  };
 }
 
 function toDatabaseActor(actor: string) {

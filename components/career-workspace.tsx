@@ -8,7 +8,6 @@ import { syntheticProfile } from '@/lib/fixture';
 import {
   agentRoles,
   buildStrategy,
-  canPublish,
   runReviews,
   type Opportunity,
   type Strategy,
@@ -20,7 +19,21 @@ import {
   type Profile,
   type Review,
 } from '@/lib/schemas';
-import { persistedRunSchema } from '@/lib/run-contract';
+import {
+  persistedRunSchema,
+  reviewIssueDecisionResultSchema,
+  type PersistedRun,
+} from '@/lib/run-contract';
+
+type WorkspaceReview = Review & {
+  reviewId?: string;
+  issues?: PersistedRun['reviews'][number]['issues'];
+};
+type ReviewDecision = {
+  reviewId: string;
+  issueIndex: number;
+  decision: 'keep' | 'correct';
+};
 
 type SavedState = {
   profile: Profile;
@@ -29,7 +42,9 @@ type SavedState = {
   spec?: PageSpec;
   runId?: string;
   runProfile?: Profile;
-  reviews: Review[];
+  reviews: WorkspaceReview[];
+  reviewDecisions?: ReviewDecision[];
+  publicationEligible?: boolean;
   approved: boolean;
   capability?: string;
   events: WorkflowEvent[];
@@ -58,7 +73,7 @@ const dossierViews: Array<[Exclude<DossierView, 'board'>, string]> = [
   ['company', 'Entreprise'],
   ['journey', 'Parcours'],
   ['draft', 'Page privée'],
-  ['share', 'Versions'],
+  ['share', 'Partager'],
 ];
 
 export function CareerWorkspace() {
@@ -72,7 +87,7 @@ export function CareerWorkspace() {
     events: [],
     paused: false,
   });
-  const [loaded, setLoaded] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [primaryView, setPrimaryView] = useState<PrimaryView>('home');
   const [dossierView, setDossierView] = useState<DossierView>('brief');
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -81,6 +96,9 @@ export function CareerWorkspace() {
   const [generateError, setGenerateError] = useState('');
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
+  const [decisionPending, setDecisionPending] = useState('');
+  const [decisionError, setDecisionError] = useState('');
+  const [decisionMessage, setDecisionMessage] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [shareMessage, setShareMessage] = useState('');
   const [memoryError, setMemoryError] = useState('');
@@ -99,6 +117,7 @@ export function CareerWorkspace() {
   const pendingRun = useRef<{ input: string; key: string } | undefined>(
     undefined,
   );
+  const pendingDecisions = useRef(new Map<string, string>());
   const activeTenantId = session.data?.session.activeOrganizationId;
   const storageKey = activeTenantId
     ? `career-os-workspace:${activeTenantId}`
@@ -187,19 +206,21 @@ export function CareerWorkspace() {
       </main>
     );
 
+  const decisionCount = unresolvedReviewIssues(
+    state.reviews,
+    state.reviewDecisions,
+  ).length;
   const status = state.capability
     ? 'Partagée'
     : state.approved
       ? 'Validée'
-      : state.spec && state.reviews.length === 3
-        ? 'Prête à valider'
-        : state.spec
-          ? 'Brouillon prêt'
-          : 'Offre prête';
-  const decisionCount = state.reviews.reduce(
-    (total, item) => total + item.findings.length,
-    0,
-  );
+      : state.spec && decisionCount
+        ? 'Revue requise'
+        : state.spec && reviewGateReady(state)
+          ? 'Prête à valider'
+          : state.spec
+            ? 'Brouillon prêt'
+            : 'Offre prête';
 
   async function generate() {
     if (activeTenantId && JSON.stringify(state.profile) !== savedProfileJson) {
@@ -219,9 +240,10 @@ export function CareerWorkspace() {
       });
       let runId: string | undefined;
       let runProfile = state.profile;
-      let reviews: Review[];
+      let reviews: WorkspaceReview[];
       let events: WorkflowEvent[];
       let spec: PageSpec | undefined;
+      let publicationEligible = false;
 
       if (activeTenantId) {
         if (pendingRun.current?.input !== persistedInput)
@@ -246,15 +268,10 @@ export function CareerWorkspace() {
         runProfile = persisted.profile;
         reviews = persisted.reviews;
         spec = persisted.spec;
-        events = persisted.events.map((event) => ({
-          actor:
-            event.actor === 'human' || event.actor === 'evidence-archivist'
-              ? 'system'
-              : event.actor,
-          action: event.summary,
-          artifact: event.artifactId,
-          costMicros: event.costMicros,
-        }));
+        events = persistedEvents(persisted);
+        publicationEligible = persisted.reviews.every(
+          (review) => review.passed,
+        );
         pendingRun.current = undefined;
       } else {
         const localRun = await runAgentTeam({
@@ -265,6 +282,7 @@ export function CareerWorkspace() {
         });
         spec = latestPageSpec(localRun);
         reviews = localRun.reviews;
+        publicationEligible = reviews.every((review) => review.passed);
         events = localRun.events.map((event) => ({
           actor:
             event.actor === 'human' || event.actor === 'evidence-archivist'
@@ -283,6 +301,8 @@ export function CareerWorkspace() {
         runId,
         runProfile,
         reviews,
+        reviewDecisions: [],
+        publicationEligible,
         approved: false,
         capability: undefined,
         events,
@@ -307,6 +327,8 @@ export function CareerWorkspace() {
     setState((current) => ({
       ...current,
       reviews,
+      reviewDecisions: [],
+      publicationEligible: reviews.every((item) => item.passed),
       approved: false,
       events: [
         ...current.events,
@@ -325,8 +347,116 @@ export function CareerWorkspace() {
     }));
   }
 
+  async function decideReviewIssue(
+    review: WorkspaceReview,
+    issueIndex: number,
+    decision: ReviewDecision['decision'],
+  ) {
+    if (!state.runId || !review.reviewId) {
+      setDecisionError(
+        'Cette ancienne revue doit être régénérée avant de pouvoir être tranchée.',
+      );
+      return;
+    }
+    const issueKey = `${review.reviewId}:${issueIndex}`;
+    const operationKey = `${state.runId}:${issueKey}:${decision}`;
+    const idempotencyKey =
+      pendingDecisions.current.get(operationKey) ?? crypto.randomUUID();
+    pendingDecisions.current.set(operationKey, idempotencyKey);
+    setDecisionPending(issueKey);
+    setDecisionError('');
+    setDecisionMessage('');
+    try {
+      const response = await fetch(
+        `/api/runs/${state.runId}/review-decisions`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify({
+            reviewId: review.reviewId,
+            issueIndex,
+            decision,
+          }),
+        },
+      );
+      if (!response.ok)
+        throw new Error(
+          response.status === 409
+            ? 'DECISION_CONFLICT'
+            : response.status === 401
+              ? 'AUTH_REQUIRED'
+              : response.status === 400
+                ? 'DECISION_REJECTED'
+                : 'DECISION_FAILED',
+        );
+      const result = reviewIssueDecisionResultSchema.parse(
+        await response.json(),
+      );
+      pendingDecisions.current.delete(operationKey);
+      if (result.correctedRun) {
+        setState((current) => ({
+          ...current,
+          spec: result.correctedRun!.spec,
+          runId: result.correctedRun!.runId,
+          runProfile: result.correctedRun!.profile,
+          reviews: result.correctedRun!.reviews,
+          reviewDecisions: [],
+          publicationEligible: result.correctedRun!.reviews.every(
+            (item) => item.passed,
+          ),
+          approved: false,
+          capability: undefined,
+          events: persistedEvents(result.correctedRun!),
+        }));
+        setShareUrl('');
+        setShareMessage('');
+        setDecisionMessage(
+          'Une nouvelle version a été générée et validée par les trois contrôles.',
+        );
+      } else {
+        setState((current) => ({
+          ...current,
+          reviewDecisions: [
+            ...(current.reviewDecisions ?? []).filter(
+              (item) =>
+                item.reviewId !== result.reviewId ||
+                item.issueIndex !== result.issueIndex,
+            ),
+            {
+              reviewId: result.reviewId,
+              issueIndex: result.issueIndex,
+              decision: result.decision,
+            },
+          ],
+          publicationEligible: result.publicationEligible,
+          approved: false,
+        }));
+        setDecisionMessage(
+          result.publicationEligible
+            ? 'Votre décision est enregistrée. La candidature peut maintenant être validée.'
+            : 'Votre décision est enregistrée. Il reste des points à trancher.',
+        );
+      }
+    } catch (error) {
+      setDecisionError(
+        error instanceof Error && error.message === 'DECISION_CONFLICT'
+          ? 'Une autre session a déjà tranché ce point différemment. Relancez la candidature depuis son état enregistré.'
+          : error instanceof Error && error.message === 'AUTH_REQUIRED'
+            ? 'Reconnectez-vous avant de trancher ce point.'
+            : error instanceof Error && error.message === 'DECISION_REJECTED'
+              ? 'Cette correction ne peut pas être appliquée automatiquement sans inventer. Modifiez le brief ou régénérez la candidature.'
+              : 'La décision n’a pas pu être enregistrée. Vous pouvez réessayer sans risque de doublon.',
+      );
+    } finally {
+      setDecisionPending('');
+    }
+  }
+
   async function publish() {
-    if (!state.runId || !canPublish(state.approved, state.reviews)) return;
+    if (!state.runId || !state.approved || !reviewGateReady(state)) return;
     setPublishing(true);
     setPublishError('');
     try {
@@ -434,6 +564,8 @@ export function CareerWorkspace() {
         runId: undefined,
         runProfile: undefined,
         reviews: [],
+        reviewDecisions: [],
+        publicationEligible: undefined,
         approved: false,
       }));
       setMemorySyncMessage(
@@ -507,6 +639,8 @@ export function CareerWorkspace() {
       runId: undefined,
       runProfile: undefined,
       reviews: [],
+      reviewDecisions: [],
+      publicationEligible: undefined,
       approved: false,
       events: [],
     }));
@@ -611,19 +745,6 @@ export function CareerWorkspace() {
                 ) : null}
               </button>
             ))}
-            <button onClick={() => setPrimaryView('memory')} type="button">
-              <NavIcon name="memory" />
-              <span>Preuves</span>
-            </button>
-            <button
-              onClick={() =>
-                openApplications(state.capability ? 'share' : 'board')
-              }
-              type="button"
-            >
-              <NavIcon name="activity" />
-              <span>Liens privés</span>
-            </button>
           </nav>
           <p className="sidebar-label">En cours</p>
           <div className="application-list">
@@ -717,6 +838,7 @@ export function CareerWorkspace() {
             opportunity={state.opportunity}
             profile={state.profile}
             reviews={state.reviews}
+            decisions={state.reviewDecisions}
             spec={state.spec}
             status={status}
             onOpenApplication={(view) => {
@@ -731,6 +853,7 @@ export function CareerWorkspace() {
             opportunity={state.opportunity}
             profile={state.profile}
             reviews={state.reviews}
+            decisions={state.reviewDecisions}
             spec={state.spec}
             status={status}
             onOpen={(view) => openApplications(view)}
@@ -761,8 +884,18 @@ export function CareerWorkspace() {
               <nav className="dossier-tabs" aria-label="Vues de la candidature">
                 {dossierViews.map(([id, label]) => (
                   <button
-                    aria-current={dossierView === id ? 'page' : undefined}
-                    className={dossierView === id ? 'active' : ''}
+                    aria-current={
+                      dossierView === id ||
+                      (dossierView === 'review' && id === 'journey')
+                        ? 'page'
+                        : undefined
+                    }
+                    className={
+                      dossierView === id ||
+                      (dossierView === 'review' && id === 'journey')
+                        ? 'active'
+                        : ''
+                    }
                     disabled={
                       id !== 'brief' &&
                       id !== 'company' &&
@@ -793,14 +926,6 @@ export function CareerWorkspace() {
                   </button>
                 ) : null}
                 <button
-                  className="round-action quiet"
-                  aria-label="Historique des versions"
-                  onClick={() => setDossierView('share')}
-                  type="button"
-                >
-                  ↶
-                </button>
-                <button
                   disabled={!state.approved}
                   onClick={() => setDossierView('share')}
                 >
@@ -826,6 +951,8 @@ export function CareerWorkspace() {
                         runId: undefined,
                         runProfile: undefined,
                         reviews: [],
+                        reviewDecisions: [],
+                        publicationEligible: undefined,
                         approved: false,
                         capability: undefined,
                         events: [],
@@ -872,11 +999,19 @@ export function CareerWorkspace() {
                     approved={state.approved}
                     paused={state.paused}
                     reviews={state.reviews}
+                    decisions={state.reviewDecisions}
+                    decisionError={decisionError}
+                    decisionMessage={decisionMessage}
+                    decisionPending={decisionPending}
+                    publicationEligible={reviewGateReady(state)}
                     canRerun={!state.runId}
                     onApprove={(approved) =>
                       setState((current) => ({ ...current, approved }))
                     }
                     onContinue={() => setDossierView('share')}
+                    onDecide={(review, issueIndex, decision) =>
+                      void decideReviewIssue(review, issueIndex, decision)
+                    }
                     onReview={review}
                   />
                 ) : null}
@@ -885,7 +1020,8 @@ export function CareerWorkspace() {
                     canPublish={
                       memoryRevision > 0 &&
                       Boolean(state.runId) &&
-                      canPublish(state.approved, state.reviews)
+                      state.approved &&
+                      reviewGateReady(state)
                     }
                     error={publishError}
                     publishing={publishing}
@@ -947,6 +1083,8 @@ export function CareerWorkspace() {
                 runId: undefined,
                 runProfile: undefined,
                 reviews: [],
+                reviewDecisions: [],
+                publicationEligible: undefined,
                 approved: false,
               }))
             }
@@ -957,6 +1095,7 @@ export function CareerWorkspace() {
             events={state.events}
             paused={state.paused}
             reviews={state.reviews}
+            decisions={state.reviewDecisions}
             onOpenReview={() => {
               setDossierView('review');
               setPrimaryView('applications');
@@ -985,6 +1124,7 @@ export function CareerWorkspace() {
 
 function HomeView({
   capability,
+  decisions,
   events,
   onOpenApplication,
   onOpenMemory,
@@ -995,12 +1135,13 @@ function HomeView({
   status,
 }: {
   capability?: string;
+  decisions?: ReviewDecision[];
   events: WorkflowEvent[];
   onOpenApplication: (view: DossierView) => void;
   onOpenMemory: () => void;
   opportunity: Opportunity;
   profile: Profile;
-  reviews: Review[];
+  reviews: WorkspaceReview[];
   spec?: PageSpec;
   status: string;
 }) {
@@ -1012,7 +1153,7 @@ function HomeView({
   const coverage = profile.claims.length
     ? Math.round((verified / profile.claims.length) * 100)
     : 0;
-  const findings = reviews.flatMap((review) => review.findings);
+  const findings = unresolvedReviewIssues(reviews, decisions);
   const nextView: DossierView = spec
     ? capability
       ? 'share'
@@ -1147,7 +1288,7 @@ function HomeView({
               {spec
                 ? reviews.length
                   ? findings.length
-                    ? `${findings.length} décisions à trancher avant d’envoyer votre page privée.`
+                    ? `${findings.length} décision${findings.length > 1 ? 's' : ''} à trancher avant d’envoyer votre page privée.`
                     : 'Votre candidature est prête pour validation.'
                   : 'Votre candidature est prête pour une revue humaine.'
                 : 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.'}
@@ -1171,6 +1312,36 @@ function HomeView({
               ) : null}
             </div>
           </section>
+
+          {findings.length ? (
+            <section className="home-pipeline decision-queue">
+              <header>
+                <div>
+                  <h2>À trancher maintenant</h2>
+                  <span>
+                    Chaque point doit être corrigé ou explicitement assumé.
+                  </span>
+                </div>
+              </header>
+              {findings.slice(0, 3).map(({ issue, review, issueIndex }) => (
+                <article
+                  key={`${review.reviewId ?? review.reviewer}:${issueIndex}`}
+                >
+                  <span className="decision-icon" aria-hidden="true">
+                    !
+                  </span>
+                  <div>
+                    <strong>{reviewerLabel(review.reviewer)}</strong>
+                    <p>{issue.message}</p>
+                    <small>{sectionLabel(issue.section)}</small>
+                  </div>
+                  <button onClick={() => onOpenApplication('review')}>
+                    Trancher
+                  </button>
+                </article>
+              ))}
+            </section>
+          ) : null}
 
           <section className="home-stats" aria-label="Résumé de l’espace">
             <article>
@@ -1316,6 +1487,7 @@ function HomeView({
 
 function ApplicationsView({
   capability,
+  decisions,
   onOpen,
   opportunity,
   profile,
@@ -1324,15 +1496,16 @@ function ApplicationsView({
   status,
 }: {
   capability?: string;
+  decisions?: ReviewDecision[];
   onOpen: (view: DossierView) => void;
   opportunity: Opportunity;
   profile: Profile;
-  reviews: Review[];
+  reviews: WorkspaceReview[];
   spec?: PageSpec;
   status: string;
 }) {
   const [layout, setLayout] = useState<'list' | 'kanban'>('kanban');
-  const findings = reviews.flatMap((review) => review.findings).length;
+  const findings = unresolvedReviewIssues(reviews, decisions).length;
   const nextView: DossierView = spec
     ? capability
       ? 'share'
@@ -2007,44 +2180,134 @@ function EvidenceInspector({
 function ReviewView({
   approved,
   canRerun,
+  decisionError,
+  decisionMessage,
+  decisionPending,
+  decisions,
   onApprove,
   onContinue,
+  onDecide,
   onReview,
   paused,
+  publicationEligible,
   reviews,
 }: {
   approved: boolean;
   canRerun: boolean;
+  decisionError: string;
+  decisionMessage: string;
+  decisionPending: string;
+  decisions?: ReviewDecision[];
   onApprove: (approved: boolean) => void;
   onContinue: () => void;
+  onDecide: (
+    review: WorkspaceReview,
+    issueIndex: number,
+    decision: ReviewDecision['decision'],
+  ) => void;
   onReview: () => void;
   paused: boolean;
-  reviews: Review[];
+  publicationEligible: boolean;
+  reviews: WorkspaceReview[];
 }) {
-  const ready = reviews.length === 3 && reviews.every((item) => item.passed);
+  const ready =
+    reviews.length === 3 &&
+    (publicationEligible || reviews.every((item) => item.passed));
   return (
     <section className="document review-document">
       <header className="document-heading">
         <p className="section-label">Revue</p>
         <h2>Confirmer la pertinence et les preuves</h2>
-        <p>Les trois contrôles doivent passer avant la validation humaine.</p>
+        <p>
+          Corrigez une objection ou assumez-la explicitement. Un point factuel
+          doit toujours être corrigé.
+        </p>
       </header>
+      {decisionError ? <p role="alert">{decisionError}</p> : null}
+      {decisionMessage ? <p role="status">{decisionMessage}</p> : null}
       <div className="review-list">
-        {reviews.map((item) => (
-          <article key={item.reviewer}>
-            <div>
-              <strong>{reviewerLabel(item.reviewer)}</strong>
-              <small>
-                {item.findings.length
-                  ? item.findings.join(' ')
-                  : 'Aucun blocage détecté.'}
-              </small>
-            </div>
-            <span className={item.passed ? 'passed' : 'blocked'}>
-              {item.passed ? 'Validé' : 'À corriger'}
-            </span>
-          </article>
-        ))}
+        {reviews.map((item) => {
+          const issues = item.issues ?? [];
+          const unresolved = issues.some(
+            (_, issueIndex) =>
+              !decisions?.some(
+                (decision) =>
+                  decision.reviewId === item.reviewId &&
+                  decision.issueIndex === issueIndex,
+              ),
+          );
+          const kept = !item.passed && issues.length > 0 && !unresolved;
+          return (
+            <article className="review-card" key={item.reviewer}>
+              <header>
+                <div>
+                  <strong>{reviewerLabel(item.reviewer)}</strong>
+                  <small>
+                    {item.passed
+                      ? 'Aucun blocage détecté.'
+                      : `${item.findings.length} point${item.findings.length > 1 ? 's' : ''} à examiner.`}
+                  </small>
+                </div>
+                <span className={item.passed || kept ? 'passed' : 'blocked'}>
+                  {item.passed ? 'Validé' : kept ? 'Assumé' : 'À trancher'}
+                </span>
+              </header>
+              {issues.map((issue, issueIndex) => {
+                const choice = decisions?.find(
+                  (decision) =>
+                    decision.reviewId === item.reviewId &&
+                    decision.issueIndex === issueIndex,
+                );
+                const issueKey = `${item.reviewId}:${issueIndex}`;
+                return (
+                  <section className="review-issue" key={issueKey}>
+                    <p>{issue.message}</p>
+                    <small>{sectionLabel(issue.section)}</small>
+                    {choice ? (
+                      <span className="decision-recorded">
+                        Version gardée · décision enregistrée
+                      </span>
+                    ) : (
+                      <div className="review-actions">
+                        <button
+                          disabled={Boolean(decisionPending)}
+                          onClick={() => onDecide(item, issueIndex, 'correct')}
+                        >
+                          Corriger
+                        </button>
+                        {item.reviewer !== 'factuality' ? (
+                          <button
+                            className="quiet"
+                            disabled={Boolean(decisionPending)}
+                            onClick={() => onDecide(item, issueIndex, 'keep')}
+                          >
+                            Garder cette version
+                          </button>
+                        ) : (
+                          <small className="decision-policy">
+                            Une affirmation factuelle ne peut pas être conservée
+                            sans correction.
+                          </small>
+                        )}
+                        {decisionPending === issueKey ? (
+                          <small className="decision-saving" role="status">
+                            Enregistrement de votre décision…
+                          </small>
+                        ) : null}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+              {!item.passed && !issues.length ? (
+                <p className="review-legacy-note">
+                  {item.findings.join(' ')} Cette ancienne revue doit être
+                  régénérée pour devenir actionnable.
+                </p>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
       {canRerun ? (
         <button className="quiet" disabled={paused} onClick={onReview}>
@@ -2059,14 +2322,14 @@ function ReviewView({
           type="checkbox"
         />
         <span>
-          <strong>Valider cette candidature</strong>J’ai vérifié les preuves et
-          je valide cette candidature.
+          <strong>Valider cette candidature</strong>
+          J’ai vérifié les preuves et je valide cette candidature.
         </span>
       </label>
       <div className="document-actions">
         <p>
           {ready
-            ? 'Toutes les vérifications sont validées.'
+            ? 'Les contrôles et vos décisions autorisent la validation.'
             : 'Résolvez d’abord les blocages de la revue.'}
         </p>
         <button disabled={!approved} onClick={onContinue}>
@@ -2434,18 +2697,20 @@ function CareerMemoryView({
 }
 
 function ActivityView({
+  decisions,
   events,
   onOpenReview,
   paused,
   reviews,
 }: {
+  decisions?: ReviewDecision[];
   events: WorkflowEvent[];
   onOpenReview: () => void;
   paused: boolean;
-  reviews: Review[];
+  reviews: WorkspaceReview[];
 }) {
   const deliverables = events.filter((event) => event.artifact);
-  const findings = reviews.flatMap((review) => review.findings);
+  const findings = unresolvedReviewIssues(reviews, decisions);
   return (
     <div className="standalone-view run-review-view">
       <header className="view-header">
@@ -2506,15 +2771,31 @@ function ActivityView({
               </div>
               <span>{findings.length} points à trancher</span>
             </header>
-            {reviews.map((review) => (
-              <article key={review.reviewer}>
-                <span className={review.passed ? 'passed' : 'blocked'}>
-                  {review.passed ? 'Validé' : 'Décision requise'}
-                </span>
-                <strong>{reviewerLabel(review.reviewer)}</strong>
-                <p>{review.findings.join(' ') || 'Aucun blocage détecté.'}</p>
-              </article>
-            ))}
+            {reviews.map((review) => {
+              const reviewFindings = findings.filter(
+                (finding) => finding.review.reviewer === review.reviewer,
+              );
+              return (
+                <article key={review.reviewer}>
+                  <span className={review.passed ? 'passed' : 'blocked'}>
+                    {review.passed
+                      ? 'Validé'
+                      : reviewFindings.length
+                        ? 'Décision requise'
+                        : 'Décision enregistrée'}
+                  </span>
+                  <strong>{reviewerLabel(review.reviewer)}</strong>
+                  <p>
+                    {reviewFindings
+                      .map((finding) => finding.issue.message)
+                      .join(' ') ||
+                      (review.passed
+                        ? 'Aucun blocage détecté.'
+                        : 'Tous les points ont été explicitement tranchés.')}
+                  </p>
+                </article>
+              );
+            })}
             {!reviews.length ? (
               <div className="review-placeholder">
                 <strong>Aucune revue</strong>
@@ -2657,6 +2938,58 @@ function reviewerLabel(reviewer: Review['reviewer']) {
   if (reviewer === 'hiring-manager') return 'Pertinence pour le poste';
   if (reviewer === 'factuality') return 'Vérification des preuves';
   return 'Clarté de la candidature';
+}
+
+function persistedEvents(run: PersistedRun): WorkflowEvent[] {
+  return run.events.map((event) => ({
+    actor:
+      event.actor === 'human' || event.actor === 'evidence-archivist'
+        ? 'system'
+        : event.actor,
+    action: event.summary,
+    artifact: event.artifactId,
+    costMicros: event.costMicros,
+  }));
+}
+
+function reviewGateReady(
+  state: Pick<SavedState, 'publicationEligible' | 'reviews'>,
+) {
+  return (
+    state.publicationEligible ??
+    (state.reviews.length === 3 &&
+      state.reviews.every((review) => review.passed))
+  );
+}
+
+function unresolvedReviewIssues(
+  reviews: WorkspaceReview[],
+  decisions: ReviewDecision[] = [],
+) {
+  const resolved = new Set(
+    decisions.map(({ issueIndex, reviewId }) => `${reviewId}:${issueIndex}`),
+  );
+  return reviews.flatMap((review) => {
+    const issues = review.issues?.length
+      ? review.issues
+      : review.findings.map((message) => ({
+          section: '',
+          message,
+          blocking: false,
+        }));
+    return issues
+      .map((issue, issueIndex) => ({ issue, issueIndex, review }))
+      .filter(
+        ({ issueIndex }) =>
+          !review.reviewId || !resolved.has(`${review.reviewId}:${issueIndex}`),
+      );
+  });
+}
+
+function sectionLabel(section: string) {
+  if (section === 'hero.thesis') return 'Ouverture de la page';
+  if (section.startsWith('blocks.evidence')) return 'Preuves détaillées';
+  return section ? `Section ${section}` : 'Ancienne revue';
 }
 
 function deliverableLabel(event: WorkflowEvent) {

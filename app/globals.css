@@ -837,6 +837,87 @@ blockquote p {
   color: var(--secondary);
 }
 
+.review-list .review-card {
+  display: grid;
+  gap: 14px;
+  justify-content: stretch;
+}
+
+.review-card > header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.review-card > header > div {
+  min-width: 0;
+}
+
+.review-issue {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+
+.review-issue p,
+.review-legacy-note {
+  margin: 0;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.review-actions button {
+  min-height: 40px;
+}
+
+.decision-recorded {
+  display: inline-flex;
+  margin-top: 12px;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.review-list .decision-policy {
+  max-width: 40rem;
+  margin: 0;
+  color: var(--danger);
+}
+
+.review-list .decision-saving {
+  margin: 0;
+  color: var(--secondary);
+  font-weight: 700;
+}
+
+.review-document > [role='alert'],
+.review-document > [role='status'] {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-radius: 9px;
+  font-weight: 650;
+}
+
+.review-document > [role='alert'] {
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
+.review-document > [role='status'] {
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+}
+
 .approval {
   display: flex;
   grid-template-columns: none;
@@ -2888,7 +2969,7 @@ button,
 
 .sidebar-label {
   margin: 0 10px 8px;
-  color: #92929e;
+  color: #686873;
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.08em;
@@ -2999,7 +3080,7 @@ button,
   width: min(100%, 690px);
   align-items: center;
   margin: 0;
-  color: #92929e;
+  color: #686873;
 }
 
 .global-search > span {
@@ -3022,7 +3103,7 @@ button,
   position: absolute;
   right: 16px;
   padding: 3px 6px;
-  color: #8d8d98;
+  color: #686873;
   border: 1px solid #e4e4e8;
   border-radius: 6px;
   background: #fff;
@@ -3371,6 +3452,10 @@ button,
   padding: 20px 22px;
   border: 1px solid #e5e5ea;
   border-radius: 18px;
+}
+
+.decision-queue {
+  margin-top: 18px;
 }
 
 .decision-icon {
@@ -3877,7 +3962,7 @@ button,
 
 .application-topbar .object-identity p {
   margin: 0;
-  color: #8d8d98;
+  color: #686873;
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.06em;
@@ -4511,7 +4596,7 @@ button,
     flex-direction: column;
     justify-content: center;
     padding: 0;
-    color: #8f909d;
+    color: #62626d;
     border: 0;
     border-radius: 13px;
     background: transparent;
@@ -4520,7 +4605,7 @@ button,
 
   .mobile-primary-nav button small {
     color: currentColor;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
   }
 
@@ -4655,7 +4740,7 @@ button,
   .dossier-mode .primary-nav button small {
     display: block;
     color: currentColor;
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
   }
 

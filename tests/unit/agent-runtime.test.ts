@@ -68,6 +68,28 @@ test('invalid output and blocking factuality fail closed', async () => {
   assert.throws(() => approveRun(blocked), /not eligible/);
 });
 
+test('a correction constraint is applied before real reviews', async () => {
+  const feedback = 'State the role-specific operating outcome.';
+  const corrected = await runAgentTeam({
+    ...input,
+    runId: 'corrected-run',
+    correction: {
+      section: 'hero.thesis',
+      intent: 'foreground_role_specific_operating_outcome',
+      feedback,
+    },
+    provider: new FakeAgentProvider(),
+  });
+  assert.equal(corrected.status, 'awaiting_approval');
+  assert.match(
+    latestPageSpec(corrected)!.hero.thesis,
+    /role-specific thesis foregrounds the operating outcome/i,
+  );
+  assert.doesNotMatch(latestPageSpec(corrected)!.hero.thesis, /State the/);
+  assert.equal(corrected.reviews.length, 3);
+  assert.ok(corrected.reviews.every((review) => review.passed));
+});
+
 test('budget and cancellation stop before the next provider call', async () => {
   const exhausted = await runAgentTeam({ ...input, tokenBudget: 59 });
   assert.equal(exhausted.status, 'budget_exhausted');

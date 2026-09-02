@@ -12,11 +12,11 @@ The first vertical is a real browser workflow that starts with synthetic demo da
 2. paste an offer (URLs are stored but deliberately not fetched yet);
 3. run a bounded seven-role team through a deterministic fake provider and produce a Zod-validated PageSpec;
 4. inspect a company-themed, accessible preview;
-5. run recruiter, hiring-manager and factuality reviews;
+5. run recruiter, hiring-manager and factuality reviews, then correct or explicitly keep each non-factual objection;
 6. approve, mint an expiring server capability, exchange its URL fragment for a scoped HttpOnly cookie, and revoke it;
 7. inspect or interrupt the bounded agent ledger and export all data.
 
-Email/password accounts, organization membership and Career Memory revisions persist in PostgreSQL. Draft workflow state is cached locally, but it cannot authorize publication. Starting a run reloads the requested saved Career Memory revision and writes an immutable profile snapshot, opportunity, PageSpecs, review results and audit events in one transaction. Publication accepts only that persisted run, records human approval, and serves only claims, evidence and sources derived from its reviewed snapshot.
+Email/password accounts, organization membership and Career Memory revisions persist in PostgreSQL. Draft workflow state is cached locally, but it cannot authorize publication. Starting a run reloads the requested saved Career Memory revision and writes an immutable profile snapshot, opportunity, PageSpecs, review results and audit events in one transaction. Review decisions are immutable and tenant-scoped; factual objections cannot be overridden, and a correction creates a new reviewed run. Publication accepts only a persisted run that passes this database gate, records human approval, and serves only claims, evidence and sources derived from its reviewed snapshot.
 
 ## Quick start
 

@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import {
   createRunInputSchema,
   persistedRunSchema,
+  reviewIssueDecisionInputSchema,
+  reviewIssueDecisionResultSchema,
 } from '../../lib/run-contract';
 import { syntheticProfile } from '../../lib/fixture';
 
@@ -53,7 +55,21 @@ test('persisted run contract exposes measured zero cost and durable UUIDs', () =
       usedTokens: 42,
       usedCostMicros: 0,
       profile: syntheticProfile,
-      reviews: [],
+      reviews: [
+        {
+          reviewId: randomUUID(),
+          reviewer: 'recruiter',
+          passed: false,
+          findings: ['State the role-specific operating outcome.'],
+          issues: [
+            {
+              section: 'hero.thesis',
+              message: 'State the role-specific operating outcome.',
+              blocking: false,
+            },
+          ],
+        },
+      ],
       events: [
         {
           actor: 'system',
@@ -65,5 +81,29 @@ test('persisted run contract exposes measured zero cost and durable UUIDs', () =
       ],
     }).success,
     true,
+  );
+});
+
+test('review decisions are strict and corrections require a real run', () => {
+  const input = {
+    reviewId: randomUUID(),
+    issueIndex: 0,
+    decision: 'keep' as const,
+  };
+  assert.deepEqual(reviewIssueDecisionInputSchema.parse(input), input);
+  assert.equal(
+    reviewIssueDecisionInputSchema.safeParse({ ...input, force: true }).success,
+    false,
+  );
+  assert.equal(
+    reviewIssueDecisionResultSchema.safeParse({
+      decisionId: randomUUID(),
+      runId: randomUUID(),
+      reviewId: input.reviewId,
+      issueIndex: 0,
+      decision: 'correct',
+      publicationEligible: false,
+    }).success,
+    false,
   );
 });
