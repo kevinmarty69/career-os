@@ -49,9 +49,10 @@ test('the deterministic workflow keeps provenance and gates publication', () => 
   );
   assert.equal(canPublish(false, reviews), false);
   assert.equal(canPublish(true, reviews), true);
-  assert.deepEqual(
-    strategy.selectedClaimIds,
-    syntheticProfile.claims.map((claim) => claim.id),
+  assert.deepEqual(strategy.selectedClaimIds, ['claim-demo-collaboration']);
+  assert.equal(
+    strategy.matches.some((match) => match.claimId),
+    true,
   );
 });
 
@@ -63,4 +64,17 @@ test('unsafe low-contrast accents fall back to an accessible token', () => {
     strategy,
   );
   assert.equal(spec.company.accent, '#21504b');
+});
+
+test('an unrelated astrophysics opportunity is refused', () => {
+  assert.throws(
+    () =>
+      buildStrategy(syntheticProfile, {
+        company: 'Cosmos Institute',
+        role: 'Astrophysicist',
+        description: 'Calibrate telescope optics and model stellar spectra.',
+        accent: '#21504b',
+      }),
+    /not supported by eligible evidence/,
+  );
 });

@@ -1,0 +1,18 @@
+{
+  "package": "@openai/agents@0.17.0",
+  "tag": "v0.17.0",
+  "commit": "0319b657",
+  "license": "MIT",
+  "npmIntegrity": "sha512-yzJ3tfHLO/6um9wsZ5IzEAQDaY7VcDBMxOPq7IgBaJkEPHrGX0vIXWGL0aqyreikHW4OpVmWwCaBBIOxxILXlA==",
+  "commands": ["npm run typecheck", "npm test"],
+  "tests": { "passed": 6, "failed": 0 },
+  "productionPackages": 23,
+  "typescriptLines": 196,
+  "paidCalls": 0,
+  "networkBlocked": true,
+  "limitations": [
+    "No durable scheduler",
+    "No exactly-once side-effect proof",
+    "RunState can contain tenant evidence and requires protected storage"
+  ]
+}

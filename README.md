@@ -10,13 +10,13 @@ The first vertical is a real browser workflow backed by synthetic demo data:
 
 1. edit a profile and add a source, claim and optional proof;
 2. paste an offer (URLs are stored but deliberately not fetched yet);
-3. generate a deterministic strategy and Zod-validated PageSpec;
+3. run a bounded seven-role team through a deterministic fake provider and produce a Zod-validated PageSpec;
 4. inspect a company-themed, accessible preview;
 5. run recruiter, hiring-manager and factuality reviews;
-6. approve as a human, then issue a demo private capability;
+6. inspect the human approval and publication gate (the browser-only demo capability is not a production security boundary);
 7. inspect or interrupt the bounded agent ledger and export all data.
 
-Browser data currently persists in localStorage. PostgreSQL migrations separately establish tenant RLS, composite tenant foreign keys, claim/publication gates, durable run artifacts and model-usage accounting. Authentication, DB-backed UI writes, real model calls and server capability exchange are the next slice, not hidden simulations.
+Browser data currently persists in localStorage. It is mutable demo state and cannot authorize publication. PostgreSQL migrations separately establish tenant RLS, composite tenant foreign keys, immutable hash-bound gates, durable step leases/idempotency and atomic model-budget accounting. Authentication, DB-backed UI writes, crash recovery and server capability exchange remain required before production publication. ADR-002 therefore remains proposed.
 
 ## Quick start
 

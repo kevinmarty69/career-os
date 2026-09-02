@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { syntheticProfile } from '@/lib/fixture';
+import { latestPageSpec, runAgentTeam } from '@/lib/agent-runtime';
 import {
   agentRoles,
-  buildPageSpec,
   buildStrategy,
   canPublish,
   runReviews,
@@ -85,44 +85,32 @@ export function CareerWorkspace() {
     [state.profile.claims],
   );
 
-  function generate() {
+  async function generate() {
     const strategy = buildStrategy(state.profile, state.opportunity);
-    const spec = buildPageSpec(state.profile, state.opportunity, strategy);
+    const run = await runAgentTeam({
+      tenantId: 'local-demo',
+      runId: crypto.randomUUID(),
+      profile: state.profile,
+      opportunity: state.opportunity,
+    });
+    const spec = latestPageSpec(run);
+    if (!spec) return;
     setState((current) => ({
       ...current,
       strategy,
       spec,
-      reviews: [],
+      reviews: run.reviews,
       approved: false,
       capability: undefined,
-      events: [
-        {
-          actor: 'system',
-          action: current.opportunity.url
-            ? 'Blocked URL extraction; using pasted text.'
-            : 'Accepted pasted offer text.',
-          artifact: 'offer-v1',
-          costMicros: 0,
-        },
-        {
-          actor: 'company-researcher',
-          action: 'Produced bounded company context from the offer only.',
-          artifact: 'research-v1',
-          costMicros: 0,
-        },
-        {
-          actor: 'recruiter-strategist',
-          action: `Selected ${strategy.selectedClaimIds.length} eligible claims.`,
-          artifact: 'strategy-v1',
-          costMicros: 0,
-        },
-        {
-          actor: 'page-composer',
-          action: 'Produced schema-valid PageSpec.',
-          artifact: 'page-spec-v1',
-          costMicros: 0,
-        },
-      ],
+      events: run.events.map((event) => ({
+        actor:
+          event.actor === 'human' || event.actor === 'evidence-archivist'
+            ? 'system'
+            : event.actor,
+        action: event.summary,
+        artifact: event.artifactId,
+        costMicros: event.costMicros,
+      })),
     }));
   }
 
@@ -512,13 +500,32 @@ export function CareerWorkspace() {
                     {'claimIds' in block ? (
                       block.claimIds.map((id) => {
                         const claim = claims.get(id);
+                        const evidence = claim?.evidenceIds
+                          .map((evidenceId) =>
+                            state.profile.evidence.find(
+                              (item) => item.id === evidenceId,
+                            ),
+                          )
+                          .filter(Boolean);
                         return claim ? (
-                          <p key={id}>
-                            {claim.statement}{' '}
-                            <small className={`level ${claim.level}`}>
-                              {claim.level}
-                            </small>
-                          </p>
+                          <div key={id}>
+                            <p>
+                              {claim.statement}{' '}
+                              <small className={`level ${claim.level}`}>
+                                {claim.level}
+                              </small>
+                            </p>
+                            {evidence?.map((item) => {
+                              const source = state.profile.sources.find(
+                                (candidate) => candidate.id === item!.sourceId,
+                              );
+                              return (
+                                <small key={item!.id}>
+                                  {source?.title}: “{item!.excerpt}”
+                                </small>
+                              );
+                            })}
+                          </div>
                         ) : null;
                       })
                     ) : (

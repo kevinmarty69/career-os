@@ -68,6 +68,11 @@ export function PrivatePublication() {
             {'claimIds' in block ? (
               block.claimIds.map((id) => {
                 const claim = claims.get(id);
+                const evidence = claim?.evidenceIds
+                  .map((evidenceId) =>
+                    profile.evidence.find((item) => item.id === evidenceId),
+                  )
+                  .filter(Boolean);
                 return claim ? (
                   <details key={id}>
                     <summary>{claim.statement}</summary>
@@ -80,6 +85,16 @@ export function PrivatePublication() {
                         ? `${claim.evidenceIds.length} linked proof`
                         : 'No independent proof attached.'}
                     </p>
+                    {evidence?.map((item) => {
+                      const source = profile.sources.find(
+                        (candidate) => candidate.id === item!.sourceId,
+                      );
+                      return (
+                        <p key={item!.id}>
+                          <strong>{source?.title}</strong>: “{item!.excerpt}”
+                        </p>
+                      );
+                    })}
                   </details>
                 ) : null;
               })

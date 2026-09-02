@@ -15,24 +15,24 @@
     "test:e2e": "playwright test",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "db:up": "docker compose up -d --wait db",
-    "db:test": "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/tenant_isolation.sql",
+    "db:test": "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/tenant_isolation.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/agent_ledger.sql",
     "db:down": "docker compose down"
   },
   "dependencies": {
-    "next": "16.1.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "zod": "4.3.6"
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.5.4"
   },
   "devDependencies": {
-    "@playwright/test": "1.58.2",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.10.1",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
     "eslint": "9.39.2",
-    "eslint-config-next": "16.1.6",
-    "prettier": "3.8.1",
-    "tsx": "4.21.0",
+    "eslint-config-next": "16.3.4",
+    "prettier": "3.9.6",
+    "tsx": "4.23.13",
     "typescript": "5.9.3"
   },
   "packageManager": "pnpm@11.24.0"

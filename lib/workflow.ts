@@ -18,6 +18,12 @@ export type Strategy = {
   thesis: string;
   selectedClaimIds: string[];
   gaps: string[];
+  matches: Array<{
+    requirement: string;
+    claimId?: string;
+    evidenceIds: string[];
+    gap?: string;
+  }>;
 };
 
 export type WorkflowEvent = {
@@ -78,24 +84,95 @@ export function buildStrategy(
   opportunity: Opportunity,
 ): Strategy {
   const profile = profileSchema.parse(profileInput);
-  const selected = profile.claims
-    .filter(
-      (claim) =>
-        claim.allowedUses.includes('application') &&
-        claim.sensitivity !== 'restricted',
-    )
-    .slice(0, 3);
+  const eligible = profile.claims.filter(
+    (claim) =>
+      claim.allowedUses.includes('application') &&
+      claim.sensitivity !== 'restricted',
+  );
+  const requirements = sentences(
+    `${opportunity.role}. ${opportunity.description}`,
+  );
+  const matches = requirements.map((requirement) => {
+    const requirementWords = keywords(requirement);
+    const claim = eligible
+      .map((candidate) => ({
+        candidate,
+        score: overlap(
+          requirementWords,
+          keywords(
+            [
+              candidate.statement,
+              ...candidate.evidenceIds.map(
+                (id) =>
+                  profile.evidence.find((item) => item.id === id)?.excerpt,
+              ),
+            ].join(' '),
+          ),
+        ),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .find(({ score }) => score > 0)?.candidate;
+    return claim
+      ? { requirement, claimId: claim.id, evidenceIds: claim.evidenceIds }
+      : {
+          requirement,
+          evidenceIds: [],
+          gap: `No eligible evidence supports: ${requirement}`,
+        };
+  });
+  const selectedClaimIds = [
+    ...new Set(
+      matches.flatMap((match) => (match.claimId ? [match.claimId] : [])),
+    ),
+  ];
 
-  if (selected.length === 0)
-    throw new Error('At least one publishable claim is required.');
+  if (selectedClaimIds.length === 0)
+    throw new Error('The opportunity is not supported by eligible evidence.');
 
   return {
     thesis: `${profile.headline} applied to ${opportunity.role} at ${opportunity.company}.`,
-    selectedClaimIds: selected.map((claim) => claim.id),
-    gaps: opportunity.description.trim()
-      ? []
-      : ['The role description is missing.'],
+    selectedClaimIds,
+    gaps: matches.flatMap((match) => (match.gap ? [match.gap] : [])),
+    matches,
   };
+}
+
+const ignoredWords = new Set([
+  'and',
+  'at',
+  'build',
+  'customer',
+  'facing',
+  'for',
+  'in',
+  'of',
+  'role',
+  'senior',
+  'small',
+  'team',
+  'the',
+  'to',
+  'with',
+]);
+
+function sentences(value: string) {
+  return value
+    .split(/[.!?\n]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function keywords(value: string) {
+  return new Set(
+    value
+      .toLowerCase()
+      .match(/[a-z0-9]+/g)
+      ?.filter((word) => word.length > 2 && !ignoredWords.has(word)) ?? [],
+  );
+}
+
+function overlap(left: Set<string>, right: Set<string>) {
+  return [...left].filter((word) => right.has(word)).length;
 }
 
 export function buildPageSpec(

@@ -6,10 +6,11 @@ services:
       POSTGRES_PASSWORD: career_os
       POSTGRES_DB: career_os
     ports:
-      - '54329:5432'
+      - '127.0.0.1:54329:5432'
     volumes:
       - career_os_db:/var/lib/postgresql/data
       - ./supabase/migrations/0001_initial.sql:/docker-entrypoint-initdb.d/0001_initial.sql:ro
+      - ./supabase/migrations/0002_agent_ledger.sql:/docker-entrypoint-initdb.d/0002_agent_ledger.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U career_os']
       interval: 2s
