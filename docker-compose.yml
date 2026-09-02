@@ -17,6 +17,7 @@ services:
       - ./supabase/migrations/0006_living_profiles.sql:/docker-entrypoint-initdb.d/0006_living_profiles.sql:ro
       - ./supabase/migrations/0007_persisted_agent_runs.sql:/docker-entrypoint-initdb.d/0007_persisted_agent_runs.sql:ro
       - ./supabase/migrations/0008_review_issue_decisions.sql:/docker-entrypoint-initdb.d/0008_review_issue_decisions.sql:ro
+      - ./supabase/migrations/0009_applications.sql:/docker-entrypoint-initdb.d/0009_applications.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U career_os']
       interval: 2s

@@ -4,8 +4,14 @@ begin;
 insert into app.tenants (id, owner_id, name) values
   ('21000000-0000-0000-0000-000000000001', '11000000-0000-0000-0000-000000000001', 'Ledger tenant'),
   ('21000000-0000-0000-0000-000000000002', '11000000-0000-0000-0000-000000000002', 'Other tenant');
-insert into app.opportunities (id, tenant_id, company, role, raw_text, extraction_status) values
-  ('41000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', 'Northstar', 'Engineer', 'workflow', 'ready');
+insert into app.applications (id, tenant_id, company, role, raw_text, accent,
+  create_idempotency_key, create_input_hash) values
+  ('41000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', 'Northstar', 'Engineer', 'workflow', '#21504b',
+   '41000000-0000-0000-0000-000000000011', repeat('a', 64));
+insert into app.opportunities (id, tenant_id, application_id, application_revision,
+  company, role, raw_text, extraction_status) values
+  ('41000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', '41000000-0000-0000-0000-000000000001', 1,
+   'Northstar', 'Engineer', 'workflow', 'ready');
 insert into app.workflow_runs (id, tenant_id, opportunity_id, state, token_budget, cost_budget_micros, deadline_at) values
   ('51000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', '41000000-0000-0000-0000-000000000001', 'running', 100, 100, now() + interval '1 hour');
 

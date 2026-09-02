@@ -13,7 +13,12 @@ export const runOpportunitySchema = z
 
 export const createRunInputSchema = z
   .object({
-    opportunity: runOpportunitySchema,
+    applicationId: z.string().uuid(),
+    applicationRevision: z
+      .number()
+      .int()
+      .positive()
+      .max(Number.MAX_SAFE_INTEGER),
     profileRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   })
   .strict();

@@ -1,7 +1,13 @@
 export class PayloadTooLargeError extends Error {}
 
 export function isSameOrigin(request: Request) {
-  return request.headers.get('origin') === new URL(request.url).origin;
+  try {
+    const configuredUrl = process.env.BETTER_AUTH_URL;
+    const expectedOrigin = new URL(configuredUrl || request.url).origin;
+    return request.headers.get('origin') === expectedOrigin;
+  } catch {
+    return false;
+  }
 }
 
 export async function readBoundedJson(request: Request, maximumBytes: number) {

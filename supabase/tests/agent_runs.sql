@@ -19,9 +19,16 @@ insert into app.profiles (id, tenant_id, name, headline, profile_kind, revision)
   ('47000000-0000-0000-0000-000000000001', '27000000-0000-0000-0000-000000000001', 'Living', 'Living profile', 'living', 2),
   ('47000000-0000-0000-0000-000000000002', '27000000-0000-0000-0000-000000000001', 'Snapshot', 'Immutable snapshot', 'snapshot', 2),
   ('47000000-0000-0000-0000-000000000003', '27000000-0000-0000-0000-000000000002', 'Other', 'Other snapshot', 'snapshot', 1);
-insert into app.opportunities (id, tenant_id, company, role, extraction_status) values
-  ('57000000-0000-0000-0000-000000000001', '27000000-0000-0000-0000-000000000001', 'Northstar', 'Engineer', 'ready'),
-  ('57000000-0000-0000-0000-000000000002', '27000000-0000-0000-0000-000000000002', 'Other', 'Engineer', 'ready');
+insert into app.applications (id, tenant_id, company, role, raw_text, accent,
+  create_idempotency_key, create_input_hash) values
+  ('57000000-0000-0000-0000-000000000001', '27000000-0000-0000-0000-000000000001', 'Northstar', 'Engineer', 'Northstar role', '#21504b',
+   '57000000-0000-0000-0000-000000000011', repeat('a', 64)),
+  ('57000000-0000-0000-0000-000000000002', '27000000-0000-0000-0000-000000000002', 'Other', 'Engineer', 'Other role', '#21504b',
+   '57000000-0000-0000-0000-000000000012', repeat('b', 64));
+insert into app.opportunities (id, tenant_id, application_id, application_revision,
+  company, role, extraction_status) values
+  ('57000000-0000-0000-0000-000000000001', '27000000-0000-0000-0000-000000000001', '57000000-0000-0000-0000-000000000001', 1, 'Northstar', 'Engineer', 'ready'),
+  ('57000000-0000-0000-0000-000000000002', '27000000-0000-0000-0000-000000000002', '57000000-0000-0000-0000-000000000002', 1, 'Other', 'Engineer', 'ready');
 insert into app.workflow_runs (
   id, tenant_id, opportunity_id, profile_id, source_profile_id,
   source_profile_revision, idempotency_key, state, status, token_budget,

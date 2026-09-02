@@ -50,17 +50,36 @@ insert into app.claim_evidence (
   '78000000-0000-0000-0000-000000000001',
   '68000000-0000-0000-0000-000000000001', 0
 );
-insert into app.opportunities (
-  id, tenant_id, company, role, extraction_status
+insert into app.applications (
+  id, tenant_id, company, role, raw_text, accent,
+  create_idempotency_key, create_input_hash
 ) values
   (
     '88000000-0000-0000-0000-000000000001',
     '28000000-0000-0000-0000-000000000001',
+    'Decision Co', 'Engineer', 'Decision role', '#21504b',
+    '88000000-0000-0000-0000-000000000011', repeat('a', 64)
+  ),
+  (
+    '88000000-0000-0000-0000-000000000002',
+    '28000000-0000-0000-0000-000000000001',
+    'Other Co', 'Engineer', 'Other role', '#21504b',
+    '88000000-0000-0000-0000-000000000012', repeat('b', 64)
+  );
+insert into app.opportunities (
+  id, tenant_id, application_id, application_revision, company, role,
+  extraction_status
+) values
+  (
+    '88000000-0000-0000-0000-000000000001',
+    '28000000-0000-0000-0000-000000000001',
+    '88000000-0000-0000-0000-000000000001', 1,
     'Decision Co', 'Engineer', 'ready'
   ),
   (
     '88000000-0000-0000-0000-000000000002',
     '28000000-0000-0000-0000-000000000001',
+    '88000000-0000-0000-0000-000000000002', 1,
     'Other Co', 'Engineer', 'ready'
   );
 insert into app.workflow_runs (

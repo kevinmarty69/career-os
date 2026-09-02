@@ -13,9 +13,16 @@ const admin = postgres(databaseUrl, { max: 1 });
 try {
   await admin`insert into app.tenants (id, owner_id, name)
     values (${tenantId}, ${ownerId}, 'Concurrency tenant')`;
+  await admin`insert into app.applications
+    (id, tenant_id, company, role, raw_text, accent, create_idempotency_key,
+      create_input_hash)
+    values (${opportunityId}, ${tenantId}, 'Concurrency Co', 'Engineer', 'test',
+      '#21504b', gen_random_uuid(), ${'a'.repeat(64)})`;
   await admin`insert into app.opportunities
-    (id, tenant_id, company, role, raw_text, extraction_status)
-    values (${opportunityId}, ${tenantId}, 'Concurrency Co', 'Engineer', 'test', 'ready')`;
+    (id, tenant_id, application_id, application_revision, company, role,
+      raw_text, extraction_status)
+    values (${opportunityId}, ${tenantId}, ${opportunityId}, 1,
+      'Concurrency Co', 'Engineer', 'test', 'ready')`;
   await admin`insert into app.workflow_runs
     (id, tenant_id, opportunity_id, state, token_budget, cost_budget_micros, deadline_at)
     values (${runId}, ${tenantId}, ${opportunityId}, 'running', 100, 100, now() + interval '1 hour')`;

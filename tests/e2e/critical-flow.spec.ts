@@ -1,36 +1,37 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function openApplications(page: Page) {
-  const navigation = page.getByRole('button', {
-    name: 'Candidatures',
-    exact: true,
+  await openApplicationsBoard(page);
+  const application = page.getByRole('button', {
+    name: 'Ouvrir la candidature Northstar Labs',
   });
+  await application.waitFor();
+  await application.click();
+}
+
+async function openApplicationsBoard(page: Page) {
+  await openPrimary(page, 'Candidatures');
+}
+
+async function openPrimary(page: Page, name: string) {
+  const navigation = page.getByRole('button', { name, exact: true });
   await navigation.first().waitFor({ state: 'attached' });
   for (let index = 0; index < (await navigation.count()); index += 1) {
     const candidate = navigation.nth(index);
     if (await candidate.isVisible()) {
       await candidate.click();
-      const application = page.getByRole('button', {
-        name: 'Ouvrir la candidature Northstar Labs',
-      });
-      await application.waitFor();
-      await application.click();
       return;
     }
   }
-  await page
-    .getByRole('button', {
-      name: /Commencer par l’offre|Ouvrir la candidature/,
-    })
-    .first()
-    .click();
+  throw new Error(`No visible ${name} navigation.`);
 }
 
 async function useDemo(page: Page) {
   const button = page.getByRole('button', {
     name: 'Explorer avec des données fictives',
   });
-  if (await button.isVisible()) await button.click();
+  await button.waitFor();
+  await button.click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -147,6 +148,72 @@ test('restores an anonymous draft after reload', async ({ page }) => {
   ).toBeVisible();
 });
 
+test('keeps two local application dossiers isolated across reloads', async ({
+  page,
+}) => {
+  await useDemo(page);
+  await openApplications(page);
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await page.getByRole('button', { name: 'Retour aux candidatures' }).click();
+  await page
+    .getByRole('button', { name: 'Coller une offre', exact: true })
+    .click();
+  await expect(page.getByText('À compléter', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Générer la page' }),
+  ).toBeDisabled();
+  await page.getByLabel('Entreprise', { exact: true }).fill('Atlas Health');
+  await page.getByLabel('Poste', { exact: true }).fill('Founding Engineer');
+  await page
+    .getByLabel('Description du poste')
+    .fill('Build a reliable patient-facing workflow with a small team.');
+  await expect(
+    page.getByRole('button', { name: 'Générer la page' }),
+  ).toBeEnabled();
+  await page.evaluate(() =>
+    sessionStorage.setItem('preserve-career-os-demo', '1'),
+  );
+  await expect(page).toHaveURL(/view=applications/);
+  await expect(page).toHaveURL(/tab=brief/);
+  await page.reload();
+  await expect(page.getByLabel('Entreprise', { exact: true })).toHaveValue(
+    'Atlas Health',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Retour aux candidatures' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Retour aux candidatures' }).click();
+  await expect(
+    page.getByRole('button', {
+      name: 'Ouvrir la candidature Northstar Labs',
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Ouvrir la candidature Atlas Health' }),
+  ).toBeVisible();
+
+  await page
+    .getByRole('button', { name: 'Ouvrir la candidature Atlas Health' })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Générer la page' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Retour aux candidatures' }).click();
+  await page
+    .getByRole('button', {
+      name: 'Ouvrir la candidature Northstar Labs',
+    })
+    .click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Confirmer la pertinence et les preuves',
+    }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Retour aux candidatures' }).click();
+  await expect(page.locator('.application-card')).toHaveCount(2);
+});
+
 test('builds, reviews, approves and issues one private capability', async ({
   browser,
   page,
@@ -211,9 +278,7 @@ test('builds, reviews, approves and issues one private capability', async ({
     .click();
   await expect(page.getByLabel('Entreprise', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('Poste', { exact: true })).toHaveValue('');
-  await page
-    .getByLabel('Entreprise', { exact: true })
-    .fill('Northstar Labs');
+  await page.getByLabel('Entreprise', { exact: true }).fill('Northstar Labs');
   await page
     .getByLabel('Poste', { exact: true })
     .fill('Senior Product Engineer');
@@ -223,7 +288,7 @@ test('builds, reviews, approves and issues one private capability', async ({
       'Build dependable customer-facing workflows with a small product team.',
     );
   await page.reload();
-  await page.getByRole('button', { name: 'Ouvrir la mémoire pro' }).click();
+  await openPrimary(page, 'Mémoire pro');
   await expect(page.getByLabel('Positionnement')).toHaveValue(
     'Evidence-backed Product Engineer',
   );
@@ -248,11 +313,12 @@ test('builds, reviews, approves and issues one private capability', async ({
       item.startsWith('career-os-workspace:'),
     )!;
     const saved = JSON.parse(localStorage.getItem(key)!);
+    const dossier = saved.dossiers[0];
     const response = await fetch('/api/publications', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        spec: saved.spec,
+        spec: dossier.spec,
         approved: true,
         profileRevision: 1,
         opportunity: {

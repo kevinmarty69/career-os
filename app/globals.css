@@ -273,6 +273,16 @@ button.danger-link:hover:not(:disabled) {
   background: var(--surface-hover);
 }
 
+.application-row + .application-row {
+  margin-top: 6px;
+}
+
+.application-row.new {
+  color: var(--secondary);
+  border-style: dashed;
+  background: transparent;
+}
+
 .application-row strong,
 .application-row small {
   display: block;
@@ -3830,6 +3840,10 @@ button,
   transform: translateY(-1px);
 }
 
+.application-column > .application-card + .application-card {
+  margin-top: 10px;
+}
+
 .application-card-copy strong,
 .application-card-copy small {
   display: block;
@@ -4674,6 +4688,10 @@ button,
 
   .application-column {
     min-height: auto;
+  }
+
+  .application-column:has(.empty-column) {
+    display: none;
   }
 
   .applications-list-head {

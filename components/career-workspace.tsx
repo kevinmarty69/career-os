@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
+import { applicationSchema } from '@/lib/application-contract';
 import { latestPageSpec, runAgentTeam } from '@/lib/agent-runtime';
 import { syntheticProfile } from '@/lib/fixture';
 import {
@@ -10,7 +11,6 @@ import {
   buildStrategy,
   runReviews,
   type Opportunity,
-  type Strategy,
   type WorkflowEvent,
 } from '@/lib/workflow';
 import {
@@ -32,16 +32,25 @@ import {
   type ProfileImportCandidate,
   type ProfileImportResult,
 } from '@/lib/profile-import';
-
-type WorkspaceReview = Review & {
-  reviewId?: string;
-  issues?: PersistedRun['reviews'][number]['issues'];
-};
-type ReviewDecision = {
-  reviewId: string;
-  issueIndex: number;
-  decision: 'keep' | 'correct';
-};
+import {
+  createDemoDossier,
+  createEmptyDossier,
+  createEmptyWorkspace,
+  dossierNextView,
+  dossierStage,
+  dossierStatus,
+  invalidateDossiersAfterProfileChange,
+  mergePersistedApplications,
+  opportunityReady,
+  restoreWorkspace,
+  updateDossier,
+  type ApplicationDossier,
+  type ReviewDecision,
+  type SavedWorkspaceV2,
+  type ScopedShareLink,
+  type WorkspaceReview,
+  visibleShareUrl,
+} from '@/lib/workspace-state';
 type AllowedUse = Profile['claims'][number]['allowedUses'][number];
 type ImportReviewCandidate = ProfileImportCandidate & {
   id: string;
@@ -57,40 +66,10 @@ type ImportReview = Omit<ProfileImportResult, 'candidates'> & {
   expiresAt: number;
 };
 type OnboardingMode = 'start' | 'paste' | 'review' | 'manual';
-
-type SavedState = {
-  profile: Profile;
-  profileOrigin: 'empty' | 'demo' | 'user';
-  opportunity: Opportunity;
-  strategy?: Strategy;
-  spec?: PageSpec;
-  runId?: string;
-  runProfile?: Profile;
-  reviews: WorkspaceReview[];
-  reviewDecisions?: ReviewDecision[];
-  publicationEligible?: boolean;
-  approved: boolean;
-  capability?: string;
-  events: WorkflowEvent[];
-  paused: boolean;
-};
 type PrimaryView = 'home' | 'applications' | 'memory' | 'activity' | 'settings';
 type DossierView =
   'board' | 'brief' | 'company' | 'journey' | 'draft' | 'review' | 'share';
 
-const initialOpportunity: Opportunity = {
-  company: 'Northstar Labs',
-  role: 'Senior Product Engineer',
-  description:
-    'Build dependable customer-facing workflows with a small product team.',
-  accent: '#21504b',
-};
-const emptyOpportunity: Opportunity = {
-  company: '',
-  role: '',
-  description: '',
-  accent: '#5847e8',
-};
 const emptyProfile: Profile = {
   name: '',
   headline: '',
@@ -98,6 +77,10 @@ const emptyProfile: Profile = {
   evidence: [],
   claims: [],
 };
+const fallbackDossier = createEmptyDossier({
+  id: '00000000-0000-4000-8000-000000000000',
+  now: 0,
+});
 const primaryViews: Array<[PrimaryView, string]> = [
   ['home', 'Accueil'],
   ['activity', 'À trancher'],
@@ -121,18 +104,48 @@ const importCandidateGroupLabels = {
   other: 'Autres informations',
 } as const;
 
+function restoreNavigation(workspace: SavedWorkspaceV2): {
+  workspace: SavedWorkspaceV2;
+  primaryView: PrimaryView;
+  dossierView: DossierView;
+} {
+  if (workspace.profileOrigin === 'empty')
+    return { workspace, primaryView: 'home', dossierView: 'brief' };
+  const params = new URLSearchParams(window.location.search);
+  const requestedView = params.get('view');
+  const primaryView = primaryViews.some(([view]) => view === requestedView)
+    ? (requestedView as PrimaryView)
+    : 'home';
+  if (primaryView !== 'applications')
+    return { workspace, primaryView, dossierView: 'brief' };
+
+  const dossier = workspace.dossiers.find(
+    ({ id }) => id === params.get('dossier'),
+  );
+  if (!dossier)
+    return { workspace, primaryView: 'applications', dossierView: 'board' };
+  const requestedTab = params.get('tab');
+  const allowedTabs: DossierView[] = [
+    'brief',
+    'company',
+    'journey',
+    ...(dossier.spec ? (['draft', 'review'] as DossierView[]) : []),
+    ...(dossier.spec || dossier.capability ? (['share'] as DossierView[]) : []),
+  ];
+  return {
+    workspace: { ...workspace, selectedDossierId: dossier.id },
+    primaryView: 'applications',
+    dossierView: allowedTabs.includes(requestedTab as DossierView)
+      ? (requestedTab as DossierView)
+      : dossierNextView(dossier),
+  };
+}
+
 export function CareerWorkspace() {
   const session = authClient.useSession();
   const activeOrganization = authClient.useActiveOrganization();
-  const [state, setState] = useState<SavedState>({
-    profile: emptyProfile,
-    profileOrigin: 'empty',
-    opportunity: emptyOpportunity,
-    reviews: [],
-    approved: false,
-    events: [],
-    paused: false,
-  });
+  const [workspace, setWorkspace] =
+    useState<SavedWorkspaceV2>(createEmptyWorkspace);
   const [loaded, setLoaded] = useState(false);
   const [primaryView, setPrimaryView] = useState<PrimaryView>('home');
   const [dossierView, setDossierView] = useState<DossierView>('brief');
@@ -145,7 +158,7 @@ export function CareerWorkspace() {
   const [decisionPending, setDecisionPending] = useState('');
   const [decisionError, setDecisionError] = useState('');
   const [decisionMessage, setDecisionMessage] = useState('');
-  const [shareUrl, setShareUrl] = useState('');
+  const [shareLink, setShareLink] = useState<ScopedShareLink>();
   const [shareMessage, setShareMessage] = useState('');
   const [memoryError, setMemoryError] = useState('');
   const [memoryRevision, setMemoryRevision] = useState(0);
@@ -167,130 +180,149 @@ export function CareerWorkspace() {
     level: 'declared' as 'verified' | 'declared' | 'inferred',
   });
   const requestedScope = useRef('');
-  const pendingRun = useRef<{ input: string; key: string } | undefined>(
-    undefined,
-  );
+  const pendingRuns = useRef(new Map<string, { input: string; key: string }>());
   const pendingDecisions = useRef(new Map<string, string>());
   const pendingImport = useRef<AbortController | undefined>(undefined);
   const activeTenantId = session.data?.session.activeOrganizationId;
+  const currentScope = activeTenantId ?? 'anonymous';
+  const workspaceReady = loaded && resolvedScope === currentScope;
   const storageKey = activeTenantId
     ? `career-os-workspace:${activeTenantId}`
     : 'career-os-demo';
   const onboardingStorageKey = activeTenantId
     ? `career-os-onboarding:${activeTenantId}`
     : 'career-os-onboarding:anonymous';
+  const state =
+    workspace.dossiers.find(
+      (dossier) => dossier.id === workspace.selectedDossierId,
+    ) ?? fallbackDossier;
+  const selectedDossierIdRef = useRef(workspace.selectedDossierId);
+  selectedDossierIdRef.current = workspace.selectedDossierId;
+  const shareUrl = visibleShareUrl(shareLink, resolvedScope, state.id);
 
   useEffect(() => {
     if (session.isPending) return;
-    const scope = activeTenantId ?? 'anonymous';
+    const scope = currentScope;
     requestedScope.current = scope;
     const controller = new AbortController();
 
     void (async () => {
       await Promise.resolve();
       if (controller.signal.aborted) return;
-      setShareUrl('');
+      setShareLink(undefined);
       setMemorySyncMessage('');
       setShowMemoryHandoff(false);
       setOnboardingMode('start');
       setImportReview(undefined);
       setImportError('');
       const saved = localStorage.getItem(storageKey);
-      let nextState: SavedState = {
-        profile: emptyProfile,
-        profileOrigin: 'empty',
-        opportunity: emptyOpportunity,
-        reviews: [],
-        approved: false,
-        events: [],
-        paused: false,
-      };
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as SavedState;
-          nextState = {
-            ...parsed,
-            profileOrigin:
-              parsed.profileOrigin ??
-              (parsed.profile.sources.some((source) =>
-                source.id.startsWith('source-demo-'),
-              )
-                ? 'empty'
-                : 'user'),
-            events: parsed.events ?? [],
-            paused: parsed.paused ?? false,
-          };
-        } catch {
-          localStorage.removeItem(storageKey);
-        }
-      }
+      let nextWorkspace = restoreWorkspace(saved);
       let revision = 0;
       if (activeTenantId) {
-        try {
-          const response = await fetch('/api/profile', {
+        const [profileRequest, applicationsRequest] = await Promise.allSettled([
+          fetch('/api/profile', {
             cache: 'no-store',
             signal: controller.signal,
-          });
-          if (!response.ok) throw new Error('PROFILE_LOAD_FAILED');
-          const result = (await response.json()) as {
+          }),
+          fetch('/api/applications', {
+            cache: 'no-store',
+            signal: controller.signal,
+          }),
+        ]);
+        if (controller.signal.aborted) return;
+        if (profileRequest.status === 'fulfilled' && profileRequest.value.ok) {
+          const result = (await profileRequest.value.json()) as {
             profile: Profile | null;
             revision: number;
           };
           if (result.profile)
-            nextState = {
-              ...nextState,
+            nextWorkspace = {
+              ...nextWorkspace,
               profile: result.profile,
               profileOrigin: 'user',
             };
-          else if (nextState.profileOrigin === 'demo')
-            nextState = {
-              ...nextState,
+          else if (nextWorkspace.profileOrigin === 'demo')
+            nextWorkspace = {
+              ...nextWorkspace,
               profile: emptyProfile,
               profileOrigin: 'empty',
+              dossiers: [],
+              selectedDossierId: undefined,
             };
           revision = result.revision;
-        } catch {
-          if (controller.signal.aborted) return;
+        } else
           setMemorySyncMessage(
             'La mémoire professionnelle enregistrée n’a pas pu être chargée. Les changements locaux restent disponibles.',
           );
-        }
+        if (
+          applicationsRequest.status === 'fulfilled' &&
+          applicationsRequest.value.ok
+        ) {
+          const payload = (await applicationsRequest.value.json()) as {
+            applications: unknown;
+          };
+          nextWorkspace = mergePersistedApplications(
+            nextWorkspace,
+            applicationSchema.array().parse(payload.applications),
+          );
+        } else
+          setMemorySyncMessage(
+            (current) =>
+              current ||
+              'Les candidatures enregistrées n’ont pas pu être chargées. Les brouillons locaux restent disponibles.',
+          );
       }
-      if (nextState.profileOrigin === 'empty') {
-        const restored = restoreImportReview(
-          sessionStorage.getItem(onboardingStorageKey),
-        );
+      if (nextWorkspace.profileOrigin === 'empty') {
+        const storedReview = sessionStorage.getItem(onboardingStorageKey);
+        const restored = restoreImportReview(storedReview);
         if (restored) {
           setImportReview(restored);
           setOnboardingMode('review');
-        } else sessionStorage.removeItem(onboardingStorageKey);
+        } else {
+          sessionStorage.removeItem(onboardingStorageKey);
+          if (importReviewExpired(storedReview))
+            setImportError(
+              'Cette revue a expiré après 30 minutes. Relancez l’import pour continuer.',
+            );
+        }
       } else sessionStorage.removeItem(onboardingStorageKey);
       if (controller.signal.aborted || requestedScope.current !== scope) return;
-      setState(nextState);
+      const navigation = restoreNavigation(nextWorkspace);
+      nextWorkspace = navigation.workspace;
+      setPrimaryView(navigation.primaryView);
+      setDossierView(navigation.dossierView);
+      setWorkspace(nextWorkspace);
       setMemoryRevision(revision);
-      setSavedProfileJson(revision ? JSON.stringify(nextState.profile) : '');
+      setSavedProfileJson(
+        revision ? JSON.stringify(nextWorkspace.profile) : '',
+      );
       setResolvedScope(scope);
       setLoaded(true);
     })();
 
     return () => controller.abort();
-  }, [activeTenantId, onboardingStorageKey, session.isPending, storageKey]);
+  }, [
+    activeTenantId,
+    currentScope,
+    onboardingStorageKey,
+    session.isPending,
+    storageKey,
+  ]);
 
   useEffect(() => {
-    const scope = activeTenantId ?? 'anonymous';
-    if (loaded && resolvedScope === scope)
-      localStorage.setItem(storageKey, JSON.stringify(state));
-  }, [activeTenantId, loaded, resolvedScope, state, storageKey]);
+    if (workspaceReady)
+      localStorage.setItem(storageKey, JSON.stringify(workspace));
+  }, [storageKey, workspace, workspaceReady]);
 
   useEffect(() => {
     const scope = activeTenantId ?? 'anonymous';
     if (!loaded || resolvedScope !== scope) return;
-    if (state.profileOrigin === 'empty' && importReview)
+    if (workspace.profileOrigin === 'empty' && importReview)
       sessionStorage.setItem(
         onboardingStorageKey,
         JSON.stringify(importReview),
       );
-    else if (state.profileOrigin !== 'empty')
+    else if (workspace.profileOrigin !== 'empty')
       sessionStorage.removeItem(onboardingStorageKey);
   }, [
     activeTenantId,
@@ -298,7 +330,7 @@ export function CareerWorkspace() {
     loaded,
     onboardingStorageKey,
     resolvedScope,
-    state.profileOrigin,
+    workspace.profileOrigin,
   ]);
 
   const importReviewExpiresAt = importReview?.expiresAt;
@@ -324,8 +356,20 @@ export function CareerWorkspace() {
     return () => window.clearTimeout(timeout);
   }, [importReviewExpiresAt, onboardingStorageKey]);
 
-  const workspaceReady =
-    loaded && resolvedScope === (activeTenantId ?? 'anonymous');
+  useEffect(() => {
+    if (!workspaceReady) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    url.searchParams.delete('dossier');
+    url.searchParams.delete('tab');
+    if (primaryView !== 'home') url.searchParams.set('view', primaryView);
+    if (primaryView === 'applications' && dossierView !== 'board') {
+      if (workspace.selectedDossierId)
+        url.searchParams.set('dossier', workspace.selectedDossierId);
+      url.searchParams.set('tab', dossierView);
+    }
+    history.replaceState(history.state, '', url);
+  }, [dossierView, primaryView, workspace.selectedDossierId, workspaceReady]);
 
   if (!workspaceReady)
     return (
@@ -337,28 +381,85 @@ export function CareerWorkspace() {
       </main>
     );
 
-  const decisionCount = unresolvedReviewIssues(
-    state.reviews,
-    state.reviewDecisions,
-  ).length;
-  const status = state.capability
-    ? 'Partagée'
-    : state.approved
-      ? 'Validée'
-      : state.spec && decisionCount
-        ? 'Revue requise'
-        : state.spec && reviewGateReady(state)
-          ? 'Prête à valider'
-          : state.spec
-            ? 'Brouillon prêt'
-            : 'Offre prête';
+  const totalDecisionCount = workspace.dossiers.reduce(
+    (total, dossier) =>
+      total +
+      unresolvedReviewIssues(dossier.reviews, dossier.reviewDecisions).length,
+    0,
+  );
+  const status = dossierStatus(state);
+
+  function updateApplicationDossier(
+    dossierId: string,
+    update: (dossier: ApplicationDossier) => ApplicationDossier,
+  ) {
+    setWorkspace((current) => updateDossier(current, dossierId, update));
+  }
+
+  async function persistApplication(dossier: ApplicationDossier) {
+    const payload = {
+      company: dossier.opportunity.company,
+      role: dossier.opportunity.role,
+      description: dossier.opportunity.description,
+      ...(dossier.opportunity.url ? { url: dossier.opportunity.url } : {}),
+      accent: dossier.opportunity.accent,
+      stage: 'draft' as const,
+    };
+    const response = await fetch(
+      dossier.applicationId
+        ? `/api/applications/${dossier.applicationId}`
+        : '/api/applications',
+      {
+        method: dossier.applicationId ? 'PATCH' : 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(!dossier.applicationId ? { 'idempotency-key': dossier.id } : {}),
+        },
+        body: JSON.stringify(
+          dossier.applicationId
+            ? { ...payload, expectedRevision: dossier.applicationRevision }
+            : payload,
+        ),
+      },
+    );
+    if (!response.ok)
+      throw new Error(
+        response.status === 409
+          ? 'APPLICATION_CONFLICT'
+          : response.status === 400
+            ? 'APPLICATION_REJECTED'
+            : 'APPLICATION_FAILED',
+      );
+    const application = applicationSchema.parse(await response.json());
+    updateApplicationDossier(dossier.id, (current) => ({
+      ...current,
+      applicationId: application.applicationId,
+      applicationRevision: application.revision,
+      opportunity: {
+        company: application.company,
+        role: application.role,
+        description: application.description,
+        ...(application.url ? { url: application.url } : {}),
+        accent: application.accent,
+      },
+    }));
+    return application;
+  }
 
   async function generate() {
+    const dossierId = state.id;
+    if (!opportunityReady(state.opportunity)) {
+      setGenerateError(
+        'Complétez l’entreprise, le poste et la description avant de générer la page.',
+      );
+      setDossierView('brief');
+      return;
+    }
     const persistedWorkspace =
-      Boolean(activeTenantId) && state.profileOrigin === 'user';
+      Boolean(activeTenantId) && workspace.profileOrigin === 'user';
     if (
       persistedWorkspace &&
-      JSON.stringify(state.profile) !== savedProfileJson
+      JSON.stringify(workspace.profile) !== savedProfileJson
     ) {
       setGenerateError(
         'Enregistrez la mémoire professionnelle avant de générer la page.',
@@ -369,29 +470,39 @@ export function CareerWorkspace() {
     setGenerating(true);
     setGenerateError('');
     try {
-      const strategy = buildStrategy(state.profile, state.opportunity);
-      const persistedInput = JSON.stringify({
-        opportunity: state.opportunity,
-        profileRevision: memoryRevision,
-      });
+      const strategy = buildStrategy(workspace.profile, state.opportunity);
+      const application = persistedWorkspace
+        ? await persistApplication(state)
+        : undefined;
+      const persistedInput = JSON.stringify(
+        application
+          ? {
+              applicationId: application.applicationId,
+              applicationRevision: application.revision,
+              profileRevision: memoryRevision,
+            }
+          : { opportunity: state.opportunity, profileRevision: memoryRevision },
+      );
       let runId: string | undefined;
-      let runProfile = state.profile;
+      let runProfile = workspace.profile;
       let reviews: WorkspaceReview[];
       let events: WorkflowEvent[];
       let spec: PageSpec | undefined;
       let publicationEligible = false;
 
       if (persistedWorkspace) {
-        if (pendingRun.current?.input !== persistedInput)
-          pendingRun.current = {
+        const pending = pendingRuns.current.get(dossierId);
+        if (pending?.input !== persistedInput)
+          pendingRuns.current.set(dossierId, {
             input: persistedInput,
             key: crypto.randomUUID(),
-          };
+          });
+        const operation = pendingRuns.current.get(dossierId)!;
         const response = await fetch('/api/runs', {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            'idempotency-key': pendingRun.current.key,
+            'idempotency-key': operation.key,
           },
           body: persistedInput,
         });
@@ -408,12 +519,12 @@ export function CareerWorkspace() {
         publicationEligible = persisted.reviews.every(
           (review) => review.passed,
         );
-        pendingRun.current = undefined;
+        pendingRuns.current.delete(dossierId);
       } else {
         const localRun = await runAgentTeam({
           tenantId: 'local-demo',
           runId: crypto.randomUUID(),
-          profile: state.profile,
+          profile: workspace.profile,
           opportunity: state.opportunity,
         });
         spec = latestPageSpec(localRun);
@@ -430,7 +541,7 @@ export function CareerWorkspace() {
         }));
       }
       if (!spec) throw new Error('Draft missing.');
-      setState((current) => ({
+      updateApplicationDossier(dossierId, (current) => ({
         ...current,
         strategy,
         spec,
@@ -447,10 +558,15 @@ export function CareerWorkspace() {
     } catch (error) {
       setGenerateError(
         error instanceof Error && error.message === 'RUN_CONFLICT'
-          ? 'La mémoire professionnelle a changé dans une autre session. Rechargez-la avant de relancer.'
-          : error instanceof Error && error.message.includes('not supported')
-            ? 'Aucune preuve ne correspond à ce poste. Ajustez le brief ou ajoutez une preuve pertinente, puis réessayez.'
-            : 'La génération s’est arrêtée sans modifier le brief. Réessayez lorsque vous êtes prêt.',
+          ? 'La candidature ou la mémoire professionnelle a changé dans une autre session. Rechargez avant de relancer.'
+          : error instanceof Error && error.message === 'APPLICATION_CONFLICT'
+            ? 'Cette candidature a changé dans une autre session. Rechargez-la avant de relancer.'
+            : error instanceof Error && error.message === 'APPLICATION_REJECTED'
+              ? 'Complétez l’entreprise, le poste et la description avant de générer la page.'
+              : error instanceof Error &&
+                  error.message.includes('not supported')
+                ? 'Aucune preuve ne correspond à ce poste. Ajustez le brief ou ajoutez une preuve pertinente, puis réessayez.'
+                : 'La génération s’est arrêtée sans modifier le brief. Réessayez lorsque vous êtes prêt.',
       );
     } finally {
       setGenerating(false);
@@ -459,8 +575,12 @@ export function CareerWorkspace() {
 
   function review() {
     if (!state.spec) return;
-    const reviews = runReviews(state.runProfile ?? state.profile, state.spec);
-    setState((current) => ({
+    const dossierId = state.id;
+    const reviews = runReviews(
+      state.runProfile ?? workspace.profile,
+      state.spec,
+    );
+    updateApplicationDossier(dossierId, (current) => ({
       ...current,
       reviews,
       reviewDecisions: [],
@@ -494,8 +614,10 @@ export function CareerWorkspace() {
       );
       return;
     }
+    const dossierId = state.id;
+    const runId = state.runId;
     const issueKey = `${review.reviewId}:${issueIndex}`;
-    const operationKey = `${state.runId}:${issueKey}:${decision}`;
+    const operationKey = `${runId}:${issueKey}:${decision}`;
     const idempotencyKey =
       pendingDecisions.current.get(operationKey) ?? crypto.randomUUID();
     pendingDecisions.current.set(operationKey, idempotencyKey);
@@ -503,21 +625,18 @@ export function CareerWorkspace() {
     setDecisionError('');
     setDecisionMessage('');
     try {
-      const response = await fetch(
-        `/api/runs/${state.runId}/review-decisions`,
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'idempotency-key': idempotencyKey,
-          },
-          body: JSON.stringify({
-            reviewId: review.reviewId,
-            issueIndex,
-            decision,
-          }),
+      const response = await fetch(`/api/runs/${runId}/review-decisions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': idempotencyKey,
         },
-      );
+        body: JSON.stringify({
+          reviewId: review.reviewId,
+          issueIndex,
+          decision,
+        }),
+      });
       if (!response.ok)
         throw new Error(
           response.status === 409
@@ -533,7 +652,7 @@ export function CareerWorkspace() {
       );
       pendingDecisions.current.delete(operationKey);
       if (result.correctedRun) {
-        setState((current) => ({
+        updateApplicationDossier(dossierId, (current) => ({
           ...current,
           spec: result.correctedRun!.spec,
           runId: result.correctedRun!.runId,
@@ -547,13 +666,13 @@ export function CareerWorkspace() {
           capability: undefined,
           events: persistedEvents(result.correctedRun!),
         }));
-        setShareUrl('');
+        setShareLink(undefined);
         setShareMessage('');
         setDecisionMessage(
           'Une nouvelle version a été générée et validée par les trois contrôles.',
         );
       } else {
-        setState((current) => ({
+        updateApplicationDossier(dossierId, (current) => ({
           ...current,
           reviewDecisions: [
             ...(current.reviewDecisions ?? []).filter(
@@ -593,13 +712,16 @@ export function CareerWorkspace() {
 
   async function publish() {
     if (!state.runId || !state.approved || !reviewGateReady(state)) return;
+    const dossierId = state.id;
+    const runId = state.runId;
+    const scopeAtStart = resolvedScope;
     setPublishing(true);
     setPublishError('');
     try {
       const response = await fetch('/api/publications', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ runId: state.runId }),
+        body: JSON.stringify({ runId }),
       });
       if (!response.ok) {
         if (response.status === 401) throw new Error('AUTH_REQUIRED');
@@ -609,12 +731,18 @@ export function CareerWorkspace() {
         publicationId: string;
         rawToken: string;
       };
-      setState((current) => ({
+      if (requestedScope.current !== scopeAtStart) return;
+      updateApplicationDossier(dossierId, (current) => ({
         ...current,
         capability: publication.publicationId,
       }));
-      setShareUrl(`/p/${publication.publicationId}#${publication.rawToken}`);
-      setShareMessage('Lien privé créé.');
+      setShareLink({
+        scope: scopeAtStart,
+        dossierId,
+        url: `/p/${publication.publicationId}#${publication.rawToken}`,
+      });
+      if (selectedDossierIdRef.current === dossierId)
+        setShareMessage('Lien privé créé.');
     } catch (error) {
       setPublishError(
         error instanceof Error && error.message === 'AUTH_REQUIRED'
@@ -627,6 +755,7 @@ export function CareerWorkspace() {
   }
 
   async function copyLink() {
+    if (!shareUrl) return;
     await navigator.clipboard.writeText(`${location.origin}${shareUrl}`);
     setShareMessage('Lien privé copié.');
   }
@@ -639,7 +768,9 @@ export function CareerWorkspace() {
       )
     )
       return;
-    const response = await fetch(`/api/publications/${state.capability}`, {
+    const dossierId = state.id;
+    const capability = state.capability;
+    const response = await fetch(`/api/publications/${capability}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -650,15 +781,18 @@ export function CareerWorkspace() {
       );
       return;
     }
-    setState((current) => ({ ...current, capability: undefined }));
-    setShareUrl('');
+    updateApplicationDossier(dossierId, (current) => ({
+      ...current,
+      capability: undefined,
+    }));
+    setShareLink(undefined);
     setShareMessage('Lien privé révoqué.');
   }
 
   async function signOut() {
     const result = await authClient.signOut();
     if (result.error) return;
-    setShareUrl('');
+    setShareLink(undefined);
     setShareMessage(
       state.capability
         ? 'Vous êtes déconnecté. Le lien privé existant reste actif jusqu’à sa révocation.'
@@ -666,7 +800,7 @@ export function CareerWorkspace() {
     );
   }
 
-  async function saveCareerMemory(profile = state.profile) {
+  async function saveCareerMemory(profile = workspace.profile) {
     if (!activeTenantId) {
       setMemorySyncMessage(
         'Connectez-vous pour enregistrer la mémoire professionnelle dans un espace.',
@@ -692,19 +826,9 @@ export function CareerWorkspace() {
       };
       setSavedProfileJson(JSON.stringify(result.profile));
       setMemoryRevision(result.revision);
-      setState((current) => ({
-        ...current,
-        profile: result.profile,
-        profileOrigin: 'user',
-        strategy: undefined,
-        spec: undefined,
-        runId: undefined,
-        runProfile: undefined,
-        reviews: [],
-        reviewDecisions: [],
-        publicationEligible: undefined,
-        approved: false,
-      }));
+      setWorkspace((current) =>
+        invalidateDossiersAfterProfileChange(current, result.profile, 'user'),
+      );
       setMemorySyncMessage(
         'Mémoire professionnelle enregistrée dans cet espace.',
       );
@@ -751,7 +875,7 @@ export function CareerWorkspace() {
 
   function updateImportReview(review: ImportReview) {
     setImportReview(review);
-    if (state.profileOrigin === 'empty')
+    if (workspace.profileOrigin === 'empty')
       sessionStorage.setItem(onboardingStorageKey, JSON.stringify(review));
   }
 
@@ -861,8 +985,8 @@ export function CareerWorkspace() {
       return;
     }
     const result = profileSchema.safeParse({
-      name: state.profile.name.trim(),
-      headline: state.profile.headline.trim(),
+      name: workspace.profile.name.trim(),
+      headline: workspace.profile.headline.trim(),
       sources: [
         {
           id: sourceId,
@@ -904,25 +1028,9 @@ export function CareerWorkspace() {
   }
 
   async function installProfile(profile: Profile) {
-    setState((current) => ({
-      ...current,
-      profile,
-      profileOrigin: 'user',
-      opportunity:
-        current.profileOrigin === 'empty'
-          ? emptyOpportunity
-          : current.opportunity,
-      strategy: undefined,
-      spec: undefined,
-      runId: undefined,
-      runProfile: undefined,
-      reviews: [],
-      reviewDecisions: [],
-      publicationEligible: undefined,
-      approved: false,
-      capability: undefined,
-      events: [],
-    }));
+    setWorkspace((current) =>
+      invalidateDossiersAfterProfileChange(current, profile, 'user'),
+    );
     sessionStorage.removeItem(onboardingStorageKey);
     setImportReview(undefined);
     setOnboardingMode('start');
@@ -943,14 +1051,13 @@ export function CareerWorkspace() {
     setImportReview(undefined);
     setImportError('');
     setShowMemoryHandoff(false);
-    setState({
+    const dossier = createDemoDossier();
+    setWorkspace({
+      version: 2,
       profile: syntheticProfile,
       profileOrigin: 'demo',
-      opportunity: initialOpportunity,
-      reviews: [],
-      approved: false,
-      events: [],
-      paused: false,
+      dossiers: [dossier],
+      selectedDossierId: dossier.id,
     });
     setPrimaryView('home');
   }
@@ -969,9 +1076,9 @@ export function CareerWorkspace() {
     const suffix = crypto.randomUUID();
     const evidenceId = `evidence-${suffix}`;
     const profile = profileSchema.parse({
-      ...state.profile,
+      ...workspace.profile,
       sources: [
-        ...state.profile.sources,
+        ...workspace.profile.sources,
         {
           id: `source-${suffix}`,
           kind: 'manual',
@@ -983,7 +1090,7 @@ export function CareerWorkspace() {
       ],
       evidence: memoryDraft.evidence.trim()
         ? [
-            ...state.profile.evidence,
+            ...workspace.profile.evidence,
             {
               id: evidenceId,
               sourceId: `source-${suffix}`,
@@ -991,9 +1098,9 @@ export function CareerWorkspace() {
               excerpt: memoryDraft.evidence.trim(),
             },
           ]
-        : state.profile.evidence,
+        : workspace.profile.evidence,
       claims: [
-        ...state.profile.claims,
+        ...workspace.profile.claims,
         {
           id: `claim-${suffix}`,
           statement: memoryDraft.claim.trim(),
@@ -1004,26 +1111,15 @@ export function CareerWorkspace() {
         },
       ],
     });
-    setState((current) => ({
-      ...current,
-      profile,
-      profileOrigin: 'user',
-      strategy: undefined,
-      spec: undefined,
-      runId: undefined,
-      runProfile: undefined,
-      reviews: [],
-      reviewDecisions: [],
-      publicationEligible: undefined,
-      approved: false,
-      events: [],
-    }));
+    setWorkspace((current) =>
+      invalidateDossiersAfterProfileChange(current, profile, 'user'),
+    );
     setMemoryDraft({ source: '', claim: '', evidence: '', level: 'declared' });
     setMemoryError('');
   }
 
   function exportData() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], {
+    const blob = new Blob([JSON.stringify(workspace, null, 2)], {
       type: 'application/json',
     });
     const link = document.createElement('a');
@@ -1038,7 +1134,34 @@ export function CareerWorkspace() {
     setPrimaryView('applications');
   }
 
-  if (state.profileOrigin === 'empty')
+  function openApplication(dossierId: string, view?: DossierView) {
+    const dossier = workspace.dossiers.find(({ id }) => id === dossierId);
+    if (!dossier) return;
+    setWorkspace((current) => ({
+      ...current,
+      selectedDossierId: dossierId,
+    }));
+    setGenerateError('');
+    setDecisionError('');
+    setDecisionMessage('');
+    setPublishError('');
+    setShareLink(undefined);
+    setShareMessage('');
+    openApplications(view ?? dossierNextView(dossier));
+  }
+
+  function createApplication() {
+    const dossier = createEmptyDossier();
+    setWorkspace((current) => ({
+      ...current,
+      dossiers: [dossier, ...current.dossiers],
+      selectedDossierId: dossier.id,
+    }));
+    setGenerateError('');
+    openApplications('brief');
+  }
+
+  if (workspace.profileOrigin === 'empty')
     return (
       <OnboardingView
         error={importError}
@@ -1047,7 +1170,7 @@ export function CareerWorkspace() {
         memoryDraft={memoryDraft}
         mode={onboardingMode}
         pasteText={pasteText}
-        profile={state.profile}
+        profile={workspace.profile}
         review={importReview}
         signedIn={Boolean(activeTenantId)}
         onAcceptImport={() => void acceptImport()}
@@ -1062,7 +1185,7 @@ export function CareerWorkspace() {
         }}
         onPasteTextChange={setPasteText}
         onProfileChange={(profile) =>
-          setState((current) => ({ ...current, profile }))
+          setWorkspace((current) => ({ ...current, profile }))
         }
         onReviewChange={updateImportReview}
         onSubmitPaste={() => void importPastedText()}
@@ -1146,24 +1269,49 @@ export function CareerWorkspace() {
               >
                 <NavIcon name={id} />
                 <span>{label}</span>
-                {id === 'activity' && decisionCount ? (
-                  <small>{decisionCount}</small>
+                {id === 'activity' && totalDecisionCount ? (
+                  <small>{totalDecisionCount}</small>
                 ) : null}
               </button>
             ))}
           </nav>
           <p className="sidebar-label">En cours</p>
           <div className="application-list">
-            <button
-              className="application-row"
-              onClick={() => openApplications(state.spec ? 'journey' : 'brief')}
-            >
+            {[...workspace.dossiers]
+              .sort((left, right) => right.updatedAt - left.updatedAt)
+              .slice(0, 5)
+              .map((dossier) => (
+                <button
+                  aria-current={
+                    primaryView === 'applications' &&
+                    workspace.selectedDossierId === dossier.id
+                      ? 'page'
+                      : undefined
+                  }
+                  className="application-row"
+                  key={dossier.id}
+                  onClick={() => openApplication(dossier.id)}
+                >
+                  <span className="company-mark compact" aria-hidden="true">
+                    {dossier.opportunity.company.charAt(0) || '+'}
+                  </span>
+                  <span>
+                    <strong>
+                      {dossier.opportunity.company || 'Nouvelle offre'}
+                    </strong>
+                    <small>
+                      {dossier.opportunity.role || 'Brief à compléter'}
+                    </small>
+                  </span>
+                </button>
+              ))}
+            <button className="application-row new" onClick={createApplication}>
               <span className="company-mark compact" aria-hidden="true">
-                {state.opportunity.company.charAt(0)}
+                +
               </span>
               <span>
-                <strong>{state.opportunity.company}</strong>
-                <small>{state.opportunity.role}</small>
+                <strong>Nouvelle candidature</strong>
+                <small>Coller une offre</small>
               </span>
             </button>
           </div>
@@ -1173,7 +1321,9 @@ export function CareerWorkspace() {
               ? memoryRevision
                 ? 'Espace synchronisé'
                 : 'Données de départ non enregistrées'
-              : 'Données de démonstration'}
+              : workspace.profileOrigin === 'demo'
+                ? 'Données de démonstration'
+                : 'Stocké dans ce navigateur'}
           </p>
           <section className="hosting-card" aria-label="État de l’instance">
             <strong>Auto-hébergé</strong>
@@ -1239,33 +1389,26 @@ export function CareerWorkspace() {
         ) : null}
         {primaryView === 'home' ? (
           <HomeView
-            capability={state.capability}
-            events={state.events}
-            opportunity={state.opportunity}
-            profile={state.profile}
-            reviews={state.reviews}
-            decisions={state.reviewDecisions}
-            spec={state.spec}
-            status={status}
-            onOpenApplication={(view) => {
-              openApplications(view);
-            }}
+            dossiers={workspace.dossiers}
+            profile={workspace.profile}
+            onCreateApplication={createApplication}
+            onOpenApplication={(dossierId, view) =>
+              openApplication(dossierId, view)
+            }
             onOpenMemory={() => setPrimaryView('memory')}
           />
         ) : null}
         {primaryView === 'applications' && dossierView === 'board' ? (
           <ApplicationsView
-            capability={state.capability}
-            opportunity={state.opportunity}
-            profile={state.profile}
-            reviews={state.reviews}
-            decisions={state.reviewDecisions}
-            spec={state.spec}
-            status={status}
-            onOpen={(view) => openApplications(view)}
+            dossiers={workspace.dossiers}
+            profile={workspace.profile}
+            onCreate={createApplication}
+            onOpen={(dossierId, view) => openApplication(dossierId, view)}
           />
         ) : null}
-        {primaryView === 'applications' && dossierView !== 'board' ? (
+        {primaryView === 'applications' &&
+        dossierView !== 'board' &&
+        workspace.selectedDossierId ? (
           <>
             <header className="application-topbar">
               <button
@@ -1348,8 +1491,9 @@ export function CareerWorkspace() {
                     hasDraft={Boolean(state.spec)}
                     opportunity={state.opportunity}
                     onChange={(opportunity) => {
-                      pendingRun.current = undefined;
-                      setState((current) => ({
+                      const dossierId = state.id;
+                      pendingRuns.current.delete(dossierId);
+                      updateApplicationDossier(dossierId, (current) => ({
                         ...current,
                         opportunity,
                         strategy: undefined,
@@ -1360,7 +1504,6 @@ export function CareerWorkspace() {
                         reviewDecisions: [],
                         publicationEligible: undefined,
                         approved: false,
-                        capability: undefined,
                         events: [],
                       }));
                     }}
@@ -1374,7 +1517,7 @@ export function CareerWorkspace() {
                   <JourneyView
                     approved={state.approved}
                     opportunity={state.opportunity}
-                    profile={state.runProfile ?? state.profile}
+                    profile={state.runProfile ?? workspace.profile}
                     reviews={state.reviews}
                     spec={state.spec}
                     onGenerate={generate}
@@ -1392,7 +1535,7 @@ export function CareerWorkspace() {
                 ) : null}
                 {dossierView === 'draft' && state.spec ? (
                   <DraftView
-                    profile={state.runProfile ?? state.profile}
+                    profile={state.runProfile ?? workspace.profile}
                     spec={state.spec}
                     onOpenEvidence={(claimId) => {
                       setSelectedClaimId(claimId);
@@ -1412,7 +1555,10 @@ export function CareerWorkspace() {
                     publicationEligible={reviewGateReady(state)}
                     canRerun={!state.runId}
                     onApprove={(approved) =>
-                      setState((current) => ({ ...current, approved }))
+                      updateApplicationDossier(state.id, (current) => ({
+                        ...current,
+                        approved,
+                      }))
                     }
                     onContinue={() => setDossierView('share')}
                     onDecide={(review, issueIndex, decision) =>
@@ -1447,7 +1593,7 @@ export function CareerWorkspace() {
               {state.spec && dossierView !== 'journey' ? (
                 <EvidenceInspector
                   open={inspectorOpen}
-                  profile={state.runProfile ?? state.profile}
+                  profile={state.runProfile ?? workspace.profile}
                   selectedClaimId={selectedClaimId}
                   spec={state.spec}
                   onClose={() => {
@@ -1473,45 +1619,31 @@ export function CareerWorkspace() {
           <CareerMemoryView
             error={memoryError}
             memoryDraft={memoryDraft}
-            dirty={JSON.stringify(state.profile) !== savedProfileJson}
+            dirty={JSON.stringify(workspace.profile) !== savedProfileJson}
             signedIn={Boolean(activeTenantId)}
             syncing={memorySyncing}
             syncMessage={memorySyncMessage}
             showHandoff={showMemoryHandoff}
-            profile={state.profile}
+            profile={workspace.profile}
             onAdd={addMemory}
             onDraftChange={setMemoryDraft}
             onSave={() => void saveCareerMemory()}
             onCreateApplication={() => {
               setShowMemoryHandoff(false);
-              openApplications('brief');
+              createApplication();
             }}
             onDismissHandoff={() => setShowMemoryHandoff(false)}
             onProfileChange={(profile) =>
-              setState((current) => ({
-                ...current,
-                profile,
-                spec: undefined,
-                runId: undefined,
-                runProfile: undefined,
-                reviews: [],
-                reviewDecisions: [],
-                publicationEligible: undefined,
-                approved: false,
-              }))
+              setWorkspace((current) =>
+                invalidateDossiersAfterProfileChange(current, profile, 'user'),
+              )
             }
           />
         ) : null}
         {primaryView === 'activity' ? (
           <ActivityView
-            events={state.events}
-            paused={state.paused}
-            reviews={state.reviews}
-            decisions={state.reviewDecisions}
-            onOpenReview={() => {
-              setDossierView('review');
-              setPrimaryView('applications');
-            }}
+            dossiers={workspace.dossiers}
+            onOpenReview={(dossierId) => openApplication(dossierId, 'review')}
           />
         ) : null}
         {primaryView === 'settings' ? (
@@ -2116,27 +2248,17 @@ function OnboardingView({
 }
 
 function HomeView({
-  capability,
-  decisions,
-  events,
+  dossiers,
+  onCreateApplication,
   onOpenApplication,
   onOpenMemory,
-  opportunity,
   profile,
-  reviews,
-  spec,
-  status,
 }: {
-  capability?: string;
-  decisions?: ReviewDecision[];
-  events: WorkflowEvent[];
-  onOpenApplication: (view: DossierView) => void;
+  dossiers: ApplicationDossier[];
+  onCreateApplication: () => void;
+  onOpenApplication: (dossierId: string, view?: DossierView) => void;
   onOpenMemory: () => void;
-  opportunity: Opportunity;
   profile: Profile;
-  reviews: WorkspaceReview[];
-  spec?: PageSpec;
-  status: string;
 }) {
   const [query, setQuery] = useState('');
   const searchInput = useRef<HTMLInputElement>(null);
@@ -2146,23 +2268,34 @@ function HomeView({
   const coverage = profile.claims.length
     ? Math.round((verified / profile.claims.length) * 100)
     : 0;
-  const findings = unresolvedReviewIssues(reviews, decisions);
-  const nextView: DossierView = spec
-    ? capability
-      ? 'share'
-      : reviews.length
-        ? 'review'
-        : 'journey'
-    : 'brief';
+  const findings = dossiers.flatMap((dossier) =>
+    unresolvedReviewIssues(dossier.reviews, dossier.reviewDecisions).map(
+      (finding) => ({ ...finding, dossier }),
+    ),
+  );
+  const priority =
+    findings[0]?.dossier ??
+    [...dossiers].sort((left, right) => right.updatedAt - left.updatedAt)[0];
+  const recentEvents = dossiers
+    .flatMap((dossier) =>
+      dossier.events.map((event, index) => ({
+        dossier,
+        event,
+        order: dossier.updatedAt + index,
+      })),
+    )
+    .sort((left, right) => right.order - left.order)
+    .slice(0, 3);
+  const activeLinks = dossiers.filter((dossier) => dossier.capability).length;
   const normalizedQuery = query.trim().toLowerCase();
   const searchResults = normalizedQuery
     ? [
-        {
-          id: 'opportunity',
-          label: `${opportunity.company} · ${opportunity.role}`,
+        ...dossiers.map((dossier) => ({
+          id: dossier.id,
+          label: `${dossier.opportunity.company || 'Nouvelle offre'} · ${dossier.opportunity.role || 'Brief à compléter'}`,
           meta: 'Candidature',
-          open: () => onOpenApplication(nextView),
-        },
+          open: () => onOpenApplication(dossier.id),
+        })),
         ...profile.claims.map((claim) => ({
           id: claim.id,
           label: claim.statement,
@@ -2237,9 +2370,7 @@ function HomeView({
           ) : null}
         </div>
         <div className="home-account">
-          <button onClick={() => onOpenApplication('brief')}>
-            Coller une offre
-          </button>
+          <button onClick={onCreateApplication}>Coller une offre</button>
           <button
             className="header-icon"
             aria-label="Aide, bientôt disponible"
@@ -2264,7 +2395,7 @@ function HomeView({
             </span>
             <span>
               <strong>{profile.name}</strong>
-              <small>Ingénieur plateforme</small>
+              <small>{profile.headline}</small>
             </span>
           </div>
         </div>
@@ -2274,31 +2405,38 @@ function HomeView({
         <div className="home-main">
           <section className="decision-hero">
             <p>
-              {spec ? 'Action requise' : 'Prochaine candidature'} ·{' '}
-              {opportunity.company}
+              {findings.length ? 'Action requise' : 'Prochaine candidature'}
+              {priority?.opportunity.company
+                ? ` · ${priority.opportunity.company}`
+                : ''}
             </p>
             <h1>
-              {spec
-                ? reviews.length
-                  ? findings.length
-                    ? `${findings.length} décision${findings.length > 1 ? 's' : ''} à trancher avant d’envoyer votre page privée.`
-                    : 'Votre candidature est prête pour validation.'
-                  : 'Votre candidature est prête pour une revue humaine.'
-                : 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.'}
+              {findings.length
+                ? `${findings.length} décision${findings.length > 1 ? 's' : ''} à trancher avant d’envoyer vos pages privées.`
+                : priority?.spec
+                  ? 'Votre prochaine candidature est prête pour validation.'
+                  : 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.'}
             </h1>
             <span>
-              {spec
-                ? `La passe d’agents est terminée. ${status}.`
+              {priority?.spec
+                ? `La passe d’agents est terminée. ${dossierStatus(priority)}.`
                 : 'Partez du poste, confrontez-le à vos preuves, puis gardez la décision finale.'}
             </span>
             <div>
-              <button onClick={() => onOpenApplication(nextView)}>
-                {spec ? 'Ouvrir la revue' : 'Commencer par l’offre'} <b>→</b>
+              <button
+                onClick={() =>
+                  priority
+                    ? onOpenApplication(priority.id)
+                    : onCreateApplication()
+                }
+              >
+                {priority?.spec ? 'Ouvrir la revue' : 'Commencer par l’offre'}{' '}
+                <b>→</b>
               </button>
-              {spec ? (
+              {priority?.spec ? (
                 <button
                   className="hero-secondary"
-                  onClick={() => onOpenApplication('journey')}
+                  onClick={() => onOpenApplication(priority.id, 'journey')}
                 >
                   Voir le run
                 </button>
@@ -2316,23 +2454,30 @@ function HomeView({
                   </span>
                 </div>
               </header>
-              {findings.slice(0, 3).map(({ issue, review, issueIndex }) => (
-                <article
-                  key={`${review.reviewId ?? review.reviewer}:${issueIndex}`}
-                >
-                  <span className="decision-icon" aria-hidden="true">
-                    !
-                  </span>
-                  <div>
-                    <strong>{reviewerLabel(review.reviewer)}</strong>
-                    <p>{issue.message}</p>
-                    <small>{sectionLabel(issue.section)}</small>
-                  </div>
-                  <button onClick={() => onOpenApplication('review')}>
-                    Trancher
-                  </button>
-                </article>
-              ))}
+              {findings
+                .slice(0, 3)
+                .map(({ dossier, issue, review, issueIndex }) => (
+                  <article
+                    key={`${dossier.id}:${review.reviewId ?? review.reviewer}:${issueIndex}`}
+                  >
+                    <span className="decision-icon" aria-hidden="true">
+                      !
+                    </span>
+                    <div>
+                      <strong>{reviewerLabel(review.reviewer)}</strong>
+                      <p>{issue.message}</p>
+                      <small>
+                        {dossier.opportunity.company} ·{' '}
+                        {sectionLabel(issue.section)}
+                      </small>
+                    </div>
+                    <button
+                      onClick={() => onOpenApplication(dossier.id, 'review')}
+                    >
+                      Trancher
+                    </button>
+                  </article>
+                ))}
             </section>
           ) : null}
 
@@ -2341,7 +2486,9 @@ function HomeView({
               <span className="metric-icon">▣</span>
               <div>
                 <small>Candidatures</small>
-                <strong>1 active</strong>
+                <strong>
+                  {dossiers.length} active{dossiers.length > 1 ? 's' : ''}
+                </strong>
               </div>
             </article>
             <article>
@@ -2357,7 +2504,11 @@ function HomeView({
               <span className="metric-icon amber">↗</span>
               <div>
                 <small>Liens privés</small>
-                <strong>{capability ? '1 actif' : 'Aucun actif'}</strong>
+                <strong>
+                  {activeLinks
+                    ? `${activeLinks} actif${activeLinks > 1 ? 's' : ''}`
+                    : 'Aucun actif'}
+                </strong>
               </div>
             </article>
           </section>
@@ -2370,10 +2521,10 @@ function HomeView({
               </div>
               <button
                 className="round-action quiet"
-                onClick={() => onOpenApplication(nextView)}
-                aria-label="Ouvrir la candidature"
+                onClick={onCreateApplication}
+                aria-label="Créer une candidature"
               >
-                →
+                +
               </button>
             </header>
             <div className="pipeline-head" aria-hidden="true">
@@ -2382,27 +2533,64 @@ function HomeView({
               <span>Preuves</span>
               <span>Prochaine action</span>
             </div>
-            <button
-              className="pipeline-row"
-              onClick={() => onOpenApplication(nextView)}
-            >
-              <span className="company-mark compact" aria-hidden="true">
-                {opportunity.company.charAt(0)}
-              </span>
-              <span>
-                <strong>{opportunity.role}</strong>
-                <small>{opportunity.company}</small>
-              </span>
-              <span className="status-label">{status}</span>
-              <span>
-                {spec
-                  ? `${profile.claims.filter((claim) => claim.level === 'verified').length} vérifiée`
-                  : 'À sélectionner'}
-              </span>
-              <b>
-                {spec ? (findings.length ? 'Trancher' : 'Valider') : 'Lancer'} →
-              </b>
-            </button>
+            {dossiers.length ? (
+              [...dossiers]
+                .sort((left, right) => right.updatedAt - left.updatedAt)
+                .slice(0, 5)
+                .map((dossier) => {
+                  const dossierFindings = unresolvedReviewIssues(
+                    dossier.reviews,
+                    dossier.reviewDecisions,
+                  ).length;
+                  const evidenceCount = dossier.spec
+                    ? new Set(
+                        dossier.spec.blocks.flatMap((block) =>
+                          'claimIds' in block ? block.claimIds : [],
+                        ),
+                      ).size
+                    : 0;
+                  return (
+                    <button
+                      className="pipeline-row"
+                      key={dossier.id}
+                      onClick={() => onOpenApplication(dossier.id)}
+                    >
+                      <span className="company-mark compact" aria-hidden="true">
+                        {dossier.opportunity.company.charAt(0) || '+'}
+                      </span>
+                      <span>
+                        <strong>
+                          {dossier.opportunity.role || 'Brief à compléter'}
+                        </strong>
+                        <small>
+                          {dossier.opportunity.company || 'Nouvelle offre'}
+                        </small>
+                      </span>
+                      <span className="status-label">
+                        {dossierStatus(dossier)}
+                      </span>
+                      <span>
+                        {evidenceCount
+                          ? `${evidenceCount} retenue${evidenceCount > 1 ? 's' : ''}`
+                          : 'À sélectionner'}
+                      </span>
+                      <b>
+                        {dossier.spec
+                          ? dossierFindings
+                            ? 'Trancher'
+                            : 'Valider'
+                          : 'Lancer'}{' '}
+                        →
+                      </b>
+                    </button>
+                  );
+                })
+            ) : (
+              <div className="home-empty-state">
+                <strong>Aucune candidature</strong>
+                <span>Collez une offre pour créer votre premier dossier.</span>
+              </div>
+            )}
           </section>
         </div>
 
@@ -2451,26 +2639,31 @@ function HomeView({
             <header>
               <h2>Activité</h2>
             </header>
-            {events.length ? (
-              events
-                .slice(-3)
-                .reverse()
-                .map((event, index) => (
-                  <article key={`${event.actor}-${index}`}>
-                    <span aria-hidden="true">✓</span>
-                    <div>
-                      <strong>{deliverableLabel(event)}</strong>
-                      <small>{event.actor.replaceAll('-', ' ')}</small>
-                    </div>
-                  </article>
-                ))
+            {recentEvents.length ? (
+              recentEvents.map(({ dossier, event }, index) => (
+                <article key={`${dossier.id}:${event.actor}:${index}`}>
+                  <span aria-hidden="true">✓</span>
+                  <div>
+                    <strong>{deliverableLabel(event)}</strong>
+                    <small>
+                      {dossier.opportunity.company} ·{' '}
+                      {event.actor.replaceAll('-', ' ')}
+                    </small>
+                  </div>
+                </article>
+              ))
             ) : (
               <div className="home-empty-state">
                 <strong>Aucun run pour le moment</strong>
                 <span>Les dernières actions vérifiées apparaîtront ici.</span>
               </div>
             )}
-            {capability ? <small>Un lien privé est actif.</small> : null}
+            {activeLinks ? (
+              <small>
+                {activeLinks} lien{activeLinks > 1 ? 's' : ''} privé
+                {activeLinks > 1 ? 's' : ''} actif{activeLinks > 1 ? 's' : ''}.
+              </small>
+            ) : null}
           </section>
         </aside>
       </div>
@@ -2479,76 +2672,63 @@ function HomeView({
 }
 
 function ApplicationsView({
-  capability,
-  decisions,
+  dossiers,
+  onCreate,
   onOpen,
-  opportunity,
   profile,
-  reviews,
-  spec,
-  status,
 }: {
-  capability?: string;
-  decisions?: ReviewDecision[];
-  onOpen: (view: DossierView) => void;
-  opportunity: Opportunity;
+  dossiers: ApplicationDossier[];
+  onCreate: () => void;
+  onOpen: (dossierId: string, view?: DossierView) => void;
   profile: Profile;
-  reviews: WorkspaceReview[];
-  spec?: PageSpec;
-  status: string;
 }) {
   const [layout, setLayout] = useState<'list' | 'kanban'>('kanban');
-  const findings = unresolvedReviewIssues(reviews, decisions).length;
-  const nextView: DossierView = spec
-    ? capability
-      ? 'share'
-      : reviews.length
-        ? 'review'
-        : 'journey'
-    : 'brief';
-  const stage = !spec
-    ? 'Brouillon'
-    : reviews.length
-      ? 'À valider'
-      : 'Brouillon';
   const columns = ['Brouillon', 'À valider', 'Envoyée', 'Entretien'] as const;
-  const evidenceCount = spec
-    ? new Set(
-        spec.blocks.flatMap((block) =>
-          'claimIds' in block ? block.claimIds : [],
-        ),
-      ).size
-    : 0;
-
-  const card = (
-    <button
-      className="application-card"
-      onClick={() => onOpen(nextView)}
-      aria-label={`Ouvrir la candidature ${opportunity.company}`}
-    >
-      <span className="company-mark" aria-hidden="true">
-        {opportunity.company.charAt(0)}
-      </span>
-      <span className="application-card-copy">
-        <strong>{opportunity.role}</strong>
-        <small>{opportunity.company}</small>
-      </span>
-      <span className="status-label">{status}</span>
-      <span className="application-card-meta">
-        {evidenceCount
-          ? `${evidenceCount} sur ${profile.claims.length} affirmations retenues`
-          : `${profile.claims.length} affirmations disponibles`}
-      </span>
-      <b>
-        {findings
-          ? `${findings} décision${findings > 1 ? 's' : ''} à trancher`
-          : spec
-            ? 'Ouvrir la candidature'
-            : 'Compléter l’offre'}{' '}
-        →
-      </b>
-    </button>
-  );
+  const renderCard = (dossier: ApplicationDossier) => {
+    const findings = unresolvedReviewIssues(
+      dossier.reviews,
+      dossier.reviewDecisions,
+    ).length;
+    const evidenceCount = dossier.spec
+      ? new Set(
+          dossier.spec.blocks.flatMap((block) =>
+            'claimIds' in block ? block.claimIds : [],
+          ),
+        ).size
+      : 0;
+    const company = dossier.opportunity.company || 'Nouvelle offre';
+    const role = dossier.opportunity.role || 'Brief à compléter';
+    return (
+      <button
+        className="application-card"
+        key={dossier.id}
+        onClick={() => onOpen(dossier.id)}
+        aria-label={`Ouvrir la candidature ${company}`}
+      >
+        <span className="company-mark" aria-hidden="true">
+          {dossier.opportunity.company.charAt(0) || '+'}
+        </span>
+        <span className="application-card-copy">
+          <strong>{role}</strong>
+          <small>{company}</small>
+        </span>
+        <span className="status-label">{dossierStatus(dossier)}</span>
+        <span className="application-card-meta">
+          {evidenceCount
+            ? `${evidenceCount} sur ${profile.claims.length} affirmations retenues`
+            : `${profile.claims.length} affirmations disponibles`}
+        </span>
+        <b>
+          {findings
+            ? `${findings} décision${findings > 1 ? 's' : ''} à trancher`
+            : dossier.spec
+              ? 'Ouvrir la candidature'
+              : 'Compléter l’offre'}{' '}
+          →
+        </b>
+      </button>
+    );
+  };
 
   return (
     <div className="standalone-view applications-view">
@@ -2582,13 +2762,13 @@ function ApplicationsView({
               Calendrier
             </button>
           </div>
-          <button onClick={() => onOpen('brief')}>Coller une offre</button>
+          <button onClick={onCreate}>Coller une offre</button>
         </div>
       </header>
 
       <section className="applications-toolbar" aria-label="Vues enregistrées">
         <strong className="active">
-          Toutes les candidatures <span>1</span>
+          Toutes les candidatures <span>{dossiers.length}</span>
         </strong>
         <span>Synchronisé avec l’espace actif</span>
       </section>
@@ -2599,10 +2779,19 @@ function ApplicationsView({
             <section className="application-column" key={column}>
               <header>
                 <h2>{column}</h2>
-                <span>{stage === column ? 1 : 0}</span>
+                <span>
+                  {
+                    dossiers.filter(
+                      (dossier) => dossierStage(dossier) === column,
+                    ).length
+                  }
+                </span>
               </header>
-              {stage === column ? (
-                card
+              {dossiers.some((dossier) => dossierStage(dossier) === column) ? (
+                [...dossiers]
+                  .filter((dossier) => dossierStage(dossier) === column)
+                  .sort((left, right) => right.updatedAt - left.updatedAt)
+                  .map(renderCard)
               ) : (
                 <div className="empty-column">
                   Aucune candidature à cette étape
@@ -2622,7 +2811,9 @@ function ApplicationsView({
             <span>Preuves</span>
             <span>Prochaine action</span>
           </div>
-          {card}
+          {[...dossiers]
+            .sort((left, right) => right.updatedAt - left.updatedAt)
+            .map(renderCard)}
         </section>
       )}
     </div>
@@ -2717,7 +2908,12 @@ function JourneyView({
               </button>
             ))}
             {!spec ? (
-              <button onClick={onGenerate}>Générer la candidature</button>
+              <button
+                disabled={!opportunityReady(opportunity)}
+                onClick={onGenerate}
+              >
+                Générer la candidature
+              </button>
             ) : null}
           </JourneyCard>
         </JourneyColumn>
@@ -3035,7 +3231,10 @@ function BriefView({
       ) : null}
       <div className="document-actions">
         <p>Le brief est enregistré localement pendant la saisie.</p>
-        <button disabled={generating} onClick={onGenerate}>
+        <button
+          disabled={generating || !opportunityReady(opportunity)}
+          onClick={onGenerate}
+        >
           {generating
             ? 'Génération de la page…'
             : error
@@ -3727,20 +3926,24 @@ function CareerMemoryView({
 }
 
 function ActivityView({
-  decisions,
-  events,
+  dossiers,
   onOpenReview,
-  paused,
-  reviews,
 }: {
-  decisions?: ReviewDecision[];
-  events: WorkflowEvent[];
-  onOpenReview: () => void;
-  paused: boolean;
-  reviews: WorkspaceReview[];
+  dossiers: ApplicationDossier[];
+  onOpenReview: (dossierId: string) => void;
 }) {
+  const findings = dossiers.flatMap((dossier) =>
+    unresolvedReviewIssues(dossier.reviews, dossier.reviewDecisions).map(
+      (finding) => ({ ...finding, dossier }),
+    ),
+  );
+  const active =
+    findings[0]?.dossier ??
+    [...dossiers]
+      .filter((dossier) => dossier.events.length)
+      .sort((left, right) => right.updatedAt - left.updatedAt)[0];
+  const events = active?.events ?? [];
   const deliverables = events.filter((event) => event.artifact);
-  const findings = unresolvedReviewIssues(reviews, decisions);
   return (
     <div className="standalone-view run-review-view">
       <header className="view-header">
@@ -3752,7 +3955,7 @@ function ActivityView({
           </p>
         </div>
       </header>
-      {events.length ? (
+      {active ? (
         <div className="run-review-layout">
           <section
             className="run-timeline"
@@ -3761,9 +3964,12 @@ function ActivityView({
             <header>
               <div>
                 <span className="status-label">
-                  {paused ? 'Mis en pause' : 'En attente de l’humain'}
+                  {active.paused ? 'Mis en pause' : dossierStatus(active)}
                 </span>
-                <strong>{events.length} événements enregistrés</strong>
+                <strong>
+                  {active.opportunity.company || 'Nouvelle offre'} ·{' '}
+                  {events.length} événements enregistrés
+                </strong>
               </div>
             </header>
             {deliverables.map((event, index) => (
@@ -3801,40 +4007,32 @@ function ActivityView({
               </div>
               <span>{findings.length} points à trancher</span>
             </header>
-            {reviews.map((review) => {
-              const reviewFindings = findings.filter(
-                (finding) => finding.review.reviewer === review.reviewer,
-              );
-              return (
-                <article key={review.reviewer}>
-                  <span className={review.passed ? 'passed' : 'blocked'}>
-                    {review.passed
-                      ? 'Validé'
-                      : reviewFindings.length
-                        ? 'Décision requise'
-                        : 'Décision enregistrée'}
-                  </span>
-                  <strong>{reviewerLabel(review.reviewer)}</strong>
-                  <p>
-                    {reviewFindings
-                      .map((finding) => finding.issue.message)
-                      .join(' ') ||
-                      (review.passed
-                        ? 'Aucun blocage détecté.'
-                        : 'Tous les points ont été explicitement tranchés.')}
-                  </p>
-                </article>
-              );
-            })}
-            {!reviews.length ? (
+            {findings.map(({ dossier, issue, issueIndex, review }) => (
+              <article
+                key={`${dossier.id}:${review.reviewId ?? review.reviewer}:${issueIndex}`}
+              >
+                <span className="blocked">Décision requise</span>
+                <strong>
+                  {dossier.opportunity.company || 'Nouvelle offre'} ·{' '}
+                  {reviewerLabel(review.reviewer)}
+                </strong>
+                <p>{issue.message}</p>
+                <button onClick={() => onOpenReview(dossier.id)}>
+                  Trancher ce point
+                </button>
+              </article>
+            ))}
+            {!findings.length ? (
               <div className="review-placeholder">
-                <strong>Aucune revue</strong>
-                <p>Générez une candidature pour créer la première revue.</p>
+                <strong>Aucune décision en attente</strong>
+                <p>Les nouvelles objections des agents apparaîtront ici.</p>
               </div>
             ) : null}
-            <button disabled={!reviews.length} onClick={onOpenReview}>
-              Ouvrir la revue de candidature
-            </button>
+            {active.reviews.length ? (
+              <button onClick={() => onOpenReview(active.id)}>
+                Ouvrir la revue de {active.opportunity.company}
+              </button>
+            ) : null}
             <details>
               <summary>Contrats techniques des agents</summary>
               <div className="role-grid">
@@ -4065,6 +4263,18 @@ function restoreImportReview(raw: string | null): ImportReview | undefined {
   }
 }
 
+function importReviewExpired(raw: string | null) {
+  if (!raw) return false;
+  try {
+    const stored = JSON.parse(raw) as { expiresAt?: unknown };
+    return (
+      typeof stored.expiresAt === 'number' && stored.expiresAt <= Date.now()
+    );
+  } catch {
+    return false;
+  }
+}
+
 function reviewerLabel(reviewer: Review['reviewer']) {
   if (reviewer === 'hiring-manager') return 'Pertinence pour le poste';
   if (reviewer === 'factuality') return 'Vérification des preuves';
@@ -4084,7 +4294,7 @@ function persistedEvents(run: PersistedRun): WorkflowEvent[] {
 }
 
 function reviewGateReady(
-  state: Pick<SavedState, 'publicationEligible' | 'reviews'>,
+  state: Pick<ApplicationDossier, 'publicationEligible' | 'reviews'>,
 ) {
   return (
     state.publicationEligible ??

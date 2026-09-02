@@ -4,15 +4,15 @@ Career OS is one Next.js application backed by PostgreSQL/Supabase. The same cod
 
 ## Source of truth
 
-PostgreSQL stores tenants, profiles, sources, claims, evidence, provenance, allowed uses, workflow runs, versioned artifacts, reviews, approvals and private publications. Embeddings may later index rows for retrieval; they never replace row IDs or provenance.
+PostgreSQL stores tenants, profiles, sources, claims, evidence, provenance, allowed uses, applications, workflow runs, versioned artifacts, reviews, approvals and private publications. Embeddings may later index rows for retrieval; they never replace row IDs or provenance.
 
 Every tenant-owned foreign key includes `tenant_id`. RLS is forced on every tenant table. Browser clients never receive a service-role key. Uploaded documents and fetched pages are untrusted data, not instructions.
 
 ## Vertical flow
 
-`memory → opportunity → strategy → PageSpec → three reviews → human approval → private capability`
+`memory + application revision → immutable opportunity snapshot → strategy → PageSpec → three reviews → human approval → private capability`
 
-The browser uses Better Auth organization sessions for tenant selection. Career Memory writes use optimistic revisions in PostgreSQL; localStorage only caches opportunity, draft and run state for the selected workspace. Run creation reloads the requested profile revision and atomically persists an immutable profile snapshot, opportunity, PageSpecs, reviews and audit events. Publication accepts only the persisted run, records human approval of its current reviewed PageSpec, and issues a revocable capability over that immutable snapshot.
+The browser uses Better Auth organization sessions for tenant selection. Career Memory and application writes use optimistic revisions in PostgreSQL. Local storage is a versioned cache for the workspace dossier UI, including unsubmitted local drafts; it is not an authorization source. Run creation locks the requested profile and application revisions and atomically persists immutable profile and opportunity snapshots, PageSpecs, reviews and audit events. Publication accepts only the persisted run, records human approval of its current reviewed PageSpec, and issues a revocable capability over that immutable snapshot. Soft-deleting an application revokes every active publication and share link derived from it.
 
 CV import runs entirely in a browser Web Worker. It keeps the raw file out of server routes, validates and bounds the document before extraction, stores a resumable review in sessionStorage for at most 30 minutes, and persists only the claims explicitly accepted by the user. Imported claims remain `declared` and linked to a source digest and page or line locator.
 

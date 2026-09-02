@@ -63,6 +63,27 @@ export async function createPersistedRun(
         };
       }
 
+      const [application] = await tx<
+        Array<{
+          company: string;
+          role: string;
+          raw_text: string;
+          url: string | null;
+          accent: string;
+          revision: string;
+        }>
+      >`select company, role, raw_text, url, accent, revision
+        from app.applications
+        where tenant_id = ${session.tenantId} and id = ${input.applicationId}
+          and deleted_at is null
+        for update`;
+      if (!application)
+        throw new RunRejectedError('Application is unavailable.');
+      if (Number(application.revision) !== input.applicationRevision)
+        throw new RunConflictError(
+          'Run requires the current application revision.',
+        );
+
       const living = await readLivingProfile(tx, session);
       if (!living || living.revision !== input.profileRevision)
         throw new RunConflictError(
@@ -78,11 +99,12 @@ export async function createPersistedRun(
       const opportunityId = randomUUID();
       const runId = randomUUID();
       await tx`insert into app.opportunities (
-        id, tenant_id, company, role, raw_text, url, extraction_status
+        id, tenant_id, application_id, application_revision, company, role,
+        raw_text, url, extraction_status
       ) values (
-        ${opportunityId}, ${session.tenantId}, ${input.opportunity.company},
-        ${input.opportunity.role}, ${input.opportunity.description},
-        ${input.opportunity.url ?? null}, 'ready'
+        ${opportunityId}, ${session.tenantId}, ${input.applicationId},
+        ${input.applicationRevision}, ${application.company}, ${application.role},
+        ${application.raw_text}, ${application.url}, 'ready'
       )`;
       await tx`insert into app.workflow_runs (
         id, tenant_id, opportunity_id, profile_id, source_profile_id,
@@ -98,7 +120,13 @@ export async function createPersistedRun(
         tenantId: session.tenantId,
         runId,
         profile: snapshot.profile,
-        opportunity: input.opportunity,
+        opportunity: {
+          company: application.company,
+          role: application.role,
+          description: application.raw_text,
+          ...(application.url ? { url: application.url } : {}),
+          accent: application.accent,
+        },
         provider: new FakeAgentProvider(),
         tokenBudget: 10_000,
         costBudgetMicros: 0,

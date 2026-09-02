@@ -54,6 +54,22 @@ test('state-changing requests require an exact origin', () => {
   );
 });
 
+test('state-changing requests trust the configured public origin behind a proxy', () => {
+  const previous = process.env.BETTER_AUTH_URL;
+  try {
+    process.env.BETTER_AUTH_URL = 'https://career.example';
+    const proxied = new Request('http://localhost:3000/api/profile', {
+      headers: { origin: 'https://career.example' },
+    });
+    assert.equal(isSameOrigin(proxied), true);
+    process.env.BETTER_AUTH_URL = 'not a URL';
+    assert.equal(isSameOrigin(proxied), false);
+  } finally {
+    if (previous === undefined) delete process.env.BETTER_AUTH_URL;
+    else process.env.BETTER_AUTH_URL = previous;
+  }
+});
+
 test('profile and publication inputs are bounded and separated', () => {
   const tooManySources = Array.from({ length: 51 }, (_, index) => ({
     ...syntheticProfile.sources[0],

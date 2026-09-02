@@ -184,9 +184,25 @@ async function main() {
     'stale profile write',
   );
 
+  const applicationResponse = await owner.post(
+    '/api/applications',
+    opportunity,
+    {
+      'idempotency-key': randomUUID(),
+    },
+  );
+  await expectStatus(applicationResponse, 201, 'application creation');
+  const application = (await applicationResponse.json()) as {
+    applicationId: string;
+    revision: number;
+  };
   const runResponse = await owner.post(
     '/api/runs',
-    { opportunity, profileRevision: savedProfile.revision },
+    {
+      applicationId: application.applicationId,
+      applicationRevision: application.revision,
+      profileRevision: savedProfile.revision,
+    },
     { 'idempotency-key': randomUUID() },
   );
   await expectStatus(runResponse, 201, 'persisted run');

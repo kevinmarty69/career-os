@@ -9,35 +9,37 @@ import {
 } from '../../lib/run-contract';
 import { syntheticProfile } from '../../lib/fixture';
 
-const opportunity = {
-  company: 'Northstar Labs',
-  role: 'Senior Product Engineer',
-  description: 'Ship dependable product workflows.',
-  accent: '#21504b',
-};
+const applicationId = randomUUID();
 
-test('run creation accepts only a bounded opportunity and saved revision', () => {
+test('run creation accepts only durable application and profile revisions', () => {
   assert.equal(
-    createRunInputSchema.safeParse({ opportunity, profileRevision: 1 }).success,
+    createRunInputSchema.safeParse({
+      applicationId,
+      applicationRevision: 1,
+      profileRevision: 1,
+    }).success,
     true,
   );
   assert.equal(
     createRunInputSchema.safeParse({
-      opportunity: { ...opportunity, description: 'x'.repeat(20_001) },
+      applicationId: 'not-a-uuid',
+      applicationRevision: 1,
       profileRevision: 1,
     }).success,
     false,
   );
   assert.equal(
     createRunInputSchema.safeParse({
-      opportunity,
+      applicationId,
+      applicationRevision: 1,
       profileRevision: 0,
     }).success,
     false,
   );
   assert.equal(
     createRunInputSchema.safeParse({
-      opportunity,
+      applicationId,
+      applicationRevision: 1,
       profileRevision: 1,
       provider: 'openai-compatible',
     }).success,

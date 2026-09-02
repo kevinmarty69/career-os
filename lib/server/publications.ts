@@ -33,6 +33,17 @@ export async function mintPublication(
   try {
     const publicationId = await sql.begin(async (tx) => {
       await authorize(tx, session);
+      const [application] = await tx<{ id: string }[]>`
+        select a.id from app.applications a
+        join app.opportunities o on o.tenant_id = a.tenant_id
+          and o.application_id = a.id
+        join app.workflow_runs wr on wr.tenant_id = o.tenant_id
+          and wr.opportunity_id = o.id
+        where wr.tenant_id = ${session.tenantId} and wr.id = ${runId}
+          and a.deleted_at is null
+        for update of a`;
+      if (!application)
+        throw new PublicationRejectedError('Application is unavailable.');
       const [run] = await tx<{ status: string }[]>`
         select status from app.workflow_runs
         where tenant_id = ${session.tenantId} and id = ${runId}

@@ -37,8 +37,14 @@ insert into app.claim_evidence (tenant_id, profile_id, claim_id, evidence_id, po
   ('22000000-0000-0000-0000-000000000001', '32000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', 0),
   ('22000000-0000-0000-0000-000000000001', '32000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000002', 1),
   ('22000000-0000-0000-0000-000000000001', '32000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000002', '52000000-0000-0000-0000-000000000002', 0);
-insert into app.opportunities (id, tenant_id, company, role, extraction_status) values
-  ('72000000-0000-0000-0000-000000000001', '22000000-0000-0000-0000-000000000001', 'Capability Co', 'Engineer', 'ready');
+insert into app.applications (id, tenant_id, company, role, raw_text, accent,
+  create_idempotency_key, create_input_hash) values
+  ('72000000-0000-0000-0000-000000000001', '22000000-0000-0000-0000-000000000001', 'Capability Co', 'Engineer', 'Capability role', '#21504b',
+   '72000000-0000-0000-0000-000000000011', repeat('a', 64));
+insert into app.opportunities (id, tenant_id, application_id, application_revision,
+  company, role, extraction_status) values
+  ('72000000-0000-0000-0000-000000000001', '22000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001', 1,
+   'Capability Co', 'Engineer', 'ready');
 insert into app.workflow_runs (id, tenant_id, opportunity_id, profile_id, state, status, token_budget, cost_budget_micros, deadline_at) values
   ('82000000-0000-0000-0000-000000000001', '22000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001', '32000000-0000-0000-0000-000000000001', 'approved', 'completed', 1000, 0, now() + interval '1 hour');
 insert into app.page_specs (id, tenant_id, workflow_run_id, version, spec) values
@@ -101,5 +107,13 @@ select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid, digest('
   and position('SECRET-RESTRICTED-EVIDENCE' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('retry-token', 'sha256'))::text) = 0
   and position('Restricted late claim' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('retry-token', 'sha256'))::text) = 0)::integer)
   as restricted_evidence_not_served;
+
+set local role career_app;
+update app.applications set deleted_at = now(), revision = revision + 1
+where id = '72000000-0000-0000-0000-000000000001';
+set local role career_reader;
+select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid,
+  digest('retry-token', 'sha256')) is null)::integer)
+  as application_deletion_revoked_capability;
 rollback;
 select 'capability writer and immutable publication snapshot ok' as result;

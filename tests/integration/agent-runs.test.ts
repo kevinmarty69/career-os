@@ -204,7 +204,8 @@ async function main() {
   const anonymous = new BrowserSession();
   await expectStatus(
     await anonymous.request('/api/runs', 'POST', {
-      opportunity,
+      applicationId: randomUUID(),
+      applicationRevision: 1,
       profileRevision: 1,
     }),
     401,
@@ -218,13 +219,26 @@ async function main() {
   });
   await expectStatus(saved, 200, 'saved Career Memory');
   const savedProfile = (await saved.json()) as { revision: number };
-  const idempotencyKey = randomUUID();
-  const create = await owner.browser.request(
-    '/api/runs',
+  const applicationResponse = await owner.browser.request(
+    '/api/applications',
     'POST',
-    { opportunity, profileRevision: savedProfile.revision },
-    { 'idempotency-key': idempotencyKey },
+    opportunity,
+    { 'idempotency-key': randomUUID() },
   );
+  await expectStatus(applicationResponse, 201, 'persisted application');
+  const application = (await applicationResponse.json()) as {
+    applicationId: string;
+    revision: number;
+  };
+  const runInput = {
+    applicationId: application.applicationId,
+    applicationRevision: application.revision,
+    profileRevision: savedProfile.revision,
+  };
+  const idempotencyKey = randomUUID();
+  const create = await owner.browser.request('/api/runs', 'POST', runInput, {
+    'idempotency-key': idempotencyKey,
+  });
   await expectStatus(create, 201, 'persisted run');
   const run = (await create.json()) as {
     runId: string;
@@ -253,12 +267,9 @@ async function main() {
   assert.ok(run.reviews.every((review) => review.passed));
   assert.ok(run.events.length > 0);
 
-  const replay = await owner.browser.request(
-    '/api/runs',
-    'POST',
-    { opportunity, profileRevision: savedProfile.revision },
-    { 'idempotency-key': idempotencyKey },
-  );
+  const replay = await owner.browser.request('/api/runs', 'POST', runInput, {
+    'idempotency-key': idempotencyKey,
+  });
   await expectStatus(replay, 200, 'idempotent replay');
   assert.deepEqual(await replay.json(), run);
   await expectStatus(
@@ -266,8 +277,8 @@ async function main() {
       '/api/runs',
       'POST',
       {
-        opportunity: { ...opportunity, company: 'Different Company' },
-        profileRevision: savedProfile.revision,
+        ...runInput,
+        applicationRevision: application.revision + 1,
       },
       { 'idempotency-key': idempotencyKey },
     ),
@@ -368,7 +379,7 @@ async function main() {
     const correctionCreate = await owner.browser.request(
       '/api/runs',
       'POST',
-      { opportunity, profileRevision: savedProfile.revision },
+      runInput,
       { 'idempotency-key': randomUUID() },
     );
     await expectStatus(correctionCreate, 201, 'correction source run');
@@ -442,7 +453,7 @@ async function main() {
     const factualCreate = await owner.browser.request(
       '/api/runs',
       'POST',
-      { opportunity, profileRevision: savedProfile.revision },
+      runInput,
       { 'idempotency-key': randomUUID() },
     );
     await expectStatus(factualCreate, 201, 'factuality source run');
