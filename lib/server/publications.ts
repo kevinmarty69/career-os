@@ -1,11 +1,5 @@
 import 'server-only';
-import {
-  createHash,
-  createHmac,
-  randomBytes,
-  randomUUID,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
 import { buildStrategy, runReviews } from '../workflow';
@@ -13,11 +7,10 @@ import {
   publicationInputSchema,
   publishedPayloadSchema,
 } from './publication-input';
-const sessionSchema = z.object({
-  userId: z.string().uuid(),
-  tenantId: z.string().uuid(),
-});
-export type PublicationSession = z.infer<typeof sessionSchema>;
+export type PublicationSession = {
+  userId: string;
+  tenantId: string;
+};
 
 export class PublicationRejectedError extends Error {}
 
@@ -25,42 +18,6 @@ function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required.');
   return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
-function sessionSecret() {
-  const secret = process.env.CAREER_OS_SESSION_SECRET;
-  if (!secret || secret.length < 32)
-    throw new Error(
-      'CAREER_OS_SESSION_SECRET must contain at least 32 characters.',
-    );
-  return secret;
-}
-
-export function createSession(): PublicationSession {
-  return { userId: randomUUID(), tenantId: randomUUID() };
-}
-
-export function encodeSession(session: PublicationSession) {
-  const payload = Buffer.from(JSON.stringify(session)).toString('base64url');
-  return `${payload}.${createHmac('sha256', sessionSecret()).update(payload).digest('base64url')}`;
-}
-
-export function decodeSession(value?: string) {
-  if (!value) return;
-  const [payload, supplied] = value.split('.');
-  if (!payload || !supplied) return;
-  const expected = createHmac('sha256', sessionSecret())
-    .update(payload)
-    .digest();
-  const candidate = Buffer.from(supplied, 'base64url');
-  if (
-    candidate.length !== expected.length ||
-    !timingSafeEqual(candidate, expected)
-  )
-    return;
-  return sessionSchema.parse(
-    JSON.parse(Buffer.from(payload, 'base64url').toString()),
-  );
 }
 
 export async function mintPublication(

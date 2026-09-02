@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
-import {
-  decodeSession,
-  readPublication,
-  revokePublication,
-} from '@/lib/server/publications';
+import { authenticatedPublicationSession } from '@/lib/server/auth';
+import { readPublication, revokePublication } from '@/lib/server/publications';
 
 export async function GET(
   request: Request,
@@ -33,9 +30,12 @@ export async function DELETE(
 ) {
   if (request.headers.get('origin') !== new URL(request.url).origin)
     return new Response('Forbidden', { status: 403 });
-  const session = decodeSession(
-    request.headers.get('cookie')?.match(/(?:^|; )career_session=([^;]+)/)?.[1],
-  );
+  let session;
+  try {
+    session = await authenticatedPublicationSession(request);
+  } catch {
+    return new Response('Authentication unavailable.', { status: 503 });
+  }
   if (!session) return new Response('Unauthorized', { status: 401 });
   try {
     const { publicationId } = await context.params;

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { syntheticProfile } from '../../lib/fixture';
 import { buildPageSpec, buildStrategy } from '../../lib/workflow';
+import { organizationOptions } from '../../lib/server/auth-config';
 import { PayloadTooLargeError, readBoundedJson } from '../../lib/server/http';
 import {
   publicationInputSchema,
@@ -23,6 +24,10 @@ const spec = buildPageSpec(
   opportunity,
   buildStrategy(syntheticProfile, opportunity),
 );
+
+test('organization invitations require a verified email', () => {
+  assert.equal(organizationOptions.requireEmailVerificationOnInvitation, true);
+});
 
 test('publication input rejects oversized arrays and text', () => {
   const tooManySources = Array.from({ length: 51 }, (_, index) => ({
