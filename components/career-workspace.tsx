@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { authClient } from '@/lib/auth-client';
 import { latestPageSpec, runAgentTeam } from '@/lib/agent-runtime';
 import { syntheticProfile } from '@/lib/fixture';
 import {
@@ -54,6 +56,8 @@ const dossierViews: Array<[DossierView, string]> = [
 ];
 
 export function CareerWorkspace() {
+  const session = authClient.useSession();
+  const activeOrganization = authClient.useActiveOrganization();
   const [state, setState] = useState<SavedState>({
     profile: syntheticProfile,
     opportunity: initialOpportunity,
@@ -90,7 +94,6 @@ export function CareerWorkspace() {
           const parsed = JSON.parse(saved) as SavedState;
           setState({
             ...parsed,
-            capability: undefined,
             events: parsed.events ?? [],
             paused: parsed.paused ?? false,
           });
@@ -114,13 +117,17 @@ export function CareerWorkspace() {
       publishedInput.current !==
         JSON.stringify([state.profile, state.opportunity])
     ) {
-      publishedInput.current = '';
       void fetch(`/api/publications/${publicationId}`, {
         method: 'DELETE',
       }).then((response) => {
         if (response.ok) {
+          publishedInput.current = '';
           setState((current) => ({ ...current, capability: undefined }));
           setShareUrl('');
+        } else {
+          setPublishError(
+            'Your Draft changed, but the existing private link is still active. Open Share to revoke it.',
+          );
         }
       });
     }
@@ -217,7 +224,10 @@ export function CareerWorkspace() {
           approved: true,
         }),
       });
-      if (!response.ok) throw new Error('Publication rejected.');
+      if (!response.ok) {
+        if (response.status === 401) throw new Error('AUTH_REQUIRED');
+        throw new Error('Publication rejected.');
+      }
       const publication = (await response.json()) as {
         publicationId: string;
         rawToken: string;
@@ -232,9 +242,11 @@ export function CareerWorkspace() {
       ]);
       setShareUrl(`/p/${publication.publicationId}#${publication.rawToken}`);
       setShareMessage('Private link created.');
-    } catch {
+    } catch (error) {
       setPublishError(
-        'The private link could not be created. Check the server connection and retry.',
+        error instanceof Error && error.message === 'AUTH_REQUIRED'
+          ? 'Sign in before creating a private link.'
+          : 'The private link could not be created. Check the server connection and retry.',
       );
     } finally {
       setPublishing(false);
@@ -255,10 +267,28 @@ export function CareerWorkspace() {
     const response = await fetch(`/api/publications/${state.capability}`, {
       method: 'DELETE',
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setPublishError(
+        response.status === 401
+          ? 'Sign in to revoke this private link.'
+          : 'The private link could not be revoked. Retry.',
+      );
+      return;
+    }
     setState((current) => ({ ...current, capability: undefined }));
     setShareUrl('');
     setShareMessage('Private link revoked.');
+  }
+
+  async function signOut() {
+    const result = await authClient.signOut();
+    if (result.error) return;
+    setShareUrl('');
+    setShareMessage(
+      state.capability
+        ? 'Signed out. The existing private link remains active until you sign in and revoke it.'
+        : 'Signed out.',
+    );
   }
 
   function addMemory() {
@@ -375,6 +405,28 @@ export function CareerWorkspace() {
           </button>
         </div>
         <p className="demo-label">Synthetic demo data</p>
+        <div className="account-control">
+          {session.isPending ? (
+            <small>Checking account…</small>
+          ) : session.data ? (
+            <>
+              <span aria-hidden="true">
+                {session.data.user.name.charAt(0).toUpperCase()}
+              </span>
+              <div>
+                <strong>{session.data.user.name}</strong>
+                <small>
+                  {activeOrganization.data?.name ?? 'Choose workspace'}
+                </small>
+                <button onClick={() => void signOut()} type="button">
+                  Sign Out
+                </button>
+              </div>
+            </>
+          ) : (
+            <Link href="/sign-in?next=/">Sign in to share</Link>
+          )}
+        </div>
       </aside>
 
       <section className="shell-content" id="main-content">
@@ -464,6 +516,10 @@ export function CareerWorkspace() {
                     publishing={publishing}
                     shareMessage={shareMessage}
                     shareUrl={shareUrl}
+                    publicationExists={Boolean(state.capability)}
+                    signedIn={Boolean(
+                      session.data?.session.activeOrganizationId,
+                    )}
                     onCopy={copyLink}
                     onPublish={publish}
                     onRevoke={revoke}
@@ -850,6 +906,8 @@ function ShareView({
   publishing,
   shareMessage,
   shareUrl,
+  publicationExists,
+  signedIn,
 }: {
   canPublish: boolean;
   error: string;
@@ -859,6 +917,8 @@ function ShareView({
   publishing: boolean;
   shareMessage: string;
   shareUrl: string;
+  publicationExists: boolean;
+  signedIn: boolean;
 }) {
   return (
     <section className="document share-document">
@@ -899,10 +959,24 @@ function ShareView({
       </p>
       {!shareUrl ? (
         <div className="document-actions">
-          <p>Approval and 3 passing checks are required.</p>
-          <button disabled={!canPublish || publishing} onClick={onPublish}>
-            {publishing ? 'Creating Private Link…' : 'Create Private Link'}
-          </button>
+          <p>
+            {publicationExists
+              ? 'The existing link is hidden on this device.'
+              : 'Approval and 3 passing checks are required.'}
+          </p>
+          {!signedIn ? (
+            <Link className="button-link" href="/sign-in?next=/">
+              Sign In to {publicationExists ? 'Manage Link' : 'Create Link'}
+            </Link>
+          ) : publicationExists ? (
+            <button className="danger-link" onClick={onRevoke}>
+              Revoke Existing Link
+            </button>
+          ) : (
+            <button disabled={!canPublish || publishing} onClick={onPublish}>
+              {publishing ? 'Creating Private Link…' : 'Create Private Link'}
+            </button>
+          )}
         </div>
       ) : null}
     </section>

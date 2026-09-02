@@ -11,6 +11,24 @@ test('builds, reviews, approves and issues one private capability', async ({
   browser,
   page,
 }) => {
+  await page.goto('/sign-in?next=/');
+  await page
+    .getByRole('button', { name: 'Create Account', exact: true })
+    .first()
+    .click();
+  await page.getByLabel('Name').fill('Alex Morgan');
+  await page
+    .getByLabel('Email')
+    .fill(`alex-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Password').fill('safe-local-password');
+  await page
+    .locator('form')
+    .getByRole('button', { name: 'Create Account' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Create your workspace' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Create Workspace' }).click();
   await expect(
     page.getByRole('heading', { name: 'Northstar Labs' }),
   ).toBeVisible();
@@ -87,6 +105,63 @@ test('builds, reviews, approves and issues one private capability', async ({
     }),
   ).toBeVisible();
   await freshContext.close();
+});
+
+test('requires an explicit workspace choice when several are available', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'Covered by the desktop flow.');
+  const email = `multi-${crypto.randomUUID()}@example.test`;
+  await page.goto('/sign-in');
+  await page
+    .getByRole('button', { name: 'Create Account', exact: true })
+    .first()
+    .click();
+  await page.getByLabel('Name').fill('Multi Workspace');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill('safe-local-password');
+  await page
+    .locator('form')
+    .getByRole('button', { name: 'Create Account' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Create your workspace' }),
+  ).toBeVisible();
+
+  const secondOrganizationId = await page.evaluate(async () => {
+    const create = (name: string, slug: string) =>
+      fetch('/api/auth/organization/create', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name, slug }),
+      }).then((response) => response.json());
+    await create('Workspace One', `workspace-one-${crypto.randomUUID()}`);
+    const second = await create(
+      'Workspace Two',
+      `workspace-two-${crypto.randomUUID()}`,
+    );
+    await fetch('/api/auth/sign-out', { method: 'POST' });
+    return second.id as string;
+  });
+
+  await page.goto('/sign-in');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill('safe-local-password');
+  await page.locator('form').getByRole('button', { name: 'Sign In' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Choose a workspace' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Use Workspace Two' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Northstar Labs' }),
+  ).toBeVisible();
+  const activeOrganizationId = await page.evaluate(async () => {
+    const session = await fetch('/api/auth/get-session').then((response) =>
+      response.json(),
+    );
+    return session.session.activeOrganizationId as string;
+  });
+  expect(activeOrganizationId).toBe(secondOrganizationId);
 });
 
 test('records a declared claim and exposes provenance progressively', async ({

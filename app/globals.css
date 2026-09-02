@@ -276,9 +276,74 @@ button.danger-link:hover:not(:disabled) {
 }
 
 .demo-label {
-  margin: auto 8px 0;
+  margin: auto 8px 12px;
   color: var(--secondary);
   font-size: 12px;
+}
+
+.account-control {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 46px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.account-control > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  color: #fff;
+  border-radius: 50%;
+  background: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  place-items: center;
+}
+
+.account-control div {
+  min-width: 0;
+}
+
+.account-control strong,
+.account-control small,
+.account-control button {
+  display: block;
+}
+
+.account-control strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-control small {
+  overflow: hidden;
+  color: var(--secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-control button {
+  min-height: auto;
+  padding: 0;
+  color: var(--secondary);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.account-control a {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
 }
 
 .shell-content {
@@ -809,6 +874,26 @@ blockquote p {
   place-items: center;
 }
 
+.button-link {
+  display: inline-grid;
+  min-height: 44px;
+  padding: 10px 14px;
+  color: #fff;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: var(--primary);
+  box-shadow: var(--shadow-sm);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+  place-items: center;
+}
+
+.button-link:hover {
+  border-color: var(--primary-hover);
+  background: var(--primary-hover);
+}
+
 .sr-status {
   min-height: 24px;
   color: var(--secondary);
@@ -1003,6 +1088,97 @@ summary {
 
 .settings-view {
   max-width: 900px;
+}
+
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  padding: 32px 20px;
+  place-items: center;
+}
+
+.auth-card {
+  width: min(100%, 420px);
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgb(24 24 27 / 8%);
+}
+
+.auth-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 28px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--surface-hover);
+}
+
+.auth-tabs button {
+  min-height: 38px;
+  padding: 7px 10px;
+  color: var(--secondary);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.auth-tabs button:hover,
+.auth-tabs button.active {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.auth-card header h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.auth-card header p {
+  margin: 8px 0 24px;
+  color: var(--secondary);
+}
+
+.auth-card form > button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.organization-list {
+  display: grid;
+  gap: 10px;
+}
+
+.organization-list button {
+  width: 100%;
+}
+
+.auth-error {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  color: #7a271a;
+  border: 1px solid #e6b8b1;
+  border-radius: 8px;
+  background: #fff4f2;
+  font-size: 13px;
+}
+
+.auth-back {
+  display: block;
+  margin-top: 22px;
+  color: var(--secondary);
+  font-size: 13px;
+  text-align: center;
 }
 
 .settings-row {
@@ -1234,7 +1410,8 @@ summary {
   }
 
   .application-list,
-  .demo-label {
+  .demo-label,
+  .account-control {
     display: none;
   }
 

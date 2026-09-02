@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  workers: 1,
   webServer: {
     command: 'pnpm exec next start --port 3117',
     port: 3117,
