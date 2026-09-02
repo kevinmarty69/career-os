@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { syntheticProfile } from '@/lib/fixture';
 import { latestPageSpec, runAgentTeam } from '@/lib/agent-runtime';
 import {
@@ -56,6 +56,8 @@ export function CareerWorkspace() {
     level: 'declared' as 'verified' | 'declared' | 'inferred',
   });
   const [memoryError, setMemoryError] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
+  const publishedInput = useRef('');
 
   useEffect(() => {
     const saved = localStorage.getItem('career-os-demo');
@@ -65,6 +67,7 @@ export function CareerWorkspace() {
           const parsed = JSON.parse(saved) as SavedState;
           setState({
             ...parsed,
+            capability: undefined,
             events: parsed.events ?? [],
             paused: parsed.paused ?? false,
           });
@@ -79,6 +82,26 @@ export function CareerWorkspace() {
   useEffect(() => {
     if (loaded) localStorage.setItem('career-os-demo', JSON.stringify(state));
   }, [loaded, state]);
+
+  useEffect(() => {
+    const publicationId = state.capability;
+    if (
+      publicationId &&
+      publishedInput.current &&
+      publishedInput.current !==
+        JSON.stringify([state.profile, state.opportunity])
+    ) {
+      publishedInput.current = '';
+      void fetch(`/api/publications/${publicationId}`, {
+        method: 'DELETE',
+      }).then((response) => {
+        if (response.ok) {
+          setState((current) => ({ ...current, capability: undefined }));
+          setShareUrl('');
+        }
+      });
+    }
+  }, [state.capability, state.profile, state.opportunity]);
 
   const claims = useMemo(
     () => new Map(state.profile.claims.map((claim) => [claim.id, claim])),
@@ -138,14 +161,39 @@ export function CareerWorkspace() {
     }));
   }
 
-  function publish() {
+  async function publish() {
     if (!canPublish(state.approved, state.reviews)) return;
-    const next = {
-      ...state,
-      capability: crypto.randomUUID().replaceAll('-', ''),
+    const response = await fetch('/api/publications', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        profile: state.profile,
+        spec: state.spec,
+        opportunity: state.opportunity,
+        approved: true,
+      }),
+    });
+    if (!response.ok) {
+      setMemoryError('Server publication is unavailable or rejected.');
+      return;
+    }
+    const publication = (await response.json()) as {
+      publicationId: string;
+      rawToken: string;
     };
-    localStorage.setItem('career-os-demo', JSON.stringify(next));
-    setState(next);
+    setState({ ...state, capability: publication.publicationId });
+    publishedInput.current = JSON.stringify([state.profile, state.opportunity]);
+    setShareUrl(`/p/${publication.publicationId}#${publication.rawToken}`);
+  }
+
+  async function revoke() {
+    if (!state.capability) return;
+    const response = await fetch(`/api/publications/${state.capability}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) return;
+    setState({ ...state, capability: undefined });
+    setShareUrl('');
   }
 
   function addMemory() {
@@ -204,7 +252,6 @@ export function CareerWorkspace() {
       spec: undefined,
       reviews: [],
       approved: false,
-      capability: undefined,
       events: [],
     });
     setMemoryDraft({ source: '', claim: '', evidence: '', level: 'declared' });
@@ -348,7 +395,6 @@ export function CareerWorkspace() {
                         spec: undefined,
                         reviews: [],
                         approved: false,
-                        capability: undefined,
                       })
                     }
                   />
@@ -626,10 +672,13 @@ export function CareerWorkspace() {
               {state.capability && (
                 <div className="capability" role="status">
                   <strong>Private demo link issued</strong>
-                  <code>/p/{state.capability}</code>
-                  <a href={`/p/${state.capability}`}>Open private demo</a>
+                  <code>{shareUrl}</code>
+                  <a href={shareUrl}>Open private demo</a>
+                  <button className="quiet" onClick={revoke}>
+                    Revoke private capability
+                  </button>
                   <p>
-                    No cross-navigation. Revoke by resetting this workspace.
+                    No cross-navigation. The token expires after seven days.
                   </p>
                 </div>
               )}

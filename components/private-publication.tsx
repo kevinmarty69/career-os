@@ -9,28 +9,45 @@ import {
   type Profile,
 } from '@/lib/schemas';
 
-type Publication = { capability?: string; spec?: PageSpec; profile: Profile };
+type Publication = { spec: PageSpec; profile: Profile };
 
 export function PrivatePublication() {
   const { capability } = useParams<{ capability: string }>();
   const [publication, setPublication] = useState<Publication | null>();
 
   useEffect(() => {
-    const saved = localStorage.getItem('career-os-demo');
-    queueMicrotask(() => {
+    async function load() {
       try {
-        const parsed = saved ? (JSON.parse(saved) as Publication) : null;
+        const token = location.hash.slice(1);
+        if (token) {
+          const exchange = await fetch(
+            `/api/publications/${capability}/exchange`,
+            {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ token }),
+            },
+          );
+          history.replaceState(null, '', location.pathname);
+          if (!exchange.ok) throw new Error('Invalid capability.');
+        }
+        const response = await fetch(`/api/publications/${capability}`, {
+          cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('Private publication unavailable.');
+        const parsed = (await response.json()) as Publication;
         const spec = pageSpecSchema.safeParse(parsed?.spec);
         const profile = profileSchema.safeParse(parsed?.profile);
         setPublication(
-          parsed?.capability === capability && spec.success && profile.success
-            ? { ...parsed, spec: spec.data, profile: profile.data }
+          spec.success && profile.success
+            ? { spec: spec.data, profile: profile.data }
             : null,
         );
       } catch {
         setPublication(null);
       }
-    });
+    }
+    void load();
   }, [capability]);
 
   if (publication === undefined)

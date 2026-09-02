@@ -49,7 +49,7 @@ test('the deterministic workflow keeps provenance and gates publication', () => 
   );
   assert.equal(canPublish(false, reviews), false);
   assert.equal(canPublish(true, reviews), true);
-  assert.deepEqual(strategy.selectedClaimIds, ['claim-demo-collaboration']);
+  assert.deepEqual(strategy.selectedClaimIds, ['claim-demo-release']);
   assert.equal(
     strategy.matches.some((match) => match.claimId),
     true,

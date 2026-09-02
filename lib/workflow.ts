@@ -87,7 +87,17 @@ export function buildStrategy(
   const eligible = profile.claims.filter(
     (claim) =>
       claim.allowedUses.includes('application') &&
-      claim.sensitivity !== 'restricted',
+      claim.sensitivity !== 'restricted' &&
+      claim.evidenceIds.some((id) => {
+        const evidence = profile.evidence.find((item) => item.id === id);
+        const source = profile.sources.find(
+          (item) => item.id === evidence?.sourceId,
+        );
+        return (
+          source?.sensitivity !== 'restricted' &&
+          source?.allowedUses.includes('application')
+        );
+      }),
   );
   const requirements = sentences(
     `${opportunity.role}. ${opportunity.description}`,
@@ -167,7 +177,10 @@ function keywords(value: string) {
     value
       .toLowerCase()
       .match(/[a-z0-9]+/g)
-      ?.filter((word) => word.length > 2 && !ignoredWords.has(word)) ?? [],
+      ?.filter((word) => word.length > 2 && !ignoredWords.has(word))
+      .map((word) =>
+        word.length > 4 && word.endsWith('s') ? word.slice(0, -1) : word,
+      ) ?? [],
   );
 }
 
@@ -240,8 +253,22 @@ export function runReviews(profile: Profile, spec: PageSpec): Review[] {
   );
   const factualProblems = uniqueClaims.flatMap((claim) => {
     if (!claim) return ['PageSpec references an unknown claim.'];
-    if (claim.level === 'verified' && claim.evidenceIds.length === 0)
-      return [`${claim.id} has no evidence.`];
+    const eligibleEvidence = claim.evidenceIds.some((id) => {
+      const evidence = profile.evidence.find((item) => item.id === id);
+      const source = profile.sources.find(
+        (item) => item.id === evidence?.sourceId,
+      );
+      return (
+        source?.sensitivity !== 'restricted' &&
+        source?.allowedUses.includes('application')
+      );
+    });
+    if (
+      claim.sensitivity === 'restricted' ||
+      !claim.allowedUses.includes('application') ||
+      !eligibleEvidence
+    )
+      return [`${claim.id} has no eligible supporting evidence.`];
     return [];
   });
 

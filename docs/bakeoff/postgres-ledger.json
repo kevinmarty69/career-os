@@ -14,11 +14,16 @@
     "crossTenantBudget": "rejected",
     "parallelReservationsPassed": 10,
     "parallelReservationsRejected": 10,
-    "reservedTokens": 100
+    "reservedTokens": 100,
+    "freshBrowserCapability": "pass",
+    "fragmentExchangeHttpOnly": "pass",
+    "revokedCapability": "rejected",
+    "forgedUnrelatedOpportunity": "rejected",
+    "unselectedPayloadClaim": "not served"
   },
   "limitations": [
     "Crash-mid-side-effect exactly-once is not yet proven",
-    "Server capability exchange is not implemented",
+    "Capability exchange is proven locally but production identity is not connected",
     "JWT verification belongs to the trusted backend in front of NOLOGIN roles"
   ]
 }

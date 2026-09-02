@@ -171,14 +171,14 @@ begin
     ) then raise exception 'publication contains an unknown, restricted or unsupported claim';
   end if;
   if exists(
-    (select value from page_specs ps, jsonb_array_elements(ps.spec -> 'blocks') block,
-      jsonb_array_elements_text(coalesce(block -> 'claimIds', '[]'::jsonb)) value
+    (select claim_value.value from page_specs ps, jsonb_array_elements(ps.spec -> 'blocks') block,
+      jsonb_array_elements_text(coalesce(block -> 'claimIds', '[]'::jsonb)) claim_value(value)
       where ps.tenant_id = new.tenant_id and ps.id = new.page_spec_id
      except select claim_id::text from page_spec_claims where tenant_id = new.tenant_id and page_spec_id = new.page_spec_id)
     union
     (select claim_id::text from page_spec_claims where tenant_id = new.tenant_id and page_spec_id = new.page_spec_id
-     except select value from page_specs ps, jsonb_array_elements(ps.spec -> 'blocks') block,
-      jsonb_array_elements_text(coalesce(block -> 'claimIds', '[]'::jsonb)) value
+     except select claim_value.value from page_specs ps, jsonb_array_elements(ps.spec -> 'blocks') block,
+      jsonb_array_elements_text(coalesce(block -> 'claimIds', '[]'::jsonb)) claim_value(value)
       where ps.tenant_id = new.tenant_id and ps.id = new.page_spec_id)
   ) then raise exception 'PageSpec claim mapping mismatch'; end if;
   return new;
