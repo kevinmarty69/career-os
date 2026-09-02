@@ -12,6 +12,7 @@ services:
       - ./supabase/migrations/0001_initial.sql:/docker-entrypoint-initdb.d/0001_initial.sql:ro
       - ./supabase/migrations/0002_agent_ledger.sql:/docker-entrypoint-initdb.d/0002_agent_ledger.sql:ro
       - ./supabase/migrations/0003_private_capabilities.sql:/docker-entrypoint-initdb.d/0003_private_capabilities.sql:ro
+      - ./supabase/migrations/0004_budget_reservations.sql:/docker-entrypoint-initdb.d/0004_budget_reservations.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U career_os']
       interval: 2s
