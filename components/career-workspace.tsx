@@ -352,6 +352,7 @@ export function CareerWorkspace() {
         <nav className="primary-nav" aria-label="Primary">
           {primaryViews.map(([id, label]) => (
             <button
+              aria-current={primaryView === id ? 'page' : undefined}
               className={primaryView === id ? 'active' : ''}
               key={id}
               onClick={() => setPrimaryView(id)}
@@ -380,10 +381,15 @@ export function CareerWorkspace() {
         {primaryView === 'applications' ? (
           <>
             <header className="object-header">
-              <div>
-                <p>Application dossier</p>
-                <h1>{state.opportunity.company}</h1>
-                <span>{state.opportunity.role}</span>
+              <div className="object-identity">
+                <span className="company-mark" aria-hidden="true">
+                  {state.opportunity.company.charAt(0)}
+                </span>
+                <div>
+                  <p>Application dossier</p>
+                  <h1>{state.opportunity.company}</h1>
+                  <span>{state.opportunity.role}</span>
+                </div>
               </div>
               <div className="status-block">
                 <span className="status-label">{status}</span>
@@ -405,6 +411,7 @@ export function CareerWorkspace() {
             <nav className="dossier-nav" aria-label="Application dossier">
               {dossierViews.map(([id, label]) => (
                 <button
+                  aria-current={dossierView === id ? 'step' : undefined}
                   className={dossierView === id ? 'active' : ''}
                   disabled={id !== 'brief' && !state.spec}
                   key={id}
