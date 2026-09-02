@@ -12,10 +12,20 @@ test('builds, reviews, approves and issues one private capability', async ({
   page,
 }) => {
   await expect(
-    page.getByText('All visible candidate content is synthetic.'),
+    page.getByRole('heading', { name: 'Northstar Labs' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Build strategy & PageSpec' }).click();
+  await page.getByRole('button', { name: 'Generate Draft' }).click();
   await expect(page.getByText('Alex Morgan × Northstar Labs')).toBeVisible();
+  await page
+    .getByRole('button', {
+      name: /Reduced a fictional deployment workflow.*View evidence/,
+    })
+    .first()
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Why these statements?' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Close evidence inspector' }).click();
   const forgedStatus = await page.evaluate(async () => {
     const saved = JSON.parse(localStorage.getItem('career-os-demo')!);
     const response = await fetch('/api/publications', {
@@ -36,22 +46,19 @@ test('builds, reviews, approves and issues one private capability', async ({
     return response.status;
   });
   expect(forgedStatus).toBe(400);
-  await expect(
-    page.getByRole('button', { name: 'Publish private capability' }),
-  ).toBeDisabled();
-  await page.getByRole('button', { name: 'Run 3 observable reviews' }).click();
+  await page.getByRole('button', { name: 'Review', exact: true }).click();
+  await page.getByRole('button', { name: 'Run Review' }).click();
   const approval = page.getByLabel(
-    'I reviewed the claims and approve this private publication.',
+    'I reviewed the evidence and approve this application.',
   );
   await expect(approval).toBeEnabled();
   await approval.check();
-  await page
-    .getByRole('button', { name: 'Publish private capability' })
-    .click();
+  await page.getByRole('button', { name: 'Continue to Share' }).click();
+  await page.getByRole('button', { name: 'Create Private Link' }).click();
   await expect(page.getByRole('status')).toContainText('/p/');
-  await expect(page.getByRole('status')).toContainText('No cross-navigation');
+  await expect(page.getByRole('status')).toContainText('Active');
   const href = await page
-    .getByRole('link', { name: 'Open private demo' })
+    .getByRole('link', { name: 'Open Private Page' })
     .getAttribute('href');
   const freshContext = await browser.newContext();
   const freshPage = await freshContext.newPage();
@@ -68,7 +75,11 @@ test('builds, reviews, approves and issues one private capability', async ({
   ).toHaveCount(0);
   expect(freshPage.url()).not.toContain('#');
   await expect(freshPage.locator('nav')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Revoke private capability' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Revoke Private Link' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Create Private Link' }),
+  ).toBeVisible();
   await freshPage.reload();
   await expect(
     freshPage.getByRole('heading', {
@@ -81,26 +92,58 @@ test('builds, reviews, approves and issues one private capability', async ({
 test('records a declared claim and exposes provenance progressively', async ({
   page,
 }) => {
-  await page.getByText('Add source, claim & proof').click();
-  await page.getByLabel('Source title').fill('Synthetic interview notes');
+  await page.getByRole('button', { name: 'Career Memory' }).click();
+  await page.getByText('Add Statement & Source').click();
+  await page.getByLabel('Source Title').fill('Synthetic interview notes');
   await page
-    .getByRole('textbox', { name: 'Claim', exact: true })
+    .getByLabel('Statement', { exact: true })
     .fill('Built a fictional customer feedback loop.');
   await page.getByRole('button', { name: 'Save to Career Memory' }).click();
-  await expect(page.getByText('3 claims')).toBeVisible();
-  await page.getByText('Inspect provenance').click();
+  await expect(page.getByText('3 statements')).toBeVisible();
   await expect(
     page.getByText('Built a fictional customer feedback loop.'),
   ).toBeVisible();
-  await expect(page.getByText('Explicitly unverified').last()).toBeVisible();
+  await expect(page.getByText('No supporting evidence').last()).toBeVisible();
 });
 
-test('fits a narrow viewport without horizontal overflow', async ({ page }) => {
-  await page.getByRole('button', { name: 'Build strategy & PageSpec' }).click();
-  const overflow = await page.evaluate(
-    () =>
-      document.documentElement.scrollWidth >
-      document.documentElement.clientWidth,
+test('fits 375, 768, and 1440 widths without horizontal overflow', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Generate Draft' }).click();
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    );
+    expect(overflow, `${width}px viewport`).toBe(false);
+  }
+});
+
+test('preserves the opportunity and offers retry when evidence does not match', async ({
+  page,
+}) => {
+  await page.getByLabel('Role').fill('Astrophysicist');
+  await page
+    .getByLabel('Job description')
+    .fill('Calibrate telescope optics and model stellar spectra.');
+  await page.getByRole('button', { name: 'Generate Draft' }).click();
+  await expect(page.locator('.inline-error')).toContainText(
+    'No evidence matches this role.',
   );
-  expect(overflow).toBe(false);
+  await expect(page.getByLabel('Role')).toHaveValue('Astrophysicist');
+  await expect(page.getByRole('button', { name: 'Retry Draft' })).toBeVisible();
+});
+
+test('keeps run mechanics in Activity details', async ({ page }) => {
+  await page.getByRole('button', { name: 'Generate Draft' }).click();
+  await page.getByRole('button', { name: 'Activity' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Run history' }),
+  ).toBeVisible();
+  await expect(page.getByText('Draft completed').first()).toBeVisible();
+  await expect(page.getByText('company-researcher').first()).toBeHidden();
+  await page.getByText('Run details').first().click();
+  await expect(page.getByText('company-researcher').first()).toBeVisible();
 });

@@ -51,12 +51,12 @@ export function PrivatePublication() {
   }, [capability]);
 
   if (publication === undefined)
-    return <main className="private-error">Checking private capability…</main>;
+    return <main className="private-error">Checking private link…</main>;
   if (!publication?.spec)
     return (
       <main className="private-error">
         <h1>Private application unavailable.</h1>
-        <p>The capability is invalid or revoked.</p>
+        <p>The private link is invalid, expired, or revoked.</p>
       </main>
     );
 
@@ -66,19 +66,33 @@ export function PrivatePublication() {
   return (
     <main
       className="private-page"
-      style={{ '--accent': spec.company.accent } as React.CSSProperties}
+      style={{ '--company-accent': spec.company.accent } as React.CSSProperties}
     >
       <header>
         <strong>{spec.company.name}</strong>
-        <span>Private application · no cross-navigation</span>
+        <span>{spec.company.role} · Private application</span>
       </header>
-      <section>
-        <p className="eyebrow">{spec.hero.eyebrow}</p>
+      <section className="memo-hero">
+        <p className="section-label">Prepared for {spec.company.name}</p>
         <h1>{spec.hero.title}</h1>
+        <p className="recipient-line">
+          {profile.name} · {spec.company.role}
+        </p>
         <p className="thesis">{spec.hero.thesis}</p>
+        <div className="memo-meta">
+          <span>Why sent: a concise, evidence-backed fit assessment</span>
+          <span>3 min read</span>
+        </div>
+        <a className="memo-action" href="#strongest-evidence">
+          View Strongest Evidence
+        </a>
       </section>
       {spec.blocks.map((block, index) => (
-        <section className="proof-block" key={`${block.type}-${index}`}>
+        <section
+          className="proof-block"
+          id={index === 0 ? 'strongest-evidence' : undefined}
+          key={`${block.type}-${index}`}
+        >
           <span>0{index + 1}</span>
           <div>
             <h2>{block.title}</h2>
@@ -122,8 +136,7 @@ export function PrivatePublication() {
         </section>
       ))}
       <footer>
-        Generated from synthetic demo data · revoke from the originating
-        workspace
+        Synthetic demonstration data · Access can be revoked by the sender
       </footer>
     </main>
   );
