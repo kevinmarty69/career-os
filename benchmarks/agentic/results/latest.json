@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-02T16:05:36.393Z",
+  "fixture": {
+    "profile": "lib/fixture.ts#syntheticProfile",
+    "workflow": "lib/agent-runtime.ts#runAgentTeam"
+  },
+  "networkBlocked": true,
+  "blockedNetworkProbes": 1,
+  "unexpectedNetworkAttempts": 0,
+  "paidCalls": 0,
+  "candidates": [
+    {
+      "package": "career-os internal",
+      "version": "workspace",
+      "license": "AGPL-3.0-only",
+      "checks": {
+        "sameFixture": {
+          "passed": true,
+          "evidence": "Ran syntheticProfile + Demo Systems opportunity through production runAgentTeam."
+        },
+        "tools": {
+          "passed": true,
+          "evidence": "16 tool calls recorded."
+        },
+        "parallelReviews": {
+          "passed": true,
+          "evidence": "Production orchestrator uses one Promise.all over three reviews."
+        },
+        "boundedRevision": {
+          "passed": true,
+          "evidence": "One targeted revision; cap=3."
+        },
+        "pauseResume": {
+          "passed": true,
+          "evidence": "Shared state JSON round-trip resumed only after three passing reviews."
+        },
+        "cancellation": {
+          "passed": true,
+          "evidence": "Pre-aborted run ended cancelled."
+        },
+        "invalidStructuredOutput": {
+          "passed": true,
+          "evidence": "Malformed PageSpec failed closed as failed/invalid_output."
+        },
+        "handoff": {
+          "passed": true,
+          "evidence": "Production FakeAgentProvider dispatches seven role contracts."
+        },
+        "nativePauseResume": {
+          "passed": true,
+          "evidence": "Career OS state serialized, parsed and approved after three passing reviews."
+        },
+        "nativeMaxTurns": {
+          "passed": true,
+          "evidence": "Production workflow enforces maxRevisions <= 3."
+        }
+      },
+      "verdict": "pass",
+      "limitations": [
+        "Baseline has no third-party runtime and only proves the current in-process application contract."
+      ]
+    },
+    {
+      "package": "@openai/agents",
+      "version": "0.17.0",
+      "license": "MIT",
+      "integrity": "sha512-yzJ3tfHLO/6um9wsZ5IzEAQDaY7VcDBMxOPq7IgBaJkEPHrGX0vIXWGL0aqyreikHW4OpVmWwCaBBIOxxILXlA==",
+      "checks": {
+        "sameFixture": {
+          "passed": true,
+          "evidence": "Ran syntheticProfile + Demo Systems opportunity through production runAgentTeam."
+        },
+        "tools": {
+          "passed": true,
+          "evidence": "16 tool calls recorded."
+        },
+        "parallelReviews": {
+          "passed": true,
+          "evidence": "Observed peak 3 concurrent review calls."
+        },
+        "boundedRevision": {
+          "passed": true,
+          "evidence": "One targeted revision; cap=3."
+        },
+        "pauseResume": {
+          "passed": true,
+          "evidence": "Shared state JSON round-trip resumed only after three passing reviews."
+        },
+        "cancellation": {
+          "passed": true,
+          "evidence": "Pre-aborted run ended cancelled."
+        },
+        "invalidStructuredOutput": {
+          "passed": true,
+          "evidence": "Malformed PageSpec failed closed as failed/invalid_output."
+        },
+        "handoff": {
+          "passed": true,
+          "evidence": "SDK handoff ended on specialist."
+        },
+        "nativePauseResume": {
+          "passed": true,
+          "evidence": "RunState JSON round-trip preserved an approval interruption and resumed it."
+        },
+        "nativeMaxTurns": {
+          "passed": true,
+          "evidence": "maxTurns: 0 raised MaxTurnsExceededError."
+        }
+      },
+      "verdict": "pass",
+      "limitations": [
+        "RunState serialization is application-persisted; it is not a durable queue or database checkpoint.",
+        "Nested handoff agents can have their own turn caps; the outer maxTurns is not a global tree budget."
+      ]
+    },
+    {
+      "package": "@mastra/core",
+      "version": "1.63.2",
+      "license": "Apache-2.0",
+      "integrity": "sha512-BHVDF4GtQnIqRND/lPVVoTnmoNzZ7+voz+EpI4YSY0W7In6c/EOrmMnshuNQSDJ9NpxQNrwip0WGYpRYwzFirQ==",
+      "checks": {
+        "sameFixture": {
+          "passed": true,
+          "evidence": "Ran syntheticProfile + Demo Systems opportunity through production runAgentTeam."
+        },
+        "tools": {
+          "passed": true,
+          "evidence": "16 tool calls recorded."
+        },
+        "parallelReviews": {
+          "passed": true,
+          "evidence": "Observed peak 3 concurrent review calls."
+        },
+        "boundedRevision": {
+          "passed": true,
+          "evidence": "One targeted revision; cap=3."
+        },
+        "pauseResume": {
+          "passed": true,
+          "evidence": "Shared state JSON round-trip resumed only after three passing reviews."
+        },
+        "cancellation": {
+          "passed": true,
+          "evidence": "Pre-aborted run ended cancelled."
+        },
+        "invalidStructuredOutput": {
+          "passed": true,
+          "evidence": "Malformed PageSpec failed closed as failed/invalid_output."
+        },
+        "handoff": {
+          "passed": true,
+          "evidence": "Role agents are invoked by the shared orchestrator; tools execute as Mastra workflow steps."
+        },
+        "nativePauseResume": {
+          "passed": false,
+          "evidence": "Not proved: no storage adapter was configured, so cross-process resume is unsupported in this harness."
+        },
+        "nativeMaxTurns": {
+          "passed": false,
+          "evidence": "maxSteps: 3 was configured, but a looping-agent fault was not executed; enforcement is unproved."
+        }
+      },
+      "verdict": "partial",
+      "limitations": [
+        "Cross-process workflow persistence was not tested.",
+        "@mastra/core/test-utils/llm-mock imports undeclared 'vitest'; harness used a minimal V1 model instead."
+      ]
+    }
+  ]
+}

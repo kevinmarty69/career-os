@@ -12,7 +12,7 @@ The formal comparison is in [agentic-stack-benchmark.md](agentic-stack-benchmark
 
 ## Candidate decision by layer
 
-- Agent runtime: OpenAI Agents SDK TS `0.17.0` is the current candidate; it beat Mastra core on dependency and glue surface while covering typed tools, handoffs, HITL, cancellation and bounded turns.
+- Agent runtime: OpenAI Agents SDK TS `0.17.0` is the current candidate. The executable offline bake-off covers tools, a real SDK handoff, three concurrent reviews, bounded revision, structured-output rejection, cancellation, `RunState` approval resume and `maxTurns`. Mastra core `1.63.2` runs the same business fixture but remains partial because cross-process resume and a looping-agent turn-limit fault were not proved.
 - Durability: PostgreSQL steps, leases, idempotency keys and atomic budget reserve/settle remain authoritative. Neither agent SDK is a durable exactly-once engine.
 - Provider calls: Vercel AI SDK Core/direct providers remain the Apache-2.0 structured-call baseline. Vercel AI Gateway is a separate proprietary hosted option and is not selected.
 - Observability: PostgreSQL audit records first; content-free OpenTelemetry only when needed. Private trace capture is off by default.
@@ -31,7 +31,7 @@ The current implementation uses a deterministic fake provider. A network provide
 7. Tenant export/delete covers sessions, checkpoints and traces.
 8. A server-minted, expiring private capability works in a fresh browser and remains revoked once revoked.
 
-The bake-off proves bounded in-process behavior, not the gates above. Temporal and Trigger.dev are durability candidates, not direct substitutes for an agent SDK.
+The reproducible harness and machine result live in [`../benchmarks/agentic/`](../benchmarks/agentic/). It proves bounded in-process behavior, not the gates above. Temporal and Trigger.dev are durability candidates, not direct substitutes for an agent SDK.
 
 ## Consequences
 

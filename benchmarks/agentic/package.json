@@ -1,0 +1,23 @@
+{
+  "name": "career-os-agentic-bakeoff",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "bakeoff": "tsx src/run.ts",
+    "test": "tsx --test src/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test && npm run bakeoff"
+  },
+  "dependencies": {
+    "@mastra/core": "1.63.2",
+    "@openai/agents": "0.17.0",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3"
+  }
+}
