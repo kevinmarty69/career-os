@@ -531,13 +531,11 @@ export async function executeBakeoff() {
       error instanceof Error &&
       error.message === 'Network disabled by agentic bake-off';
   }
-  const started = new Date().toISOString();
   const candidates = [];
   for (const candidate of ['internal', 'openai-agents', 'mastra'] as const)
     candidates.push(await runCandidate(candidate));
   return {
     schemaVersion: 1,
-    generatedAt: started,
     fixture: {
       profile: 'lib/fixture.ts#syntheticProfile',
       workflow: 'lib/agent-runtime.ts#runAgentTeam',
