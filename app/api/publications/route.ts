@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import {
   createSession,
   decodeSession,
   encodeSession,
   mintPublication,
+  PublicationRejectedError,
 } from '@/lib/server/publications';
 import { PayloadTooLargeError, readBoundedJson } from '@/lib/server/http';
 import { takePublicationAttempt } from '@/lib/server/publication-rate-limit';
@@ -42,8 +44,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof PayloadTooLargeError)
       return new Response('Publication payload too large.', { status: 413 });
+    if (error instanceof ZodError || error instanceof PublicationRejectedError)
+      return new Response('Publication rejected.', { status: 400 });
     return new Response('Publication rejected.', {
-      status: process.env.DATABASE_URL ? 400 : 503,
+      status: 503,
     });
   }
 }

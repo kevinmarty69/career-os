@@ -19,6 +19,8 @@ const sessionSchema = z.object({
 });
 export type PublicationSession = z.infer<typeof sessionSchema>;
 
+export class PublicationRejectedError extends Error {}
+
 function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required.');
@@ -66,7 +68,14 @@ export async function mintPublication(
   rawInput: unknown,
 ) {
   const { profile, spec, opportunity } = publicationInputSchema.parse(rawInput);
-  const strategy = buildStrategy(profile, opportunity);
+  let strategy: ReturnType<typeof buildStrategy>;
+  try {
+    strategy = buildStrategy(profile, opportunity);
+  } catch {
+    throw new PublicationRejectedError(
+      'Opportunity is not supported by the supplied evidence.',
+    );
+  }
   const publishedClaimIds = new Set(
     spec.blocks.flatMap((block) => ('claimIds' in block ? block.claimIds : [])),
   );
@@ -76,10 +85,12 @@ export async function mintPublication(
     strategy.selectedClaimIds.length !== publishedClaimIds.size ||
     strategy.selectedClaimIds.some((id) => !publishedClaimIds.has(id))
   )
-    throw new Error('PageSpec does not match the server strategy.');
+    throw new PublicationRejectedError(
+      'PageSpec does not match the server strategy.',
+    );
   const reviews = runReviews(profile, spec);
   if (reviews.length !== 3 || reviews.some((review) => !review.passed))
-    throw new Error('Server review rejected publication.');
+    throw new PublicationRejectedError('Server review rejected publication.');
 
   const sql = database();
   let publicationId = '';
