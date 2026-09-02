@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import { PayloadTooLargeError, readBoundedJson } from '@/lib/server/http';
 import { readPublication } from '@/lib/server/publications';
+
+const MAX_EXCHANGE_BYTES = 1024;
 
 export async function POST(
   request: Request,
@@ -9,7 +12,9 @@ export async function POST(
     return new Response('Forbidden', { status: 403 });
   try {
     const { publicationId } = await context.params;
-    const { token } = (await request.json()) as { token?: unknown };
+    const { token } = (await readBoundedJson(request, MAX_EXCHANGE_BYTES)) as {
+      token?: unknown;
+    };
     if (
       typeof token !== 'string' ||
       !(await readPublication(publicationId, token))
@@ -25,7 +30,9 @@ export async function POST(
     });
     response.headers.set('cache-control', 'no-store');
     return response;
-  } catch {
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError)
+      return new Response('Capability payload too large.', { status: 413 });
     return new Response('Invalid capability.', { status: 404 });
   }
 }

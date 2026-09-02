@@ -8,23 +8,11 @@ import {
 } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
-import { pageSpecSchema, profileSchema } from '../schemas';
 import { buildStrategy, runReviews } from '../workflow';
-
-const opportunitySchema = z.object({
-  company: z.string().min(1),
-  role: z.string().min(1),
-  description: z.string().min(1),
-  url: z.string().url().optional(),
-  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-});
-
-const publicationInputSchema = z.object({
-  profile: profileSchema,
-  spec: pageSpecSchema,
-  opportunity: opportunitySchema,
-  approved: z.literal(true),
-});
+import {
+  publicationInputSchema,
+  publishedPayloadSchema,
+} from './publication-input';
 const sessionSchema = z.object({
   userId: z.string().uuid(),
   tenantId: z.string().uuid(),
@@ -187,11 +175,7 @@ export async function readPublication(publicationId: string, rawToken: string) {
       `;
       return result;
     });
-    return row?.payload
-      ? publicationInputSchema
-          .pick({ profile: true, spec: true })
-          .parse(row.payload)
-      : undefined;
+    return row?.payload ? publishedPayloadSchema.parse(row.payload) : undefined;
   } finally {
     await sql.end();
   }

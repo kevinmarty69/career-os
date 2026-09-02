@@ -167,7 +167,12 @@ begin
             join evidence e on e.tenant_id = ce.tenant_id and e.id = ce.evidence_id
             join sources s on s.tenant_id = e.tenant_id and s.id = e.source_id
             where ce.tenant_id = c.tenant_id and ce.claim_id = c.id and ce.relation = 'supports'
-              and s.sensitivity <> 'restricted' and 'application' = any(s.allowed_uses)))
+              and s.sensitivity <> 'restricted' and 'application' = any(s.allowed_uses))
+          or exists(select 1 from claim_evidence ce
+            join evidence e on e.tenant_id = ce.tenant_id and e.id = ce.evidence_id
+            join sources s on s.tenant_id = e.tenant_id and s.id = e.source_id
+            where ce.tenant_id = c.tenant_id and ce.claim_id = c.id
+              and (s.sensitivity = 'restricted' or not ('application' = any(s.allowed_uses)))))
     ) then raise exception 'publication contains an unknown, restricted or unsupported claim';
   end if;
   if exists(
