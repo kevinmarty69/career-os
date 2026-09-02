@@ -1,20 +1,19 @@
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 10;
 
-let windowStartedAt = 0;
-let attempts = 0;
+const windows = new Map<string, { attempts: number; startedAt: number }>();
 
-export function takePublicationAttempt(now = Date.now()) {
-  if (now - windowStartedAt >= WINDOW_MS) {
-    windowStartedAt = now;
-    attempts = 0;
+export function takePublicationAttempt(key: string, now = Date.now()) {
+  const current = windows.get(key);
+  if (!current || now - current.startedAt >= WINDOW_MS) {
+    windows.set(key, { attempts: 1, startedAt: now });
+    return true;
   }
-  if (attempts >= MAX_ATTEMPTS) return false;
-  attempts += 1;
+  if (current.attempts >= MAX_ATTEMPTS) return false;
+  current.attempts += 1;
   return true;
 }
 
 export function resetPublicationRateLimitForTests() {
-  windowStartedAt = 0;
-  attempts = 0;
+  windows.clear();
 }

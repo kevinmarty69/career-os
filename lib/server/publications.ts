@@ -1,15 +1,16 @@
 import 'server-only';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
-import { buildStrategy, runReviews } from '../workflow';
 import {
   publicationInputSchema,
   publishedPayloadSchema,
 } from './publication-input';
+
 export type PublicationSession = {
   userId: string;
   tenantId: string;
+  tenantName?: string;
 };
 
 export class PublicationRejectedError extends Error {}
@@ -24,111 +25,69 @@ export async function mintPublication(
   session: PublicationSession,
   rawInput: unknown,
 ) {
-  const { profile, spec, opportunity } = publicationInputSchema.parse(rawInput);
-  let strategy: ReturnType<typeof buildStrategy>;
-  try {
-    strategy = buildStrategy(profile, opportunity);
-  } catch {
-    throw new PublicationRejectedError(
-      'Opportunity is not supported by the supplied evidence.',
-    );
-  }
-  const publishedClaimIds = new Set(
-    spec.blocks.flatMap((block) => ('claimIds' in block ? block.claimIds : [])),
-  );
-  if (
-    spec.company.name !== opportunity.company ||
-    spec.company.role !== opportunity.role ||
-    strategy.selectedClaimIds.length !== publishedClaimIds.size ||
-    strategy.selectedClaimIds.some((id) => !publishedClaimIds.has(id))
-  )
-    throw new PublicationRejectedError(
-      'PageSpec does not match the server strategy.',
-    );
-  const reviews = runReviews(profile, spec);
-  if (reviews.length !== 3 || reviews.some((review) => !review.passed))
-    throw new PublicationRejectedError('Server review rejected publication.');
-
-  const sql = database();
-  let publicationId = '';
+  const { runId } = publicationInputSchema.parse(rawInput);
   const rawToken = randomBytes(32).toString('base64url');
   const tokenHash = createHash('sha256').update(rawToken).digest();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
+  const sql = database();
   try {
-    await sql.begin(async (tx) => {
-      await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true), set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-      await tx.unsafe('set local role career_app');
-      await tx`insert into app.tenants (id, owner_id, name) values (${session.tenantId}, ${session.userId}, 'Private workspace') on conflict (id) do nothing`;
-      const profileId = randomUUID();
-      await tx`insert into app.profiles (id, tenant_id, name, headline) values (${profileId}, ${session.tenantId}, ${profile.name}, ${profile.headline})`;
-
-      const sourceIds = new Map<string, string>();
-      for (const source of profile.sources) {
-        const id = randomUUID();
-        sourceIds.set(source.id, id);
-        await tx`insert into app.sources (id, tenant_id, kind, title, locator, sensitivity, allowed_uses) values (${id}, ${session.tenantId}, ${source.kind}, ${source.title}, ${source.locator ?? null}, ${source.sensitivity}, ${source.allowedUses})`;
-      }
-      const evidenceIds = new Map<string, string>();
-      for (const evidence of profile.evidence) {
-        const id = randomUUID();
-        evidenceIds.set(evidence.id, id);
-        await tx`insert into app.evidence (id, tenant_id, source_id, label, excerpt) values (${id}, ${session.tenantId}, ${sourceIds.get(evidence.sourceId)!}, ${evidence.label}, ${evidence.excerpt})`;
-      }
-      const claimIds = new Map<string, string>();
-      for (const claim of profile.claims) {
-        const id = randomUUID();
-        claimIds.set(claim.id, id);
-        await tx`insert into app.claims (id, tenant_id, statement, level, sensitivity, allowed_uses) values (${id}, ${session.tenantId}, ${claim.statement}, ${claim.level}, ${claim.sensitivity}, ${claim.allowedUses})`;
-        for (const evidenceId of claim.evidenceIds)
-          await tx`insert into app.claim_evidence (tenant_id, claim_id, evidence_id) values (${session.tenantId}, ${id}, ${evidenceIds.get(evidenceId)!})`;
-      }
-
-      const opportunityId = randomUUID();
-      await tx`insert into app.opportunities (id, tenant_id, company, role, raw_text, url, extraction_status) values (${opportunityId}, ${session.tenantId}, ${opportunity.company}, ${opportunity.role}, ${opportunity.description}, ${opportunity.url ?? null}, 'ready')`;
-      const runId = randomUUID();
-      await tx`insert into app.workflow_runs (id, tenant_id, opportunity_id, profile_id, state, status, token_budget, cost_budget_micros, deadline_at, input_hash) values (${runId}, ${session.tenantId}, ${opportunityId}, ${profileId}, 'approved', 'completed', 10000, 0, now() + interval '1 hour', ${hashJson({ profile, opportunity })})`;
-
-      const pageSpecId = randomUUID();
-      const dbSpec = {
-        ...spec,
-        blocks: spec.blocks.map((block) =>
-          'claimIds' in block
-            ? {
-                ...block,
-                claimIds: block.claimIds.map((id) => claimIds.get(id)!),
-              }
-            : block,
-        ),
-      };
-      await tx.unsafe('set local role career_worker');
-      await tx`insert into app.page_specs (id, tenant_id, workflow_run_id, version, spec, input_hash) values (${pageSpecId}, ${session.tenantId}, ${runId}, 1, ${tx.json(dbSpec)}, ${hashJson({ profile, opportunity })})`;
-      for (const claimId of new Set(
-        spec.blocks.flatMap((block) =>
-          'claimIds' in block ? block.claimIds : [],
-        ),
-      ))
-        await tx`insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id) values (${session.tenantId}, ${pageSpecId}, ${claimIds.get(claimId)!})`;
+    const publicationId = await sql.begin(async (tx) => {
+      await authorize(tx, session);
+      const [run] = await tx<{ status: string }[]>`
+        select status from app.workflow_runs
+        where tenant_id = ${session.tenantId} and id = ${runId}
+        for update`;
+      if (!run || !['awaiting_approval', 'completed'].includes(run.status))
+        throw new PublicationRejectedError(
+          'Run is not waiting for human approval.',
+        );
       const [pageSpec] = await tx<
-        { spec_hash: string }[]
-      >`select spec_hash from app.page_specs where id = ${pageSpecId}`;
+        { id: string; spec_hash: string }[]
+      >`select id, spec_hash from app.page_specs
+        where tenant_id = ${session.tenantId} and workflow_run_id = ${runId}
+          and invalidated_at is null
+        order by version desc limit 1`;
+      if (!pageSpec)
+        throw new PublicationRejectedError('Run has no publishable PageSpec.');
+      const [reviewGate] = await tx<{ passing_reviews: string }[]>`
+        select count(*) filter (
+          where verdict = 'pass' and page_spec_hash = ${pageSpec.spec_hash}
+        ) as passing_reviews
+        from app.reviews where tenant_id = ${session.tenantId}
+          and page_spec_id = ${pageSpec.id}`;
+      if (Number(reviewGate.passing_reviews) !== 3)
+        throw new PublicationRejectedError(
+          'Publication requires three passing current reviews.',
+        );
 
-      await tx.unsafe('set local role career_reviewer');
-      for (const review of reviews)
-        await tx`insert into app.reviews (tenant_id, page_spec_id, reviewer, verdict, issues, page_spec_hash) values (${session.tenantId}, ${pageSpecId}, ${review.reviewer === 'hiring-manager' ? 'hiring_manager' : review.reviewer}, 'pass', ${tx.json(review.findings)}, ${pageSpec.spec_hash})`;
+      if (run.status === 'awaiting_approval')
+        await tx`select app.approve_page_spec(${pageSpec.id})`;
+      else {
+        const [active] = await tx<{ id: string }[]>`
+          select id from app.publications
+          where tenant_id = ${session.tenantId} and page_spec_id = ${pageSpec.id}
+            and revoked_at is null`;
+        if (!active)
+          throw new PublicationRejectedError(
+            'Completed run has no active publication.',
+          );
+      }
 
-      await tx.unsafe('set local role career_app');
-      await tx`select app.approve_page_spec(${pageSpecId})`;
       await tx.unsafe('set local role career_publisher');
       const [publication] = await tx<{ id: string }[]>`
-        select app.mint_publication(${pageSpecId}, ${tokenHash}, ${expiresAt}) as id
-      `;
-      publicationId = publication.id;
+        select app.mint_publication(
+          ${pageSpec.id}, ${tokenHash}, ${expiresAt}
+        ) as id`;
+      await authorize(tx, session);
+      await tx`update app.workflow_runs set status = 'completed',
+        state = 'publication_ready'
+        where tenant_id = ${session.tenantId} and id = ${runId}`;
+      return publication.id;
     });
+    return { publicationId, rawToken, expiresAt: expiresAt.toISOString() };
   } finally {
     await sql.end();
   }
-  return { publicationId, rawToken, expiresAt: expiresAt.toISOString() };
 }
 
 export async function readPublication(publicationId: string, rawToken: string) {
@@ -139,8 +98,9 @@ export async function readPublication(publicationId: string, rawToken: string) {
     const row = await sql.begin(async (tx) => {
       await tx.unsafe('set local role career_reader');
       const [result] = await tx<{ payload: unknown }[]>`
-        select app.read_shared_publication(${id}, ${createHash('sha256').update(token).digest()}) as payload
-      `;
+        select app.read_shared_publication(
+          ${id}, ${createHash('sha256').update(token).digest()}
+        ) as payload`;
       return result;
     });
     return row?.payload ? publishedPayloadSchema.parse(row.payload) : undefined;
@@ -157,8 +117,7 @@ export async function revokePublication(
   const sql = database();
   try {
     await sql.begin(async (tx) => {
-      await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true), set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-      await tx.unsafe('set local role career_app');
+      await authorize(tx, session);
       await tx`select app.revoke_publication(${id})`;
     });
   } finally {
@@ -166,6 +125,11 @@ export async function revokePublication(
   }
 }
 
-function hashJson(value: unknown) {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+async function authorize(
+  tx: postgres.TransactionSql,
+  session: PublicationSession,
+) {
+  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
+    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
+  await tx.unsafe('set local role career_app');
 }

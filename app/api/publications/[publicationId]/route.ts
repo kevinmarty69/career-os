@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authenticatedPublicationSession } from '@/lib/server/auth';
+import { isSameOrigin } from '@/lib/server/http';
 import { readPublication, revokePublication } from '@/lib/server/publications';
 
 export async function GET(
@@ -28,8 +29,7 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ publicationId: string }> },
 ) {
-  if (request.headers.get('origin') !== new URL(request.url).origin)
-    return new Response('Forbidden', { status: 403 });
+  if (!isSameOrigin(request)) return new Response('Forbidden', { status: 403 });
   let session;
   try {
     session = await authenticatedPublicationSession(request);

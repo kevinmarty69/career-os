@@ -44,11 +44,14 @@ export async function authenticatedPublicationSession(request: Request) {
     tenantId: session?.session.activeOrganizationId,
   });
   if (!identity.success) return;
-  const membership = await authPool.query(
-    `select 1 from auth."member"
-     where "organizationId" = $1::uuid and "userId" = $2::uuid
+  const membership = await authPool.query<{ name: string }>(
+    `select o.name from auth."member" m
+     join auth.organization o on o.id = m."organizationId"
+     where m."organizationId" = $1::uuid and m."userId" = $2::uuid
      limit 1`,
     [identity.data.tenantId, identity.data.userId],
   );
-  return membership.rowCount === 1 ? identity.data : undefined;
+  return membership.rowCount === 1
+    ? { ...identity.data, tenantName: membership.rows[0].name }
+    : undefined;
 }

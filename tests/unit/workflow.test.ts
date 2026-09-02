@@ -22,6 +22,20 @@ test('verified claims require linked evidence', () => {
   assert.equal(profileSchema.safeParse(profile).success, false);
 });
 
+test('profile references stay inside one unambiguous graph', () => {
+  const missingSource = structuredClone(syntheticProfile);
+  missingSource.evidence[0].sourceId = 'missing-source';
+  assert.equal(profileSchema.safeParse(missingSource).success, false);
+
+  const missingEvidence = structuredClone(syntheticProfile);
+  missingEvidence.claims[0].evidenceIds = ['missing-evidence'];
+  assert.equal(profileSchema.safeParse(missingEvidence).success, false);
+
+  const duplicate = structuredClone(syntheticProfile);
+  duplicate.claims.push({ ...duplicate.claims[0] });
+  assert.equal(profileSchema.safeParse(duplicate).success, false);
+});
+
 test('PageSpec rejects unknown blocks and free-form fields', () => {
   const strategy = buildStrategy(syntheticProfile, opportunity);
   const spec = buildPageSpec(syntheticProfile, opportunity, strategy);

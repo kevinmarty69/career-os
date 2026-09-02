@@ -16,7 +16,11 @@ export function PrivatePublication() {
   const [publication, setPublication] = useState<Publication | null>();
 
   useEffect(() => {
+    let request = 0;
+
     async function load() {
+      const currentRequest = ++request;
+      setPublication(undefined);
       try {
         const token = location.hash.slice(1);
         if (token) {
@@ -38,16 +42,23 @@ export function PrivatePublication() {
         const parsed = (await response.json()) as Publication;
         const spec = pageSpecSchema.safeParse(parsed?.spec);
         const profile = profileSchema.safeParse(parsed?.profile);
+        if (currentRequest !== request) return;
         setPublication(
           spec.success && profile.success
             ? { spec: spec.data, profile: profile.data }
             : null,
         );
       } catch {
-        setPublication(null);
+        if (currentRequest === request) setPublication(null);
       }
     }
+
     void load();
+    window.addEventListener('hashchange', load);
+    return () => {
+      request += 1;
+      window.removeEventListener('hashchange', load);
+    };
   }, [capability]);
 
   if (publication === undefined)

@@ -1,4 +1,30 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function openApplications(page: Page) {
+  const navigation = page.getByRole('button', {
+    name: 'Candidatures',
+    exact: true,
+  });
+  await navigation.first().waitFor({ state: 'attached' });
+  for (let index = 0; index < (await navigation.count()); index += 1) {
+    const candidate = navigation.nth(index);
+    if (await candidate.isVisible()) {
+      await candidate.click();
+      const application = page.getByRole('button', {
+        name: 'Ouvrir la candidature Northstar Labs',
+      });
+      await application.waitFor();
+      await application.click();
+      return;
+    }
+  }
+  await page
+    .getByRole('button', {
+      name: /Commencer par l’offre|Ouvrir la candidature/,
+    })
+    .first()
+    .click();
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -30,29 +56,51 @@ test('builds, reviews, approves and issues one private capability', async ({
   ).toBeVisible();
   await page.getByRole('button', { name: 'Create Workspace' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Northstar Labs' }),
+    page.getByRole('heading', {
+      name: 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.',
+    }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Generate Draft' }).click();
+  await page.getByRole('button', { name: 'Ouvrir la mémoire pro' }).click();
+  await page
+    .getByLabel('Positionnement')
+    .fill('Evidence-backed product engineer');
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  await expect(page.getByRole('status')).toContainText(
+    'Mémoire professionnelle enregistrée dans cet espace.',
+  );
+  await page.reload();
+  await page.getByRole('button', { name: 'Ouvrir la mémoire pro' }).click();
+  await expect(page.getByLabel('Positionnement')).toHaveValue(
+    'Evidence-backed product engineer',
+  );
+  await openApplications(page);
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await page.getByRole('button', { name: 'Page privée' }).click();
   await expect(page.getByText('Alex Morgan × Northstar Labs')).toBeVisible();
   await page
     .getByRole('button', {
-      name: /Reduced a fictional deployment workflow.*View evidence/,
+      name: /Reduced a fictional deployment workflow.*Voir la preuve/,
     })
     .first()
     .click();
   await expect(
-    page.getByRole('heading', { name: 'Why these statements?' }),
+    page.getByRole('heading', { name: 'Pourquoi ces affirmations ?' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Close evidence inspector' }).click();
+  await page
+    .getByRole('button', { name: 'Fermer l’inspecteur de preuves' })
+    .click();
   const forgedStatus = await page.evaluate(async () => {
-    const saved = JSON.parse(localStorage.getItem('career-os-demo')!);
+    const key = Object.keys(localStorage).find((item) =>
+      item.startsWith('career-os-workspace:'),
+    )!;
+    const saved = JSON.parse(localStorage.getItem(key)!);
     const response = await fetch('/api/publications', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        profile: saved.profile,
         spec: saved.spec,
         approved: true,
+        profileRevision: 1,
         opportunity: {
           company: 'Cosmos Institute',
           role: 'Astrophysicist',
@@ -64,23 +112,39 @@ test('builds, reviews, approves and issues one private capability', async ({
     return response.status;
   });
   expect(forgedStatus).toBe(400);
-  await page.getByRole('button', { name: 'Review', exact: true }).click();
-  await page.getByRole('button', { name: 'Run Review' }).click();
+  await page.getByRole('button', { name: 'Parcours', exact: true }).click();
+  await page.getByRole('button', { name: 'Ouvrir la revue' }).click();
   const approval = page.getByLabel(
-    'I reviewed the evidence and approve this application.',
+    /J’ai vérifié les preuves et je valide cette candidature/,
   );
   await expect(approval).toBeEnabled();
   await approval.check();
-  await page.getByRole('button', { name: 'Continue to Share' }).click();
-  await page.getByRole('button', { name: 'Create Private Link' }).click();
+  await page.getByRole('button', { name: 'Continuer vers le partage' }).click();
+  await page.getByRole('button', { name: 'Créer le lien privé' }).click();
   await expect(page.getByRole('status')).toContainText('/p/');
-  await expect(page.getByRole('status')).toContainText('Active');
+  await expect(page.getByRole('status')).toContainText('Actif');
   const href = await page
-    .getByRole('link', { name: 'Open Private Page' })
+    .getByRole('link', { name: 'Ouvrir la page privée' })
     .getAttribute('href');
+  await page.reload();
+  await openApplications(page);
+  await expect(
+    page.getByRole('button', { name: 'Remplacer le lien privé' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Remplacer le lien privé' }).click();
+  const refreshedHref = await page
+    .getByRole('link', { name: 'Ouvrir la page privée' })
+    .getAttribute('href');
+  expect(refreshedHref).not.toBe(href);
   const freshContext = await browser.newContext();
   const freshPage = await freshContext.newPage();
   await freshPage.goto(new URL(href!, page.url()).href);
+  await expect(
+    freshPage.getByRole('heading', {
+      name: 'Private application unavailable.',
+    }),
+  ).toBeVisible();
+  await freshPage.goto(new URL(refreshedHref!, page.url()).href);
   await expect(
     freshPage.getByRole('heading', { name: 'Alex Morgan × Northstar Labs' }),
   ).toBeVisible();
@@ -94,9 +158,9 @@ test('builds, reviews, approves and issues one private capability', async ({
   expect(freshPage.url()).not.toContain('#');
   await expect(freshPage.locator('nav')).toHaveCount(0);
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Revoke Private Link' }).click();
+  await page.getByRole('button', { name: 'Révoquer le lien privé' }).click();
   await expect(
-    page.getByRole('button', { name: 'Create Private Link' }),
+    page.getByRole('button', { name: 'Créer le lien privé' }),
   ).toBeVisible();
   await freshPage.reload();
   await expect(
@@ -153,7 +217,7 @@ test('requires an explicit workspace choice when several are available', async (
   ).toBeVisible();
   await page.getByRole('button', { name: 'Use Workspace Two' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Northstar Labs' }),
+    page.getByRole('button', { name: /Northstar Labs/ }).first(),
   ).toBeVisible();
   const activeOrganizationId = await page.evaluate(async () => {
     const session = await fetch('/api/auth/get-session').then((response) =>
@@ -167,24 +231,32 @@ test('requires an explicit workspace choice when several are available', async (
 test('records a declared claim and exposes provenance progressively', async ({
   page,
 }) => {
-  await page.getByRole('button', { name: 'Career Memory' }).click();
-  await page.getByText('Add Statement & Source').click();
-  await page.getByLabel('Source Title').fill('Synthetic interview notes');
+  await page.getByRole('button', { name: 'Ouvrir la mémoire pro' }).click();
+  await page.getByText('Ajouter une affirmation').click();
+  await page.getByLabel('Titre de la source').fill('Synthetic interview notes');
   await page
-    .getByLabel('Statement', { exact: true })
+    .getByLabel('Affirmation', { exact: true })
     .fill('Built a fictional customer feedback loop.');
-  await page.getByRole('button', { name: 'Save to Career Memory' }).click();
-  await expect(page.getByText('3 statements')).toBeVisible();
+  await page.getByRole('button', { name: 'Ajouter' }).click();
+  await expect(page.getByText('3 affirmations')).toBeVisible();
   await expect(
     page.getByText('Built a fictional customer feedback loop.'),
   ).toBeVisible();
-  await expect(page.getByText('No supporting evidence').last()).toBeVisible();
+  await expect(page.getByText('Aucune preuve rattachée').last()).toBeVisible();
 });
 
 test('fits 375, 768, and 1440 widths without horizontal overflow', async ({
   page,
 }) => {
-  await page.getByRole('button', { name: 'Generate Draft' }).click();
+  await openApplications(page);
+  await page.getByRole('button', { name: 'Retour aux candidatures' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Candidatures' }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Ouvrir la candidature Northstar Labs' })
+    .click();
+  await page.getByRole('button', { name: 'Générer la page' }).click();
   for (const width of [375, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const overflow = await page.evaluate(
@@ -199,26 +271,31 @@ test('fits 375, 768, and 1440 widths without horizontal overflow', async ({
 test('preserves the opportunity and offers retry when evidence does not match', async ({
   page,
 }) => {
-  await page.getByLabel('Role').fill('Astrophysicist');
+  await openApplications(page);
+  await page.getByLabel('Poste', { exact: true }).fill('Astrophysicist');
   await page
-    .getByLabel('Job description')
+    .getByLabel('Description du poste')
     .fill('Calibrate telescope optics and model stellar spectra.');
-  await page.getByRole('button', { name: 'Generate Draft' }).click();
+  await page.getByRole('button', { name: 'Générer la page' }).click();
   await expect(page.locator('.inline-error')).toContainText(
-    'No evidence matches this role.',
+    'Aucune preuve ne correspond à ce poste.',
   );
-  await expect(page.getByLabel('Role')).toHaveValue('Astrophysicist');
-  await expect(page.getByRole('button', { name: 'Retry Draft' })).toBeVisible();
+  await expect(page.getByLabel('Poste', { exact: true })).toHaveValue(
+    'Astrophysicist',
+  );
+  await expect(page.getByRole('button', { name: 'Réessayer' })).toBeVisible();
 });
 
 test('keeps run mechanics in Activity details', async ({ page }) => {
-  await page.getByRole('button', { name: 'Generate Draft' }).click();
-  await page.getByRole('button', { name: 'Activity' }).click();
+  await openApplications(page);
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await page.getByRole('button', { name: 'À trancher' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Run history' }),
+    page.getByRole('heading', { name: 'Revue avant publication' }),
   ).toBeVisible();
-  await expect(page.getByText('Draft completed').first()).toBeVisible();
-  await expect(page.getByText('company-researcher').first()).toBeHidden();
-  await page.getByText('Run details').first().click();
-  await expect(page.getByText('company-researcher').first()).toBeVisible();
+  await expect(page.getByText('Brouillon terminé').first()).toBeVisible();
+  const rawLog = page.getByText(/^01 · company-researcher ·/);
+  await expect(rawLog).toBeHidden();
+  await page.getByText('Métadonnées techniques').first().click();
+  await expect(rawLog).toBeVisible();
 });

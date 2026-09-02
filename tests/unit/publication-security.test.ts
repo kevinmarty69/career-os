@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { syntheticProfile } from '../../lib/fixture';
+import { profileSchema } from '../../lib/schemas';
 import { buildPageSpec, buildStrategy } from '../../lib/workflow';
 import { organizationOptions } from '../../lib/server/auth-config';
-import { PayloadTooLargeError, readBoundedJson } from '../../lib/server/http';
+import {
+  isSameOrigin,
+  PayloadTooLargeError,
+  readBoundedJson,
+} from '../../lib/server/http';
 import {
   publicationInputSchema,
   publishedPayloadSchema,
@@ -29,42 +35,54 @@ test('organization invitations require a verified email', () => {
   assert.equal(organizationOptions.requireEmailVerificationOnInvitation, true);
 });
 
-test('publication input rejects oversized arrays and text', () => {
+test('state-changing requests require an exact origin', () => {
+  assert.equal(
+    isSameOrigin(
+      new Request('https://career.example/api/profile', {
+        headers: { origin: 'https://career.example' },
+      }),
+    ),
+    true,
+  );
+  assert.equal(
+    isSameOrigin(
+      new Request('https://career.example/api/profile', {
+        headers: { origin: 'https://evil.example' },
+      }),
+    ),
+    false,
+  );
+});
+
+test('profile and publication inputs are bounded and separated', () => {
   const tooManySources = Array.from({ length: 51 }, (_, index) => ({
     ...syntheticProfile.sources[0],
     id: `source-${index}`,
   }));
   assert.equal(
-    publicationInputSchema.safeParse({
-      profile: { ...syntheticProfile, sources: tooManySources },
-      spec,
-      opportunity,
-      approved: true,
+    profileSchema.safeParse({
+      ...syntheticProfile,
+      sources: tooManySources,
     }).success,
     false,
+  );
+  assert.equal(
+    publicationInputSchema.safeParse({ runId: randomUUID() }).success,
+    true,
   );
   assert.equal(
     publicationInputSchema.safeParse({
       profile: syntheticProfile,
       spec,
-      opportunity: { ...opportunity, description: 'x'.repeat(20_001) },
+      opportunity,
       approved: true,
+      profileRevision: 1,
     }).success,
     false,
   );
   assert.equal(
     publicationInputSchema.safeParse({
-      profile: {
-        ...syntheticProfile,
-        sources: [
-          {
-            ...syntheticProfile.sources[0],
-            allowedUses: Array.from({ length: 5 }, () => 'application'),
-          },
-        ],
-      },
-      spec,
-      opportunity,
+      runId: randomUUID(),
       approved: true,
     }).success,
     false,
@@ -104,8 +122,9 @@ test('JSON reader stops an oversized streamed body', async () => {
 test('demo publication limiter fails closed after ten attempts', () => {
   resetPublicationRateLimitForTests();
   for (let attempt = 0; attempt < 10; attempt += 1)
-    assert.equal(takePublicationAttempt(1), true);
-  assert.equal(takePublicationAttempt(1), false);
-  assert.equal(takePublicationAttempt(60_001), true);
+    assert.equal(takePublicationAttempt('tenant-a', 1), true);
+  assert.equal(takePublicationAttempt('tenant-a', 1), false);
+  assert.equal(takePublicationAttempt('tenant-b', 1), true);
+  assert.equal(takePublicationAttempt('tenant-a', 60_001), true);
   resetPublicationRateLimitForTests();
 });

@@ -12,7 +12,7 @@ Every tenant-owned foreign key includes `tenant_id`. RLS is forced on every tena
 
 `memory → opportunity → strategy → PageSpec → three reviews → human approval → private capability`
 
-The browser demo executes the same deterministic Zod schemas without a configured backend and persists only to localStorage. It proves the interaction, review gate, renderer and export; it does not claim production authentication or publication. The SQL migration proves the server data boundary separately. Connecting them is the next vertical slice.
+The browser uses Better Auth organization sessions for tenant selection. Career Memory writes use optimistic revisions in PostgreSQL; localStorage only caches opportunity, draft and run state for the selected workspace. Run creation reloads the requested profile revision and atomically persists an immutable profile snapshot, opportunity, PageSpecs, reviews and audit events. Publication accepts only the persisted run, records human approval of its current reviewed PageSpec, and issues a revocable capability over that immutable snapshot.
 
 PageSpec is data, not code. The renderer accepts only known blocks and bounded color tokens. Essential recruiter information is visible first; provenance details use native `details` elements for progressive disclosure.
 

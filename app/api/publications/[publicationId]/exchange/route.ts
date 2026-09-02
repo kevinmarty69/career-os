@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PayloadTooLargeError, readBoundedJson } from '@/lib/server/http';
 import { readPublication } from '@/lib/server/publications';
+import { isSameOrigin } from '@/lib/server/http';
 
 const MAX_EXCHANGE_BYTES = 1024;
 
@@ -8,8 +9,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ publicationId: string }> },
 ) {
-  if (request.headers.get('origin') !== new URL(request.url).origin)
-    return new Response('Forbidden', { status: 403 });
+  if (!isSameOrigin(request)) return new Response('Forbidden', { status: 403 });
   try {
     const { publicationId } = await context.params;
     const { token } = (await readBoundedJson(request, MAX_EXCHANGE_BYTES)) as {

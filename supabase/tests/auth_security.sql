@@ -33,22 +33,31 @@ insert into app.sources (id, tenant_id, kind, title, sensitivity, allowed_uses) 
   ('41000000-0000-0000-0000-000000000003', '21000000-0000-0000-0000-000000000003', 'manual', 'Other member source', 'private', '{application}');
 
 select set_config('request.jwt.claim.sub', '11000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claim.tenant_id', '21000000-0000-0000-0000-000000000001', true);
 set local role career_app;
 
 insert into app.tenants (id, owner_id, name) values
   ('21000000-0000-0000-0000-000000000001', '11000000-0000-0000-0000-000000000001', 'Tenant One'),
   ('21000000-0000-0000-0000-000000000002', '11000000-0000-0000-0000-000000000001', 'Tenant Two');
 insert into app.sources (id, tenant_id, kind, title, sensitivity, allowed_uses) values
-  ('41000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', 'manual', 'First organization source', 'private', '{application}'),
+  ('41000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', 'manual', 'First organization source', 'private', '{application}');
+
+select set_config('request.jwt.claim.tenant_id', '21000000-0000-0000-0000-000000000002', true);
+insert into app.sources (id, tenant_id, kind, title, sensitivity, allowed_uses) values
   ('41000000-0000-0000-0000-000000000002', '21000000-0000-0000-0000-000000000002', 'manual', 'Second organization source', 'private', '{application}');
+
+select set_config('request.jwt.claim.tenant_id', '21000000-0000-0000-0000-000000000001', true);
 
 do $$
 begin
-  if (select count(*) from app.tenants) <> 2 then
-    raise exception 'a member cannot access both of their organizations';
+  if (select count(*) from app.tenants) <> 1 then
+    raise exception 'the active organization did not scope tenant access';
   end if;
-  if (select count(*) from app.sources) <> 2 then
-    raise exception 'multi-organization rows were not isolated as expected';
+  if (select count(*) from app.sources) <> 1 then
+    raise exception 'the active organization did not scope data access';
+  end if;
+  if exists(select 1 from app.sources where title = 'Second organization source') then
+    raise exception 'another member organization leaked through RLS';
   end if;
   if exists(select 1 from app.sources where title = 'Other member source') then
     raise exception 'a non-member organization leaked through RLS';
@@ -68,6 +77,7 @@ where "organizationId" = '21000000-0000-0000-0000-000000000002'
   and "userId" = '11000000-0000-0000-0000-000000000001';
 
 set local role career_app;
+select set_config('request.jwt.claim.tenant_id', '21000000-0000-0000-0000-000000000002', true);
 do $$
 begin
   if exists(

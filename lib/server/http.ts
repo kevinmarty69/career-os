@@ -1,5 +1,9 @@
 export class PayloadTooLargeError extends Error {}
 
+export function isSameOrigin(request: Request) {
+  return request.headers.get('origin') === new URL(request.url).origin;
+}
+
 export async function readBoundedJson(request: Request, maximumBytes: number) {
   const declared = request.headers.get('content-length');
   if (declared && (!/^\d+$/.test(declared) || Number(declared) > maximumBytes))

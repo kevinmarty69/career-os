@@ -4,13 +4,17 @@ import {
   PublicationRejectedError,
 } from '@/lib/server/publications';
 import { authenticatedPublicationSession } from '@/lib/server/auth';
-import { PayloadTooLargeError, readBoundedJson } from '@/lib/server/http';
+import {
+  isSameOrigin,
+  PayloadTooLargeError,
+  readBoundedJson,
+} from '@/lib/server/http';
 import { takePublicationAttempt } from '@/lib/server/publication-rate-limit';
 
-const MAX_PUBLICATION_BYTES = 128 * 1024;
+const MAX_PUBLICATION_BYTES = 4 * 1024;
 
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return new Response('Forbidden', { status: 403 });
+  if (!isSameOrigin(request)) return new Response('Forbidden', { status: 403 });
   let session;
   try {
     session = await authenticatedPublicationSession(request);
@@ -18,7 +22,7 @@ export async function POST(request: Request) {
     return new Response('Authentication unavailable.', { status: 503 });
   }
   if (!session) return new Response('Unauthorized', { status: 401 });
-  if (!takePublicationAttempt())
+  if (!takePublicationAttempt(session.tenantId))
     return new Response('Too many publication attempts.', {
       status: 429,
       headers: { 'retry-after': '60' },
@@ -40,9 +44,4 @@ export async function POST(request: Request) {
       status: 503,
     });
   }
-}
-
-function sameOrigin(request: Request) {
-  const origin = request.headers.get('origin');
-  return origin === new URL(request.url).origin;
 }

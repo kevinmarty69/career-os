@@ -6,7 +6,7 @@ Career OS is an AGPL-licensed, self-hostable application for turning structured 
 
 ## What runs today
 
-The first vertical is a real browser workflow backed by synthetic demo data:
+The first vertical is a real browser workflow that starts with synthetic demo data:
 
 1. edit a profile and add a source, claim and optional proof;
 2. paste an offer (URLs are stored but deliberately not fetched yet);
@@ -16,7 +16,7 @@ The first vertical is a real browser workflow backed by synthetic demo data:
 6. approve, mint an expiring server capability, exchange its URL fragment for a scoped HttpOnly cookie, and revoke it;
 7. inspect or interrupt the bounded agent ledger and export all data.
 
-Editable workspace data currently persists in localStorage. It is mutable demo state and cannot authorize publication. The server independently validates the approved PageSpec, writes normalized PostgreSQL snapshots, and serves only claims/evidence/sources derived from that immutable graph. The signed local workspace session is not production account authentication. DB-backed UI writes, real identity and crash recovery remain required; ADR-002 therefore remains proposed.
+Email/password accounts, organization membership and Career Memory revisions persist in PostgreSQL. Draft workflow state is cached locally, but it cannot authorize publication. Starting a run reloads the requested saved Career Memory revision and writes an immutable profile snapshot, opportunity, PageSpecs, review results and audit events in one transaction. Publication accepts only that persisted run, records human approval, and serves only claims, evidence and sources derived from its reviewed snapshot.
 
 ## Quick start
 
@@ -27,7 +27,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000`.
+Copy `.env.example` to `.env.local`, set `DATABASE_URL` and generate a `BETTER_AUTH_SECRET`, then open `http://localhost:3000`.
 
 ```bash
 pnpm check
@@ -43,7 +43,7 @@ pnpm db:test
 pnpm db:down
 ```
 
-To exercise server publication locally, set a random `CAREER_OS_SESSION_SECRET` of at least 32 characters. Publication fails closed when it or `DATABASE_URL` is missing.
+Publication and saved Career Memory fail closed when `DATABASE_URL` or `BETTER_AUTH_SECRET` is missing.
 
 The migration also runs on PostgreSQL 17 without pgvector. Embeddings are intentionally deferred.
 

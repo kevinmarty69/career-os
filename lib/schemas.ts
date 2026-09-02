@@ -9,10 +9,10 @@ export const sensitivitySchema = z.enum(['public', 'private', 'restricted']);
 
 export const sourceSchema = z
   .object({
-    id: z.string().min(1),
+    id: z.string().min(1).max(200),
     kind: z.enum(['document', 'web', 'manual']),
-    title: z.string().min(1),
-    locator: z.string().optional(),
+    title: z.string().min(1).max(500),
+    locator: z.string().max(2_048).optional(),
     sensitivity: sensitivitySchema,
     allowedUses: z
       .array(z.enum(['application', 'resume', 'linkedin', 'interview']))
@@ -23,19 +23,19 @@ export const sourceSchema = z
 
 export const evidenceSchema = z
   .object({
-    id: z.string().min(1),
-    sourceId: z.string().min(1),
-    label: z.string().min(1),
-    excerpt: z.string().min(1),
+    id: z.string().min(1).max(200),
+    sourceId: z.string().min(1).max(200),
+    label: z.string().min(1).max(500),
+    excerpt: z.string().min(1).max(10_000),
   })
   .strict();
 
 export const claimSchema = z
   .object({
-    id: z.string().min(1),
-    statement: z.string().min(1),
+    id: z.string().min(1).max(200),
+    statement: z.string().min(1).max(5_000),
     level: provenanceLevelSchema,
-    evidenceIds: z.array(z.string()),
+    evidenceIds: z.array(z.string().min(1).max(200)).max(50),
     sensitivity: sensitivitySchema,
     allowedUses: z
       .array(z.enum(['application', 'resume', 'linkedin', 'interview']))
@@ -53,13 +53,54 @@ export const claimSchema = z
 
 export const profileSchema = z
   .object({
-    name: z.string().min(2),
-    headline: z.string().min(2),
-    sources: z.array(sourceSchema),
-    evidence: z.array(evidenceSchema),
-    claims: z.array(claimSchema),
+    name: z.string().min(2).max(200),
+    headline: z.string().min(2).max(500),
+    sources: z.array(sourceSchema).max(50),
+    evidence: z.array(evidenceSchema).max(100),
+    claims: z.array(claimSchema).max(100),
+  })
+  .superRefine((profile, context) => {
+    const sourceIds = new Set(profile.sources.map((source) => source.id));
+    const evidenceIds = new Set(
+      profile.evidence.map((evidence) => evidence.id),
+    );
+    uniqueIds(context, profile.sources, ['sources']);
+    uniqueIds(context, profile.evidence, ['evidence']);
+    uniqueIds(context, profile.claims, ['claims']);
+    for (const [index, evidence] of profile.evidence.entries())
+      if (!sourceIds.has(evidence.sourceId))
+        context.addIssue({
+          code: 'custom',
+          path: ['evidence', index, 'sourceId'],
+          message: 'Evidence must reference a source in this profile.',
+        });
+    for (const [claimIndex, claim] of profile.claims.entries())
+      for (const [evidenceIndex, evidenceId] of claim.evidenceIds.entries())
+        if (!evidenceIds.has(evidenceId))
+          context.addIssue({
+            code: 'custom',
+            path: ['claims', claimIndex, 'evidenceIds', evidenceIndex],
+            message: 'Claim evidence must exist in this profile.',
+          });
   })
   .strict();
+
+function uniqueIds(
+  context: z.RefinementCtx,
+  values: Array<{ id: string }>,
+  path: PropertyKey[],
+) {
+  const seen = new Set<string>();
+  for (const [index, value] of values.entries()) {
+    if (seen.has(value.id))
+      context.addIssue({
+        code: 'custom',
+        path: [...path, index, 'id'],
+        message: 'IDs must be unique inside a profile.',
+      });
+    seen.add(value.id);
+  }
+}
 
 export const pageSpecSchema = z
   .object({
