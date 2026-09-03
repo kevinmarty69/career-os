@@ -25,6 +25,7 @@ export const createRunInputSchema = z
 
 const runStatusSchema = z.enum([
   'running',
+  'paused',
   'awaiting_approval',
   'completed',
   'blocked',
@@ -32,6 +33,22 @@ const runStatusSchema = z.enum([
   'cancelled',
   'failed',
 ]);
+
+const persistedStepSchema = z
+  .object({
+    stage: z.string().min(1).max(100),
+    status: z.enum([
+      'pending',
+      'leased',
+      'in_flight',
+      'completed',
+      'failed',
+      'cancelled',
+    ]),
+    attempt: z.number().int().positive(),
+    failureCode: z.string().min(1).max(100).optional(),
+  })
+  .strict();
 
 export const runtimeReviewSchema = z
   .object({
@@ -85,6 +102,7 @@ export const persistedRunSchema = z
     usedTokens: z.number().int().nonnegative(),
     usedCostMicros: z.number().int().nonnegative(),
     profile: profileSchema,
+    steps: z.array(persistedStepSchema).max(20),
     spec: pageSpecSchema.optional(),
     reviews: z.array(persistedReviewSchema),
     events: z.array(eventSchema),

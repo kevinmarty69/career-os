@@ -17,7 +17,6 @@ insert into app.workflow_runs (id, tenant_id, opportunity_id, state, token_budge
 
 select set_config('request.jwt.claim.tenant_id', '21000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.worker_id', '31000000-0000-0000-0000-000000000001', true);
-set local role career_worker;
 select app.reserve_run_budget(
   '21000000-0000-0000-0000-000000000001', '51000000-0000-0000-0000-000000000001',
   'first-call', 60, 60, 300
@@ -143,7 +142,7 @@ do $$ begin
     or to_regprocedure('app.settle_run_budget(uuid,uuid,integer,bigint,integer,bigint)') is not null then
     raise exception 'unsafe legacy budget functions remain callable';
   end if;
-  if not has_function_privilege(
+  if has_function_privilege(
     'career_worker', 'app.reserve_run_budget(uuid,uuid,text,integer,bigint,integer)', 'execute'
   ) or has_function_privilege(
     'career_app', 'app.reserve_run_budget(uuid,uuid,text,integer,bigint,integer)', 'execute'

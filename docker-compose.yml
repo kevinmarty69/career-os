@@ -19,6 +19,8 @@ services:
       - ./supabase/migrations/0008_review_issue_decisions.sql:/docker-entrypoint-initdb.d/0008_review_issue_decisions.sql:ro
       - ./supabase/migrations/0009_applications.sql:/docker-entrypoint-initdb.d/0009_applications.sql:ro
       - ./supabase/migrations/0010_url_import_quota.sql:/docker-entrypoint-initdb.d/0010_url_import_quota.sql:ro
+      - ./supabase/migrations/0011_durable_company_researcher.sql:/docker-entrypoint-initdb.d/0011_durable_company_researcher.sql:ro
+      - ./supabase/migrations/0012_global_company_researcher_worker.sql:/docker-entrypoint-initdb.d/0012_global_company_researcher_worker.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U career_os']
       interval: 2s

@@ -28,6 +28,7 @@ import {
   reviewIssueDecisionResultSchema,
   type PersistedRun,
 } from '@/lib/run-contract';
+import { persistedRunOperation } from '@/lib/run-operation';
 import {
   importProfileFile,
   importProfileText,
@@ -73,6 +74,8 @@ type OnboardingMode = 'start' | 'paste' | 'review' | 'manual';
 type PrimaryView = 'home' | 'applications' | 'memory' | 'activity' | 'settings';
 type DossierView =
   'board' | 'brief' | 'company' | 'journey' | 'draft' | 'review' | 'share';
+
+type RunPollingState = Record<string, string>;
 
 const emptyProfile: Profile = {
   name: '',
@@ -157,6 +160,8 @@ export function CareerWorkspace() {
   const [selectedClaimId, setSelectedClaimId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
+  const [runPollingErrors, setRunPollingErrors] = useState<RunPollingState>({});
+  const [runRefreshVersion, setRunRefreshVersion] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
   const [decisionPending, setDecisionPending] = useState('');
@@ -184,7 +189,6 @@ export function CareerWorkspace() {
     level: 'declared' as 'verified' | 'declared' | 'inferred',
   });
   const requestedScope = useRef('');
-  const pendingRuns = useRef(new Map<string, { input: string; key: string }>());
   const pendingDecisions = useRef(new Map<string, string>());
   const pendingImport = useRef<AbortController | undefined>(undefined);
   const activeTenantId = session.data?.session.activeOrganizationId;
@@ -375,6 +379,83 @@ export function CareerWorkspace() {
     history.replaceState(history.state, '', url);
   }, [dossierView, primaryView, workspace.selectedDossierId, workspaceReady]);
 
+  useEffect(() => {
+    if (primaryView === 'applications' && dossierView === 'journey')
+      window.scrollTo(0, 0);
+  }, [dossierView, primaryView]);
+
+  const selectedRunId = state.runId;
+  const selectedRunStatus = state.runStatus;
+  const selectedRunHasDraft = Boolean(state.spec);
+  const selectedRunDossierId = state.id;
+  useEffect(() => {
+    if (
+      !workspaceReady ||
+      !activeTenantId ||
+      !selectedRunId ||
+      selectedRunHasDraft ||
+      (selectedRunStatus && selectedRunStatus !== 'running')
+    )
+      return;
+
+    const controller = new AbortController();
+    let timer: number | undefined;
+    let stopped = false;
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/runs/${selectedRunId}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('RUN_POLL_FAILED');
+        const run = persistedRunSchema.parse(await response.json());
+        if (stopped || run.runId !== selectedRunId) return;
+        setRunPollingErrors((current) => {
+          if (!current[selectedRunDossierId]) return current;
+          const next = { ...current };
+          delete next[selectedRunDossierId];
+          return next;
+        });
+        setWorkspace((current) => {
+          const dossier = current.dossiers.find(
+            ({ id }) => id === selectedRunDossierId,
+          );
+          if (!dossier || hasCurrentRunProjection(dossier, run)) return current;
+          return updateDossier(current, selectedRunDossierId, (candidate) =>
+            applyPersistedRun(candidate, run),
+          );
+        });
+        if (run.status !== 'running') window.scrollTo(0, 0);
+        if (run.status === 'running')
+          timer = window.setTimeout(() => void poll(), 2_000);
+      } catch {
+        if (stopped || controller.signal.aborted) return;
+        setRunPollingErrors((current) => ({
+          ...current,
+          [selectedRunDossierId]:
+            'Impossible d’actualiser pour le moment. L’analyse peut continuer en arrière-plan.',
+        }));
+        timer = window.setTimeout(() => void poll(), 4_000);
+      }
+    };
+
+    void poll();
+    return () => {
+      stopped = true;
+      controller.abort();
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [
+    activeTenantId,
+    runRefreshVersion,
+    selectedRunDossierId,
+    selectedRunHasDraft,
+    selectedRunId,
+    selectedRunStatus,
+    workspaceReady,
+  ]);
+
   if (!workspaceReady)
     return (
       <main className="workspace-loading" aria-busy="true">
@@ -450,7 +531,7 @@ export function CareerWorkspace() {
     return application;
   }
 
-  async function generate() {
+  async function generate(forceNewRun = false) {
     const dossierId = state.id;
     if (!opportunityReady(state.opportunity)) {
       setGenerateError(
@@ -488,20 +569,19 @@ export function CareerWorkspace() {
           : { opportunity: state.opportunity, profileRevision: memoryRevision },
       );
       let runId: string | undefined;
-      let runProfile = workspace.profile;
+      const runProfile = workspace.profile;
       let reviews: WorkspaceReview[];
       let events: WorkflowEvent[];
       let spec: PageSpec | undefined;
       let publicationEligible = false;
 
       if (persistedWorkspace) {
-        const pending = pendingRuns.current.get(dossierId);
-        if (pending?.input !== persistedInput)
-          pendingRuns.current.set(dossierId, {
-            input: persistedInput,
-            key: crypto.randomUUID(),
-          });
-        const operation = pendingRuns.current.get(dossierId)!;
+        const operation = persistedRunOperation(
+          localStorage,
+          `career-os-run-request:${activeTenantId}:${dossierId}`,
+          persistedInput,
+          forceNewRun,
+        );
         const response = await fetch('/api/runs', {
           method: 'POST',
           headers: {
@@ -512,18 +592,25 @@ export function CareerWorkspace() {
         });
         if (!response.ok)
           throw new Error(
-            response.status === 409 ? 'RUN_CONFLICT' : 'RUN_FAILED',
+            response.status === 409
+              ? 'RUN_CONFLICT'
+              : response.status === 429
+                ? 'RUN_RATE_LIMITED'
+                : 'RUN_FAILED',
           );
         const persisted = persistedRunSchema.parse(await response.json());
-        runId = persisted.runId;
-        runProfile = persisted.profile;
-        reviews = persisted.reviews;
-        spec = persisted.spec;
-        events = persistedEvents(persisted);
-        publicationEligible = persisted.reviews.every(
-          (review) => review.passed,
-        );
-        pendingRuns.current.delete(dossierId);
+        updateApplicationDossier(dossierId, (current) => ({
+          ...applyPersistedRun(current, persisted),
+          strategy,
+        }));
+        setRunPollingErrors((current) => {
+          if (!current[dossierId]) return current;
+          const next = { ...current };
+          delete next[dossierId];
+          return next;
+        });
+        setDossierView('journey');
+        return;
       } else {
         const localRun = await runAgentTeam({
           tenantId: 'local-demo',
@@ -563,14 +650,17 @@ export function CareerWorkspace() {
       setGenerateError(
         error instanceof Error && error.message === 'RUN_CONFLICT'
           ? 'La candidature ou la mémoire professionnelle a changé dans une autre session. Rechargez avant de relancer.'
-          : error instanceof Error && error.message === 'APPLICATION_CONFLICT'
-            ? 'Cette candidature a changé dans une autre session. Rechargez-la avant de relancer.'
-            : error instanceof Error && error.message === 'APPLICATION_REJECTED'
-              ? 'Complétez l’entreprise, le poste et la description avant de générer la page.'
+          : error instanceof Error && error.message === 'RUN_RATE_LIMITED'
+            ? 'La limite d’analyses de cet espace est atteinte. Attendez qu’une analyse se termine ou réessayez plus tard.'
+            : error instanceof Error && error.message === 'APPLICATION_CONFLICT'
+              ? 'Cette candidature a changé dans une autre session. Rechargez-la avant de relancer.'
               : error instanceof Error &&
-                  error.message.includes('not supported')
-                ? 'Aucune preuve ne correspond à ce poste. Ajustez le brief ou ajoutez une preuve pertinente, puis réessayez.'
-                : 'La génération s’est arrêtée sans modifier le brief. Réessayez lorsque vous êtes prêt.',
+                  error.message === 'APPLICATION_REJECTED'
+                ? 'Complétez l’entreprise, le poste et la description avant de générer la page.'
+                : error instanceof Error &&
+                    error.message.includes('not supported')
+                  ? 'Aucune preuve ne correspond à ce poste. Ajustez le brief ou ajoutez une preuve pertinente, puis réessayez.'
+                  : 'La génération s’est arrêtée sans modifier le brief. Réessayez lorsque vous êtes prêt.',
       );
     } finally {
       setGenerating(false);
@@ -1478,12 +1568,15 @@ export function CareerWorkspace() {
                     ⌕
                   </button>
                 ) : null}
-                <button
-                  disabled={!state.approved}
-                  onClick={() => setDossierView('share')}
-                >
-                  {state.approved ? 'Valider et publier' : status}
-                </button>
+                {state.approved ? (
+                  <button onClick={() => setDossierView('share')}>
+                    Valider et publier
+                  </button>
+                ) : (
+                  <span className="application-status" role="status">
+                    {status}
+                  </span>
+                )}
               </div>
             </header>
             <div className="application-layout">
@@ -1495,16 +1588,27 @@ export function CareerWorkspace() {
                     error={generateError}
                     generating={generating}
                     hasDraft={Boolean(state.spec)}
+                    locked={
+                      Boolean(state.runId) &&
+                      !state.spec &&
+                      state.runStatus === 'running'
+                    }
                     opportunity={state.opportunity}
                     onChange={(opportunity) => {
                       const dossierId = state.id;
-                      pendingRuns.current.delete(dossierId);
+                      if (activeTenantId)
+                        localStorage.removeItem(
+                          `career-os-run-request:${activeTenantId}:${dossierId}`,
+                        );
                       updateApplicationDossier(dossierId, (current) => ({
                         ...current,
                         opportunity,
                         strategy: undefined,
                         spec: undefined,
                         runId: undefined,
+                        runStatus: undefined,
+                        runStage: undefined,
+                        runSteps: undefined,
                         runProfile: undefined,
                         reviews: [],
                         reviewDecisions: [],
@@ -1520,24 +1624,37 @@ export function CareerWorkspace() {
                   <CompanyView opportunity={state.opportunity} />
                 ) : null}
                 {dossierView === 'journey' ? (
-                  <JourneyView
-                    approved={state.approved}
-                    opportunity={state.opportunity}
-                    profile={state.runProfile ?? workspace.profile}
-                    reviews={state.reviews}
-                    spec={state.spec}
-                    onGenerate={generate}
-                    onOpenBrief={() => setDossierView('brief')}
-                    onOpenDraft={() => setDossierView('draft')}
-                    onOpenEvidence={(claimId) => {
-                      setSelectedClaimId(claimId);
-                      setInspectorOpen(true);
-                    }}
-                    onReview={() => {
-                      if (!state.runId) review();
-                      setDossierView('review');
-                    }}
-                  />
+                  state.runId && !state.spec ? (
+                    <RunProgressView
+                      dossier={state}
+                      pollingError={runPollingErrors[state.id]}
+                      onBack={() => openApplications('board')}
+                      onOpenBrief={() => setDossierView('brief')}
+                      onRefresh={() =>
+                        setRunRefreshVersion((current) => current + 1)
+                      }
+                      onRetry={() => void generate(true)}
+                    />
+                  ) : (
+                    <JourneyView
+                      approved={state.approved}
+                      opportunity={state.opportunity}
+                      profile={state.runProfile ?? workspace.profile}
+                      reviews={state.reviews}
+                      spec={state.spec}
+                      onGenerate={generate}
+                      onOpenBrief={() => setDossierView('brief')}
+                      onOpenDraft={() => setDossierView('draft')}
+                      onOpenEvidence={(claimId) => {
+                        setSelectedClaimId(claimId);
+                        setInspectorOpen(true);
+                      }}
+                      onReview={() => {
+                        if (!state.runId) review();
+                        setDossierView('review');
+                      }}
+                    />
+                  )
                 ) : null}
                 {dossierView === 'draft' && state.spec ? (
                   <DraftView
@@ -2727,9 +2844,15 @@ function ApplicationsView({
         <b>
           {findings
             ? `${findings} décision${findings > 1 ? 's' : ''} à trancher`
-            : dossier.spec
-              ? 'Ouvrir la candidature'
-              : 'Compléter l’offre'}{' '}
+            : dossier.runId && !dossier.spec
+              ? dossier.runStatus === 'running' || !dossier.runStatus
+                ? 'Voir l’avancement'
+                : dossier.runStatus === 'paused'
+                  ? 'Ouvrir l’analyse'
+                  : 'Reprendre la génération'
+              : dossier.spec
+                ? 'Ouvrir la candidature'
+                : 'Compléter l’offre'}{' '}
           →
         </b>
       </button>
@@ -3047,6 +3170,206 @@ function JourneyView({
   );
 }
 
+type RunProgressGroup = {
+  title: string;
+  description: string;
+  stages: string[];
+};
+
+const runProgressGroups: RunProgressGroup[] = [
+  {
+    title: 'Analyse de l’offre',
+    description: 'Comprendre le poste et son contexte.',
+    stages: ['company-researcher'],
+  },
+  {
+    title: 'Sélection des preuves',
+    description: 'Retenir uniquement les expériences pertinentes.',
+    stages: ['evidence-archivist', 'recruiter-strategist'],
+  },
+  {
+    title: 'Composition de la page',
+    description: 'Assembler une candidature adaptée au poste.',
+    stages: ['page-composer'],
+  },
+  {
+    title: 'Vérifications',
+    description: 'Contrôler la clarté, la pertinence et les faits.',
+    stages: ['recruiter', 'hiring-manager', 'fact-checker'],
+  },
+];
+
+function RunProgressView({
+  dossier,
+  onBack,
+  onOpenBrief,
+  onRefresh,
+  onRetry,
+  pollingError,
+}: {
+  dossier: ApplicationDossier;
+  onBack: () => void;
+  onOpenBrief: () => void;
+  onRefresh: () => void;
+  onRetry: () => void;
+  pollingError?: string;
+}) {
+  const status = dossier.runStatus ?? 'running';
+  const running = status === 'running';
+  const terminalCopy = runTerminalCopy(status);
+
+  return (
+    <section className="run-progress" aria-labelledby="run-progress-title">
+      <header>
+        <p className="section-label">Analyse de la candidature</p>
+        <h2 id="run-progress-title">
+          {running ? 'Analyse de l’offre en cours' : terminalCopy.title}
+        </h2>
+        <p className="run-progress-status" role="status" aria-live="polite">
+          {running
+            ? 'Vous pouvez quitter ce dossier. L’analyse continue et son état restera disponible ici.'
+            : terminalCopy.description}
+        </p>
+      </header>
+
+      <div className="run-snapshot-note">
+        <strong>Contenu utilisé pour ce run</strong>
+        <span>
+          L’offre et la mémoire professionnelle enregistrées au lancement. Les
+          changements ultérieurs ne modifient pas cette génération.
+        </span>
+      </div>
+
+      <ol className="run-progress-steps" aria-label="Progression enregistrée">
+        {runProgressGroups.map((group) => {
+          const groupStatus = runProgressGroupStatus(
+            dossier.runSteps ?? [],
+            group.stages,
+          );
+          return (
+            <li className={groupStatus} key={group.title}>
+              <span className="run-step-marker" aria-hidden="true">
+                {groupStatus === 'complete'
+                  ? '✓'
+                  : groupStatus === 'failed'
+                    ? '!'
+                    : '·'}
+              </span>
+              <div>
+                <strong>{group.title}</strong>
+                <p>{group.description}</p>
+              </div>
+              <small>{runProgressStatusLabel(groupStatus)}</small>
+            </li>
+          );
+        })}
+      </ol>
+
+      {pollingError ? (
+        <div className="run-polling-warning" role="status" aria-live="polite">
+          <p>{pollingError}</p>
+          <button className="quiet" onClick={onRefresh} type="button">
+            Réessayer maintenant
+          </button>
+        </div>
+      ) : null}
+
+      <div className="run-progress-actions">
+        {running ? (
+          <button className="quiet" onClick={onBack} type="button">
+            Retour aux candidatures
+          </button>
+        ) : status === 'paused' ? (
+          <button onClick={onOpenBrief} type="button">
+            Modifier le brief
+          </button>
+        ) : (
+          <>
+            <button onClick={onRetry} type="button">
+              Relancer la génération
+            </button>
+            <button className="quiet" onClick={onOpenBrief} type="button">
+              Modifier le brief
+            </button>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function runProgressGroupStatus(
+  steps: NonNullable<ApplicationDossier['runSteps']>,
+  stages: string[],
+) {
+  const relevant = steps.filter((step) => stages.includes(step.stage));
+  if (!relevant.length) return 'future';
+  if (relevant.some((step) => step.status === 'failed')) return 'failed';
+  if (relevant.some((step) => step.status === 'cancelled')) return 'cancelled';
+  if (
+    relevant.length &&
+    relevant.some((step) =>
+      ['leased', 'in_flight', 'completed'].includes(step.status),
+    ) &&
+    !stages.every((stage) =>
+      relevant.some(
+        (step) => step.stage === stage && step.status === 'completed',
+      ),
+    )
+  )
+    return 'active';
+  if (
+    stages.every((stage) =>
+      relevant.some(
+        (step) => step.stage === stage && step.status === 'completed',
+      ),
+    )
+  )
+    return 'complete';
+  return 'pending';
+}
+
+function runProgressStatusLabel(
+  status: ReturnType<typeof runProgressGroupStatus>,
+) {
+  if (status === 'complete') return 'Terminé';
+  if (status === 'active') return 'En cours';
+  if (status === 'failed') return 'Échec';
+  if (status === 'cancelled') return 'Annulé';
+  if (status === 'future') return 'À venir';
+  return 'En attente';
+}
+
+function runTerminalCopy(status: ApplicationDossier['runStatus']) {
+  if (status === 'paused')
+    return {
+      title: 'Analyse de l’offre terminée',
+      description:
+        'Le premier agent a enregistré ses résultats. La sélection des preuves n’est pas encore activée dans cette version.',
+    };
+  if (status === 'budget_exhausted')
+    return {
+      title: 'La limite de ce run a été atteinte.',
+      description:
+        'Aucune page partielle ne sera publiée. Vous pouvez relancer la génération.',
+    };
+  if (status === 'cancelled')
+    return {
+      title: 'La génération a été annulée.',
+      description: 'Aucune page partielle ne sera publiée.',
+    };
+  if (status === 'failed')
+    return {
+      title: 'La génération s’est arrêtée.',
+      description:
+        'Le brief est intact et aucune page partielle ne sera publiée.',
+    };
+  return {
+    title: 'Le résultat n’est pas encore disponible.',
+    description: 'Actualisez le suivi avant de relancer la génération.',
+  };
+}
+
 function JourneyColumn({
   children,
   number,
@@ -3145,6 +3468,7 @@ function BriefView({
   error,
   generating,
   hasDraft,
+  locked,
   opportunity,
   onChange,
   onGenerate,
@@ -3153,6 +3477,7 @@ function BriefView({
   error: string;
   generating: boolean;
   hasDraft: boolean;
+  locked: boolean;
   opportunity: Opportunity;
   onChange: (opportunity: Opportunity) => void;
   onGenerate: () => void;
@@ -3316,6 +3641,15 @@ function BriefView({
           le soutiennent réellement.
         </p>
       </header>
+      {locked ? (
+        <div className="run-brief-lock" role="status">
+          <strong>Analyse en cours</strong>
+          <p>
+            Ce brief reste consultable, mais l’instantané utilisé par le run ne
+            peut plus être modifié.
+          </p>
+        </div>
+      ) : null}
       <div className="job-import-panel">
         <div>
           <strong>Importer l’offre</strong>
@@ -3332,6 +3666,7 @@ function BriefView({
           <div>
             <input
               autoComplete="url"
+              disabled={locked}
               id="job-url"
               name="job-url"
               placeholder="https://entreprise.com/jobs/role…"
@@ -3342,7 +3677,9 @@ function BriefView({
               }
             />
             <button
-              disabled={!canImportUrl || importing || !opportunity.url}
+              disabled={
+                locked || !canImportUrl || importing || !opportunity.url
+              }
               ref={importButton}
               type="submit"
             >
@@ -3385,6 +3722,7 @@ function BriefView({
             }
             aria-invalid={missingFields.includes('company') || undefined}
             autoComplete="organization"
+            disabled={locked}
             id="job-company"
             name="company"
             value={opportunity.company}
@@ -3407,6 +3745,7 @@ function BriefView({
             }
             aria-invalid={missingFields.includes('role') || undefined}
             autoComplete="organization-title"
+            disabled={locked}
             id="job-role"
             name="role"
             value={opportunity.role}
@@ -3432,6 +3771,7 @@ function BriefView({
           }
           aria-invalid={missingFields.includes('description') || undefined}
           autoComplete="off"
+          disabled={locked}
           id="job-description"
           name="job-description"
           rows={8}
@@ -3455,6 +3795,7 @@ function BriefView({
           Couleur <span>Décorative uniquement</span>
           <input
             aria-label="Couleur de l’entreprise"
+            disabled={locked}
             name="company-accent"
             type="color"
             value={opportunity.accent}
@@ -3478,9 +3819,13 @@ function BriefView({
         </div>
       ) : null}
       <div className="document-actions">
-        <p>Le brief est enregistré localement pendant la saisie.</p>
+        <p>
+          {locked
+            ? 'Revenez dans Parcours pour suivre cette génération.'
+            : 'Le brief est enregistré localement pendant la saisie.'}
+        </p>
         <button
-          disabled={generating || !opportunityReady(opportunity)}
+          disabled={locked || generating || !opportunityReady(opportunity)}
           onClick={onGenerate}
         >
           {generating
@@ -4576,6 +4921,50 @@ function persistedEvents(run: PersistedRun): WorkflowEvent[] {
     artifact: event.artifactId,
     costMicros: event.costMicros,
   }));
+}
+
+function applyPersistedRun(
+  dossier: ApplicationDossier,
+  run: PersistedRun,
+): ApplicationDossier {
+  const reviewable = ['awaiting_approval', 'blocked', 'completed'].includes(
+    run.status,
+  );
+  const reviews = reviewable ? run.reviews : [];
+  return {
+    ...dossier,
+    runId: run.runId,
+    runStatus: run.status,
+    runStage: run.stage,
+    runSteps: run.steps,
+    runProfile: run.profile,
+    spec: reviewable ? run.spec : undefined,
+    reviews,
+    reviewDecisions: [],
+    publicationEligible:
+      reviews.length === 3 && reviews.every((review) => review.passed),
+    approved: false,
+    capability: undefined,
+    events: persistedEvents(run),
+  };
+}
+
+function hasCurrentRunProjection(
+  dossier: ApplicationDossier,
+  run: PersistedRun,
+) {
+  const reviewable = ['awaiting_approval', 'blocked', 'completed'].includes(
+    run.status,
+  );
+  return (
+    dossier.runId === run.runId &&
+    dossier.runStatus === run.status &&
+    dossier.runStage === run.stage &&
+    JSON.stringify(dossier.runSteps ?? []) === JSON.stringify(run.steps) &&
+    JSON.stringify(dossier.events) === JSON.stringify(persistedEvents(run)) &&
+    Boolean(dossier.spec) === Boolean(reviewable && run.spec) &&
+    dossier.reviews.length === (reviewable ? run.reviews.length : 0)
+  );
 }
 
 function reviewGateReady(

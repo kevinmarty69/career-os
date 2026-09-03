@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   approveRun,
-  configuredAgentProvider,
   FakeAgentProvider,
   latestPageSpec,
   resumeRun,
@@ -99,22 +98,4 @@ test('budget and cancellation stop before the next provider call', async () => {
   controller.abort();
   const cancelled = await runAgentTeam({ ...input, signal: controller.signal });
   assert.equal(cancelled.status, 'cancelled');
-});
-
-test('network providers require explicit activation and pricing', () => {
-  assert.throws(
-    () =>
-      configuredAgentProvider({
-        CAREER_OS_AGENT_PROVIDER: 'openai-compatible',
-      }),
-    /disabled by default/,
-  );
-  assert.throws(
-    () =>
-      configuredAgentProvider({
-        CAREER_OS_AGENT_PROVIDER: 'openai-compatible',
-        CAREER_OS_ALLOW_NETWORK_PROVIDER: 'true',
-      }),
-    /explicit pricing/,
-  );
 });

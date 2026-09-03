@@ -36,7 +36,6 @@ try {
           await transaction`select
             set_config('request.jwt.claim.tenant_id', ${tenantId}, true),
             set_config('request.jwt.claim.worker_id', ${workerId}, true)`;
-          await transaction.unsafe('set local role career_worker');
           await transaction`select app.reserve_run_budget(
             ${tenantId}, ${runId}, ${`concurrent-${index}`}, 10, 10, 300
           )`;

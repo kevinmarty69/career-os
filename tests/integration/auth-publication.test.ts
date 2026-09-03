@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import { latestPageSpec, runAgentTeam } from '../../lib/agent-runtime';
 import { syntheticProfile } from '../../lib/fixture';
+import type { PersistedRun } from '../../lib/run-contract';
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
 const authOrigin = process.env.TEST_AUTH_ORIGIN ?? baseUrl;
@@ -101,6 +103,70 @@ async function expectStatus(
     assert.fail(
       `${context}: expected ${expected}, received ${response.status}: ${await response.text()}`,
     );
+}
+
+async function makeRunPublishable(run: PersistedRun, tenantId: string) {
+  const demo = await runAgentTeam({
+    tenantId,
+    runId: run.runId,
+    profile: run.profile,
+    opportunity,
+    costBudgetMicros: 0,
+  });
+  const spec = latestPageSpec(demo);
+  assert.ok(spec);
+  const claimIds = [
+    ...new Set(
+      spec.blocks.flatMap((block) =>
+        'claimIds' in block ? block.claimIds : [],
+      ),
+    ),
+  ];
+  assert.ok(claimIds.length > 0);
+
+  const database = new Pool({ connectionString: databaseUrl });
+  const client = await database.connect();
+  try {
+    await client.query('begin');
+    const pageSpec = await client.query<{ id: string; spec_hash: string }>(
+      `insert into app.page_specs (
+         tenant_id, workflow_run_id, version, spec, input_hash
+       ) values ($1, $2, 1, $3, $4)
+       returning id, spec_hash`,
+      [tenantId, run.runId, spec, 'test-fixture'],
+    );
+    for (const claimId of claimIds)
+      await client.query(
+        `insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id)
+         values ($1, $2, $3)`,
+        [tenantId, pageSpec.rows[0].id, claimId],
+      );
+    for (const reviewer of ['recruiter', 'hiring_manager', 'factuality'])
+      await client.query(
+        `insert into app.reviews (
+           tenant_id, page_spec_id, reviewer, verdict, issues, page_spec_hash
+         ) values ($1, $2, $3, 'pass', '[]', $4)`,
+        [tenantId, pageSpec.rows[0].id, reviewer, pageSpec.rows[0].spec_hash],
+      );
+    await client.query(
+      `update app.workflow_steps set status = 'cancelled'
+       where tenant_id = $1 and workflow_run_id = $2 and status = 'pending'`,
+      [tenantId, run.runId],
+    );
+    await client.query(
+      `update app.workflow_runs set status = 'awaiting_approval',
+         state = 'human_approval'
+       where tenant_id = $1 and id = $2`,
+      [tenantId, run.runId],
+    );
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+    await database.end();
+  }
 }
 
 async function main() {
@@ -230,8 +296,9 @@ async function main() {
     },
     { 'idempotency-key': randomUUID() },
   );
-  await expectStatus(runResponse, 201, 'persisted run');
-  const run = (await runResponse.json()) as { runId: string };
+  await expectStatus(runResponse, 202, 'persisted run');
+  const run = (await runResponse.json()) as PersistedRun;
+  await makeRunPublishable(run, organization.id);
   const publishableBody = { runId: run.runId };
 
   const publicationResponse = await owner.post(

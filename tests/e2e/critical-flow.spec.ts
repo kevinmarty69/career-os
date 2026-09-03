@@ -34,6 +34,47 @@ async function useDemo(page: Page) {
   await button.click();
 }
 
+async function createPersistedApplication(page: Page) {
+  await page.goto('/sign-in?next=/');
+  await page
+    .getByRole('button', { name: 'Create Account', exact: true })
+    .first()
+    .click();
+  await page.getByLabel('Name').fill('Run Tester');
+  await page
+    .getByLabel('Email')
+    .fill(`run-${crypto.randomUUID()}@example.test`);
+  await page.getByLabel('Password').fill('safe-local-password');
+  await page
+    .locator('form')
+    .getByRole('button', { name: 'Create Account' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Create your workspace' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Create Workspace' }).click();
+  await page.getByRole('button', { name: /Coller le texte de mon CV/ }).click();
+  await page
+    .getByLabel('Contenu du CV')
+    .fill(
+      'Run Tester\nProduct Engineer\nBuilt and operated a production workflow.',
+    );
+  await page.getByRole('button', { name: 'Relire les informations' }).click();
+  await page.getByLabel(/Je valide les .* affirmations sélectionnées/).check();
+  await page.getByRole('button', { name: 'Enregistrer ma mémoire' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Votre mémoire est prête.' }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Créer ma première candidature' })
+    .click();
+  await page.getByLabel('Entreprise', { exact: true }).fill('Durable Labs');
+  await page.getByLabel('Poste', { exact: true }).fill('Product Engineer');
+  await page
+    .getByLabel('Description du poste')
+    .fill('Build a durable product workflow with evidence-backed outputs.');
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     if (
@@ -148,6 +189,163 @@ test('restores an anonymous draft after reload', async ({ page }) => {
   ).toBeVisible();
 });
 
+test('resumes a durable run and separates polling loss from run failure', async ({
+  page,
+}) => {
+  await createPersistedApplication(page);
+  const profile = await page.evaluate(async () => {
+    const response = await fetch('/api/profile');
+    return ((await response.json()) as { profile: unknown }).profile;
+  });
+  const runId = crypto.randomUUID();
+  const pausedRunId = crypto.randomUUID();
+  let runStarts = 0;
+  let runRead: 'unavailable' | 'running' | 'failed' = 'unavailable';
+  const runningRun = {
+    runId,
+    status: 'running',
+    stage: 'research',
+    revision: 0,
+    usedTokens: 0,
+    usedCostMicros: 0,
+    profile,
+    steps: [
+      {
+        stage: 'company-researcher',
+        status: 'completed',
+        attempt: 1,
+      },
+      {
+        stage: 'evidence-archivist',
+        status: 'completed',
+        attempt: 1,
+      },
+      {
+        stage: 'recruiter-strategist',
+        status: 'in_flight',
+        attempt: 1,
+      },
+    ],
+    reviews: [],
+    events: [],
+  };
+  await page.route('**/api/runs', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    runStarts += 1;
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...runningRun,
+        ...(runStarts > 1
+          ? {
+              runId: pausedRunId,
+              status: 'paused',
+              stage: 'evidence_archive',
+            }
+          : {}),
+        steps: [
+          {
+            stage: 'company-researcher',
+            status: runStarts > 1 ? 'completed' : 'in_flight',
+            attempt: 1,
+          },
+        ],
+      }),
+    });
+  });
+  await page.route(`**/api/runs/${runId}`, async (route) => {
+    if (runRead === 'unavailable') {
+      await route.fulfill({ status: 503, body: 'Run unavailable.' });
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(
+        runRead === 'failed'
+          ? {
+              ...runningRun,
+              status: 'failed',
+              stage: 'invalid_output',
+              steps: [
+                ...runningRun.steps.slice(0, 2),
+                {
+                  stage: 'recruiter-strategist',
+                  status: 'failed',
+                  attempt: 1,
+                  failureCode: 'invalid_output',
+                },
+              ],
+            }
+          : runningRun,
+      ),
+    });
+  });
+
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Analyse de l’offre en cours',
+    }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(page.getByText('L’analyse peut continuer')).toBeVisible();
+
+  runRead = 'running';
+  await page.getByRole('button', { name: 'Réessayer maintenant' }).click();
+  const progress = page.getByRole('list', { name: 'Progression enregistrée' });
+  await expect(
+    progress
+      .getByRole('listitem')
+      .filter({ hasText: 'Analyse de l’offre' })
+      .getByText('Terminé'),
+  ).toBeVisible();
+  await expect(
+    progress
+      .getByRole('listitem')
+      .filter({ hasText: 'Sélection des preuves' })
+      .getByText('En cours'),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Offre', exact: true }).click();
+  await expect(page.getByLabel('Entreprise', { exact: true })).toBeDisabled();
+  await expect(page.getByText('Ce brief reste consultable')).toBeVisible();
+  await page.getByRole('button', { name: 'Parcours', exact: true }).click();
+
+  await page.reload();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Analyse de l’offre en cours',
+    }),
+  ).toBeVisible();
+  runRead = 'failed';
+  await expect(
+    page.getByRole('heading', { name: 'La génération s’est arrêtée.' }),
+  ).toBeVisible({ timeout: 7_000 });
+  await expect(page.getByText('Le brief est intact')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Relancer la génération' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Relancer la génération' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Analyse de l’offre terminée' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Le premier agent a enregistré ses résultats. La sélection des preuves n’est pas encore activée dans cette version.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Modifier le brief' }),
+  ).toBeVisible();
+  await expect(progress.getByText('En cours', { exact: true })).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false);
+});
+
 test('keeps two local application dossiers isolated across reloads', async ({
   page,
 }) => {
@@ -214,8 +412,7 @@ test('keeps two local application dossiers isolated across reloads', async ({
   await expect(page.locator('.application-card')).toHaveCount(2);
 });
 
-test('builds, reviews, approves and issues one private capability', async ({
-  browser,
+test('persists onboarding and starts one durable application run', async ({
   page,
 }) => {
   await page.goto('/sign-in?next=/');
@@ -316,7 +513,9 @@ test('builds, reviews, approves and issues one private capability', async ({
     .getByLabel('URL publique de l’offre')
     .fill('https://jobs.example.com/partial');
   await page.getByRole('button', { name: 'Importer', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Import partiel.');
+  await expect(page.locator('.import-feedback[role="status"]')).toContainText(
+    'Import partiel.',
+  );
   await expect(page.getByLabel('Poste', { exact: true })).toHaveAttribute(
     'aria-invalid',
     'true',
@@ -361,7 +560,9 @@ test('builds, reviews, approves and issues one private capability', async ({
   await expect(page.getByLabel('Poste', { exact: true })).toHaveValue(
     'Senior Product Engineer',
   );
-  await expect(page.getByRole('status')).toContainText('Offre importée.');
+  await expect(page.locator('.import-feedback[role="status"]')).toContainText(
+    'Offre importée.',
+  );
 
   await page
     .getByLabel('URL publique de l’offre')
@@ -386,99 +587,23 @@ test('builds, reviews, approves and issues one private capability', async ({
   );
   await openApplications(page);
   await page.getByRole('button', { name: 'Générer la page' }).click();
-  await page.getByRole('button', { name: 'Page privée' }).click();
-  await expect(page.getByText('Alex Morgan × Northstar Labs')).toBeVisible();
-  await page
-    .getByRole('button', {
-      name: /Reduced a fictional deployment workflow.*Voir la preuve/,
-    })
-    .first()
-    .click();
   await expect(
-    page.getByRole('heading', { name: 'Pourquoi ces affirmations ?' }),
+    page.getByRole('heading', {
+      name: 'Analyse de l’offre en cours',
+    }),
   ).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Fermer l’inspecteur de preuves' })
-    .click();
-  const forgedStatus = await page.evaluate(async () => {
-    const key = Object.keys(localStorage).find((item) =>
-      item.startsWith('career-os-workspace:'),
-    )!;
-    const saved = JSON.parse(localStorage.getItem(key)!);
-    const dossier = saved.dossiers[0];
-    const response = await fetch('/api/publications', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        spec: dossier.spec,
-        approved: true,
-        profileRevision: 1,
-        opportunity: {
-          company: 'Cosmos Institute',
-          role: 'Astrophysicist',
-          description: 'Calibrate telescope optics and model stellar spectra.',
-          accent: '#21504b',
-        },
-      }),
-    });
-    return response.status;
-  });
-  expect(forgedStatus).toBe(400);
-  await page.getByRole('button', { name: 'Parcours', exact: true }).click();
-  await page.getByRole('button', { name: 'Ouvrir la revue' }).click();
-  const approval = page.getByLabel(
-    /J’ai vérifié les preuves et je valide cette candidature/,
-  );
-  await expect(approval).toBeEnabled();
-  await approval.check();
-  await page.getByRole('button', { name: 'Continuer vers le partage' }).click();
-  await page.getByRole('button', { name: 'Créer le lien privé' }).click();
-  await expect(page.getByRole('status')).toContainText('/p/');
-  await expect(page.getByRole('status')).toContainText('Actif');
-  const href = await page
-    .getByRole('link', { name: 'Ouvrir la page privée' })
-    .getAttribute('href');
+  await expect(
+    page.getByRole('list', { name: 'Progression enregistrée' }),
+  ).toContainText('Analyse de l’offre');
+  await expect(
+    page.getByRole('list', { name: 'Progression enregistrée' }),
+  ).toContainText('À venir');
   await page.reload();
-  await openApplications(page);
   await expect(
-    page.getByRole('button', { name: 'Remplacer le lien privé' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Remplacer le lien privé' }).click();
-  const refreshedHref = await page
-    .getByRole('link', { name: 'Ouvrir la page privée' })
-    .getAttribute('href');
-  expect(refreshedHref).not.toBe(href);
-  const freshContext = await browser.newContext();
-  const freshPage = await freshContext.newPage();
-  await freshPage.goto(new URL(href!, page.url()).href);
-  await expect(
-    freshPage.getByRole('heading', {
-      name: 'Private application unavailable.',
+    page.getByRole('heading', {
+      name: 'Analyse de l’offre en cours',
     }),
   ).toBeVisible();
-  await freshPage.goto(new URL(refreshedHref!, page.url()).href);
-  await expect(
-    freshPage.getByRole('heading', { name: 'Alex Morgan × Northstar Labs' }),
-  ).toBeVisible();
-  await freshPage.locator('details').first().locator('summary').click();
-  await expect(freshPage.getByText('CV collé').first()).toBeVisible();
-  await expect(
-    freshPage.getByText(/Publishes a monthly reading list/),
-  ).toHaveCount(0);
-  expect(freshPage.url()).not.toContain('#');
-  await expect(freshPage.locator('nav')).toHaveCount(0);
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Révoquer le lien privé' }).click();
-  await expect(
-    page.getByRole('button', { name: 'Créer le lien privé' }),
-  ).toBeVisible();
-  await freshPage.reload();
-  await expect(
-    freshPage.getByRole('heading', {
-      name: 'Private application unavailable.',
-    }),
-  ).toBeVisible();
-  await freshContext.close();
 });
 
 test('requires an explicit workspace choice when several are available', async ({

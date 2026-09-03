@@ -8,6 +8,7 @@ import {
 import {
   createPersistedRun,
   RunConflictError,
+  RunRateLimitError,
   RunRejectedError,
 } from '@/lib/server/runs';
 
@@ -22,10 +23,9 @@ export async function POST(request: Request) {
       session,
       await readBoundedJson(request, MAX_RUN_BYTES),
       request.headers.get('idempotency-key') ?? '',
-      request.signal,
     );
     const response = Response.json(result.run, {
-      status: result.created ? 201 : 200,
+      status: result.created ? 202 : 200,
     });
     response.headers.set('cache-control', 'private, no-store');
     return response;
@@ -35,6 +35,11 @@ export async function POST(request: Request) {
     if (error instanceof RunConflictError)
       return new Response('Career Memory changed in another session.', {
         status: 409,
+      });
+    if (error instanceof RunRateLimitError)
+      return new Response('Run admission limit reached.', {
+        status: 429,
+        headers: { 'retry-after': '60' },
       });
     if (error instanceof ZodError || error instanceof RunRejectedError)
       return new Response('Run rejected.', { status: 400 });

@@ -27,7 +27,6 @@ export async function POST(
       runId,
       await readBoundedJson(request, MAX_DECISION_BYTES),
       request.headers.get('idempotency-key') ?? '',
-      request.signal,
     );
     const response = Response.json(result.decision, {
       status: result.created ? 201 : 200,

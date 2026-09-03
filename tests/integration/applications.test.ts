@@ -203,7 +203,7 @@ async function main() {
     },
     { 'idempotency-key': randomUUID() },
   );
-  await expectStatus(run, 201, 'run from application');
+  await expectStatus(run, 202, 'run from application');
   const persistedRun = (await run.json()) as { runId: string };
 
   const pool = new Pool({ connectionString: databaseUrl });

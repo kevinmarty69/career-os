@@ -317,138 +317,6 @@ export class FakeAgentProvider implements AgentProvider {
   }
 }
 
-export class OpenAICompatibleProvider implements AgentProvider {
-  readonly name = 'openai-compatible';
-  constructor(
-    private readonly config: {
-      baseUrl: string;
-      apiKey: string;
-      model: string;
-      inputCostPerMillion: number;
-      outputCostPerMillion: number;
-    },
-  ) {}
-
-  reserve(input: unknown, maxOutputTokens: number) {
-    const inputTokens =
-      new TextEncoder().encode(JSON.stringify(input)).length + 256;
-    return {
-      tokens: inputTokens + maxOutputTokens,
-      costMicros:
-        Math.ceil((inputTokens * this.config.inputCostPerMillion) / 1_000_000) +
-        Math.ceil(
-          (maxOutputTokens * this.config.outputCostPerMillion) / 1_000_000,
-        ),
-    };
-  }
-
-  async generate<T extends ModelOutput>(request: GenerateRequest<T>) {
-    const started = performance.now();
-    const response = await fetch(
-      `${this.config.baseUrl.replace(/\/$/, '')}/chat/completions`,
-      {
-        method: 'POST',
-        signal: request.signal,
-        headers: {
-          authorization: `Bearer ${this.config.apiKey}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          max_tokens: request.maxOutputTokens,
-          messages: [
-            {
-              role: 'system',
-              content: `Act only as ${request.role}. Return JSON matching the supplied schema.`,
-            },
-            { role: 'user', content: JSON.stringify(request.input) },
-          ],
-          response_format: {
-            type: 'json_schema',
-            json_schema: {
-              name: request.role.replaceAll('-', '_'),
-              strict: true,
-              schema: z.toJSONSchema(request.schema),
-            },
-          },
-        }),
-      },
-    );
-    if (!response.ok)
-      throw new Error(`Model provider returned ${response.status}.`);
-    const body = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
-    };
-    const content = body.choices?.[0]?.message?.content;
-    if (!content)
-      throw new Error('Model provider returned no structured output.');
-    const inputTokens = body.usage?.prompt_tokens;
-    const outputTokens = body.usage?.completion_tokens;
-    if (inputTokens === undefined || outputTokens === undefined)
-      throw new Error('Model provider omitted authoritative usage.');
-    return {
-      output: request.schema.parse(JSON.parse(content)),
-      usage: {
-        inputTokens,
-        outputTokens,
-        costMicros:
-          Math.ceil(
-            (inputTokens * this.config.inputCostPerMillion) / 1_000_000,
-          ) +
-          Math.ceil(
-            (outputTokens * this.config.outputCostPerMillion) / 1_000_000,
-          ),
-        latencyMs: Math.round(performance.now() - started),
-        reservedTokens: 0,
-        reservedCostMicros: 0,
-      },
-      toolCalls: [],
-    };
-  }
-}
-
-export function configuredAgentProvider(
-  env: Record<string, string | undefined> = process.env,
-): AgentProvider {
-  if (env.CAREER_OS_AGENT_PROVIDER !== 'openai-compatible')
-    return new FakeAgentProvider();
-  if (env.CAREER_OS_ALLOW_NETWORK_PROVIDER !== 'true')
-    throw new Error('Network providers are disabled by default.');
-  const baseUrl = env.CAREER_OS_OPENAI_BASE_URL;
-  const apiKey = env.CAREER_OS_OPENAI_API_KEY;
-  const model = env.CAREER_OS_OPENAI_MODEL;
-  const inputCostPerMillion = Number(
-    env.CAREER_OS_INPUT_COST_MICROS_PER_MILLION,
-  );
-  const outputCostPerMillion = Number(
-    env.CAREER_OS_OUTPUT_COST_MICROS_PER_MILLION,
-  );
-  if (
-    !baseUrl ||
-    !apiKey ||
-    !model ||
-    !Number.isFinite(inputCostPerMillion) ||
-    !Number.isFinite(outputCostPerMillion)
-  )
-    throw new Error(
-      'The openai-compatible provider requires URL, key, model and explicit pricing.',
-    );
-  const host = new URL(baseUrl).hostname;
-  if (
-    env.CAREER_OS_ALLOW_REMOTE_PROVIDER !== 'true' &&
-    !['localhost', '127.0.0.1', '::1'].includes(host)
-  )
-    throw new Error('Remote providers require explicit opt-in.');
-  return new OpenAICompatibleProvider({
-    baseUrl,
-    apiKey,
-    model,
-    inputCostPerMillion,
-    outputCostPerMillion,
-  });
-}
-
 export async function runAgentTeam(input: {
   tenantId: string;
   runId: string;
@@ -465,7 +333,7 @@ export async function runAgentTeam(input: {
   const correction = input.correction
     ? correctionConstraintSchema.parse(input.correction)
     : undefined;
-  const provider = input.provider ?? configuredAgentProvider();
+  const provider = input.provider ?? new FakeAgentProvider();
   const state: AgentRunState = runStateSchema.parse({
     tenantId: input.tenantId,
     runId: input.runId,

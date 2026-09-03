@@ -55,6 +55,18 @@ try {
   await target.query(
     await readFile('supabase/migrations/0010_url_import_quota.sql', 'utf8'),
   );
+  await target.query(
+    await readFile(
+      'supabase/migrations/0011_durable_company_researcher.sql',
+      'utf8',
+    ),
+  );
+  await target.query(
+    await readFile(
+      'supabase/migrations/0012_global_company_researcher_worker.sql',
+      'utf8',
+    ),
+  );
 
   const { rows } = await target.query(
     `select id, company, role, raw_text, url

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Application } from './application-contract';
+import type { PersistedRun } from './run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from './schemas';
 import type { Opportunity, Strategy, WorkflowEvent } from './workflow';
 
@@ -25,6 +26,9 @@ export type ApplicationDossier = {
   strategy?: Strategy;
   spec?: z.infer<typeof pageSpecSchema>;
   runId?: string;
+  runStatus?: PersistedRun['status'];
+  runStage?: string;
+  runSteps?: PersistedRun['steps'];
   runProfile?: Profile;
   reviews: WorkspaceReview[];
   reviewDecisions: ReviewDecision[];
@@ -51,6 +55,9 @@ export type DossierStatus =
   | 'Revue requise'
   | 'Prête à valider'
   | 'Brouillon prêt'
+  | 'Analyse en cours'
+  | 'Analyse terminée'
+  | 'Génération arrêtée'
   | 'À compléter'
   | 'Offre prête';
 export type DossierStage = 'Brouillon' | 'À valider' | 'Envoyée';
@@ -148,6 +155,39 @@ const applicationDossierSchema: z.ZodType<ApplicationDossier> = z
     strategy: strategySchema.optional(),
     spec: pageSpecSchema.optional(),
     runId: z.string().uuid().optional(),
+    runStatus: z
+      .enum([
+        'running',
+        'paused',
+        'awaiting_approval',
+        'completed',
+        'blocked',
+        'budget_exhausted',
+        'cancelled',
+        'failed',
+      ])
+      .optional(),
+    runStage: z.string().min(1).max(100).optional(),
+    runSteps: z
+      .array(
+        z
+          .object({
+            stage: z.string().min(1).max(100),
+            status: z.enum([
+              'pending',
+              'leased',
+              'in_flight',
+              'completed',
+              'failed',
+              'cancelled',
+            ]),
+            attempt: z.number().int().positive(),
+            failureCode: z.string().min(1).max(100).optional(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
     runProfile: profileSchema.optional(),
     reviews: z.array(workspaceReviewSchema),
     reviewDecisions: z.array(reviewDecisionSchema),
@@ -424,6 +464,18 @@ export function invalidateDossiersAfterProfileChange(
 export function dossierStatus(dossier: ApplicationDossier): DossierStatus {
   if (dossier.capability) return 'Partagée';
   if (dossier.approved) return 'Validée';
+  if (dossier.runId && !dossier.spec && dossier.runStatus === 'running')
+    return 'Analyse en cours';
+  if (dossier.runId && !dossier.spec && dossier.runStatus === 'paused')
+    return 'Analyse terminée';
+  if (
+    dossier.runId &&
+    !dossier.spec &&
+    ['budget_exhausted', 'cancelled', 'failed'].includes(
+      dossier.runStatus ?? '',
+    )
+  )
+    return 'Génération arrêtée';
   if (dossier.spec && unresolvedIssueCount(dossier) > 0) return 'Revue requise';
   if (dossier.spec && reviewGateReady(dossier)) return 'Prête à valider';
   if (dossier.spec) return 'Brouillon prêt';
@@ -454,7 +506,7 @@ export function dossierStage(dossier: ApplicationDossier): DossierStage {
 export function dossierNextView(dossier: ApplicationDossier): DossierNextView {
   if (dossier.capability || dossier.approved) return 'share';
   if (dossier.spec && dossier.reviews.length) return 'review';
-  return dossier.spec ? 'journey' : 'brief';
+  return dossier.spec || dossier.runId ? 'journey' : 'brief';
 }
 
 function createDossier(

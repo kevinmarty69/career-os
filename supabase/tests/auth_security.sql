@@ -93,7 +93,8 @@ do $$
 declare role_name text;
 begin
   foreach role_name in array array[
-    'career_app', 'career_worker', 'career_reviewer', 'career_publisher', 'career_reader'
+    'career_app', 'career_worker', 'career_company_researcher',
+    'career_reviewer', 'career_publisher', 'career_reader'
   ] loop
     if has_schema_privilege(role_name, 'auth', 'usage') then
       raise exception '% has direct auth schema access', role_name;

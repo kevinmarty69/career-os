@@ -57,6 +57,13 @@ test('persisted run contract exposes measured zero cost and durable UUIDs', () =
       usedTokens: 42,
       usedCostMicros: 0,
       profile: syntheticProfile,
+      steps: [
+        {
+          stage: 'company-researcher',
+          status: 'completed',
+          attempt: 1,
+        },
+      ],
       reviews: [
         {
           reviewId: randomUUID(),

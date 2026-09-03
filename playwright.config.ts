@@ -7,6 +7,11 @@ export default defineConfig({
     command: 'pnpm exec next start --port 3117',
     port: 3117,
     reuseExistingServer: false,
+    env: {
+      DATABASE_URL: 'postgres://career_os:career_os@127.0.0.1:54329/career_os',
+      BETTER_AUTH_URL: 'http://localhost:3117',
+      BETTER_AUTH_SECRET: 'career-os-local-test-secret-change-me',
+    },
   },
   use: { baseURL: 'http://localhost:3117', trace: 'retain-on-failure' },
   projects: [
