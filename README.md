@@ -113,7 +113,7 @@ The migration also runs on PostgreSQL 17 without pgvector. Embeddings are intent
 - [Agentic stack benchmark](docs/agentic-stack-benchmark.md)
 - [Agentic stack selection](docs/ADR-002-agentic-stack-selection.md)
 
-Self-hosters will use their own provider keys or local OpenAI-compatible models. The managed cloud will run the same product with server-enforced quotas and isolated execution. No remote repository, deployment or hosted service is created by this scaffold.
+Self-hosters use their own provider keys or local OpenAI-compatible models. The future managed cloud will run the same product with server-enforced quotas and isolated execution. Hosted-only deployment, billing and operations code is not part of this repository.
 
 ## License
 

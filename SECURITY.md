@@ -17,4 +17,4 @@
 - Store only SHA-256 capability-token hashes. Exchange a URL-fragment token for an HttpOnly, Secure, SameSite=Lax session; recheck expiry/revocation on every request. Private responses are `no-store`, `no-referrer`, `noindex` and expose no cross-navigation.
 - Cloud agents run as non-root in per-run sandboxes with no host shell, minimal scoped secrets, read-only mounts, egress policy, and server-enforced token/cost/time/concurrency budgets.
 
-Report vulnerabilities privately to the repository owner. Do not open a public exploit report before a private contact channel is configured.
+Report vulnerabilities through GitHub's private vulnerability reporting for this repository. Do not open a public exploit report.
