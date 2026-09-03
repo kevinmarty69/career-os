@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-page-custom-font -- the root App Router layout applies this kit font globally */
 import type { Metadata } from 'next';
 import { JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
@@ -23,6 +24,18 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html className={`${sans.variable} ${mono.variable}`} lang="fr">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300,0,0&icon_names=add_link,badge,chevron_right,code,database,description,how_to_reg,inbox,link,lock,record_voice_over,search,settings,space_dashboard,upload_file,work_history&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

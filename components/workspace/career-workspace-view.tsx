@@ -149,6 +149,7 @@ export function CareerWorkspaceView({
         profile={workspace.profile}
         review={importReview}
         signedIn={Boolean(activeTenantId)}
+        userName={session.data?.user.name}
         onAcceptImport={() => void acceptImport()}
         onAcceptManual={() => void acceptManualProfile()}
         onCancel={() => discardImportReview()}

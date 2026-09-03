@@ -71,13 +71,13 @@ async function createPersistedApplication(page: Page) {
     page.getByRole('heading', { name: 'Create your workspace' }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Create Workspace' }).click();
-  await page.getByRole('button', { name: /Coller le texte de mon CV/ }).click();
-  await page
-    .getByLabel('Contenu du CV')
-    .fill(
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'run-tester-cv.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
       'Run Tester\nProduct Engineer\nBuilt and operated a production workflow.',
-    );
-  await page.getByRole('button', { name: 'Relire les informations' }).click();
+    ),
+  });
   await page.getByLabel(/Je valide les .* affirmations sélectionnées/).check();
   await page.getByRole('button', { name: 'Enregistrer ma mémoire' }).click();
   await expect(page.getByRole('status')).toContainText(
@@ -1385,13 +1385,22 @@ test('persists onboarding and starts one durable application run', async ({
   await page.getByRole('button', { name: 'Create Workspace' }).click();
   await expect(
     page.getByRole('heading', {
-      name: 'Construisons votre mémoire professionnelle.',
+      name: 'Career OS ne saura rien dire de vous avant que vous lui donniez des preuves.',
     }),
   ).toBeVisible();
-  await page.getByRole('button', { name: /Coller le texte de mon CV/ }).click();
-  await page
-    .getByLabel('Contenu du CV')
-    .fill(
+  await expect(page.getByText('BIENVENUE, ALEX')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Lier LinkedIn, indisponible' }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole('button', {
+      name: 'Répondre à 7 questions, indisponible',
+    }),
+  ).toBeDisabled();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'alex-morgan-cv.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(
       [
         'Alex Morgan',
         'Evidence-backed Product Engineer',
@@ -1399,8 +1408,8 @@ test('persists onboarding and starts one durable application run', async ({
         'Enjoys turning ambiguous requirements into small, operated product slices.',
         'Publishes a monthly reading list for friends and former colleagues.',
       ].join('\n'),
-    );
-  await page.getByRole('button', { name: 'Relire les informations' }).click();
+    ),
+  });
   await expect(page.getByLabel('Affirmation 2')).toBeEnabled();
   await expect(page.getByLabel('Affirmation 2')).toHaveAttribute(
     'readonly',
@@ -1607,7 +1616,7 @@ test('requires an explicit workspace choice when several are available', async (
   await page.getByRole('button', { name: 'Use Workspace Two' }).click();
   await expect(
     page.getByRole('heading', {
-      name: 'Construisons votre mémoire professionnelle.',
+      name: 'Career OS ne saura rien dire de vous avant que vous lui donniez des preuves.',
     }),
   ).toBeVisible();
   const activeOrganizationId = await page.evaluate(async () => {

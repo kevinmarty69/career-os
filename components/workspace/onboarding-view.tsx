@@ -4,6 +4,7 @@ import type { Profile } from '@/lib/schemas';
 import type { ImportReview, OnboardingMode } from './use-career-workspace';
 import { importCandidateGroupLabels } from './use-career-workspace';
 import { allowedUseLabel } from './workspace-view-labels';
+import styles from './signed-in-empty-state.module.css';
 
 export function OnboardingView({
   error,
@@ -27,6 +28,7 @@ export function OnboardingView({
   profile,
   review,
   signedIn,
+  userName,
 }: {
   error: string;
   importing: boolean;
@@ -54,6 +56,7 @@ export function OnboardingView({
   profile: Profile;
   review?: ImportReview;
   signedIn: boolean;
+  userName?: string;
 }) {
   const selectedCount =
     review?.candidates.filter((candidate) => candidate.selected).length ?? 0;
@@ -67,6 +70,16 @@ export function OnboardingView({
       .filter((candidate) => candidate.selected)
       .every((candidate) => candidate.allowedUses.length > 0),
   );
+
+  if (signedIn && mode === 'start')
+    return (
+      <SignedInEmptyState
+        error={error}
+        importing={importing}
+        onFile={onFile}
+        userName={userName ?? ''}
+      />
+    );
 
   return (
     <main className="onboarding-shell" id="main-content">
@@ -581,6 +594,281 @@ export function OnboardingView({
             </>
           ) : null}
         </div>
+      </section>
+    </main>
+  );
+}
+
+const desktopNavigation = [
+  ['space_dashboard', 'Accueil', 'active'],
+  ['inbox', 'À trancher', 'disabled'],
+  ['work_history', 'Candidatures', 'disabled'],
+  ['database', 'Mémoire pro', 'rest'],
+  ['description', 'Assets', 'disabled'],
+  ['link', 'Liens privés', 'disabled'],
+  ['settings', 'Réglages', 'rest'],
+] as const;
+
+const mobileNavigation = [
+  ['space_dashboard', 'Accueil', 'active'],
+  ['inbox', 'Trancher', 'disabled'],
+  ['work_history', 'Suivi', 'disabled'],
+  ['link', 'Liens', 'disabled'],
+] as const;
+
+function SignedInEmptyState({
+  error,
+  importing,
+  onFile,
+  userName,
+}: {
+  error: string;
+  importing: boolean;
+  onFile: (file: File) => void;
+  userName: string;
+}) {
+  const names = userName.trim().split(/\s+/).filter(Boolean);
+  const firstName = names[0] ?? '';
+  const initials =
+    names
+      .slice(0, 2)
+      .map((name) => name.charAt(0))
+      .join('')
+      .toLocaleUpperCase('fr-FR') || 'CO';
+
+  return (
+    <main className={styles.shell}>
+      <a className={styles.skipLink} href="#first-run-content">
+        Aller au contenu
+      </a>
+
+      <aside className={styles.sidebar} aria-label="Navigation Career OS">
+        <div className={styles.brand}>
+          <span className={styles.brandMark} aria-hidden="true">
+            <span />
+          </span>
+          <span>Career OS</span>
+        </div>
+
+        <nav className={styles.desktopNavigation} aria-label="Espace">
+          {desktopNavigation.map(([icon, label, state]) => (
+            <span
+              aria-current={state === 'active' ? 'page' : undefined}
+              className={`${styles.navigationItem} ${state === 'rest' ? '' : styles[state]}`}
+              key={label}
+            >
+              <span className={styles.symbol} aria-hidden="true">
+                {icon}
+              </span>
+              <span>{label}</span>
+            </span>
+          ))}
+        </nav>
+
+        <div className={styles.setupCard}>
+          <strong>Mise en place</strong>
+          <span className={styles.progress} aria-hidden="true">
+            <span />
+          </span>
+          <span>1 étape sur 4 · compte créé</span>
+        </div>
+      </aside>
+
+      <section className={styles.panel}>
+        <header className={styles.topbar}>
+          <div className={styles.mobileBrand}>
+            <span className={styles.brandMark} aria-hidden="true">
+              <span />
+            </span>
+            <strong>Career OS</strong>
+          </div>
+          <div className={styles.search} aria-disabled="true">
+            <span className={styles.symbol} aria-hidden="true">
+              search
+            </span>
+            <span>Rien à chercher pour l&apos;instant</span>
+          </div>
+          <div className={styles.account}>
+            <span>Documentation</span>
+            <span className={styles.avatar} aria-label={userName}>
+              {initials}
+            </span>
+          </div>
+        </header>
+
+        <div className={styles.contentViewport} id="first-run-content">
+          <div className={styles.content}>
+            <div className={styles.introduction}>
+              <span className={styles.overline}>
+                BIENVENUE
+                {firstName ? `, ${firstName.toLocaleUpperCase('fr-FR')}` : ''}
+              </span>
+              <h1>
+                Career OS ne saura rien dire de vous avant que vous lui donniez
+                des preuves.
+              </h1>
+              <p>
+                Importez d&apos;abord ce qui existe déjà : votre CV, un
+                post-mortem, une review, un dépôt. L&apos;app en extrait des
+                affirmations datées et sourcées — c&apos;est cette matière que
+                les agents utiliseront, jamais leur imagination.
+              </p>
+            </div>
+
+            <div className={styles.actions}>
+              <label className={styles.resumeCard}>
+                <input
+                  accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  className={styles.fileInput}
+                  disabled={importing}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) onFile(file);
+                    event.currentTarget.value = '';
+                  }}
+                  type="file"
+                />
+                <span className={styles.resumeIcon} aria-hidden="true">
+                  <span className={styles.symbol}>upload_file</span>
+                </span>
+                <span className={styles.actionCopy}>
+                  <strong>Importer mon CV</strong>
+                  <span>
+                    Deux minutes. C&apos;est le socle : postes, dates, premières
+                    affirmations.
+                  </span>
+                </span>
+                <span className={styles.primaryButton}>
+                  {importing ? 'Lecture du CV…' : 'Choisir un fichier'}
+                </span>
+              </label>
+
+              <div className={styles.secondaryActions}>
+                <button
+                  aria-label="Lier LinkedIn, indisponible"
+                  className={styles.secondaryAction}
+                  disabled
+                  type="button"
+                >
+                  <span className={styles.secondaryIcon} aria-hidden="true">
+                    <span className={styles.symbol}>badge</span>
+                  </span>
+                  <span className={styles.actionCopy}>
+                    <strong>Lier LinkedIn</strong>
+                    <span>Postes, dates, recommandations · indisponible</span>
+                  </span>
+                  <span className={styles.symbol} aria-hidden="true">
+                    chevron_right
+                  </span>
+                </button>
+                <button
+                  aria-label="Lier GitHub, indisponible"
+                  className={styles.secondaryAction}
+                  disabled
+                  type="button"
+                >
+                  <span className={styles.secondaryIcon} aria-hidden="true">
+                    <span className={styles.symbol}>code</span>
+                  </span>
+                  <span className={styles.actionCopy}>
+                    <strong>Lier GitHub</strong>
+                    <span>
+                      Projets et contributions publiques · indisponible
+                    </span>
+                  </span>
+                  <span className={styles.symbol} aria-hidden="true">
+                    chevron_right
+                  </span>
+                </button>
+                <button
+                  aria-label="Répondre à 7 questions, indisponible"
+                  className={styles.secondaryAction}
+                  disabled
+                  type="button"
+                >
+                  <span className={styles.secondaryIcon} aria-hidden="true">
+                    <span className={styles.symbol}>record_voice_over</span>
+                  </span>
+                  <span className={styles.actionCopy}>
+                    <strong>Répondre à 7 questions</strong>
+                    <span>
+                      Si vous n&apos;avez aucun document sous la main ·
+                      indisponible
+                    </span>
+                  </span>
+                  <span className={styles.symbol} aria-hidden="true">
+                    chevron_right
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {error ? (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            <div className={styles.explanation}>
+              <div>
+                <span className={styles.explanationTitle}>
+                  <span className={styles.symbol} aria-hidden="true">
+                    database
+                  </span>
+                  <strong>1 · Mémoire</strong>
+                </span>
+                <span>
+                  Vos preuves, datées et rangées une fois pour toutes.
+                </span>
+              </div>
+              <div>
+                <span className={styles.explanationTitle}>
+                  <span className={styles.symbol} aria-hidden="true">
+                    add_link
+                  </span>
+                  <strong>2 · Une offre</strong>
+                </span>
+                <span>
+                  Collez l&apos;URL. Les agents analysent, apparient, rédigent.
+                </span>
+              </div>
+              <div>
+                <span className={styles.explanationTitle}>
+                  <span className={styles.symbol} aria-hidden="true">
+                    how_to_reg
+                  </span>
+                  <strong>3 · Vous validez</strong>
+                </span>
+                <span>Rien ne part sans votre accord, phrase par phrase.</span>
+              </div>
+            </div>
+
+            <div className={styles.privacy}>
+              <span className={styles.symbol} aria-hidden="true">
+                lock
+              </span>
+              <span>
+                Instance auto-hébergée. Vos documents restent chez vous, et
+                l&apos;export complet est disponible dès le premier jour.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <nav className={styles.mobileNavigation} aria-label="Navigation mobile">
+          {mobileNavigation.map(([icon, label, state]) => (
+            <span
+              aria-current={state === 'active' ? 'page' : undefined}
+              className={`${styles.mobileNavigationItem} ${styles[state]}`}
+              key={label}
+            >
+              <span className={styles.symbol} aria-hidden="true">
+                {icon}
+              </span>
+              <span>{label}</span>
+            </span>
+          ))}
+        </nav>
       </section>
     </main>
   );
