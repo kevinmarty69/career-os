@@ -29,4 +29,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm build
+      - run: docker build -f Dockerfile.page-composer -t career-os-page-composer:test .
       - run: pnpm audit --prod --audit-level high
