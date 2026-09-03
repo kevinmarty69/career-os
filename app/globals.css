@@ -4690,6 +4690,10 @@ button,
   color: #16875f;
 }
 
+.summary-state.attention b {
+  color: #a96805;
+}
+
 .journey-summary .journey-people {
   margin-left: auto;
   padding: 0;

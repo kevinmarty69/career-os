@@ -330,7 +330,13 @@ begin
   end;
 end $$;
 
-set local role career_reviewer;
+reset role;
+do $$
+begin
+  if has_schema_privilege('career_reviewer', 'app', 'usage') then
+    raise exception 'legacy reviewer role retained app access';
+  end if;
+end $$;
 do $$
 declare target_hash text;
 begin
@@ -405,10 +411,10 @@ declare target_hash text;
 begin
   select spec_hash into target_hash from app.page_specs
   where id = 'a8000000-0000-0000-0000-000000000001';
-  if not app.page_spec_review_gate(
+  if app.page_spec_review_gate(
     '28000000-0000-0000-0000-000000000001',
     'a8000000-0000-0000-0000-000000000001', target_hash
-  ) then raise exception 'explicit recruiter keep did not satisfy gate'; end if;
+  ) then raise exception 'legacy reviews passed the durable gate'; end if;
 end $$;
 
 reset role;
@@ -424,12 +430,16 @@ begin
 end $$;
 
 set local role career_app;
-select app.approve_page_spec('a8000000-0000-0000-0000-000000000001');
-set local role career_publisher;
-select app.mint_publication(
-  'a8000000-0000-0000-0000-000000000001', digest('hitl-token', 'sha256'),
-  now() + interval '1 day'
-);
+do $$
+begin
+  begin
+    perform app.approve_page_spec('a8000000-0000-0000-0000-000000000001');
+    raise exception 'legacy reviews opened publication';
+  exception when raise_exception then
+    if sqlerrm <> 'approval requires passing reviews or explicit non-factual keeps'
+    then raise; end if;
+  end;
+end $$;
 
 reset role;
 insert into app.page_specs (

@@ -10,6 +10,7 @@ import {
   researchSelectionInputSchema,
   reviewIssueDecisionInputSchema,
   reviewIssueDecisionResultSchema,
+  reviewStartInputSchema,
   strategyStartInputSchema,
   strategyApprovalInputSchema,
   type PersistedRun,
@@ -17,6 +18,7 @@ import {
 } from '../run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from '../schemas';
 import { COMPANY_RESEARCH_RUN_TOKEN_BUDGET } from './local-openai-client';
+import { REVIEW_RUN_TOKEN_BUDGET } from './local-openai-review-client';
 import { RECRUITER_STRATEGY_RUN_TOKEN_BUDGET } from './local-openai-strategy-client';
 
 export type RunSession = {
@@ -136,7 +138,7 @@ export async function createPersistedRun(
       ) values (
         ${runId}, ${session.tenantId}, ${opportunityId}, ${snapshot.id},
         ${living.id}, ${living.revision}, ${key}, 'research', 'running',
-        ${COMPANY_RESEARCH_RUN_TOKEN_BUDGET + RECRUITER_STRATEGY_RUN_TOKEN_BUDGET},
+        ${COMPANY_RESEARCH_RUN_TOKEN_BUDGET + RECRUITER_STRATEGY_RUN_TOKEN_BUDGET + REVIEW_RUN_TOKEN_BUDGET * 2},
         0, now() + interval '1 hour', ${inputHash}
       )`;
       const researchInput = {
@@ -257,6 +259,37 @@ export async function approveRecruiterStrategy(
         select app.approve_recruiter_strategy(
           ${session.tenantId}, ${runId}, ${input.strategyArtifactId},
           ${input.strategyArtifactHash}, ${key}
+        ) as created`;
+      return {
+        created: result.created,
+        run: await readRunProjection(tx, session.tenantId, runId),
+      };
+    });
+  } catch (error) {
+    if (isDatabaseConflict(error)) throw new RunConflictError();
+    if (isDatabaseRejection(error)) throw new RunRejectedError();
+    throw error;
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function startPageSpecReviews(
+  session: RunSession,
+  rawRunId: string,
+  rawInput: unknown,
+  idempotencyKey: string,
+) {
+  const runId = idempotencyKeySchema(rawRunId);
+  reviewStartInputSchema.parse(rawInput);
+  const key = idempotencyKeySchema(idempotencyKey);
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session, 'career_app');
+      const [result] = await tx<{ created: boolean }[]>`
+        select app.start_page_spec_reviews(
+          ${session.tenantId}, ${runId}, ${key}
         ) as created`;
       return {
         created: result.created,
@@ -714,11 +747,16 @@ async function readRunProjection(
       spec: unknown;
       spec_hash: string;
       source_artifact_id: string | null;
+      source_artifact_hash: string | null;
     }>
-  >`select id, spec, spec_hash, source_artifact_id from app.page_specs
-    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
-      and invalidated_at is null and source_artifact_id is not null
-    order by version desc limit 1`;
+  >`select page.id, page.spec, page.spec_hash, page.source_artifact_id,
+      encode(digest(artifact.body::text, 'sha256'), 'hex') source_artifact_hash
+    from app.page_specs page
+    join app.artifacts artifact on artifact.tenant_id = page.tenant_id
+      and artifact.id = page.source_artifact_id
+    where page.tenant_id = ${tenantId} and page.workflow_run_id = ${runId}
+      and page.invalidated_at is null and page.source_artifact_id is not null
+    order by page.version desc limit 1`;
   const reviews = pageSpec
     ? await tx<
         Array<{
@@ -732,6 +770,24 @@ async function readRunProjection(
         order by case reviewer when 'recruiter' then 1
           when 'hiring_manager' then 2 else 3 end`
     : [];
+  const reviewDecisions = pageSpec
+    ? await tx<
+        Array<{
+          review_id: string;
+          issue_index: number;
+          decision: 'keep' | 'correct';
+        }>
+      >`select decision.review_id, decision.issue_index, decision.decision
+        from app.review_issue_decisions decision
+        join app.reviews review on review.tenant_id = decision.tenant_id
+          and review.id = decision.review_id
+        where decision.tenant_id = ${tenantId}
+          and decision.page_spec_id = ${pageSpec.id}
+        order by decision.created_at, decision.id`
+    : [];
+  const publicationEligible = pageSpec
+    ? await pageSpecReviewGate(tx, tenantId, pageSpec.id, pageSpec.spec_hash)
+    : false;
   const events = await tx<
     Array<{
       actor: string;
@@ -808,6 +864,9 @@ async function readRunProjection(
           ...(pageSpec.source_artifact_id
             ? { pageSpecArtifactId: pageSpec.source_artifact_id }
             : {}),
+          ...(pageSpec.source_artifact_hash
+            ? { pageSpecArtifactHash: pageSpec.source_artifact_hash }
+            : {}),
           spec: pageSpecSchema.parse(pageSpec.spec),
         }
       : {}),
@@ -821,6 +880,12 @@ async function readRunProjection(
       findings: reviewFindings(review.issues),
       issues: reviewIssues(review.issues),
     })),
+    reviewDecisions: reviewDecisions.map((decision) => ({
+      reviewId: decision.review_id,
+      issueIndex: decision.issue_index,
+      decision: decision.decision,
+    })),
+    publicationEligible,
     events: events.map((event) => ({
       actor: fromDatabaseActor(event.actor),
       type: event.event_type,
@@ -892,6 +957,12 @@ function reviewIssues(value: unknown) {
           section: issue.section,
           message: issue.message,
           blocking: issue.blocking,
+          ...('claimId' in issue && typeof issue.claimId === 'string'
+            ? { claimId: issue.claimId }
+            : {}),
+          ...('evidenceIds' in issue && Array.isArray(issue.evidenceIds)
+            ? { evidenceIds: issue.evidenceIds }
+            : {}),
         },
       ];
     return [];
@@ -930,6 +1001,7 @@ function isDatabaseConflict(error: unknown) {
     error instanceof Error &&
     (error.message.includes('selection conflict') ||
       error.message.includes('strategy approval conflict') ||
+      error.message.includes('review start conflict') ||
       error.message.includes('idempotency key conflict'))
   );
 }
@@ -939,7 +1011,11 @@ function isDatabaseRejection(error: unknown) {
     error instanceof Error &&
     (error.message.includes('research selection') ||
       error.message.includes('evidence archive') ||
-      error.message.includes('strategy '))
+      error.message.includes('strategy ') ||
+      error.message.includes('review run unavailable') ||
+      error.message.includes('review PageSpec unavailable') ||
+      error.message.includes('review PageSpec lineage rejected') ||
+      error.message.includes('review input unavailable'))
   );
 }
 

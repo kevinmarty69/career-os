@@ -187,6 +187,16 @@ async function main() {
   const read = await owner.request(`/api/runs/${run.runId}`);
   await expectStatus(read, 200, 'run read');
   assert.deepEqual(await read.json(), run);
+  await expectStatus(
+    await owner.request(
+      `/api/runs/${run.runId}/reviews`,
+      'POST',
+      {},
+      { 'idempotency-key': randomUUID() },
+    ),
+    400,
+    'review start rejected before PageSpec',
+  );
 
   const pool = new Pool({ connectionString: databaseUrl });
   try {
@@ -208,7 +218,7 @@ async function main() {
     assert.deepEqual(stored.rows[0], {
       profile_kind: 'snapshot',
       source_profile_revision: '1',
-      token_budget: 131840,
+      token_budget: 462592,
       opportunity_company: 'Northstar Labs',
       step_count: '1',
       artifact_count: '0',
@@ -227,9 +237,119 @@ async function main() {
         },
       },
     });
+
+    const proof = (
+      await pool.query(
+        `select claim.id claim_id,claim.statement,evidence.id evidence_id
+         from app.workflow_runs run
+         join app.claims claim on claim.profile_id=run.profile_id
+           and claim.tenant_id=run.tenant_id
+         join app.claim_evidence link on link.claim_id=claim.id
+           and link.profile_id=claim.profile_id and link.tenant_id=claim.tenant_id
+         join app.evidence evidence on evidence.id=link.evidence_id
+           and evidence.profile_id=claim.profile_id
+           and evidence.tenant_id=claim.tenant_id
+         where run.id=$1 order by claim.position,link.position limit 1`,
+        [run.runId],
+      )
+    ).rows[0];
+    const artifactId = randomUUID();
+    const pageSpecId = randomUUID();
+    const pageSpec = {
+      version: 1,
+      company: {
+        name: 'Northstar Labs',
+        role: 'Senior Product Engineer',
+        accent: '#21504b',
+      },
+      hero: {
+        eyebrow: 'Private application',
+        title: 'Ada Lovelace × Northstar Labs',
+        thesis: proof.statement,
+      },
+      blocks: [
+        {
+          type: 'fit',
+          title: 'Relevant experience',
+          claimIds: [proof.claim_id],
+        },
+      ],
+    };
+    await pool.query(
+      `insert into app.artifacts (
+         id,tenant_id,workflow_run_id,kind,version,schema_version,body,created_by
+       ) select $2,tenant_id,id,'page_spec',1,1,$3,'page_composer'
+         from app.workflow_runs where id=$1`,
+      [run.runId, artifactId, JSON.stringify(pageSpec)],
+    );
+    await pool.query(
+      `insert into app.page_specs (
+         id,tenant_id,workflow_run_id,version,spec,input_hash,source_artifact_id
+       ) select $4,tenant_id,id,1,$3,repeat('d',64),$2
+         from app.workflow_runs where id=$1`,
+      [run.runId, artifactId, JSON.stringify(pageSpec), pageSpecId],
+    );
+    await pool.query(
+      `insert into app.page_spec_claims (tenant_id,page_spec_id,claim_id)
+         select tenant_id,$2,$3 from app.workflow_runs where id=$1`,
+      [run.runId, pageSpecId, proof.claim_id],
+    );
+    await pool.query(
+      `insert into app.page_spec_evidence (
+         tenant_id,page_spec_id,claim_id,evidence_id,position
+       ) select tenant_id,$2,$3,$4,0 from app.workflow_runs where id=$1`,
+      [run.runId, pageSpecId, proof.claim_id, proof.evidence_id],
+    );
+    await pool.query(
+      `insert into app.workflow_steps (
+         tenant_id,workflow_run_id,stage,status,idempotency_key,input,input_hash,
+         output_artifact_id,page_spec_id,completed_at
+       ) select tenant_id,id,'page-composer','completed',
+         'http-review-fixture','{}'::jsonb,
+         encode(digest('{}'::jsonb::text,'sha256'),'hex'),$2,$3,now()
+         from app.workflow_runs where id=$1`,
+      [run.runId, artifactId, pageSpecId],
+    );
+    await pool.query(
+      `update app.workflow_runs set status='paused',state='page_spec_review'
+       where id=$1`,
+      [run.runId],
+    );
   } finally {
     await pool.end();
   }
+
+  const reviewKey = randomUUID();
+  await expectStatus(
+    await owner.request(
+      `/api/runs/${run.runId}/reviews`,
+      'POST',
+      {},
+      { 'idempotency-key': reviewKey },
+    ),
+    202,
+    'review start accepted',
+  );
+  await expectStatus(
+    await owner.request(
+      `/api/runs/${run.runId}/reviews`,
+      'POST',
+      {},
+      { 'idempotency-key': reviewKey },
+    ),
+    200,
+    'review start replayed',
+  );
+  await expectStatus(
+    await owner.request(
+      `/api/runs/${run.runId}/reviews`,
+      'POST',
+      {},
+      { 'idempotency-key': randomUUID() },
+    ),
+    409,
+    'review start conflict',
+  );
 
   const other = await createWorkspace('RunOther');
   await expectStatus(

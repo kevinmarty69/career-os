@@ -113,6 +113,8 @@ export const strategyApprovalInputSchema = z
   })
   .strict();
 
+export const reviewStartInputSchema = z.object({}).strict();
+
 export const persistedEvidenceArchiveSchema = evidenceArchiveOutputSchema
   .extend({
     artifactId: z.string().uuid(),
@@ -131,22 +133,34 @@ export const runtimeReviewSchema = z
   .object({
     reviewer: z.enum(['recruiter', 'hiring-manager', 'factuality']),
     passed: z.boolean(),
-    findings: z.array(z.string()),
+    findings: z.array(z.string().min(1).max(400)).max(5),
   })
   .strict();
 
 const persistedReviewSchema = runtimeReviewSchema
   .extend({
     reviewId: z.string().uuid(),
-    issues: z.array(
-      z
-        .object({
-          section: z.string().min(1),
-          message: z.string().min(1),
-          blocking: z.boolean(),
-        })
-        .strict(),
-    ),
+    issues: z
+      .array(
+        z
+          .object({
+            section: z.string().min(1).max(100),
+            message: z.string().min(1).max(400),
+            blocking: z.boolean(),
+            claimId: z.string().uuid().optional(),
+            evidenceIds: z.array(z.string().uuid()).max(2).optional(),
+          })
+          .strict(),
+      )
+      .max(5),
+  })
+  .strict();
+
+const persistedReviewDecisionSchema = z
+  .object({
+    reviewId: z.string().uuid(),
+    issueIndex: z.number().int().min(0).max(4),
+    decision: z.enum(['keep', 'correct']),
   })
   .strict();
 
@@ -189,8 +203,14 @@ export const persistedRunSchema = z
       .regex(/^[0-9a-f]{64}$/)
       .optional(),
     pageSpecArtifactId: z.string().uuid().optional(),
+    pageSpecArtifactHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
     spec: pageSpecSchema.optional(),
-    reviews: z.array(persistedReviewSchema),
+    reviews: z.array(persistedReviewSchema).max(3),
+    reviewDecisions: z.array(persistedReviewDecisionSchema).max(15),
+    publicationEligible: z.boolean(),
     events: z.array(eventSchema),
   })
   .strict()
@@ -200,6 +220,7 @@ export const persistedRunSchema = z
       run.pageSpecId,
       run.pageSpecHash,
       run.pageSpecArtifactId,
+      run.pageSpecArtifactHash,
     ];
     const present = pageFields.filter((value) => value !== undefined).length;
     if (present !== 0 && present !== pageFields.length)
@@ -215,7 +236,7 @@ export type PersistedRun = z.infer<typeof persistedRunSchema>;
 export const reviewIssueDecisionInputSchema = z
   .object({
     reviewId: z.string().uuid(),
-    issueIndex: z.number().int().min(0).max(99),
+    issueIndex: z.number().int().min(0).max(4),
     decision: z.enum(['keep', 'correct']),
   })
   .strict();

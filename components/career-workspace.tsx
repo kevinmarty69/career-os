@@ -48,6 +48,7 @@ import {
   invalidateDossiersAfterProfileChange,
   mergePersistedApplications,
   opportunityReady,
+  reviewProcessState,
   reviewsComplete,
   restoreWorkspace,
   updateDossier,
@@ -138,7 +139,10 @@ function restoreNavigation(workspace: SavedWorkspaceV2): {
     'brief',
     'company',
     'journey',
-    ...(dossier.spec ? (['draft', 'review'] as DossierView[]) : []),
+    ...(dossier.spec ? (['draft'] as DossierView[]) : []),
+    ...(dossier.spec && reviewsComplete(dossier.reviews)
+      ? (['review'] as DossierView[])
+      : []),
     ...(dossier.spec || dossier.capability ? (['share'] as DossierView[]) : []),
   ];
   return {
@@ -161,6 +165,7 @@ export function CareerWorkspace() {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [selectedClaimId, setSelectedClaimId] = useState('');
   const inspectorTrigger = useRef<HTMLElement | null>(null);
+  const generationPending = useRef(false);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
   const [runPollingErrors, setRunPollingErrors] = useState<RunPollingState>({});
@@ -460,7 +465,7 @@ export function CareerWorkspace() {
         setRunPollingErrors((current) => ({
           ...current,
           [selectedRunDossierId]:
-            'Impossible d’actualiser pour le moment. L’analyse peut continuer en arrière-plan.',
+            'Impossible d’actualiser pour le moment. Le traitement peut continuer en arrière-plan.',
         }));
         timer = window.setTimeout(() => void poll(), 4_000);
       }
@@ -501,6 +506,7 @@ export function CareerWorkspace() {
     0,
   );
   const status = dossierStatus(state);
+  const currentReviewState = reviewProcessState(state);
 
   function updateApplicationDossier(
     dossierId: string,
@@ -560,6 +566,7 @@ export function CareerWorkspace() {
   }
 
   async function generate(forceNewRun = false) {
+    if (generationPending.current) return;
     const dossierId = state.id;
     if (!opportunityReady(state.opportunity)) {
       setGenerateError(
@@ -580,6 +587,7 @@ export function CareerWorkspace() {
       setPrimaryView('memory');
       return;
     }
+    generationPending.current = true;
     setGenerating(true);
     setGenerateError('');
     try {
@@ -691,6 +699,7 @@ export function CareerWorkspace() {
                   : 'La génération s’est arrêtée sans modifier le brief. Réessayez lorsque vous êtes prêt.',
       );
     } finally {
+      generationPending.current = false;
       setGenerating(false);
     }
   }
@@ -824,7 +833,7 @@ export function CareerWorkspace() {
           : error instanceof Error && error.message === 'AUTH_REQUIRED'
             ? 'Reconnectez-vous avant de trancher ce point.'
             : error instanceof Error && error.message === 'DECISION_REJECTED'
-              ? 'Cette correction ne peut pas être appliquée automatiquement sans inventer. Modifiez le brief ou régénérez la candidature.'
+              ? 'Cette décision n’est pas autorisée pour ce contrôle. Revenez au brief pour produire une nouvelle version.'
               : 'La décision n’a pas pu être enregistrée. Vous pouvez réessayer sans risque de doublon.',
       );
     } finally {
@@ -980,6 +989,60 @@ export function CareerWorkspace() {
           : error instanceof Error && error.message === 'APPROVAL_REJECTED'
             ? 'Cette stratégie n’est plus la version courante. Actualisez le dossier.'
             : 'La validation n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.',
+      );
+    } finally {
+      setSelectionPending(false);
+    }
+  }
+
+  async function startReviews() {
+    if (!state.spec) return;
+    if (!state.runId) {
+      review();
+      setDossierView('review');
+      return;
+    }
+    if (!activeTenantId) return;
+    const dossierId = state.id;
+    const runId = state.runId;
+    const payload = '{}';
+    const operation = persistedRunOperation(
+      localStorage,
+      `career-os-review-start:${activeTenantId}:${runId}`,
+      payload,
+    );
+    setSelectionPending(true);
+    setSelectionError('');
+    try {
+      const response = await fetch(`/api/runs/${runId}/reviews`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': operation.key,
+        },
+        body: payload,
+      });
+      if (!response.ok)
+        throw new Error(
+          response.status === 409
+            ? 'REVIEW_CONFLICT'
+            : response.status === 400
+              ? 'REVIEW_REJECTED'
+              : 'REVIEW_FAILED',
+        );
+      const run = persistedRunSchema.parse(await response.json());
+      updateApplicationDossier(dossierId, (current) =>
+        applyPersistedRun(current, run),
+      );
+      setDossierView('journey');
+      setRunRefreshVersion((current) => current + 1);
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error && error.message === 'REVIEW_CONFLICT'
+          ? 'Ces vérifications ont déjà été lancées depuis une autre version.'
+          : error instanceof Error && error.message === 'REVIEW_REJECTED'
+            ? 'Le brouillon n’est plus la version courante. Actualisez le dossier.'
+            : 'Les vérifications n’ont pas démarré. Vous pouvez réessayer sans risque de doublon.',
       );
     } finally {
       setSelectionPending(false);
@@ -1827,12 +1890,20 @@ export function CareerWorkspace() {
                       approved={state.approved}
                       opportunity={state.opportunity}
                       profile={state.runProfile ?? workspace.profile}
+                      pollingError={runPollingErrors[state.id] ?? ''}
+                      retryError={generateError}
+                      retryPending={generating}
+                      reviewState={currentReviewState}
                       reviews={state.reviews}
                       spec={state.spec}
                       onGenerate={generate}
                       onOpenBrief={() => setDossierView('brief')}
                       onOpenDraft={() => setDossierView('draft')}
                       onOpenEvidence={openEvidenceInspector}
+                      onRefresh={() =>
+                        setRunRefreshVersion((current) => current + 1)
+                      }
+                      onRetry={() => void generate(true)}
                       onReview={() => {
                         if (!state.runId) review();
                         setDossierView('review');
@@ -1843,9 +1914,17 @@ export function CareerWorkspace() {
                 {dossierView === 'draft' && state.spec ? (
                   <DraftView
                     profile={state.runProfile ?? workspace.profile}
+                    reviewError={selectionError}
+                    reviewPending={selectionPending}
+                    retryError={generateError}
+                    retryPending={generating}
                     reviewsAvailable={reviewsComplete(state.reviews)}
+                    reviewState={currentReviewState}
                     spec={state.spec}
                     onOpenEvidence={openEvidenceInspector}
+                    onOpenReview={() => setDossierView('review')}
+                    onRetry={() => void generate(true)}
+                    onStartReviews={() => void startReviews()}
                   />
                 ) : null}
                 {dossierView === 'review' && state.spec ? (
@@ -1866,6 +1945,7 @@ export function CareerWorkspace() {
                       }))
                     }
                     onContinue={() => setDossierView('share')}
+                    onReturnToBrief={() => setDossierView('brief')}
                     onDecide={(review, issueIndex, decision) =>
                       void decideReviewIssue(review, issueIndex, decision)
                     }
@@ -2579,6 +2659,7 @@ function HomeView({
     findings[0]?.dossier ??
     [...dossiers].sort((left, right) => right.updatedAt - left.updatedAt)[0];
   const priorityHasReviews = reviewsComplete(priority?.reviews ?? []);
+  const priorityReviewState = priority ? reviewProcessState(priority) : 'idle';
   const recentEvents = dossiers
     .flatMap((dossier) =>
       dossier.events.map((event, index) => ({
@@ -2718,16 +2799,24 @@ function HomeView({
                 ? `${findings.length} décision${findings.length > 1 ? 's' : ''} à trancher avant d’envoyer vos pages privées.`
                 : priority?.spec && priorityHasReviews
                   ? 'Votre prochaine candidature est prête pour validation.'
-                  : priority?.spec
-                    ? 'Votre brouillon est prêt à relire.'
-                    : 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.'}
+                  : priorityReviewState === 'running'
+                    ? 'Les vérifications sont en cours.'
+                    : priorityReviewState === 'failed'
+                      ? 'Les vérifications se sont arrêtées.'
+                      : priority?.spec
+                        ? 'Votre brouillon est prêt à relire.'
+                        : 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.'}
             </h1>
             <span>
               {priority?.spec && priorityHasReviews
                 ? `La passe d’agents est terminée. ${dossierStatus(priority)}.`
-                : priority?.spec
-                  ? 'Le brouillon reprend la stratégie approuvée. Relisez exactement ce que l’entreprise verra.'
-                  : 'Partez du poste, confrontez-le à vos preuves, puis gardez la décision finale.'}
+                : priorityReviewState === 'running'
+                  ? `${priority.reviews.length} sur 3 vérifications terminées. Vous pouvez revenir plus tard.`
+                  : priorityReviewState === 'failed'
+                    ? 'Le brouillon reste intact. Relancez la candidature lorsque vous êtes prêt.'
+                    : priority?.spec
+                      ? 'Le brouillon reprend la stratégie approuvée. Relisez exactement ce que l’entreprise verra.'
+                      : 'Partez du poste, confrontez-le à vos preuves, puis gardez la décision finale.'}
             </span>
             <div>
               <button
@@ -2739,9 +2828,13 @@ function HomeView({
               >
                 {priority?.spec && priorityHasReviews
                   ? 'Ouvrir la revue'
-                  : priority?.spec
-                    ? 'Relire la page privée'
-                    : 'Commencer par l’offre'}{' '}
+                  : priorityReviewState === 'running'
+                    ? 'Voir l’avancement'
+                    : priorityReviewState === 'failed'
+                      ? 'Ouvrir et relancer'
+                      : priority?.spec
+                        ? 'Relire la page privée'
+                        : 'Commencer par l’offre'}{' '}
                 <b>→</b>
               </button>
               {priority?.spec ? (
@@ -2889,9 +2982,13 @@ function HomeView({
                         {dossier.spec
                           ? dossierFindings
                             ? 'Trancher'
-                            : reviewsComplete(dossier.reviews)
-                              ? 'Valider'
-                              : 'Relire'
+                            : reviewProcessState(dossier) === 'running'
+                              ? 'Suivre'
+                              : reviewProcessState(dossier) === 'failed'
+                                ? 'Relancer'
+                                : reviewsComplete(dossier.reviews)
+                                  ? 'Valider'
+                                  : 'Relire'
                           : 'Lancer'}{' '}
                         →
                       </b>
@@ -3145,9 +3242,15 @@ function JourneyView({
   onOpenBrief,
   onOpenDraft,
   onOpenEvidence,
+  onRefresh,
+  onRetry,
   onReview,
   opportunity,
+  pollingError,
   profile,
+  retryError,
+  retryPending,
+  reviewState,
   reviews,
   spec,
 }: {
@@ -3156,9 +3259,15 @@ function JourneyView({
   onOpenBrief: () => void;
   onOpenDraft: () => void;
   onOpenEvidence: (claimId: string) => void;
+  onRefresh: () => void;
+  onRetry: () => void;
   onReview: () => void;
   opportunity: Opportunity;
+  pollingError: string;
   profile: Profile;
+  retryError: string;
+  retryPending: boolean;
+  reviewState: ReturnType<typeof reviewProcessState>;
   reviews: Review[];
   spec?: PageSpec;
 }) {
@@ -3172,13 +3281,29 @@ function JourneyView({
   );
   const sourced = usedClaims.filter((claim) => claim.evidenceIds.length);
   const reviewed = reviewsComplete(reviews);
+  const reviewing = reviewState === 'running';
+  const reviewFailed = reviewState === 'failed';
+  const reviewStatusHeading = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (reviewing) reviewStatusHeading.current?.focus();
+  }, [reviewing]);
 
   return (
     <div className="journey-view">
       <section className="journey-summary" aria-label="État du parcours">
-        <span className="summary-state">
-          <b>{spec ? '✓' : '○'}</b>
-          {spec ? 'Passe terminée' : 'Prêt à démarrer'}
+        <span
+          className={`summary-state ${reviewing || reviewFailed ? 'attention' : ''}`}
+        >
+          <b>{reviewFailed ? '!' : reviewing ? '…' : spec ? '✓' : '○'}</b>
+          {reviewed
+            ? 'Vérifications terminées'
+            : reviewFailed
+              ? 'Vérifications arrêtées'
+              : reviewing
+                ? 'Vérifications en cours'
+                : spec
+                  ? 'Brouillon prêt'
+                  : 'Prêt à démarrer'}
         </span>
         <span>
           Preuves retenues <strong>{usedClaims.length}</strong>
@@ -3192,11 +3317,21 @@ function JourneyView({
         <span className="journey-people">
           {reviewed
             ? 'Brouillon composé · vérifications terminées'
-            : spec
-              ? 'Brouillon composé · vérifications non disponibles'
-              : 'Composition non démarrée'}
+            : reviewing
+              ? `${reviews.length} / 3 vérifications terminées`
+              : spec
+                ? 'Brouillon composé · prêt à vérifier'
+                : 'Composition non démarrée'}
         </span>
       </section>
+      {pollingError ? (
+        <div className="inline-error" role="status">
+          <p>{pollingError}</p>
+          <button className="quiet" onClick={onRefresh}>
+            Réessayer maintenant
+          </button>
+        </div>
+      ) : null}
 
       <section className="journey-board" aria-label="Parcours de candidature">
         <JourneyColumn number="1" state="complete" title="Lecture de l’offre">
@@ -3245,7 +3380,13 @@ function JourneyView({
 
         <JourneyColumn
           number="3"
-          state={approved ? 'complete' : reviewed ? 'attention' : 'idle'}
+          state={
+            approved
+              ? 'complete'
+              : reviewed || reviewing || reviewFailed
+                ? 'attention'
+                : 'idle'
+          }
           title="Vérification"
         >
           <JourneyCard
@@ -3256,27 +3397,48 @@ function JourneyView({
                 ? 'Validé'
                 : reviewed
                   ? 'Décision humaine'
-                  : spec
-                    ? 'Indisponible'
-                    : 'En attente'
+                  : reviewFailed
+                    ? 'Arrêté'
+                    : reviewing
+                      ? 'En cours'
+                      : spec
+                        ? 'À lancer'
+                        : 'En attente'
             }
           >
-            <strong>
+            <strong aria-live="polite" ref={reviewStatusHeading} tabIndex={-1}>
               {reviewed
                 ? 'Trois vérifications terminées'
-                : spec
-                  ? 'Brouillon prêt'
-                  : 'Rien à vérifier pour le moment'}
+                : reviewFailed
+                  ? 'Vérifications arrêtées'
+                  : reviewing
+                    ? `${reviews.length} / 3 vérifications terminées`
+                    : spec
+                      ? 'Brouillon prêt'
+                      : 'Rien à vérifier pour le moment'}
             </strong>
             <p>
               {reviewed
                 ? `${reviews.filter((item) => item.passed).length} / 3 vérifications validées.`
-                : spec
-                  ? 'Les vérifications durables ne sont pas encore disponibles.'
-                  : 'Les contrôles démarreront après la composition.'}
+                : reviewFailed
+                  ? 'Le brouillon reste disponible. Relancez la candidature pour reprendre sur une base propre.'
+                  : reviewing
+                    ? 'Les agents relisent la pertinence, le fond et chaque preuve.'
+                    : spec
+                      ? 'Relisez le brouillon, puis lancez les trois vérifications.'
+                      : 'Les contrôles démarreront après la composition.'}
             </p>
             {reviewed ? (
               <button onClick={onReview}>Ouvrir la revue</button>
+            ) : reviewFailed ? (
+              <button disabled={retryPending} onClick={onRetry}>
+                {retryPending ? 'Relance en cours…' : 'Relancer la candidature'}
+              </button>
+            ) : null}
+            {reviewFailed && retryError ? (
+              <p className="inline-error" role="alert">
+                {retryError}
+              </p>
             ) : null}
           </JourneyCard>
           <JourneyCard icon="✓" status={sourced.length ? 'Prêt' : 'En attente'}>
@@ -4423,13 +4585,29 @@ function ImportConflictDialog({
 
 function DraftView({
   onOpenEvidence,
+  onOpenReview,
+  onRetry,
+  onStartReviews,
   profile,
+  reviewError,
+  retryError,
+  retryPending,
   reviewsAvailable,
+  reviewPending,
+  reviewState,
   spec,
 }: {
   onOpenEvidence: (claimId: string) => void;
+  onOpenReview: () => void;
+  onRetry: () => void;
+  onStartReviews: () => void;
   profile: Profile;
+  reviewError: string;
+  retryError: string;
+  retryPending: boolean;
   reviewsAvailable: boolean;
+  reviewPending: boolean;
+  reviewState: ReturnType<typeof reviewProcessState>;
   spec: PageSpec;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -4440,6 +4618,8 @@ function DraftView({
   const sourcedCount = profile.claims.filter(
     (claim) => usedClaimIds.has(claim.id) && claim.evidenceIds.length,
   ).length;
+  const reviewStarted = reviewState === 'running';
+  const reviewFailed = reviewState === 'failed';
   useEffect(() => heading.current?.focus(), []);
   return (
     <article
@@ -4462,8 +4642,11 @@ function DraftView({
           <p>Rien ne sera partagé sans votre validation.</p>
           {!reviewsAvailable ? (
             <p className="draft-review-state">
-              Brouillon prêt. Les vérifications durables ne sont pas encore
-              disponibles.
+              {reviewStarted
+                ? 'Les trois vérifications sont en cours.'
+                : reviewFailed
+                  ? 'Les vérifications se sont arrêtées. Le brouillon reste intact.'
+                  : 'Brouillon prêt. Lancez les vérifications après votre relecture.'}
             </p>
           ) : null}
         </div>
@@ -4502,6 +4685,41 @@ function DraftView({
           </div>
         </section>
       ))}
+      {reviewError ? <p role="alert">{reviewError}</p> : null}
+      <div className="document-actions">
+        <p>
+          {reviewsAvailable
+            ? 'Les trois vérifications sont terminées.'
+            : reviewFailed
+              ? 'Relancez la candidature pour créer un nouveau run vérifiable.'
+              : reviewStarted
+                ? 'Le traitement continue en arrière-plan. Vous pouvez quitter cette page.'
+                : 'Trois agents vérifieront la pertinence, la lisibilité et les preuves.'}
+        </p>
+        {reviewsAvailable ? (
+          <button onClick={onOpenReview}>Ouvrir la revue</button>
+        ) : reviewFailed ? (
+          <button disabled={retryPending} onClick={onRetry}>
+            {retryPending ? 'Relance en cours…' : 'Relancer la candidature'}
+          </button>
+        ) : (
+          <button
+            disabled={reviewPending || reviewStarted}
+            onClick={onStartReviews}
+          >
+            {reviewPending
+              ? 'Lancement…'
+              : reviewStarted
+                ? 'Vérifications en cours'
+                : 'Lancer les 3 vérifications'}
+          </button>
+        )}
+        {reviewFailed && retryError ? (
+          <p className="inline-error" role="alert">
+            {retryError}
+          </p>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -4658,6 +4876,7 @@ function ReviewView({
   onApprove,
   onContinue,
   onDecide,
+  onReturnToBrief,
   onReview,
   paused,
   publicationEligible,
@@ -4671,6 +4890,7 @@ function ReviewView({
   decisions?: ReviewDecision[];
   onApprove: (approved: boolean) => void;
   onContinue: () => void;
+  onReturnToBrief: () => void;
   onDecide: (
     review: WorkspaceReview,
     issueIndex: number,
@@ -4681,17 +4901,16 @@ function ReviewView({
   publicationEligible: boolean;
   reviews: WorkspaceReview[];
 }) {
-  const ready =
-    reviewsComplete(reviews) &&
-    (publicationEligible || reviews.every((item) => item.passed));
+  const ready = reviewsComplete(reviews) && publicationEligible;
   return (
     <section className="document review-document">
       <header className="document-heading">
         <p className="section-label">Revue</p>
         <h2>Confirmer la pertinence et les preuves</h2>
         <p>
-          Corrigez une objection ou assumez-la explicitement. Un point factuel
-          doit toujours être corrigé.
+          Assumez explicitement une objection non factuelle, ou revenez au brief
+          pour produire une nouvelle version. Un point factuel ne peut jamais
+          être ignoré.
         </p>
       </header>
       {decisionError ? <p role="alert">{decisionError}</p> : null}
@@ -4740,11 +4959,8 @@ function ReviewView({
                       </span>
                     ) : (
                       <div className="review-actions">
-                        <button
-                          disabled={Boolean(decisionPending)}
-                          onClick={() => onDecide(item, issueIndex, 'correct')}
-                        >
-                          Corriger
+                        <button onClick={onReturnToBrief}>
+                          Revenir au brief
                         </button>
                         {item.reviewer !== 'factuality' ? (
                           <button
@@ -5591,15 +5807,15 @@ function applyPersistedRun(
     pageSpecId: run.pageSpecId,
     pageSpecHash: run.pageSpecHash,
     pageSpecArtifactId: run.pageSpecArtifactId,
+    pageSpecArtifactHash: run.pageSpecArtifactHash,
     selectedResearchSignalIds:
       dossier.runResearch?.artifactId === run.research?.artifactId
         ? dossier.selectedResearchSignalIds
         : run.research?.signals.map((signal) => signal.signalId),
     spec: reviewable ? run.spec : undefined,
     reviews,
-    reviewDecisions: [],
-    publicationEligible:
-      reviewsComplete(reviews) && reviews.every((review) => review.passed),
+    reviewDecisions: reviewable ? run.reviewDecisions : [],
+    publicationEligible: reviewable ? run.publicationEligible : false,
     approved: false,
     capability: undefined,
     events: persistedEvents(run),
@@ -5624,25 +5840,28 @@ function hasCurrentRunProjection(
     dossier.pageSpecId === run.pageSpecId &&
     dossier.pageSpecHash === run.pageSpecHash &&
     dossier.pageSpecArtifactId === run.pageSpecArtifactId &&
+    dossier.pageSpecArtifactHash === run.pageSpecArtifactHash &&
     Boolean(dossier.spec) === Boolean(reviewable && run.spec) &&
-    dossier.reviews.length === (reviewable ? run.reviews.length : 0)
+    JSON.stringify(dossier.reviews) ===
+      JSON.stringify(reviewable ? run.reviews : []) &&
+    JSON.stringify(dossier.reviewDecisions) ===
+      JSON.stringify(reviewable ? run.reviewDecisions : []) &&
+    dossier.publicationEligible ===
+      (reviewable ? run.publicationEligible : false)
   );
 }
 
 function reviewGateReady(
   state: Pick<ApplicationDossier, 'publicationEligible' | 'reviews'>,
 ) {
-  return (
-    reviewsComplete(state.reviews) &&
-    (state.publicationEligible ??
-      state.reviews.every((review) => review.passed))
-  );
+  return reviewsComplete(state.reviews) && state.publicationEligible === true;
 }
 
 function unresolvedReviewIssues(
   reviews: WorkspaceReview[],
   decisions: ReviewDecision[] = [],
 ) {
+  if (!reviewsComplete(reviews)) return [];
   const resolved = new Set(
     decisions.map(({ issueIndex, reviewId }) => `${reviewId}:${issueIndex}`),
   );

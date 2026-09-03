@@ -305,6 +305,34 @@ test('derives status, stage and next view from each dossier only', () => {
     'À valider',
     'review',
   ]);
+
+  const reviewing = generatedDossier({
+    id: DOSSIER_A,
+    runId: RUN_ID,
+    reviews: [],
+    publicationEligible: false,
+    runStatus: 'running',
+    runSteps: [
+      { stage: 'recruiter-reviewer', status: 'in_flight', attempt: 1 },
+    ],
+  });
+  assert.deepEqual(presentation(reviewing), [
+    'Vérifications en cours',
+    'Brouillon',
+    'journey',
+  ]);
+  const failedReview = {
+    ...reviewing,
+    runStatus: 'failed' as const,
+    runSteps: [
+      { stage: 'recruiter-reviewer', status: 'failed' as const, attempt: 3 },
+    ],
+  };
+  assert.deepEqual(presentation(failedReview), [
+    'Vérifications arrêtées',
+    'Brouillon',
+    'draft',
+  ]);
   assert.equal(dossierStatus({ ...ready, approved: true }), 'Validée');
   assert.equal(dossierNextView({ ...ready, approved: true }), 'share');
   assert.deepEqual(presentation({ ...ready, capability: PUBLICATION_ID }), [

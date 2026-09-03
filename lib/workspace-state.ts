@@ -14,7 +14,13 @@ export type WorkspaceReview = {
   passed: boolean;
   findings: string[];
   reviewId?: string;
-  issues?: Array<{ section: string; message: string; blocking: boolean }>;
+  issues?: Array<{
+    section: string;
+    message: string;
+    blocking: boolean;
+    claimId?: string;
+    evidenceIds?: string[];
+  }>;
 };
 
 export type ReviewDecision = {
@@ -41,6 +47,7 @@ export type ApplicationDossier = {
   pageSpecId?: string;
   pageSpecHash?: string;
   pageSpecArtifactId?: string;
+  pageSpecArtifactHash?: string;
   selectedResearchSignalIds?: string[];
   reviews: WorkspaceReview[];
   reviewDecisions: ReviewDecision[];
@@ -71,6 +78,7 @@ export type DossierStatus =
   | 'Sélection des preuves'
   | 'Composition en cours'
   | 'Vérifications en cours'
+  | 'Vérifications arrêtées'
   | 'Analyse terminée'
   | 'Génération arrêtée'
   | 'À compléter'
@@ -78,6 +86,7 @@ export type DossierStatus =
 export type DossierStage = 'Brouillon' | 'À valider' | 'Envoyée';
 export type DossierNextView =
   'brief' | 'journey' | 'draft' | 'review' | 'share';
+export type ReviewProcessState = 'idle' | 'running' | 'failed' | 'complete';
 export type ScopedShareLink = {
   scope: string;
   dossierId: string;
@@ -149,16 +158,19 @@ const workspaceReviewSchema: z.ZodType<WorkspaceReview> = z
             section: z.string(),
             message: z.string(),
             blocking: z.boolean(),
+            claimId: z.string().uuid().optional(),
+            evidenceIds: z.array(z.string().uuid()).max(2).optional(),
           })
           .strict(),
       )
+      .max(5)
       .optional(),
   })
   .strict();
 const reviewDecisionSchema: z.ZodType<ReviewDecision> = z
   .object({
     reviewId: z.string().uuid(),
-    issueIndex: z.number().int().min(0).max(99),
+    issueIndex: z.number().int().min(0).max(4),
     decision: z.enum(['keep', 'correct']),
   })
   .strict();
@@ -214,6 +226,10 @@ const applicationDossierSchema: z.ZodType<ApplicationDossier> = z
       .regex(/^[0-9a-f]{64}$/)
       .optional(),
     pageSpecArtifactId: z.string().uuid().optional(),
+    pageSpecArtifactHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
     selectedResearchSignalIds: z
       .array(z.string().regex(/^signal-(?:[1-9]|1\d|20)$/))
       .max(20)
@@ -493,17 +509,12 @@ export function invalidateDossiersAfterProfileChange(
 export function dossierStatus(dossier: ApplicationDossier): DossierStatus {
   if (dossier.capability) return 'Partagée';
   if (dossier.approved) return 'Validée';
-  if (dossier.runId && !dossier.spec && dossier.runStatus === 'running') {
+  const reviewState = reviewProcessState(dossier);
+  if (reviewState === 'running') return 'Vérifications en cours';
+  if (reviewState === 'failed') return 'Vérifications arrêtées';
+  if (dossier.runId && dossier.runStatus === 'running') {
     const steps = dossier.runSteps ?? [];
-    if (
-      steps.some(
-        (step) =>
-          ['recruiter', 'hiring-manager', 'fact-checker'].includes(
-            step.stage,
-          ) && step.status !== 'completed',
-      )
-    )
-      return 'Vérifications en cours';
+    if (dossier.spec) return 'Brouillon prêt';
     if (
       steps.some(
         (step) =>
@@ -525,7 +536,6 @@ export function dossierStatus(dossier: ApplicationDossier): DossierStatus {
     return 'Analyse terminée';
   if (
     dossier.runId &&
-    !dossier.spec &&
     ['budget_exhausted', 'cancelled', 'failed'].includes(
       dossier.runStatus ?? '',
     )
@@ -585,6 +595,29 @@ export function reviewsComplete(
   );
 }
 
+export function reviewProcessState(
+  dossier: Pick<ApplicationDossier, 'reviews' | 'runStatus' | 'runSteps'>,
+): ReviewProcessState {
+  if (reviewsComplete(dossier.reviews)) return 'complete';
+  const steps =
+    dossier.runSteps?.filter((step) => step.stage.endsWith('-reviewer')) ?? [];
+  if (
+    steps.some((step) => ['failed', 'cancelled'].includes(step.status)) ||
+    (steps.length > 0 &&
+      ['budget_exhausted', 'cancelled', 'failed'].includes(
+        dossier.runStatus ?? '',
+      ))
+  )
+    return 'failed';
+  if (
+    steps.some((step) =>
+      ['pending', 'leased', 'in_flight'].includes(step.status),
+    )
+  )
+    return 'running';
+  return 'idle';
+}
+
 function createDossier(
   opportunity: Opportunity,
   options: CreationOptions,
@@ -617,9 +650,7 @@ function normalizeSelection(workspace: SavedWorkspaceV2): SavedWorkspaceV2 {
 
 function reviewGateReady(dossier: ApplicationDossier): boolean {
   return (
-    reviewsComplete(dossier.reviews) &&
-    (dossier.publicationEligible ??
-      dossier.reviews.every((review) => review.passed))
+    reviewsComplete(dossier.reviews) && dossier.publicationEligible === true
   );
 }
 

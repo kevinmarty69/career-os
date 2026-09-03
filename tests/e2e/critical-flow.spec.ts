@@ -230,6 +230,8 @@ test('resumes a durable run and separates polling loss from run failure', async 
       },
     ],
     reviews: [],
+    reviewDecisions: [],
+    publicationEligible: false,
     events: [],
   };
   await page.route('**/api/runs', async (route) => {
@@ -292,7 +294,7 @@ test('resumes a durable run and separates polling loss from run failure', async 
     }),
   ).toBeVisible();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  await expect(page.getByText('L’analyse peut continuer')).toBeVisible();
+  await expect(page.getByText('Le traitement peut continuer')).toBeVisible();
 
   runRead = 'running';
   await page.getByRole('button', { name: 'Réessayer maintenant' }).click();
@@ -402,6 +404,8 @@ test('keeps the human research checkpoint explicit and retry-safe', async ({
     research,
     steps: [{ stage: 'company-researcher', status: 'completed', attempt: 1 }],
     reviews: [],
+    reviewDecisions: [],
+    publicationEligible: false,
     events: [],
   };
   await page.route('**/api/runs', async (route) => {
@@ -541,6 +545,42 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
   const strategyArtifactId = crypto.randomUUID();
   const pageSpecId = crypto.randomUUID();
   const pageSpecArtifactId = crypto.randomUUID();
+  let reviewsStarted = false;
+  let reviewStage = 0;
+  let reviewReadUnavailable = false;
+  let reviewDecisionKept = false;
+  const recruiterReviewId = crypto.randomUUID();
+  const reviewResults = [
+    {
+      reviewId: recruiterReviewId,
+      reviewer: 'recruiter',
+      passed: false,
+      findings: ['Raccourcir l’ouverture pour une lecture plus rapide.'],
+      issues: [
+        {
+          section: 'hero',
+          message: 'Raccourcir l’ouverture pour une lecture plus rapide.',
+          blocking: false,
+          claimId: claim!.id,
+          evidenceIds: [claim!.evidenceIds[0]],
+        },
+      ],
+    },
+    {
+      reviewId: crypto.randomUUID(),
+      reviewer: 'hiring-manager',
+      passed: true,
+      findings: [],
+      issues: [],
+    },
+    {
+      reviewId: crypto.randomUUID(),
+      reviewer: 'factuality',
+      passed: true,
+      findings: [],
+      issues: [],
+    },
+  ] as const;
   const research = {
     artifactId: researchArtifactId,
     artifactHash: 'a'.repeat(64),
@@ -635,6 +675,8 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
     research,
     evidenceArchive,
     reviews: [],
+    reviewDecisions: [],
+    publicationEligible: false,
     events: [],
   };
   await page.route('**/api/runs', async (route) => {
@@ -705,6 +747,11 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
   });
   await page.route(`**/api/runs/${runId}`, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
+    if (reviewReadUnavailable) {
+      await route.fulfill({ status: 503, body: 'Run unavailable.' });
+      return;
+    }
+    const reviewCount = reviewsStarted ? reviewStage : 0;
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -715,8 +762,28 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
         pageSpecId,
         pageSpecHash: 'd'.repeat(64),
         pageSpecArtifactId,
-        status: 'paused',
-        stage: 'page_spec_review',
+        pageSpecArtifactHash: 'e'.repeat(64),
+        reviews: reviewResults.slice(0, reviewCount),
+        reviewDecisions: reviewDecisionKept
+          ? [{ reviewId: recruiterReviewId, issueIndex: 0, decision: 'keep' }]
+          : [],
+        publicationEligible: reviewCount === 3 && reviewDecisionKept,
+        status:
+          reviewCount === 3
+            ? 'awaiting_approval'
+            : reviewsStarted
+              ? 'running'
+              : 'paused',
+        stage:
+          reviewCount === 3
+            ? 'review_decision'
+            : reviewCount === 2
+              ? 'review_factuality'
+              : reviewCount === 1
+                ? 'review_hiring_manager'
+                : reviewsStarted
+                  ? 'review_recruiter'
+                  : 'page_spec_review',
         steps: [
           { stage: 'company-researcher', status: 'completed', attempt: 1 },
           { stage: 'evidence-archivist', status: 'completed', attempt: 1 },
@@ -726,7 +793,112 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
             attempt: 1,
           },
           { stage: 'page-composer', status: 'completed', attempt: 1 },
+          ...(reviewCount >= 1
+            ? [
+                {
+                  stage: 'recruiter-reviewer',
+                  status: 'completed',
+                  attempt: 1,
+                },
+              ]
+            : []),
+          ...(reviewCount >= 2
+            ? [
+                {
+                  stage: 'hiring-manager-reviewer',
+                  status: 'completed',
+                  attempt: 1,
+                },
+              ]
+            : []),
+          ...(reviewCount === 3
+            ? [
+                {
+                  stage: 'factuality-reviewer',
+                  status: 'completed',
+                  attempt: 1,
+                },
+              ]
+            : reviewCount === 2
+              ? [
+                  {
+                    stage: 'factuality-reviewer',
+                    status: 'pending',
+                    attempt: 1,
+                  },
+                ]
+              : reviewCount === 1
+                ? [
+                    {
+                      stage: 'hiring-manager-reviewer',
+                      status: 'pending',
+                      attempt: 1,
+                    },
+                  ]
+                : reviewsStarted
+                  ? [
+                      {
+                        stage: 'recruiter-reviewer',
+                        status: 'pending',
+                        attempt: 1,
+                      },
+                    ]
+                  : []),
         ],
+      }),
+    });
+  });
+  await page.route(`**/api/runs/${runId}/reviews`, async (route) => {
+    expect(route.request().postDataJSON()).toEqual({});
+    expect(route.request().headers()['idempotency-key']).toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
+    reviewsStarted = true;
+    reviewReadUnavailable = true;
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...baseRun,
+        strategy,
+        spec,
+        pageSpecId,
+        pageSpecHash: 'd'.repeat(64),
+        pageSpecArtifactId,
+        pageSpecArtifactHash: 'e'.repeat(64),
+        status: 'running',
+        stage: 'review_recruiter',
+        steps: [
+          { stage: 'company-researcher', status: 'completed', attempt: 1 },
+          { stage: 'evidence-archivist', status: 'completed', attempt: 1 },
+          {
+            stage: 'recruiter-strategist',
+            status: 'completed',
+            attempt: 1,
+          },
+          { stage: 'page-composer', status: 'completed', attempt: 1 },
+          { stage: 'recruiter-reviewer', status: 'pending', attempt: 1 },
+        ],
+      }),
+    });
+  });
+  await page.route(`**/api/runs/${runId}/review-decisions`, async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      reviewId: recruiterReviewId,
+      issueIndex: 0,
+      decision: 'keep',
+    });
+    reviewDecisionKept = true;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        decisionId: crypto.randomUUID(),
+        runId,
+        reviewId: recruiterReviewId,
+        issueIndex: 0,
+        decision: 'keep',
+        publicationEligible: true,
       }),
     });
   });
@@ -781,18 +953,34 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
   ).toBeVisible();
   await expect(
     page.getByText(
-      'Brouillon prêt. Les vérifications durables ne sont pas encore disponibles.',
+      'Brouillon prêt. Lancez les vérifications après votre relecture.',
     ),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Partager' })).toBeDisabled();
   await expect(page.locator('.draft-thesis')).toHaveText(claim!.statement);
   await page.getByRole('button', { name: 'Parcours' }).click();
   await expect(
-    page.getByText('Brouillon composé · vérifications non disponibles'),
+    page.getByText('Brouillon composé · prêt à vérifier'),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Ouvrir la revue' }),
   ).toHaveCount(0);
+  const partialReviewUrl = await page.evaluate(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'review');
+    return url.href;
+  });
+  await page.goto(partialReviewUrl);
+  await expect(
+    page.getByRole('heading', {
+      name: 'Confirmer la pertinence et les preuves',
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(
+      'Brouillon prêt. Lancez les vérifications après votre relecture.',
+    ),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Accueil' }).first().click();
   await expect(
     page.getByRole('heading', { name: 'Votre brouillon est prêt à relire.' }),
@@ -801,6 +989,57 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: spec.hero.title }),
   ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Lancer les 3 vérifications' })
+    .click();
+  await expect(
+    page.getByText('0 / 3 vérifications terminées').first(),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Impossible d’actualiser pour le moment.'),
+  ).toBeVisible();
+  reviewReadUnavailable = false;
+  reviewStage = 1;
+  await page.getByRole('button', { name: 'Réessayer maintenant' }).click();
+  await expect(
+    page.getByText('1 / 3 vérifications terminées').first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Ouvrir la revue' }),
+  ).toHaveCount(0);
+  const runningReviewUrl = await page.evaluate(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'review');
+    return url.href;
+  });
+  await page.goto(runningReviewUrl);
+  await expect(
+    page.getByRole('heading', {
+      name: 'Confirmer la pertinence et les preuves',
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText('1 / 3 vérifications terminées').first(),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Accueil' }).first().click();
+  await expect(
+    page.getByRole('heading', { name: 'Les vérifications sont en cours.' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Trancher ce point' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: /Voir l’avancement/ }).click();
+  reviewStage = 3;
+  await page.reload();
+  await expect(page.getByText('Trois vérifications terminées')).toBeVisible();
+  await page.getByRole('button', { name: 'Ouvrir la revue' }).click();
+  await expect(
+    page.getByRole('checkbox', { name: /Valider cette candidature/ }),
+  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Garder cette version' }).click();
+  await expect(
+    page.getByRole('checkbox', { name: /Valider cette candidature/ }),
+  ).toBeEnabled();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,
@@ -826,12 +1065,28 @@ test('protects the durable strategy HTTP boundary', async ({ page }) => {
       })
     ).status(),
   ).toBe(401);
+  expect(
+    (
+      await page.request.post(`/api/runs/${runId}/reviews`, {
+        data: {},
+        headers,
+      })
+    ).status(),
+  ).toBe(401);
 
   await createPersistedApplication(page);
   expect(
     (
       await page.request.post(`/api/runs/${runId}/strategy`, {
         data: startBody,
+        headers: { ...headers, Origin: 'https://attacker.example' },
+      })
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await page.request.post(`/api/runs/${runId}/reviews`, {
+        data: {},
         headers: { ...headers, Origin: 'https://attacker.example' },
       })
     ).status(),
@@ -851,6 +1106,14 @@ test('protects the durable strategy HTTP boundary', async ({ page }) => {
           strategyArtifactId: crypto.randomUUID(),
           strategyArtifactHash: 'b'.repeat(64),
         },
+        headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() },
+      })
+    ).status(),
+  ).toBe(400);
+  expect(
+    (
+      await page.request.post(`/api/runs/${runId}/reviews`, {
+        data: { pageSpecId: crypto.randomUUID() },
         headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() },
       })
     ).status(),

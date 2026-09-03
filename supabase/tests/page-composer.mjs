@@ -68,8 +68,9 @@ try {
   const migrations = (await readdir('supabase/migrations'))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))
     .sort();
-  assert.equal(migrations.at(-1)?.slice(0, 4), '0015');
-  for (const migration of migrations.slice(0, -1))
+  const composerMigration = '0015_durable_page_composer.sql';
+  assert.ok(migrations.includes(composerMigration));
+  for (const migration of migrations.filter((name) => name < composerMigration))
     await target.query(
       await readFile(`supabase/migrations/${migration}`, 'utf8'),
     );
@@ -206,7 +207,7 @@ try {
   );
 
   await target.query(
-    await readFile(`supabase/migrations/${migrations.at(-1)}`, 'utf8'),
+    await readFile(`supabase/migrations/${composerMigration}`, 'utf8'),
   );
   assert.equal(
     (

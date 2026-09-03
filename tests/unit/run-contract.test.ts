@@ -6,6 +6,7 @@ import {
   persistedRunSchema,
   reviewIssueDecisionInputSchema,
   reviewIssueDecisionResultSchema,
+  reviewStartInputSchema,
   strategyApprovalInputSchema,
   strategyStartInputSchema,
 } from '../../lib/run-contract';
@@ -79,6 +80,14 @@ test('strategy approval is pinned to one exact strategy artifact', () => {
   );
 });
 
+test('review start accepts no client-controlled lineage', () => {
+  assert.deepEqual(reviewStartInputSchema.parse({}), {});
+  assert.equal(
+    reviewStartInputSchema.safeParse({ pageSpecId: randomUUID() }).success,
+    false,
+  );
+});
+
 test('persisted run contract exposes measured zero cost and durable UUIDs', () => {
   assert.equal(
     persistedRunSchema.safeParse({
@@ -111,6 +120,8 @@ test('persisted run contract exposes measured zero cost and durable UUIDs', () =
           ],
         },
       ],
+      reviewDecisions: [],
+      publicationEligible: false,
       events: [
         {
           actor: 'system',
@@ -136,6 +147,8 @@ test('a persisted PageSpec requires its exact durable lineage', () => {
     profile: syntheticProfile,
     steps: [],
     reviews: [],
+    reviewDecisions: [],
+    publicationEligible: false,
     events: [],
     spec: {
       version: 1,
@@ -165,6 +178,7 @@ test('a persisted PageSpec requires its exact durable lineage', () => {
       pageSpecId: randomUUID(),
       pageSpecHash: 'd'.repeat(64),
       pageSpecArtifactId: randomUUID(),
+      pageSpecArtifactHash: 'e'.repeat(64),
     }).success,
     true,
   );
