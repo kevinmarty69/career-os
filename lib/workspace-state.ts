@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import type { Application } from './application-contract';
-import { persistedResearchSchema, type PersistedRun } from './run-contract';
-import { evidenceArchiveOutputSchema } from './evidence-archive';
+import {
+  persistedEvidenceArchiveSchema,
+  persistedRecruiterStrategySchema,
+  persistedResearchSchema,
+  type PersistedRun,
+} from './run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from './schemas';
 import type { Opportunity, Strategy, WorkflowEvent } from './workflow';
 
@@ -33,6 +37,7 @@ export type ApplicationDossier = {
   runProfile?: Profile;
   runResearch?: PersistedRun['research'];
   runEvidenceArchive?: PersistedRun['evidenceArchive'];
+  runStrategy?: PersistedRun['strategy'];
   selectedResearchSignalIds?: string[];
   reviews: WorkspaceReview[];
   reviewDecisions: ReviewDecision[];
@@ -197,7 +202,8 @@ const applicationDossierSchema: z.ZodType<ApplicationDossier> = z
       .optional(),
     runProfile: profileSchema.optional(),
     runResearch: persistedResearchSchema.optional(),
-    runEvidenceArchive: evidenceArchiveOutputSchema.optional(),
+    runEvidenceArchive: persistedEvidenceArchiveSchema.optional(),
+    runStrategy: persistedRecruiterStrategySchema.optional(),
     selectedResearchSignalIds: z
       .array(z.string().regex(/^signal-(?:[1-9]|1\d|20)$/))
       .max(20)

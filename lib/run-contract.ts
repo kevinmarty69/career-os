@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { evidenceArchiveOutputSchema } from './evidence-archive';
+import { recruiterStrategyArtifactSchema } from './recruiter-strategy';
 import { pageSpecSchema, profileSchema } from './schemas';
 
 export const runOpportunitySchema = z
@@ -98,6 +99,34 @@ export const researchSelectionInputSchema = z
     { path: ['selectedSignalIds'], message: 'Signal IDs must be unique.' },
   );
 
+export const strategyStartInputSchema = z
+  .object({
+    evidenceArtifactId: z.string().uuid(),
+    evidenceArtifactHash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+
+export const strategyApprovalInputSchema = z
+  .object({
+    strategyArtifactId: z.string().uuid(),
+    strategyArtifactHash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+
+export const persistedEvidenceArchiveSchema = evidenceArchiveOutputSchema
+  .extend({
+    artifactId: z.string().uuid(),
+    artifactHash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+
+export const persistedRecruiterStrategySchema = recruiterStrategyArtifactSchema
+  .extend({
+    artifactId: z.string().uuid(),
+    artifactHash: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+
 export const runtimeReviewSchema = z
   .object({
     reviewer: z.enum(['recruiter', 'hiring-manager', 'factuality']),
@@ -152,7 +181,8 @@ export const persistedRunSchema = z
     profile: profileSchema,
     steps: z.array(persistedStepSchema).max(20),
     research: persistedResearchSchema.optional(),
-    evidenceArchive: evidenceArchiveOutputSchema.optional(),
+    evidenceArchive: persistedEvidenceArchiveSchema.optional(),
+    strategy: persistedRecruiterStrategySchema.optional(),
     spec: pageSpecSchema.optional(),
     reviews: z.array(persistedReviewSchema),
     events: z.array(eventSchema),

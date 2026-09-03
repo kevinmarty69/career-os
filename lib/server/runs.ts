@@ -3,16 +3,21 @@ import { createHash, randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import {
   createRunInputSchema,
+  persistedEvidenceArchiveSchema,
+  persistedRecruiterStrategySchema,
   persistedResearchSchema,
   persistedRunSchema,
   researchSelectionInputSchema,
   reviewIssueDecisionInputSchema,
   reviewIssueDecisionResultSchema,
+  strategyStartInputSchema,
+  strategyApprovalInputSchema,
   type PersistedRun,
   type ReviewIssueDecisionResult,
 } from '../run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from '../schemas';
 import { COMPANY_RESEARCH_RUN_TOKEN_BUDGET } from './local-openai-client';
+import { RECRUITER_STRATEGY_RUN_TOKEN_BUDGET } from './local-openai-strategy-client';
 
 export type RunSession = {
   userId: string;
@@ -131,7 +136,7 @@ export async function createPersistedRun(
       ) values (
         ${runId}, ${session.tenantId}, ${opportunityId}, ${snapshot.id},
         ${living.id}, ${living.revision}, ${key}, 'research', 'running',
-        ${COMPANY_RESEARCH_RUN_TOKEN_BUDGET},
+        ${COMPANY_RESEARCH_RUN_TOKEN_BUDGET + RECRUITER_STRATEGY_RUN_TOKEN_BUDGET},
         0, now() + interval '1 hour', ${inputHash}
       )`;
       const researchInput = {
@@ -188,6 +193,70 @@ export async function confirmResearchSelection(
         select app.confirm_research_signal_selection(
           ${session.tenantId}, ${runId}, ${input.researchArtifactId},
           ${input.selectedSignalIds}, ${key}
+        ) as created`;
+      return {
+        created: result.created,
+        run: await readRunProjection(tx, session.tenantId, runId),
+      };
+    });
+  } catch (error) {
+    if (isDatabaseConflict(error)) throw new RunConflictError();
+    if (isDatabaseRejection(error)) throw new RunRejectedError();
+    throw error;
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function startRecruiterStrategy(
+  session: RunSession,
+  rawRunId: string,
+  rawInput: unknown,
+  idempotencyKey: string,
+) {
+  const runId = idempotencyKeySchema(rawRunId);
+  const input = strategyStartInputSchema.parse(rawInput);
+  const key = idempotencyKeySchema(idempotencyKey);
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session, 'career_app');
+      const [result] = await tx<{ created: boolean }[]>`
+        select app.confirm_evidence_archive_selection(
+          ${session.tenantId}, ${runId}, ${input.evidenceArtifactId},
+          ${input.evidenceArtifactHash}, ${key}
+        ) as created`;
+      return {
+        created: result.created,
+        run: await readRunProjection(tx, session.tenantId, runId),
+      };
+    });
+  } catch (error) {
+    if (isDatabaseConflict(error)) throw new RunConflictError();
+    if (isDatabaseRejection(error)) throw new RunRejectedError();
+    throw error;
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function approveRecruiterStrategy(
+  session: RunSession,
+  rawRunId: string,
+  rawInput: unknown,
+  idempotencyKey: string,
+) {
+  const runId = idempotencyKeySchema(rawRunId);
+  const input = strategyApprovalInputSchema.parse(rawInput);
+  const key = idempotencyKeySchema(idempotencyKey);
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session, 'career_app');
+      const [result] = await tx<{ created: boolean }[]>`
+        select app.approve_recruiter_strategy(
+          ${session.tenantId}, ${runId}, ${input.strategyArtifactId},
+          ${input.strategyArtifactHash}, ${key}
         ) as created`;
       return {
         created: result.created,
@@ -625,10 +694,21 @@ async function readRunProjection(
     where tenant_id = ${tenantId} and workflow_run_id = ${runId}
       and kind = 'research'
     order by version desc limit 1`;
-  const [evidenceArtifact] = await tx<Array<{ body: unknown }>>`
-    select body from app.artifacts
+  const [evidenceArtifact] = await tx<
+    Array<{ id: string; body: unknown; artifact_hash: string }>
+  >`
+    select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
+    from app.artifacts
     where tenant_id = ${tenantId} and workflow_run_id = ${runId}
       and kind = 'evidence_archive'
+    order by version desc limit 1`;
+  const [strategyArtifact] = await tx<
+    Array<{ id: string; body: unknown; artifact_hash: string }>
+  >`
+    select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
+    from app.artifacts
+    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+      and kind = 'strategy'
     order by version desc limit 1`;
   const [pageSpec] = await tx<
     Array<{ id: string; spec: unknown }>
@@ -693,7 +773,30 @@ async function readRunProjection(
           ),
         }
       : {}),
-    ...(evidenceArtifact ? { evidenceArchive: evidenceArtifact.body } : {}),
+    ...(evidenceArtifact
+      ? {
+          evidenceArchive: persistedEvidenceArchiveSchema.parse({
+            ...(typeof evidenceArtifact.body === 'object' &&
+            evidenceArtifact.body !== null
+              ? evidenceArtifact.body
+              : {}),
+            artifactId: evidenceArtifact.id,
+            artifactHash: evidenceArtifact.artifact_hash,
+          }),
+        }
+      : {}),
+    ...(strategyArtifact
+      ? {
+          strategy: persistedRecruiterStrategySchema.parse({
+            ...(typeof strategyArtifact.body === 'object' &&
+            strategyArtifact.body !== null
+              ? strategyArtifact.body
+              : {}),
+            artifactId: strategyArtifact.id,
+            artifactHash: strategyArtifact.artifact_hash,
+          }),
+        }
+      : {}),
     ...(pageSpec ? { spec: pageSpecSchema.parse(pageSpec.spec) } : {}),
     reviews: reviews.map((review) => ({
       reviewId: review.id,
@@ -813,6 +916,7 @@ function isDatabaseConflict(error: unknown) {
   return (
     error instanceof Error &&
     (error.message.includes('selection conflict') ||
+      error.message.includes('strategy approval conflict') ||
       error.message.includes('idempotency key conflict'))
   );
 }
@@ -821,7 +925,8 @@ function isDatabaseRejection(error: unknown) {
   return (
     error instanceof Error &&
     (error.message.includes('research selection') ||
-      error.message.includes('evidence archive'))
+      error.message.includes('evidence archive') ||
+      error.message.includes('strategy '))
   );
 }
 

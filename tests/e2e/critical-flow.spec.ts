@@ -62,6 +62,9 @@ async function createPersistedApplication(page: Page) {
   await page.getByRole('button', { name: 'Relire les informations' }).click();
   await page.getByLabel(/Je valide les .* affirmations sélectionnées/).check();
   await page.getByRole('button', { name: 'Enregistrer ma mémoire' }).click();
+  await expect(page.getByRole('status')).toContainText(
+    'Mémoire professionnelle enregistrée dans cet espace.',
+  );
   await expect(
     page.getByRole('heading', { name: 'Votre mémoire est prête.' }),
   ).toBeVisible();
@@ -303,11 +306,13 @@ test('resumes a durable run and separates polling loss from run failure', async 
   await expect(
     progress
       .getByRole('listitem')
-      .filter({ hasText: 'Composition de la page' })
+      .filter({ hasText: 'Stratégie de candidature' })
       .getByText('En cours'),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Composition de la page en cours' }),
+    page.getByRole('heading', {
+      name: 'Stratégie de candidature en cours',
+    }),
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Offre', exact: true }).click();
@@ -318,7 +323,7 @@ test('resumes a durable run and separates polling loss from run failure', async 
   await page.reload();
   await expect(
     page.getByRole('heading', {
-      name: 'Composition de la page en cours',
+      name: 'Stratégie de candidature en cours',
     }),
   ).toBeVisible();
   runRead = 'failed';
@@ -495,6 +500,285 @@ test('keeps the human research checkpoint explicit and retry-safe', async ({
       () => document.documentElement.scrollWidth > window.innerWidth,
     ),
   ).toBe(false);
+});
+
+test('reviews and approves a durable recruiter strategy', async ({ page }) => {
+  await createPersistedApplication(page);
+  const profile = await page.evaluate(async () => {
+    const response = await fetch('/api/profile');
+    return (
+      (await response.json()) as {
+        profile: {
+          claims: Array<{
+            id: string;
+            statement: string;
+            evidenceIds: string[];
+          }>;
+          evidence: Array<{
+            id: string;
+            sourceId: string;
+            excerpt: string;
+          }>;
+          sources: Array<{ id: string; title: string }>;
+        };
+      }
+    ).profile;
+  });
+  const claim = profile.claims.find((candidate) => candidate.evidenceIds[0]);
+  expect(claim).toBeTruthy();
+  const evidence = profile.evidence.find(
+    (candidate) => candidate.id === claim!.evidenceIds[0],
+  );
+  const source = profile.sources.find(
+    (candidate) => candidate.id === evidence?.sourceId,
+  );
+  expect(evidence).toBeTruthy();
+  expect(source).toBeTruthy();
+  const runId = crypto.randomUUID();
+  const researchArtifactId = crypto.randomUUID();
+  const evidenceArtifactId = crypto.randomUUID();
+  const strategyArtifactId = crypto.randomUUID();
+  const research = {
+    artifactId: researchArtifactId,
+    artifactHash: 'a'.repeat(64),
+    company: 'Durable Labs',
+    role: 'Product Engineer',
+    source: { kind: 'job-posting', trust: 'untrusted-data' },
+    signals: [
+      {
+        signalId: 'signal-1',
+        statement: 'Construire un workflow produit durable.',
+        excerpt: 'Build a durable product workflow',
+        category: 'responsibility',
+        priority: 'high',
+      },
+    ],
+  };
+  const evidenceArchive = {
+    artifactId: evidenceArtifactId,
+    artifactHash: 'b'.repeat(64),
+    schemaVersion: 1,
+    purpose: 'application',
+    profileSnapshotId: crypto.randomUUID(),
+    researchArtifactId,
+    researchArtifactHash: research.artifactHash,
+    signals: [
+      {
+        signalId: 'signal-1',
+        coverage: 'declared_candidate',
+        matches: [
+          {
+            claimId: claim!.id,
+            evidenceIds: [claim!.evidenceIds[0]],
+            provenance: 'declared',
+            relevanceScore: 80,
+          },
+        ],
+      },
+    ],
+  };
+  const strategy = {
+    artifactId: strategyArtifactId,
+    artifactHash: 'c'.repeat(64),
+    schemaVersion: 1,
+    purpose: 'application',
+    profileSnapshotId: evidenceArchive.profileSnapshotId,
+    researchArtifactId,
+    researchArtifactHash: research.artifactHash,
+    evidenceArchiveArtifactId: evidenceArtifactId,
+    evidenceArchiveArtifactHash: evidenceArchive.artifactHash,
+    copyPolicy: 'internal-editorial-direction',
+    positioning: {
+      message:
+        'Montrer une ownership produit concrète, de la décision à la production.',
+      sourceSignalIds: ['signal-1'],
+    },
+    lead: {
+      signalId: 'signal-1',
+      claimId: claim!.id,
+      evidenceIds: [claim!.evidenceIds[0]],
+      rationale: 'Preuve directe de livraison produit.',
+    },
+    supports: [],
+    gaps: [],
+    omittedSignalIds: [],
+  };
+  const baseRun = {
+    runId,
+    revision: 0,
+    usedTokens: 24,
+    usedCostMicros: 0,
+    profile,
+    research,
+    evidenceArchive,
+    reviews: [],
+    events: [],
+  };
+  await page.route('**/api/runs', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...baseRun,
+        status: 'paused',
+        stage: 'strategy',
+        steps: [
+          { stage: 'company-researcher', status: 'completed', attempt: 1 },
+          { stage: 'evidence-archivist', status: 'completed', attempt: 1 },
+        ],
+      }),
+    });
+  });
+  await page.route(`**/api/runs/${runId}/strategy`, async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      evidenceArtifactId,
+      evidenceArtifactHash: evidenceArchive.artifactHash,
+    });
+    expect(route.request().headers()['idempotency-key']).toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...baseRun,
+        strategy,
+        status: 'paused',
+        stage: 'strategy_review',
+        steps: [
+          { stage: 'company-researcher', status: 'completed', attempt: 1 },
+          { stage: 'evidence-archivist', status: 'completed', attempt: 1 },
+          { stage: 'recruiter-strategist', status: 'completed', attempt: 1 },
+        ],
+      }),
+    });
+  });
+  await page.route(`**/api/runs/${runId}/strategy/approval`, async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      strategyArtifactId,
+      strategyArtifactHash: strategy.artifactHash,
+    });
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...baseRun,
+        strategy,
+        status: 'paused',
+        stage: 'page_spec',
+        steps: [
+          { stage: 'company-researcher', status: 'completed', attempt: 1 },
+          { stage: 'evidence-archivist', status: 'completed', attempt: 1 },
+          {
+            stage: 'recruiter-strategist',
+            status: 'completed',
+            attempt: 1,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Preuves candidates sélectionnées' }),
+  ).toBeVisible();
+  const archiveProof = page
+    .locator('.evidence-selection-result button')
+    .filter({ hasText: claim!.statement })
+    .first();
+  await archiveProof.click();
+  const inspector = page.locator('#evidence-inspector');
+  const closeInspector = inspector.getByRole('button', {
+    name: 'Fermer l’inspecteur de preuves',
+  });
+  await expect(inspector).toBeVisible();
+  await expect(closeInspector).toBeFocused();
+  if ((page.viewportSize()?.width ?? 0) <= 1023) {
+    await expect(page.locator('.document-area')).toHaveAttribute('inert', '');
+    await page.keyboard.press('Shift+Tab');
+    await expect(closeInspector).toBeFocused();
+  }
+  await expect(inspector.getByText(source!.title)).toBeVisible();
+  await expect(
+    inspector.getByText(`“${evidence!.excerpt}”`, { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(inspector).toBeHidden();
+  await expect(archiveProof).toBeFocused();
+  await page.getByRole('button', { name: 'Construire la stratégie' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Angle de candidature à valider' }),
+  ).toBeVisible();
+  await expect(page.getByText(strategy.positioning.message)).toBeVisible();
+  const strategyProof = page
+    .getByRole('button', { name: 'Vérifier la source' })
+    .first();
+  await strategyProof.click();
+  await expect(inspector).toBeVisible();
+  await expect(closeInspector).toBeFocused();
+  await expect(inspector.getByText(source!.title)).toBeVisible();
+  await closeInspector.click();
+  await expect(strategyProof).toBeFocused();
+  await page.getByRole('button', { name: 'Valider la stratégie' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Stratégie validée' }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false);
+});
+
+test('protects the durable strategy HTTP boundary', async ({ page }) => {
+  const runId = crypto.randomUUID();
+  const startBody = {
+    evidenceArtifactId: crypto.randomUUID(),
+    evidenceArtifactHash: 'a'.repeat(64),
+  };
+  const headers = {
+    Origin: 'http://localhost:3117',
+    'Idempotency-Key': crypto.randomUUID(),
+  };
+  expect(
+    (
+      await page.request.post(`/api/runs/${runId}/strategy`, {
+        data: startBody,
+        headers,
+      })
+    ).status(),
+  ).toBe(401);
+
+  await createPersistedApplication(page);
+  expect(
+    (
+      await page.request.post(`/api/runs/${runId}/strategy`, {
+        data: startBody,
+        headers: { ...headers, Origin: 'https://attacker.example' },
+      })
+    ).status(),
+  ).toBe(403);
+  expect(
+    (
+      await page.request.post(`/api/runs/${runId}/strategy`, {
+        data: startBody,
+        headers,
+      })
+    ).status(),
+  ).toBe(400);
+  expect(
+    (
+      await page.request.post(`/api/runs/${runId}/strategy/approval`, {
+        data: {
+          strategyArtifactId: crypto.randomUUID(),
+          strategyArtifactHash: 'b'.repeat(64),
+        },
+        headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() },
+      })
+    ).status(),
+  ).toBe(400);
 });
 
 test('keeps two local application dossiers isolated across reloads', async ({

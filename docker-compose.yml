@@ -22,6 +22,7 @@ services:
       - ./supabase/migrations/0011_durable_company_researcher.sql:/docker-entrypoint-initdb.d/0011_durable_company_researcher.sql:ro
       - ./supabase/migrations/0012_global_company_researcher_worker.sql:/docker-entrypoint-initdb.d/0012_global_company_researcher_worker.sql:ro
       - ./supabase/migrations/0013_durable_evidence_archivist.sql:/docker-entrypoint-initdb.d/0013_durable_evidence_archivist.sql:ro
+      - ./supabase/migrations/0014_durable_recruiter_strategist.sql:/docker-entrypoint-initdb.d/0014_durable_recruiter_strategist.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U career_os']
       interval: 2s

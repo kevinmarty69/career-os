@@ -15,6 +15,7 @@
     "test:integration:worker": "DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/*worker.test.ts",
     "worker": "tsx --env-file=.env.local scripts/run-agent-worker.ts",
     "worker:evidence": "tsx --env-file=.env.local scripts/run-evidence-worker.ts",
+    "worker:strategy": "tsx --env-file=.env.local scripts/run-strategy-worker.ts",
     "test:e2e": "pnpm build && playwright test --project=chromium && playwright test --project=mobile",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "db:up": "docker compose up -d --wait db",

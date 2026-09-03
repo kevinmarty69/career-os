@@ -6,6 +6,8 @@ import {
   persistedRunSchema,
   reviewIssueDecisionInputSchema,
   reviewIssueDecisionResultSchema,
+  strategyApprovalInputSchema,
+  strategyStartInputSchema,
 } from '../../lib/run-contract';
 import { syntheticProfile } from '../../lib/fixture';
 
@@ -43,6 +45,36 @@ test('run creation accepts only durable application and profile revisions', () =
       profileRevision: 1,
       provider: 'openai-compatible',
     }).success,
+    false,
+  );
+});
+
+test('strategy start is pinned to one exact evidence artifact', () => {
+  const input = {
+    evidenceArtifactId: randomUUID(),
+    evidenceArtifactHash: 'a'.repeat(64),
+  };
+  assert.deepEqual(strategyStartInputSchema.parse(input), input);
+  assert.equal(
+    strategyStartInputSchema.safeParse({ ...input, evidenceArtifactHash: '' })
+      .success,
+    false,
+  );
+  assert.equal(
+    strategyStartInputSchema.safeParse({ ...input, force: true }).success,
+    false,
+  );
+});
+
+test('strategy approval is pinned to one exact strategy artifact', () => {
+  const input = {
+    strategyArtifactId: randomUUID(),
+    strategyArtifactHash: 'b'.repeat(64),
+  };
+  assert.deepEqual(strategyApprovalInputSchema.parse(input), input);
+  assert.equal(
+    strategyApprovalInputSchema.safeParse({ ...input, approveLatest: true })
+      .success,
     false,
   );
 });

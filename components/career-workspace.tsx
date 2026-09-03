@@ -15,6 +15,7 @@ import {
   buildStrategy,
   runReviews,
   type Opportunity,
+  type Strategy,
   type WorkflowEvent,
 } from '@/lib/workflow';
 import {
@@ -158,6 +159,7 @@ export function CareerWorkspace() {
   const [dossierView, setDossierView] = useState<DossierView>('brief');
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [selectedClaimId, setSelectedClaimId] = useState('');
+  const inspectorTrigger = useRef<HTMLElement | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
   const [runPollingErrors, setRunPollingErrors] = useState<RunPollingState>({});
@@ -190,6 +192,21 @@ export function CareerWorkspace() {
     evidence: '',
     level: 'declared' as 'verified' | 'declared' | 'inferred',
   });
+
+  function openEvidenceInspector(claimId = '') {
+    inspectorTrigger.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setSelectedClaimId(claimId);
+    setInspectorOpen(true);
+  }
+
+  function closeEvidenceInspector() {
+    setInspectorOpen(false);
+    setSelectedClaimId('');
+    requestAnimationFrame(() => inspectorTrigger.current?.focus());
+  }
   const requestedScope = useRef('');
   const pendingDecisions = useRef(new Map<string, string>());
   const pendingImport = useRef<AbortController | undefined>(undefined);
@@ -557,7 +574,6 @@ export function CareerWorkspace() {
     setGenerating(true);
     setGenerateError('');
     try {
-      const strategy = buildStrategy(workspace.profile, state.opportunity);
       const application = persistedWorkspace
         ? await persistApplication(state)
         : undefined;
@@ -575,6 +591,7 @@ export function CareerWorkspace() {
       let reviews: WorkspaceReview[];
       let events: WorkflowEvent[];
       let spec: PageSpec | undefined;
+      let strategy: Strategy | undefined;
       let publicationEligible = false;
 
       if (persistedWorkspace) {
@@ -601,10 +618,9 @@ export function CareerWorkspace() {
                 : 'RUN_FAILED',
           );
         const persisted = persistedRunSchema.parse(await response.json());
-        updateApplicationDossier(dossierId, (current) => ({
-          ...applyPersistedRun(current, persisted),
-          strategy,
-        }));
+        updateApplicationDossier(dossierId, (current) =>
+          applyPersistedRun(current, persisted),
+        );
         setRunPollingErrors((current) => {
           if (!current[dossierId]) return current;
           const next = { ...current };
@@ -614,6 +630,7 @@ export function CareerWorkspace() {
         setDossierView('journey');
         return;
       } else {
+        strategy = buildStrategy(workspace.profile, state.opportunity);
         const localRun = await runAgentTeam({
           tenantId: 'local-demo',
           runId: crypto.randomUUID(),
@@ -855,6 +872,105 @@ export function CareerWorkspace() {
           : error instanceof Error && error.message === 'SELECTION_REJECTED'
             ? 'La sélection ne correspond plus à cette analyse. Actualisez le dossier.'
             : 'La sélection n’a pas été enregistrée. Vous pouvez réessayer sans perdre vos choix.',
+      );
+    } finally {
+      setSelectionPending(false);
+    }
+  }
+
+  async function startRecruiterStrategy() {
+    if (!activeTenantId || !state.runId || !state.runEvidenceArchive) return;
+    const dossierId = state.id;
+    const runId = state.runId;
+    const payload = JSON.stringify({
+      evidenceArtifactId: state.runEvidenceArchive.artifactId,
+      evidenceArtifactHash: state.runEvidenceArchive.artifactHash,
+    });
+    const operation = persistedRunOperation(
+      localStorage,
+      `career-os-strategy-start:${activeTenantId}:${runId}`,
+      payload,
+    );
+    setSelectionPending(true);
+    setSelectionError('');
+    try {
+      const response = await fetch(`/api/runs/${runId}/strategy`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': operation.key,
+        },
+        body: payload,
+      });
+      if (!response.ok)
+        throw new Error(
+          response.status === 409
+            ? 'STRATEGY_CONFLICT'
+            : response.status === 400
+              ? 'STRATEGY_REJECTED'
+              : 'STRATEGY_FAILED',
+        );
+      const run = persistedRunSchema.parse(await response.json());
+      updateApplicationDossier(dossierId, (current) =>
+        applyPersistedRun(current, run),
+      );
+      setRunRefreshVersion((current) => current + 1);
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error && error.message === 'STRATEGY_CONFLICT'
+          ? 'Cette archive a déjà été validée avec une autre décision.'
+          : error instanceof Error && error.message === 'STRATEGY_REJECTED'
+            ? 'Cette archive n’est plus la version courante. Actualisez le dossier.'
+            : 'La stratégie n’a pas démarré. Vous pouvez réessayer sans risque de doublon.',
+      );
+    } finally {
+      setSelectionPending(false);
+    }
+  }
+
+  async function approveRecruiterStrategy() {
+    if (!activeTenantId || !state.runId || !state.runStrategy) return;
+    const dossierId = state.id;
+    const runId = state.runId;
+    const payload = JSON.stringify({
+      strategyArtifactId: state.runStrategy.artifactId,
+      strategyArtifactHash: state.runStrategy.artifactHash,
+    });
+    const operation = persistedRunOperation(
+      localStorage,
+      `career-os-strategy-approval:${activeTenantId}:${runId}`,
+      payload,
+    );
+    setSelectionPending(true);
+    setSelectionError('');
+    try {
+      const response = await fetch(`/api/runs/${runId}/strategy/approval`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': operation.key,
+        },
+        body: payload,
+      });
+      if (!response.ok)
+        throw new Error(
+          response.status === 409
+            ? 'APPROVAL_CONFLICT'
+            : response.status === 400
+              ? 'APPROVAL_REJECTED'
+              : 'APPROVAL_FAILED',
+        );
+      const run = persistedRunSchema.parse(await response.json());
+      updateApplicationDossier(dossierId, (current) =>
+        applyPersistedRun(current, run),
+      );
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error && error.message === 'APPROVAL_CONFLICT'
+          ? 'Cette stratégie a déjà reçu une décision différente.'
+          : error instanceof Error && error.message === 'APPROVAL_REJECTED'
+            ? 'Cette stratégie n’est plus la version courante. Actualisez le dossier.'
+            : 'La validation n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.',
       );
     } finally {
       setSelectionPending(false);
@@ -1617,10 +1733,7 @@ export function CareerWorkspace() {
                     aria-label="Voir les preuves"
                     aria-controls="evidence-inspector"
                     aria-expanded={inspectorOpen}
-                    onClick={() => {
-                      setSelectedClaimId('');
-                      setInspectorOpen(true);
-                    }}
+                    onClick={() => openEvidenceInspector()}
                   >
                     ⌕
                   </button>
@@ -1683,6 +1796,8 @@ export function CareerWorkspace() {
                       selectionError={selectionError}
                       selectionPending={selectionPending}
                       onConfirmResearch={() => void confirmResearchSignals()}
+                      onStartStrategy={() => void startRecruiterStrategy()}
+                      onApproveStrategy={() => void approveRecruiterStrategy()}
                       onToggleSignal={(signalId) =>
                         updateApplicationDossier(state.id, (current) => {
                           const selected = new Set(
@@ -1699,10 +1814,7 @@ export function CareerWorkspace() {
                           };
                         })
                       }
-                      onOpenEvidence={(claimId) => {
-                        setSelectedClaimId(claimId);
-                        setInspectorOpen(true);
-                      }}
+                      onOpenEvidence={openEvidenceInspector}
                     />
                   ) : (
                     <JourneyView
@@ -1714,10 +1826,7 @@ export function CareerWorkspace() {
                       onGenerate={generate}
                       onOpenBrief={() => setDossierView('brief')}
                       onOpenDraft={() => setDossierView('draft')}
-                      onOpenEvidence={(claimId) => {
-                        setSelectedClaimId(claimId);
-                        setInspectorOpen(true);
-                      }}
+                      onOpenEvidence={openEvidenceInspector}
                       onReview={() => {
                         if (!state.runId) review();
                         setDossierView('review');
@@ -1729,10 +1838,7 @@ export function CareerWorkspace() {
                   <DraftView
                     profile={state.runProfile ?? workspace.profile}
                     spec={state.spec}
-                    onOpenEvidence={(claimId) => {
-                      setSelectedClaimId(claimId);
-                      setInspectorOpen(true);
-                    }}
+                    onOpenEvidence={openEvidenceInspector}
                   />
                 ) : null}
                 {dossierView === 'review' && state.spec ? (
@@ -1782,16 +1888,13 @@ export function CareerWorkspace() {
                   />
                 ) : null}
               </div>
-              {state.spec && dossierView !== 'journey' ? (
+              {state.spec || inspectorOpen ? (
                 <EvidenceInspector
                   open={inspectorOpen}
                   profile={state.runProfile ?? workspace.profile}
                   selectedClaimId={selectedClaimId}
                   spec={state.spec}
-                  onClose={() => {
-                    setInspectorOpen(false);
-                    setSelectedClaimId('');
-                  }}
+                  onClose={closeEvidenceInspector}
                 />
               ) : dossierView === 'brief' ? (
                 <aside className="brief-context" aria-label="Prochaine étape">
@@ -3257,9 +3360,14 @@ const runProgressGroups: RunProgressGroup[] = [
     stages: ['evidence-archivist'],
   },
   {
+    title: 'Stratégie de candidature',
+    description: 'Hiérarchiser l’angle, les preuves et les limites.',
+    stages: ['recruiter-strategist'],
+  },
+  {
     title: 'Composition de la page',
-    description: 'Assembler une candidature adaptée au poste.',
-    stages: ['recruiter-strategist', 'page-composer'],
+    description: 'Assembler une page adaptée au poste.',
+    stages: ['page-composer'],
   },
   {
     title: 'Vérifications',
@@ -3275,6 +3383,8 @@ function RunProgressView({
   onRefresh,
   onRetry,
   onConfirmResearch,
+  onStartStrategy,
+  onApproveStrategy,
   onToggleSignal,
   onOpenEvidence,
   pollingError,
@@ -3287,6 +3397,8 @@ function RunProgressView({
   onRefresh: () => void;
   onRetry: () => void;
   onConfirmResearch: () => void;
+  onStartStrategy: () => void;
+  onApproveStrategy: () => void;
   onToggleSignal: (signalId: string) => void;
   onOpenEvidence: (claimId: string) => void;
   pollingError?: string;
@@ -3307,6 +3419,16 @@ function RunProgressView({
     dossier.runStage === 'strategy' &&
     dossier.runEvidenceArchive,
   );
+  const strategyReady = Boolean(
+    status === 'paused' &&
+    dossier.runStage === 'strategy_review' &&
+    dossier.runStrategy,
+  );
+  const strategyApproved = Boolean(
+    status === 'paused' &&
+    dossier.runStage === 'page_spec' &&
+    dossier.runStrategy,
+  );
   const selectedSignals = new Set(dossier.selectedResearchSignalIds ?? []);
   const selectedCount = selectedSignals.size;
   const currentGroup = runProgressGroups.find((group) => {
@@ -3324,16 +3446,24 @@ function RunProgressView({
     ? 'Analyse de l’offre à vérifier'
     : archiveReady
       ? 'Preuves candidates sélectionnées'
-      : running
-        ? `${currentGroup?.title ?? 'Analyse de la candidature'} en cours`
-        : terminalCopy.title;
+      : strategyReady
+        ? 'Angle de candidature à valider'
+        : strategyApproved
+          ? 'Stratégie validée'
+          : running
+            ? `${currentGroup?.title ?? 'Analyse de la candidature'} en cours`
+            : terminalCopy.title;
   const description = reviewingResearch
     ? 'Vérifiez ce que nous avons compris du poste. Vous gardez la main avant que votre parcours soit analysé.'
     : archiveReady
-      ? 'Les correspondances ci-dessous respectent les permissions de votre mémoire. Cette version s’arrête ici : le stratège recruteur n’est pas encore activé.'
-      : running
-        ? `${currentGroup?.description ?? 'Le traitement continue.'} Vous pouvez quitter ce dossier : son état restera disponible ici.`
-        : terminalCopy.description;
+      ? 'Les correspondances ci-dessous respectent les permissions de votre mémoire. Vérifiez-les avant de demander au stratège de choisir l’angle de candidature.'
+      : strategyReady
+        ? 'Le stratège a hiérarchisé les preuves sans modifier les faits. Vérifiez ce choix avant la composition de la page.'
+        : strategyApproved
+          ? 'Votre décision est enregistrée. Le compositeur de page sera la prochaine étape durable du workflow.'
+          : running
+            ? `${currentGroup?.description ?? 'Le traitement continue.'} Vous pouvez quitter ce dossier : son état restera disponible ici.`
+            : terminalCopy.description;
 
   return (
     <section className="run-progress" aria-labelledby="run-progress-title">
@@ -3509,6 +3639,115 @@ function RunProgressView({
               );
             })}
           </ul>
+          {selectionError ? (
+            <p className="form-error" role="alert">
+              {selectionError}
+            </p>
+          ) : null}
+          <footer className="run-progress-actions">
+            <button
+              className="quiet"
+              disabled={selectionPending}
+              onClick={onOpenBrief}
+              type="button"
+            >
+              Modifier le brief
+            </button>
+            <button
+              disabled={selectionPending || matchedSignalCount === 0}
+              onClick={onStartStrategy}
+              type="button"
+            >
+              {selectionPending
+                ? 'Stratégie en préparation…'
+                : 'Construire la stratégie'}
+            </button>
+          </footer>
+        </section>
+      ) : null}
+
+      {strategyReady && dossier.runStrategy ? (
+        <section className="strategy-review">
+          <header>
+            <p className="section-label">Direction éditoriale interne</p>
+            <h3>{dossier.runStrategy.positioning.message}</h3>
+            <p>
+              Cette formulation guide la future page. Les faits affichés
+              resteront ceux de votre mémoire professionnelle.
+            </p>
+          </header>
+          <div className="strategy-proof-list">
+            {[dossier.runStrategy.lead, ...dossier.runStrategy.supports].map(
+              (selection, index) => {
+                const claim = dossier.runProfile?.claims.find(
+                  ({ id }) => id === selection.claimId,
+                );
+                const signal = dossier.runResearch?.signals.find(
+                  ({ signalId }) => signalId === selection.signalId,
+                );
+                return (
+                  <article key={`${selection.signalId}:${selection.claimId}`}>
+                    <small>{index === 0 ? 'Preuve principale' : 'Appui'}</small>
+                    <strong>{claim?.statement ?? 'Preuve enregistrée'}</strong>
+                    <span>{signal?.statement ?? selection.signalId}</span>
+                    <button
+                      className="text-action"
+                      onClick={() => onOpenEvidence(selection.claimId)}
+                      type="button"
+                    >
+                      Vérifier la source
+                    </button>
+                  </article>
+                );
+              },
+            )}
+          </div>
+          {dossier.runStrategy.gaps.length ? (
+            <div className="strategy-gaps">
+              <strong>Sujets à traiter honnêtement</strong>
+              <ul>
+                {dossier.runStrategy.gaps.map((gap) => {
+                  const signal = dossier.runResearch?.signals.find(
+                    ({ signalId }) => signalId === gap.signalId,
+                  );
+                  return (
+                    <li key={gap.signalId}>
+                      {signal?.statement ?? gap.signalId}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+          <p className="strategy-omissions">
+            {dossier.runStrategy.omittedSignalIds.length} critère
+            {dossier.runStrategy.omittedSignalIds.length === 1 ? '' : 's'}{' '}
+            volontairement écarté
+            {dossier.runStrategy.omittedSignalIds.length === 1 ? '' : 's'} de la
+            page courte.
+          </p>
+          {selectionError ? (
+            <p className="form-error" role="alert">
+              {selectionError}
+            </p>
+          ) : null}
+          <footer className="run-progress-actions">
+            <button
+              className="quiet"
+              disabled={selectionPending}
+              onClick={onOpenBrief}
+              type="button"
+            >
+              Modifier le brief
+            </button>
+            <button
+              disabled={selectionPending}
+              onClick={onApproveStrategy}
+              type="button"
+            >
+              {selectionPending ? 'Validation…' : 'Valider la stratégie'}
+            </button>
+          </footer>
         </section>
       ) : null}
 
@@ -3521,7 +3760,7 @@ function RunProgressView({
         </div>
       ) : null}
 
-      {!reviewingResearch ? (
+      {!reviewingResearch && !archiveReady && !strategyReady ? (
         <div className="run-progress-actions">
           {running ? (
             <button className="quiet" onClick={onBack} type="button">
@@ -4212,26 +4451,100 @@ function EvidenceInspector({
   open: boolean;
   profile: Profile;
   selectedClaimId: string;
-  spec: PageSpec;
+  spec?: PageSpec;
 }) {
+  const inspector = useRef<HTMLElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   const selectedIds = new Set(
-    spec.blocks.flatMap((block) => ('claimIds' in block ? block.claimIds : [])),
+    spec?.blocks.flatMap((block) =>
+      'claimIds' in block ? block.claimIds : [],
+    ) ?? [],
   );
+
+  useEffect(() => {
+    if (!open || !inspector.current) return;
+    const node = inspector.current;
+    const mobile = matchMedia('(max-width: 1023px)');
+    let inerted: HTMLElement[] = [];
+
+    function resetModalState() {
+      inerted.forEach((element) => (element.inert = false));
+      inerted = [];
+      node.removeAttribute('role');
+      node.removeAttribute('aria-modal');
+    }
+
+    function syncModalState() {
+      resetModalState();
+      if (mobile.matches) {
+        node.setAttribute('role', 'dialog');
+        node.setAttribute('aria-modal', 'true');
+        let current: HTMLElement = node;
+        while (current.parentElement) {
+          const parent = current.parentElement;
+          for (const sibling of parent.children)
+            if (sibling !== current && sibling instanceof HTMLElement) {
+              sibling.inert = true;
+              inerted.push(sibling);
+            }
+          current = parent;
+          if (parent.matches('main.app-shell')) break;
+        }
+      }
+      closeButton.current?.focus();
+    }
+
+    syncModalState();
+    mobile.addEventListener('change', syncModalState);
+    return () => {
+      mobile.removeEventListener('change', syncModalState);
+      resetModalState();
+    };
+  }, [open]);
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab' || !inspector.current?.hasAttribute('aria-modal'))
+      return;
+    const focusable = [
+      ...inspector.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      ),
+    ];
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!first || !last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
     <aside
       className={`evidence-inspector ${open ? 'open' : ''}`}
       id="evidence-inspector"
-      aria-label="Inspecteur de preuves"
+      aria-labelledby="evidence-inspector-title"
+      onKeyDown={handleKeyDown}
+      ref={inspector}
     >
       <header>
         <div>
           <p className="section-label">Preuves</p>
-          <h2>Pourquoi ces affirmations ?</h2>
+          <h2 id="evidence-inspector-title">Pourquoi ces affirmations ?</h2>
         </div>
         <button
           className="inspector-close quiet"
           onClick={onClose}
           aria-label="Fermer l’inspecteur de preuves"
+          ref={closeButton}
         >
           Fermer
         </button>
@@ -5210,6 +5523,7 @@ function applyPersistedRun(
     runProfile: run.profile,
     runResearch: run.research,
     runEvidenceArchive: run.evidenceArchive,
+    runStrategy: run.strategy,
     selectedResearchSignalIds:
       dossier.runResearch?.artifactId === run.research?.artifactId
         ? dossier.selectedResearchSignalIds
@@ -5240,6 +5554,7 @@ function hasCurrentRunProjection(
     JSON.stringify(dossier.runResearch) === JSON.stringify(run.research) &&
     JSON.stringify(dossier.runEvidenceArchive) ===
       JSON.stringify(run.evidenceArchive) &&
+    JSON.stringify(dossier.runStrategy) === JSON.stringify(run.strategy) &&
     JSON.stringify(dossier.events) === JSON.stringify(persistedEvents(run)) &&
     Boolean(dossier.spec) === Boolean(reviewable && run.spec) &&
     dossier.reviews.length === (reviewable ? run.reviews.length : 0)

@@ -27,6 +27,12 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
   },
+  rateLimit: {
+    customRules:
+      process.env.CAREER_OS_E2E === '1'
+        ? { '/sign-up/email': false }
+        : undefined,
+  },
   advanced: {
     cookiePrefix: 'career_os',
     database: { generateId: 'uuid' },

@@ -73,6 +73,12 @@ try {
       'utf8',
     ),
   );
+  await target.query(
+    await readFile(
+      'supabase/migrations/0014_durable_recruiter_strategist.sql',
+      'utf8',
+    ),
+  );
 
   const { rows } = await target.query(
     `select id, company, role, raw_text, url
