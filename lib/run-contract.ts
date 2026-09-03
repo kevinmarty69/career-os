@@ -183,11 +183,32 @@ export const persistedRunSchema = z
     research: persistedResearchSchema.optional(),
     evidenceArchive: persistedEvidenceArchiveSchema.optional(),
     strategy: persistedRecruiterStrategySchema.optional(),
+    pageSpecId: z.string().uuid().optional(),
+    pageSpecHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
+    pageSpecArtifactId: z.string().uuid().optional(),
     spec: pageSpecSchema.optional(),
     reviews: z.array(persistedReviewSchema),
     events: z.array(eventSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((run, context) => {
+    const pageFields = [
+      run.spec,
+      run.pageSpecId,
+      run.pageSpecHash,
+      run.pageSpecArtifactId,
+    ];
+    const present = pageFields.filter((value) => value !== undefined).length;
+    if (present !== 0 && present !== pageFields.length)
+      context.addIssue({
+        code: 'custom',
+        path: ['spec'],
+        message: 'A PageSpec projection requires its exact durable lineage.',
+      });
+  });
 
 export type PersistedRun = z.infer<typeof persistedRunSchema>;
 

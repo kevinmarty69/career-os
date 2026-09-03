@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 import { Client } from 'pg';
 import { LocalOpenAIRecruiterStrategyClient } from '../../lib/server/local-openai-strategy-client';
+import { processPageComposerStep } from '../../lib/server/page-composer-worker';
 import { processRecruiterStrategyStep } from '../../lib/server/strategy-worker';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -21,6 +22,11 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
   const workerUrl = new URL(targetUrl);
   workerUrl.username = workerLogin;
   workerUrl.password = workerPassword;
+  const composerLogin = `page_composer_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+  const composerPassword = `worker-${randomUUID()}`;
+  const composerUrl = new URL(targetUrl);
+  composerUrl.username = composerLogin;
+  composerUrl.password = composerPassword;
   const tenantId = randomUUID();
   const otherTenantId = randomUUID();
   const ownerId = randomUUID();
@@ -100,6 +106,10 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     await target.query(
       `create role ${workerLogin} login noinherit password '${workerPassword}'
        in role career_recruiter_strategist`,
+    );
+    await target.query(
+      `create role ${composerLogin} login noinherit password '${composerPassword}'
+       in role career_page_composer`,
     );
     worker = new Client({ connectionString: workerUrl.toString() });
     await worker.connect();
@@ -397,9 +407,33 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
       [runId],
     );
     assert.deepEqual(approvedRun.rows[0], {
-      status: 'paused',
+      status: 'running',
       state: 'page_spec',
     });
+    const composerStep = await target.query(
+      `select status, stage from app.workflow_steps
+       where workflow_run_id = $1 and stage = 'page-composer'`,
+      [runId],
+    );
+    assert.deepEqual(composerStep.rows, [
+      { status: 'pending', stage: 'page-composer' },
+    ]);
+    const composed = await processPageComposerStep(composerUrl.toString());
+    assert.equal(composed.status, 'completed');
+    assert.equal(composed.runId, runId);
+    const composedRun = await target.query(
+      `select run.status, run.state, page.spec
+       from app.workflow_runs run
+       join app.page_specs page on page.workflow_run_id = run.id
+       where run.id = $1`,
+      [runId],
+    );
+    assert.equal(composedRun.rows[0].status, 'paused');
+    assert.equal(composedRun.rows[0].state, 'page_spec_review');
+    assert.equal(
+      composedRun.rows[0].spec.hero.thesis,
+      'Built reliable distributed systems.',
+    );
 
     const hostileRunId = randomUUID();
     const hostileResearchId = randomUUID();
@@ -642,6 +676,9 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
       .catch(() => undefined);
     await admin
       .query(`drop role if exists ${workerLogin}`)
+      .catch(() => undefined);
+    await admin
+      .query(`drop role if exists ${composerLogin}`)
       .catch(() => undefined);
     await admin.end().catch(() => undefined);
   }

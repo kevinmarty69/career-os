@@ -47,11 +47,54 @@ insert into app.opportunities (id, tenant_id, application_id, application_revisi
    'Capability Co', 'Engineer', 'ready');
 insert into app.workflow_runs (id, tenant_id, opportunity_id, profile_id, state, status, token_budget, cost_budget_micros, deadline_at) values
   ('82000000-0000-0000-0000-000000000001', '22000000-0000-0000-0000-000000000001', '72000000-0000-0000-0000-000000000001', '32000000-0000-0000-0000-000000000001', 'approved', 'completed', 1000, 0, now() + interval '1 hour');
-insert into app.page_specs (id, tenant_id, workflow_run_id, version, spec) values
+insert into app.artifacts (
+  id, tenant_id, workflow_run_id, kind, version, body, created_by
+) values
+  ('83000000-0000-0000-0000-000000000001', '22000000-0000-0000-0000-000000000001', '82000000-0000-0000-0000-000000000001', 'strategy', 1, '{"fixture":true}', 'recruiter_strategist'),
+  ('83000000-0000-0000-0000-000000000002', '22000000-0000-0000-0000-000000000001', '82000000-0000-0000-0000-000000000001', 'page_spec', 1, '{"blocks":[{"type":"fit","claimIds":["62000000-0000-0000-0000-000000000001"]}]}', 'page_composer');
+insert into app.page_specs (
+  id, tenant_id, workflow_run_id, version, spec, input_hash, source_artifact_id
+) values
   ('92000000-0000-0000-0000-000000000001', '22000000-0000-0000-0000-000000000001', '82000000-0000-0000-0000-000000000001', 1,
-   '{"blocks":[{"type":"fit","claimIds":["62000000-0000-0000-0000-000000000001"]}]}'::jsonb);
+   '{"blocks":[{"type":"fit","claimIds":["62000000-0000-0000-0000-000000000001"]}]}'::jsonb, repeat('c', 64),
+   '83000000-0000-0000-0000-000000000002');
 insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id) values
   ('22000000-0000-0000-0000-000000000001', '92000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000001');
+insert into app.page_spec_evidence (
+  tenant_id, page_spec_id, claim_id, evidence_id, position
+) values
+  ('22000000-0000-0000-0000-000000000001', '92000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000001', 0),
+  ('22000000-0000-0000-0000-000000000001', '92000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000002', 1);
+insert into app.strategy_approvals (
+  id, tenant_id, workflow_run_id, strategy_artifact_id,
+  strategy_artifact_hash, idempotency_key, approved_by
+)
+select '84000000-0000-0000-0000-000000000001',
+  '22000000-0000-0000-0000-000000000001',
+  '82000000-0000-0000-0000-000000000001', id,
+  encode(digest(body::text, 'sha256'), 'hex'),
+  '84000000-0000-0000-0000-000000000011',
+  '12000000-0000-0000-0000-000000000001'
+from app.artifacts where id = '83000000-0000-0000-0000-000000000001';
+insert into app.workflow_steps (
+  id, tenant_id, workflow_run_id, stage, status, idempotency_key, input,
+  input_hash, output_artifact_id, completed_at, page_spec_id
+)
+select '85000000-0000-0000-0000-000000000001',
+  '22000000-0000-0000-0000-000000000001',
+  '82000000-0000-0000-0000-000000000001', 'page-composer', 'completed',
+  'capability-page-composer', fixture.input,
+  encode(digest(fixture.input::text, 'sha256'), 'hex'),
+  '83000000-0000-0000-0000-000000000002', now(),
+  '92000000-0000-0000-0000-000000000001'
+from (
+  select jsonb_build_object(
+    'strategyArtifactId', '83000000-0000-0000-0000-000000000001',
+    'strategyArtifactHash', encode(digest(body::text, 'sha256'), 'hex'),
+    'strategyApprovalId', '84000000-0000-0000-0000-000000000001'
+  ) input
+  from app.artifacts where id = '83000000-0000-0000-0000-000000000001'
+) fixture;
 insert into app.reviews (tenant_id, page_spec_id, reviewer, verdict, page_spec_hash)
 select '22000000-0000-0000-0000-000000000001', '92000000-0000-0000-0000-000000000001', reviewer, 'pass', spec_hash
 from app.page_specs cross join (values ('recruiter'), ('hiring_manager'), ('factuality')) reviewers(reviewer)
@@ -72,6 +115,9 @@ do $$ begin
 end $$;
 
 reset role;
+delete from app.page_spec_evidence
+where claim_id = '62000000-0000-0000-0000-000000000001'
+  and evidence_id = '52000000-0000-0000-0000-000000000002';
 delete from app.claim_evidence
 where claim_id = '62000000-0000-0000-0000-000000000001'
   and evidence_id = '52000000-0000-0000-0000-000000000002';
@@ -98,6 +144,15 @@ where id = '62000000-0000-0000-0000-000000000001';
 insert into app.claim_evidence (tenant_id, profile_id, claim_id, evidence_id, position) values
   ('22000000-0000-0000-0000-000000000001', '32000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000001', '52000000-0000-0000-0000-000000000002', 1);
 set local role career_worker;
+do $$ begin
+  begin
+    insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id) values
+      ('22000000-0000-0000-0000-000000000001', '92000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000002');
+    raise exception 'legacy worker mutated PageSpec mappings';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
 insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id) values
   ('22000000-0000-0000-0000-000000000001', '92000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000002');
 set local role career_reader;

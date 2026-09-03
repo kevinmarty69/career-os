@@ -117,19 +117,64 @@ insert into app.workflow_runs (
     '48000000-0000-0000-0000-000000000001', 'review', 'blocked', 10000, 0,
     now() + interval '1 hour'
   );
+insert into app.artifacts (
+  id, tenant_id, workflow_run_id, kind, version, body, created_by
+) values
+  ('a9000000-0000-0000-0000-000000000001', '28000000-0000-0000-0000-000000000001', '98000000-0000-0000-0000-000000000001', 'strategy', 1, '{"fixture":true}', 'recruiter_strategist'),
+  ('a9000000-0000-0000-0000-000000000002', '28000000-0000-0000-0000-000000000001', '98000000-0000-0000-0000-000000000001', 'page_spec', 1, '{"blocks":[{"type":"fit","claimIds":["78000000-0000-0000-0000-000000000001"]}]}', 'page_composer');
 insert into app.page_specs (
-  id, tenant_id, workflow_run_id, version, spec
+  id, tenant_id, workflow_run_id, version, spec, input_hash,
+  source_artifact_id
 ) values (
   'a8000000-0000-0000-0000-000000000001',
   '28000000-0000-0000-0000-000000000001',
   '98000000-0000-0000-0000-000000000001', 1,
-  '{"blocks":[{"type":"fit","claimIds":["78000000-0000-0000-0000-000000000001"]}]}'::jsonb
+  '{"blocks":[{"type":"fit","claimIds":["78000000-0000-0000-0000-000000000001"]}]}'::jsonb,
+  repeat('c', 64), 'a9000000-0000-0000-0000-000000000002'
 );
 insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id) values (
   '28000000-0000-0000-0000-000000000001',
   'a8000000-0000-0000-0000-000000000001',
   '78000000-0000-0000-0000-000000000001'
 );
+insert into app.page_spec_evidence (
+  tenant_id, page_spec_id, claim_id, evidence_id, position
+) values (
+  '28000000-0000-0000-0000-000000000001',
+  'a8000000-0000-0000-0000-000000000001',
+  '78000000-0000-0000-0000-000000000001',
+  '68000000-0000-0000-0000-000000000001', 0
+);
+insert into app.strategy_approvals (
+  id, tenant_id, workflow_run_id, strategy_artifact_id,
+  strategy_artifact_hash, idempotency_key, approved_by
+)
+select 'aa000000-0000-0000-0000-000000000001',
+  '28000000-0000-0000-0000-000000000001',
+  '98000000-0000-0000-0000-000000000001', id,
+  encode(digest(body::text, 'sha256'), 'hex'),
+  'aa000000-0000-0000-0000-000000000011',
+  '18000000-0000-0000-0000-000000000001'
+from app.artifacts where id = 'a9000000-0000-0000-0000-000000000001';
+insert into app.workflow_steps (
+  id, tenant_id, workflow_run_id, stage, status, idempotency_key, input,
+  input_hash, output_artifact_id, completed_at, page_spec_id
+)
+select 'ab000000-0000-0000-0000-000000000001',
+  '28000000-0000-0000-0000-000000000001',
+  '98000000-0000-0000-0000-000000000001', 'page-composer', 'completed',
+  'hitl-page-composer', fixture.input,
+  encode(digest(fixture.input::text, 'sha256'), 'hex'),
+  'a9000000-0000-0000-0000-000000000002', now(),
+  'a8000000-0000-0000-0000-000000000001'
+from (
+  select jsonb_build_object(
+    'strategyArtifactId', 'a9000000-0000-0000-0000-000000000001',
+    'strategyArtifactHash', encode(digest(body::text, 'sha256'), 'hex'),
+    'strategyApprovalId', 'aa000000-0000-0000-0000-000000000001'
+  ) input
+  from app.artifacts where id = 'a9000000-0000-0000-0000-000000000001'
+) fixture;
 insert into app.reviews (
   id, tenant_id, page_spec_id, reviewer, verdict, issues, page_spec_hash
 )

@@ -807,6 +807,49 @@ textarea[aria-invalid='true'] {
   font-size: 13px;
 }
 
+.draft-review-note {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin: -44px 0 38px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+}
+
+.draft-review-note h2,
+.draft-review-note p {
+  margin: 0;
+}
+
+.draft-review-note h2 {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.draft-review-note h2:focus {
+  outline: none;
+}
+
+.draft-review-note p,
+.draft-review-note > span {
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.draft-review-note > span {
+  flex: 0 0 auto;
+}
+
+.draft-review-note .draft-review-state {
+  margin-top: 6px;
+  color: var(--foreground);
+  font-weight: 600;
+}
+
 .draft-document > h2 {
   max-width: 680px;
   margin: 6px 0 14px;
@@ -1741,6 +1784,11 @@ summary {
 @media (max-width: 760px) {
   body {
     font-size: 16px;
+  }
+
+  .draft-review-note {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .app-shell {

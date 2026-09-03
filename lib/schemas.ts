@@ -105,38 +105,49 @@ function uniqueIds(
 export const pageSpecSchema = z
   .object({
     version: z.literal(1),
-    company: z.object({
-      name: z.string().min(1),
-      role: z.string().min(1),
-      logoUrl: z.string().url().optional(),
-      accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-    }),
-    hero: z.object({
-      eyebrow: z.string(),
-      title: z.string(),
-      thesis: z.string(),
-    }),
+    company: z
+      .object({
+        name: z.string().min(1).max(200),
+        role: z.string().min(1).max(200),
+        logoUrl: z.string().url().max(2_048).optional(),
+        accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      })
+      .strict(),
+    hero: z
+      .object({
+        eyebrow: z.string().min(1).max(100),
+        title: z.string().min(1).max(420),
+        thesis: z.string().min(1).max(5_000),
+      })
+      .strict(),
     blocks: z
       .array(
         z.discriminatedUnion('type', [
-          z.object({
-            type: z.literal('fit'),
-            title: z.string(),
-            claimIds: z.array(z.string()).min(1),
-          }),
-          z.object({
-            type: z.literal('evidence'),
-            title: z.string(),
-            claimIds: z.array(z.string()).min(1),
-          }),
-          z.object({
-            type: z.literal('gap'),
-            title: z.string(),
-            text: z.string(),
-          }),
+          z
+            .object({
+              type: z.literal('fit'),
+              title: z.string().min(1).max(200),
+              claimIds: z.array(z.string().min(1).max(200)).min(1).max(10),
+            })
+            .strict(),
+          z
+            .object({
+              type: z.literal('evidence'),
+              title: z.string().min(1).max(200),
+              claimIds: z.array(z.string().min(1).max(200)).min(1).max(10),
+            })
+            .strict(),
+          z
+            .object({
+              type: z.literal('gap'),
+              title: z.string().min(1).max(200),
+              text: z.string().min(1).max(5_000),
+            })
+            .strict(),
         ]),
       )
-      .min(2),
+      .min(1)
+      .max(6),
   })
   .strict();
 

@@ -250,7 +250,7 @@ test('derives status, stage and next view from each dossier only', () => {
   assert.deepEqual(presentation(generated), [
     'Brouillon prêt',
     'Brouillon',
-    'journey',
+    'draft',
   ]);
 
   const blocked = generatedDossier({

@@ -16,10 +16,10 @@ The first vertical is a real browser workflow that starts with an empty, honest 
 6. inspect the resulting source-bound research artifact, choose the hiring signals to keep, and resume safely after a failed request or reload;
 7. map the confirmed signals to permitted, source-bound proof with a separate deterministic worker that consumes no model tokens;
 8. approve that immutable evidence archive, run a least-privilege recruiter strategist against a loopback model, and review its IDs-only editorial strategy;
-9. exercise PageSpec composition, review and approval with an explicit deterministic demo; the private-capability API remains gated and tested for persisted reviewed runs;
+9. approve the strategy to enqueue a deterministic, zero-token PageSpec composer and inspect the generated draft; durable review and publication remain gated;
 10. inspect or interrupt the bounded agent ledger and export all data.
 
-Email/password accounts, organization membership, Career Memory revisions and application briefs persist in PostgreSQL. Local storage caches the active dossier UI, but it cannot authorize publication. Starting a run locks the current application and Career Memory revisions, writes immutable profile and opportunity snapshots, and atomically enqueues the first workflow step. The browser persists its idempotency key before sending, while PostgreSQL caps each tenant at five active runs and 30 admissions per hour. A dedicated company-researcher worker records one research artifact or one conservative failure settlement. Human confirmation then creates an immutable, permission-filtered input for a second least-privilege worker. That evidence archivist ranks IDs deterministically, writes no generated prose, calls no provider and records zero model usage. A second human checkpoint can enqueue a separately isolated recruiter strategist. Its output is internal editorial direction linked only to exact signal, claim and evidence IDs; PostgreSQL rejects stale or forged lineage before storage. The persisted workflow pauses again for human approval before PageSpec composition. Composition, review and publication remain available only in the explicit deterministic demo until they receive the same durable execution path. Editing an application creates a new revision without changing earlier runs. Deleting an application revokes its active private links.
+Email/password accounts, organization membership, Career Memory revisions and application briefs persist in PostgreSQL. Local storage caches the active dossier UI, but it cannot authorize publication. Starting a run locks the current application and Career Memory revisions, writes immutable profile and opportunity snapshots, and atomically enqueues the first workflow step. The browser persists its idempotency key before sending, while PostgreSQL caps each tenant at five active runs and 30 admissions per hour. A dedicated company-researcher worker records one research artifact or one conservative failure settlement. Human confirmation then creates an immutable, permission-filtered input for a second least-privilege worker. That evidence archivist ranks IDs deterministically, writes no generated prose, calls no provider and records zero model usage. A second human checkpoint can enqueue a separately isolated recruiter strategist. Its output is internal editorial direction linked only to exact signal, claim and evidence IDs; PostgreSQL rejects stale or forged lineage before storage. The persisted workflow pauses again for human approval before a fourth isolated worker composes one strict PageSpec from the approved lead and supporting claim IDs. The composer calls no model or network service, consumes no budget and copies its thesis exactly from the approved lead claim. Editing an application creates a new revision without changing earlier runs. Deleting an application revokes its active private links.
 
 CV bytes never leave the browser and are not retained. The local parser validates file signatures, bounds decompression and extracted text, rejects active or externally linked DOCX content and embedded PDF attachments, and marks all accepted statements as `declared` and `untrusted-data`. Only the fields approved by the user are persisted.
 
@@ -51,6 +51,10 @@ grant career_evidence_archivist to career_evidence_archivist_login;
 create role career_recruiter_strategist_login login noinherit
   password '<generate another strong local password>';
 grant career_recruiter_strategist to career_recruiter_strategist_login;
+
+create role career_page_composer_login login noinherit
+  password '<generate another strong local password>';
+grant career_page_composer to career_page_composer_login;
 ```
 
 The login must not own the database or schema, have `SUPERUSER`, `BYPASSRLS`, `CREATEDB` or `CREATEROLE`, inherit any other role, or hold direct table privileges. The worker checks these conditions before claiming work and fails closed.
@@ -59,6 +63,7 @@ The login must not own the database or schema, have `SUPERUSER`, `BYPASSRLS`, `C
 pnpm worker
 pnpm worker:evidence
 pnpm worker:strategy
+pnpm worker:page
 ```
 
 The canary intentionally accepts loopback endpoints only. It cannot call a remote or paid model. No worker receives a tenant selector or direct table access. Use a distinct login and connection string for each worker.

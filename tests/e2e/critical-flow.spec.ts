@@ -509,6 +509,7 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
     return (
       (await response.json()) as {
         profile: {
+          name: string;
           claims: Array<{
             id: string;
             statement: string;
@@ -538,6 +539,8 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
   const researchArtifactId = crypto.randomUUID();
   const evidenceArtifactId = crypto.randomUUID();
   const strategyArtifactId = crypto.randomUUID();
+  const pageSpecId = crypto.randomUUID();
+  const pageSpecArtifactId = crypto.randomUUID();
   const research = {
     artifactId: researchArtifactId,
     artifactHash: 'a'.repeat(64),
@@ -603,6 +606,26 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
     gaps: [],
     omittedSignalIds: [],
   };
+  const spec = {
+    version: 1,
+    company: {
+      name: 'Durable Labs',
+      role: 'Product Engineer',
+      accent: '#5b45e8',
+    },
+    hero: {
+      eyebrow: 'Private application',
+      title: `${profile.name} × Durable Labs`,
+      thesis: claim!.statement,
+    },
+    blocks: [
+      {
+        type: 'fit',
+        title: 'Relevant experience',
+        claimIds: [claim!.id],
+      },
+    ],
+  };
   const baseRun = {
     runId,
     revision: 0,
@@ -665,7 +688,7 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
       body: JSON.stringify({
         ...baseRun,
         strategy,
-        status: 'paused',
+        status: 'running',
         stage: 'page_spec',
         steps: [
           { stage: 'company-researcher', status: 'completed', attempt: 1 },
@@ -675,6 +698,34 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
             status: 'completed',
             attempt: 1,
           },
+          { stage: 'page-composer', status: 'in_flight', attempt: 1 },
+        ],
+      }),
+    });
+  });
+  await page.route(`**/api/runs/${runId}`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...baseRun,
+        strategy,
+        spec,
+        pageSpecId,
+        pageSpecHash: 'd'.repeat(64),
+        pageSpecArtifactId,
+        status: 'paused',
+        stage: 'page_spec_review',
+        steps: [
+          { stage: 'company-researcher', status: 'completed', attempt: 1 },
+          { stage: 'evidence-archivist', status: 'completed', attempt: 1 },
+          {
+            stage: 'recruiter-strategist',
+            status: 'completed',
+            attempt: 1,
+          },
+          { stage: 'page-composer', status: 'completed', attempt: 1 },
         ],
       }),
     });
@@ -723,7 +774,32 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
   await expect(strategyProof).toBeFocused();
   await page.getByRole('button', { name: 'Valider la stratégie' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Stratégie validée' }),
+    page.getByRole('heading', { name: spec.hero.title }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Relisez exactement ce que l’entreprise verra.'),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Brouillon prêt. Les vérifications durables ne sont pas encore disponibles.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Partager' })).toBeDisabled();
+  await expect(page.locator('.draft-thesis')).toHaveText(claim!.statement);
+  await page.getByRole('button', { name: 'Parcours' }).click();
+  await expect(
+    page.getByText('Brouillon composé · vérifications non disponibles'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Ouvrir la revue' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Accueil' }).first().click();
+  await expect(
+    page.getByRole('heading', { name: 'Votre brouillon est prêt à relire.' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /Relire la page privée/ }).click();
+  await expect(
+    page.getByRole('heading', { name: spec.hero.title }),
   ).toBeVisible();
   expect(
     await page.evaluate(

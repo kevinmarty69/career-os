@@ -445,6 +445,12 @@ export function CareerWorkspace() {
             applyPersistedRun(candidate, run),
           );
         });
+        if (
+          run.spec &&
+          primaryView === 'applications' &&
+          dossierView === 'journey'
+        )
+          setDossierView('draft');
         if (run.status !== 'running') window.scrollTo(0, 0);
         if (run.status === 'running')
           timer = window.setTimeout(() => void poll(), 2_000);
@@ -467,6 +473,8 @@ export function CareerWorkspace() {
     };
   }, [
     activeTenantId,
+    dossierView,
+    primaryView,
     runRefreshVersion,
     selectedRunDossierId,
     selectedRunHasDraft,
@@ -1713,11 +1721,8 @@ export function CareerWorkspace() {
                         : ''
                     }
                     disabled={
-                      id !== 'brief' &&
-                      id !== 'company' &&
-                      id !== 'journey' &&
-                      !state.spec &&
-                      !(id === 'share' && state.capability)
+                      (id === 'draft' && !state.spec) ||
+                      (id === 'share' && !state.approved && !state.capability)
                     }
                     key={id}
                     onClick={() => setDossierView(id)}
@@ -1837,6 +1842,7 @@ export function CareerWorkspace() {
                 {dossierView === 'draft' && state.spec ? (
                   <DraftView
                     profile={state.runProfile ?? workspace.profile}
+                    reviewsAvailable={state.reviews.length === 3}
                     spec={state.spec}
                     onOpenEvidence={openEvidenceInspector}
                   />
@@ -2571,6 +2577,7 @@ function HomeView({
   const priority =
     findings[0]?.dossier ??
     [...dossiers].sort((left, right) => right.updatedAt - left.updatedAt)[0];
+  const priorityHasReviews = Boolean(priority?.reviews.length);
   const recentEvents = dossiers
     .flatMap((dossier) =>
       dossier.events.map((event, index) => ({
@@ -2708,14 +2715,18 @@ function HomeView({
             <h1>
               {findings.length
                 ? `${findings.length} décision${findings.length > 1 ? 's' : ''} à trancher avant d’envoyer vos pages privées.`
-                : priority?.spec
+                : priority?.spec && priorityHasReviews
                   ? 'Votre prochaine candidature est prête pour validation.'
-                  : 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.'}
+                  : priority?.spec
+                    ? 'Votre brouillon est prêt à relire.'
+                    : 'Construisez une candidature qui ne promet que ce que vos preuves démontrent.'}
             </h1>
             <span>
-              {priority?.spec
+              {priority?.spec && priorityHasReviews
                 ? `La passe d’agents est terminée. ${dossierStatus(priority)}.`
-                : 'Partez du poste, confrontez-le à vos preuves, puis gardez la décision finale.'}
+                : priority?.spec
+                  ? 'Le brouillon reprend la stratégie approuvée. Relisez exactement ce que l’entreprise verra.'
+                  : 'Partez du poste, confrontez-le à vos preuves, puis gardez la décision finale.'}
             </span>
             <div>
               <button
@@ -2725,7 +2736,11 @@ function HomeView({
                     : onCreateApplication()
                 }
               >
-                {priority?.spec ? 'Ouvrir la revue' : 'Commencer par l’offre'}{' '}
+                {priority?.spec && priorityHasReviews
+                  ? 'Ouvrir la revue'
+                  : priority?.spec
+                    ? 'Relire la page privée'
+                    : 'Commencer par l’offre'}{' '}
                 <b>→</b>
               </button>
               {priority?.spec ? (
@@ -2873,7 +2888,9 @@ function HomeView({
                         {dossier.spec
                           ? dossierFindings
                             ? 'Trancher'
-                            : 'Valider'
+                            : dossier.reviews.length
+                              ? 'Valider'
+                              : 'Relire'
                           : 'Lancer'}{' '}
                         →
                       </b>
@@ -3171,7 +3188,13 @@ function JourneyView({
             {sourced.length} / {usedClaims.length || 0}
           </strong>
         </span>
-        <span className="journey-people">4 agents · 1 humain</span>
+        <span className="journey-people">
+          {reviewed
+            ? 'Brouillon composé · vérifications terminées'
+            : spec
+              ? 'Brouillon composé · vérifications non disponibles'
+              : 'Composition non démarrée'}
+        </span>
       </section>
 
       <section className="journey-board" aria-label="Parcours de candidature">
@@ -3221,29 +3244,39 @@ function JourneyView({
 
         <JourneyColumn
           number="3"
-          state={approved ? 'complete' : spec ? 'attention' : 'idle'}
+          state={approved ? 'complete' : reviewed ? 'attention' : 'idle'}
           title="Vérification"
         >
           <JourneyCard
-            dark={Boolean(spec && !approved)}
+            dark={Boolean(reviewed && !approved)}
             icon="!"
             status={
-              approved ? 'Validé' : spec ? 'Décision humaine' : 'En attente'
+              approved
+                ? 'Validé'
+                : reviewed
+                  ? 'Décision humaine'
+                  : spec
+                    ? 'Indisponible'
+                    : 'En attente'
             }
           >
             <strong>
               {reviewed
                 ? 'Trois vérifications terminées'
                 : spec
-                  ? 'Une décision humaine est requise'
+                  ? 'Brouillon prêt'
                   : 'Rien à vérifier pour le moment'}
             </strong>
             <p>
               {reviewed
                 ? `${reviews.filter((item) => item.passed).length} / 3 vérifications validées.`
-                : 'Les agents proposent. Vous décidez de ce qui devient public.'}
+                : spec
+                  ? 'Les vérifications durables ne sont pas encore disponibles.'
+                  : 'Les contrôles démarreront après la composition.'}
             </p>
-            {spec ? <button onClick={onReview}>Ouvrir la revue</button> : null}
+            {reviewed ? (
+              <button onClick={onReview}>Ouvrir la revue</button>
+            ) : null}
           </JourneyCard>
           <JourneyCard icon="✓" status={sourced.length ? 'Prêt' : 'En attente'}>
             <strong>{sourced.length} affirmations sourcées</strong>
@@ -4390,13 +4423,23 @@ function ImportConflictDialog({
 function DraftView({
   onOpenEvidence,
   profile,
+  reviewsAvailable,
   spec,
 }: {
   onOpenEvidence: (claimId: string) => void;
   profile: Profile;
+  reviewsAvailable: boolean;
   spec: PageSpec;
 }) {
+  const heading = useRef<HTMLHeadingElement>(null);
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
+  const usedClaimIds = new Set(
+    spec.blocks.flatMap((block) => ('claimIds' in block ? block.claimIds : [])),
+  );
+  const sourcedCount = profile.claims.filter(
+    (claim) => usedClaimIds.has(claim.id) && claim.evidenceIds.length,
+  ).length;
+  useEffect(() => heading.current?.focus(), []);
   return (
     <article
       className="document draft-document"
@@ -4405,8 +4448,30 @@ function DraftView({
       <div className="draft-accent" aria-hidden="true" />
       <header className="draft-heading">
         <p>{spec.company.role}</p>
-        <span>Brouillon · Appuyé par des preuves</span>
+        <span>Brouillon généré</span>
       </header>
+      <section
+        className="draft-review-note"
+        aria-label="Relecture du brouillon"
+      >
+        <div>
+          <h2 ref={heading} tabIndex={-1}>
+            Relisez exactement ce que l’entreprise verra.
+          </h2>
+          <p>Rien ne sera partagé sans votre validation.</p>
+          {!reviewsAvailable ? (
+            <p className="draft-review-state">
+              Brouillon prêt. Les vérifications durables ne sont pas encore
+              disponibles.
+            </p>
+          ) : null}
+        </div>
+        <span>
+          {spec.blocks.length} section{spec.blocks.length > 1 ? 's' : ''} ·{' '}
+          {usedClaimIds.size} affirmation{usedClaimIds.size > 1 ? 's' : ''} ·{' '}
+          {sourcedCount}/{usedClaimIds.size} sourcées
+        </span>
+      </section>
       <p className="section-label">{spec.hero.eyebrow}</p>
       <h2>{spec.hero.title}</h2>
       <p className="draft-thesis">{spec.hero.thesis}</p>
@@ -5510,9 +5575,7 @@ function applyPersistedRun(
   dossier: ApplicationDossier,
   run: PersistedRun,
 ): ApplicationDossier {
-  const reviewable = ['awaiting_approval', 'blocked', 'completed'].includes(
-    run.status,
-  );
+  const reviewable = Boolean(run.spec);
   const reviews = reviewable ? run.reviews : [];
   return {
     ...dossier,
@@ -5524,6 +5587,9 @@ function applyPersistedRun(
     runResearch: run.research,
     runEvidenceArchive: run.evidenceArchive,
     runStrategy: run.strategy,
+    pageSpecId: run.pageSpecId,
+    pageSpecHash: run.pageSpecHash,
+    pageSpecArtifactId: run.pageSpecArtifactId,
     selectedResearchSignalIds:
       dossier.runResearch?.artifactId === run.research?.artifactId
         ? dossier.selectedResearchSignalIds
@@ -5556,6 +5622,9 @@ function hasCurrentRunProjection(
       JSON.stringify(run.evidenceArchive) &&
     JSON.stringify(dossier.runStrategy) === JSON.stringify(run.strategy) &&
     JSON.stringify(dossier.events) === JSON.stringify(persistedEvents(run)) &&
+    dossier.pageSpecId === run.pageSpecId &&
+    dossier.pageSpecHash === run.pageSpecHash &&
+    dossier.pageSpecArtifactId === run.pageSpecArtifactId &&
     Boolean(dossier.spec) === Boolean(reviewable && run.spec) &&
     dossier.reviews.length === (reviewable ? run.reviews.length : 0)
   );

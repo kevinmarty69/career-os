@@ -125,6 +125,51 @@ test('persisted run contract exposes measured zero cost and durable UUIDs', () =
   );
 });
 
+test('a persisted PageSpec requires its exact durable lineage', () => {
+  const base = {
+    runId: randomUUID(),
+    status: 'paused',
+    stage: 'page_spec_review',
+    revision: 0,
+    usedTokens: 0,
+    usedCostMicros: 0,
+    profile: syntheticProfile,
+    steps: [],
+    reviews: [],
+    events: [],
+    spec: {
+      version: 1,
+      company: {
+        name: 'Durable Labs',
+        role: 'Product Engineer',
+        accent: '#5b45e8',
+      },
+      hero: {
+        eyebrow: 'Private application',
+        title: 'Kévin Marty × Durable Labs',
+        thesis: syntheticProfile.claims[0].statement,
+      },
+      blocks: [
+        {
+          type: 'fit',
+          title: 'Relevant experience',
+          claimIds: [syntheticProfile.claims[0].id],
+        },
+      ],
+    },
+  };
+  assert.equal(persistedRunSchema.safeParse(base).success, false);
+  assert.equal(
+    persistedRunSchema.safeParse({
+      ...base,
+      pageSpecId: randomUUID(),
+      pageSpecHash: 'd'.repeat(64),
+      pageSpecArtifactId: randomUUID(),
+    }).success,
+    true,
+  );
+});
+
 test('review decisions are strict and corrections require a real run', () => {
   const input = {
     reviewId: randomUUID(),

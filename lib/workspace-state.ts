@@ -38,6 +38,9 @@ export type ApplicationDossier = {
   runResearch?: PersistedRun['research'];
   runEvidenceArchive?: PersistedRun['evidenceArchive'];
   runStrategy?: PersistedRun['strategy'];
+  pageSpecId?: string;
+  pageSpecHash?: string;
+  pageSpecArtifactId?: string;
   selectedResearchSignalIds?: string[];
   reviews: WorkspaceReview[];
   reviewDecisions: ReviewDecision[];
@@ -73,7 +76,8 @@ export type DossierStatus =
   | 'À compléter'
   | 'Offre prête';
 export type DossierStage = 'Brouillon' | 'À valider' | 'Envoyée';
-export type DossierNextView = 'brief' | 'journey' | 'review' | 'share';
+export type DossierNextView =
+  'brief' | 'journey' | 'draft' | 'review' | 'share';
 export type ScopedShareLink = {
   scope: string;
   dossierId: string;
@@ -204,6 +208,12 @@ const applicationDossierSchema: z.ZodType<ApplicationDossier> = z
     runResearch: persistedResearchSchema.optional(),
     runEvidenceArchive: persistedEvidenceArchiveSchema.optional(),
     runStrategy: persistedRecruiterStrategySchema.optional(),
+    pageSpecId: z.string().uuid().optional(),
+    pageSpecHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
+    pageSpecArtifactId: z.string().uuid().optional(),
     selectedResearchSignalIds: z
       .array(z.string().regex(/^signal-(?:[1-9]|1\d|20)$/))
       .max(20)
@@ -551,7 +561,8 @@ export function dossierStage(dossier: ApplicationDossier): DossierStage {
 export function dossierNextView(dossier: ApplicationDossier): DossierNextView {
   if (dossier.capability || dossier.approved) return 'share';
   if (dossier.spec && dossier.reviews.length) return 'review';
-  return dossier.spec || dossier.runId ? 'journey' : 'brief';
+  if (dossier.spec) return 'draft';
+  return dossier.runId ? 'journey' : 'brief';
 }
 
 function createDossier(

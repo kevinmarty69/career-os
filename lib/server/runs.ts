@@ -123,11 +123,11 @@ export async function createPersistedRun(
       const runId = randomUUID();
       await tx`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role,
-        raw_text, url, extraction_status
+        raw_text, url, accent, extraction_status
       ) values (
         ${opportunityId}, ${session.tenantId}, ${input.applicationId},
         ${input.applicationRevision}, ${application.company}, ${application.role},
-        ${application.raw_text}, ${application.url}, 'ready'
+        ${application.raw_text}, ${application.url}, ${application.accent}, 'ready'
       )`;
       await tx`insert into app.workflow_runs (
         id, tenant_id, opportunity_id, profile_id, source_profile_id,
@@ -388,7 +388,6 @@ export async function decideReviewIssue(
         ${review.id}, ${input.issueIndex}, ${issueText}, ${input.decision},
         ${correctedRunId ?? null}, ${session.userId}, ${key}, ${inputHash}
       )`;
-      await authorize(tx, session, 'career_worker');
       await tx`insert into app.workflow_events (
         tenant_id, workflow_run_id, actor, event_type, summary, payload
       ) values (
@@ -403,7 +402,6 @@ export async function decideReviewIssue(
           costMicros: 0,
         })}
       )`;
-      await authorize(tx, session, 'career_app');
       const publicationEligible =
         input.decision === 'keep' &&
         (await pageSpecReviewGate(
@@ -711,9 +709,15 @@ async function readRunProjection(
       and kind = 'strategy'
     order by version desc limit 1`;
   const [pageSpec] = await tx<
-    Array<{ id: string; spec: unknown }>
-  >`select id, spec from app.page_specs
+    Array<{
+      id: string;
+      spec: unknown;
+      spec_hash: string;
+      source_artifact_id: string | null;
+    }>
+  >`select id, spec, spec_hash, source_artifact_id from app.page_specs
     where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+      and invalidated_at is null and source_artifact_id is not null
     order by version desc limit 1`;
   const reviews = pageSpec
     ? await tx<
@@ -797,7 +801,16 @@ async function readRunProjection(
           }),
         }
       : {}),
-    ...(pageSpec ? { spec: pageSpecSchema.parse(pageSpec.spec) } : {}),
+    ...(pageSpec
+      ? {
+          pageSpecId: pageSpec.id,
+          pageSpecHash: pageSpec.spec_hash,
+          ...(pageSpec.source_artifact_id
+            ? { pageSpecArtifactId: pageSpec.source_artifact_id }
+            : {}),
+          spec: pageSpecSchema.parse(pageSpec.spec),
+        }
+      : {}),
     reviews: reviews.map((review) => ({
       reviewId: review.id,
       reviewer:
@@ -826,7 +839,7 @@ async function readRunProjection(
 async function authorize(
   tx: postgres.TransactionSql,
   session: RunSession,
-  role: 'career_app' | 'career_worker' | 'career_reviewer',
+  role: 'career_app' | 'career_reviewer',
 ) {
   await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
     set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;

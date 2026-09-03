@@ -46,6 +46,13 @@ test('PageSpec rejects unknown blocks and free-form fields', () => {
   assert.equal(
     pageSpecSchema.safeParse({
       ...spec,
+      hero: { ...spec.hero, rawHtml: '<strong>trust me</strong>' },
+    }).success,
+    false,
+  );
+  assert.equal(
+    pageSpecSchema.safeParse({
+      ...spec,
       blocks: [{ type: 'html', value: '<script />' }],
     }).success,
     false,
