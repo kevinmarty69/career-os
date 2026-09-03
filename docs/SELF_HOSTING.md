@@ -82,6 +82,20 @@ Map each login to its matching environment variable:
 | Hiring-manager reviewer | `CAREER_OS_HIRING_MANAGER_REVIEWER_DATABASE_URL` | `pnpm worker:hiring-manager-reviewer` | required |
 | Factuality reviewer     | `CAREER_OS_FACTUALITY_REVIEWER_DATABASE_URL`     | `pnpm worker:factuality-reviewer`     | no       |
 
+Build the disposable Page Composer image before starting that worker:
+
+```bash
+docker build -f Dockerfile.page-composer -t career-os-page-composer:local .
+export CAREER_OS_PAGE_COMPOSER_IMAGE=career-os-page-composer:local
+```
+
+The worker sends only the bounded Page Composer input through stdin. Docker
+starts a fresh non-root, read-only container without network, host mounts or
+inherited application environment, then the trusted worker validates and
+recomputes the result before completing the leased database step. Managed deployments also
+require the image reference to end in an immutable `@sha256:...` digest and do
+not fall back to in-process composition.
+
 Model-backed workers also need:
 
 ```bash

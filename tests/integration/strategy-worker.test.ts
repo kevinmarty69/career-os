@@ -4,6 +4,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import test from 'node:test';
 import { Client } from 'pg';
+import { composeApprovedStrategyPage } from '../../lib/page-composer';
 import { LocalOpenAIRecruiterStrategyClient } from '../../lib/server/local-openai-strategy-client';
 import { processPageComposerStep } from '../../lib/server/page-composer-worker';
 import { processRecruiterStrategyStep } from '../../lib/server/strategy-worker';
@@ -418,7 +419,10 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     assert.deepEqual(composerStep.rows, [
       { status: 'pending', stage: 'page-composer' },
     ]);
-    const composed = await processPageComposerStep(composerUrl.toString());
+    const composed = await processPageComposerStep({
+      databaseUrl: composerUrl.toString(),
+      composePage: async (input) => composeApprovedStrategyPage(input),
+    });
     assert.equal(composed.status, 'completed');
     assert.equal(composed.runId, runId);
     const composedRun = await target.query(

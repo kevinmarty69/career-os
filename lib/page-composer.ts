@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-const MAX_INPUT_BYTES = 64 * 1024;
+export const MAX_PAGE_COMPOSER_INPUT_BYTES = 64 * 1024;
+export const MAX_PAGE_COMPOSER_OUTPUT_BYTES = 16 * 1024;
 const hashSchema = z.string().regex(/^[0-9a-f]{64}$/);
 const signalIdSchema = z.string().regex(/^signal-(?:[1-9]|1\d|20)$/);
 const uuidSchema = z.string().uuid();
@@ -117,7 +118,7 @@ export type PageComposerOutput = z.infer<typeof pageComposerOutputSchema>;
 
 export function parsePageComposerInput(value: unknown): PageComposerInput {
   const input = pageComposerInputSchema.parse(value);
-  if (utf8Bytes(JSON.stringify(input)) > MAX_INPUT_BYTES)
+  if (utf8Bytes(JSON.stringify(input)) > MAX_PAGE_COMPOSER_INPUT_BYTES)
     throw new Error('Page composer input exceeds its size limit.');
   return input;
 }

@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import {
+  applicationSchema,
   applicationFieldsSchema,
   deleteApplicationInputSchema,
   updateApplicationInputSchema,
 } from '../../lib/application-contract';
+import { optionalHttpUrl } from '../../lib/http-url';
 
 const application = {
   company: 'Northstar Labs',
@@ -52,5 +54,23 @@ test('application mutations are strict and bounded', () => {
   assert.equal(
     deleteApplicationInputSchema.safeParse({ expectedRevision: 0 }).success,
     false,
+  );
+});
+
+test('legacy URLs can be omitted without weakening the HTTP boundary', () => {
+  assert.equal(optionalHttpUrl('mailto:jobs@example.test'), undefined);
+  assert.equal(
+    optionalHttpUrl('https://jobs.example.test/offer'),
+    'https://jobs.example.test/offer',
+  );
+  assert.equal(
+    applicationSchema.safeParse({
+      ...application,
+      applicationId: randomUUID(),
+      revision: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }).success,
+    true,
   );
 });

@@ -9,6 +9,7 @@ import {
   updateApplicationInputSchema,
   type Application,
 } from '../application-contract';
+import { optionalHttpUrl } from '../http-url';
 import type { PublicationSession } from './publications';
 
 export class ApplicationConflictError extends Error {}
@@ -208,13 +209,13 @@ export async function deleteApplication(
 }
 
 function projection(row: ApplicationRow): Application {
-  const url = z.string().url().safeParse(row.url);
+  const url = optionalHttpUrl(row.url);
   return applicationSchema.parse({
     applicationId: row.id,
     company: row.company,
     role: row.role,
     description: row.raw_text,
-    ...(url.success ? { url: url.data } : {}),
+    ...(url ? { url } : {}),
     accent: row.accent,
     stage: row.stage,
     revision: Number(row.revision),

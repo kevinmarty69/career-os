@@ -1,14 +1,23 @@
 import { processPageComposerStep } from '../lib/server/page-composer-worker';
+import {
+  pageComposerSandboxConfig,
+  runPageComposerSandbox,
+} from '../lib/server/page-composer-sandbox';
 import { runWorkerLoop } from './worker-loop';
 
 async function main() {
   const databaseUrl = required('CAREER_OS_PAGE_COMPOSER_DATABASE_URL');
+  const sandboxConfig = pageComposerSandboxConfig(process.env);
   const once = process.argv.includes('--once');
 
   await runWorkerLoop({
     workerName: 'Page composer',
     once,
-    iteration: () => processPageComposerStep(databaseUrl),
+    iteration: () =>
+      processPageComposerStep({
+        databaseUrl,
+        composePage: (input) => runPageComposerSandbox(input, sandboxConfig),
+      }),
   });
 }
 

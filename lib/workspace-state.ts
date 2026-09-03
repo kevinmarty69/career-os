@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Application } from './application-contract';
-import { httpUrlSchema } from './http-url';
+import { httpUrlSchema, optionalHttpUrl } from './http-url';
 import {
   persistedEvidenceArchiveSchema,
   persistedRecruiterStrategySchema,
@@ -353,6 +353,7 @@ export function restoreWorkspace(
   } catch {
     return createEmptyWorkspace();
   }
+  removeUnsupportedCachedUrls(parsed);
 
   const current = savedWorkspaceV2Schema.safeParse(parsed);
   if (current.success) return normalizeSelection(current.data);
@@ -403,6 +404,32 @@ export function restoreWorkspace(
     ],
     selectedDossierId: id,
   };
+}
+
+function removeUnsupportedCachedUrls(value: unknown) {
+  if (!value || typeof value !== 'object') return;
+  const workspace = value as Record<string, unknown>;
+  sanitizeOpportunity(workspace.opportunity);
+  if (!Array.isArray(workspace.dossiers)) return;
+  for (const dossier of workspace.dossiers) {
+    if (!dossier || typeof dossier !== 'object') continue;
+    const candidate = dossier as Record<string, unknown>;
+    sanitizeOpportunity(candidate.opportunity);
+    if (!candidate.runResearch || typeof candidate.runResearch !== 'object')
+      continue;
+    const source = (candidate.runResearch as Record<string, unknown>).source;
+    sanitizeUrl(source);
+  }
+}
+
+function sanitizeOpportunity(value: unknown) {
+  sanitizeUrl(value);
+}
+
+function sanitizeUrl(value: unknown) {
+  if (!value || typeof value !== 'object') return;
+  const record = value as Record<string, unknown>;
+  if ('url' in record && !optionalHttpUrl(record.url)) delete record.url;
 }
 
 export function updateDossier(

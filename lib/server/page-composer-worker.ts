@@ -1,5 +1,11 @@
 import postgres from 'postgres';
-import { composeApprovedStrategyPage } from '../page-composer';
+import { isDeepStrictEqual } from 'node:util';
+import {
+  composeApprovedStrategyPage,
+  pageComposerOutputSchema,
+  parsePageComposerInput,
+  type PageComposerInput,
+} from '../page-composer';
 import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
 
 const STEP_LEASE_SECONDS = 300;
@@ -13,10 +19,17 @@ type ClaimedStep = {
   input_hash: string;
 };
 
-export async function processPageComposerStep(databaseUrl: string) {
+type ComposePage = (input: PageComposerInput) => Promise<unknown>;
+
+export async function processPageComposerStep({
+  databaseUrl,
+  composePage,
+}: {
+  databaseUrl: string;
+  composePage: ComposePage;
+}) {
   const sql = postgres(databaseUrl, { max: 1, idle_timeout: 5 });
   let claimed: ClaimedStep | undefined;
-  let outputBuilt = false;
   let stopHeartbeat: () => Promise<void> = async () => undefined;
   try {
     await verifyRestrictedWorkerCredential(sql);
@@ -44,13 +57,32 @@ export async function processPageComposerStep(databaseUrl: string) {
     });
     if (!claimed) return { status: 'idle' as const };
 
-    const output = composeApprovedStrategyPage(claimed.input);
-    outputBuilt = true;
+    let input: PageComposerInput;
+    try {
+      input = parsePageComposerInput(claimed.input);
+    } catch {
+      return await failClaimedStep(sql, claimed, 'invalid_step_input');
+    }
+
+    let sandboxOutput: unknown;
+    try {
+      sandboxOutput = await composePage(input);
+    } catch {
+      return await failClaimedStep(sql, claimed, 'sandbox_execution_failed');
+    }
+
+    const expectedOutput = composeApprovedStrategyPage(input);
+    const parsedOutput = pageComposerOutputSchema.safeParse(sandboxOutput);
+    if (
+      !parsedOutput.success ||
+      !isDeepStrictEqual(parsedOutput.data, expectedOutput)
+    )
+      return await failClaimedStep(sql, claimed, 'invalid_sandbox_output');
     const artifactId = await sql.begin(async (tx) => {
       await authorizeWorker(tx);
       const [stored] = await tx<{ id: string }[]>`
         select app.complete_page_composer_step(
-          ${claimed!.step_id}, ${claimed!.lease_token}, ${tx.json(output)}
+          ${claimed!.step_id}, ${claimed!.lease_token}, ${tx.json(expectedOutput)}
         ) as id`;
       return stored.id;
     });
@@ -60,24 +92,32 @@ export async function processPageComposerStep(databaseUrl: string) {
       stepId: claimed.step_id,
       artifactId,
     };
-  } catch (error) {
-    if (!claimed || outputBuilt) throw error;
-    await sql.begin(async (tx) => {
-      await authorizeWorker(tx);
-      await tx`select app.fail_page_composer_step(
-        ${claimed!.step_id}, ${claimed!.lease_token}, 'invalid_step_input'
-      )`;
-    });
-    return {
-      status: 'failed' as const,
-      runId: claimed.workflow_run_id,
-      stepId: claimed.step_id,
-      failureCode: 'invalid_step_input' as const,
-    };
   } finally {
     await stopHeartbeat();
     await sql.end();
   }
+}
+
+async function failClaimedStep(
+  sql: postgres.Sql,
+  claimed: ClaimedStep,
+  failureCode:
+    | 'invalid_step_input'
+    | 'sandbox_execution_failed'
+    | 'invalid_sandbox_output',
+) {
+  await sql.begin(async (tx) => {
+    await authorizeWorker(tx);
+    await tx`select app.fail_page_composer_step(
+      ${claimed.step_id}, ${claimed.lease_token}, ${failureCode}
+    )`;
+  });
+  return {
+    status: 'failed' as const,
+    runId: claimed.workflow_run_id,
+    stepId: claimed.step_id,
+    failureCode,
+  };
 }
 
 async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {

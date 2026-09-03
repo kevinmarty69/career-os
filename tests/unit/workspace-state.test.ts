@@ -97,7 +97,8 @@ test('restores V2 safely and normalizes a stale selection', () => {
       ],
     }),
   );
-  assert.deepEqual(unsafeUrl, createEmptyWorkspace());
+  assert.equal(unsafeUrl.dossiers.length, 1);
+  assert.equal(unsafeUrl.dossiers[0]?.opportunity.url, undefined);
   const unsafeResearchUrl = restoreWorkspace(
     JSON.stringify({
       ...stored,
@@ -128,7 +129,11 @@ test('restores V2 safely and normalizes a stale selection', () => {
       ],
     }),
   );
-  assert.deepEqual(unsafeResearchUrl, createEmptyWorkspace());
+  assert.equal(unsafeResearchUrl.dossiers.length, 1);
+  assert.equal(
+    unsafeResearchUrl.dossiers[0]?.runResearch?.source.url,
+    undefined,
+  );
 });
 
 test('migrates the legacy singleton into one selected dossier', () => {

@@ -1,0 +1,12 @@
+FROM node:24-alpine
+
+WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
+COPY tsconfig.json ./
+COPY lib/page-composer.ts lib/page-composer.ts
+COPY scripts/run-page-composer-sandbox.ts scripts/run-page-composer-sandbox.ts
+
+USER 65532:65532
+ENTRYPOINT ["node", "--import", "tsx", "scripts/run-page-composer-sandbox.ts"]
