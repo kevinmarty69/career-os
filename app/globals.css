@@ -749,6 +749,11 @@ textarea[aria-invalid='true'] {
   margin: 4px 0 0;
 }
 
+.inline-error .inline-error-action {
+  margin-top: 12px;
+  min-height: 38px;
+}
+
 .document-actions {
   display: flex;
   gap: 18px;
@@ -1616,6 +1621,133 @@ summary {
   margin-top: 4px;
 }
 
+.instance-settings {
+  display: grid;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.instance-settings-heading {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.instance-status {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+}
+
+.instance-status > strong,
+.instance-status > p {
+  display: block;
+  margin: 0;
+}
+
+.instance-status > p {
+  margin-top: 5px;
+}
+
+.instance-status > a {
+  display: inline-flex;
+  margin-top: 14px;
+  font-weight: 700;
+}
+
+.instance-ready {
+  color: var(--success);
+}
+
+.instance-return {
+  justify-self: start;
+}
+
+.instance-setup-help {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.instance-setup-help summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.instance-setup-help p {
+  margin: 10px 0;
+}
+
+.instance-setup-help ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.instance-setup-help code {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+.instance-service-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.instance-service-groups section {
+  min-width: 0;
+}
+
+.instance-service-groups h3 {
+  margin: 0 0 8px;
+  color: var(--secondary);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.instance-service-groups ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.instance-service-groups li {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.instance-service-groups li span,
+.instance-service-groups li strong,
+.instance-service-groups li small {
+  display: block;
+}
+
+.instance-service-groups li small {
+  margin-top: 2px;
+  color: var(--secondary);
+}
+
+.instance-service-groups code {
+  overflow-x: auto;
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: var(--surface-hover);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .danger-zone {
   border-color: #deb9b4;
 }
@@ -1919,6 +2051,15 @@ summary {
   .settings-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .instance-settings-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .instance-service-groups {
+    grid-template-columns: 1fr;
   }
 
   .memory-header-actions {

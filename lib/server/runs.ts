@@ -3,6 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import {
   createRunInputSchema,
+  deploymentModeSchema,
+  instanceStatusSchema,
   persistedEvidenceArchiveSchema,
   persistedRecruiterStrategySchema,
   persistedResearchSchema,
@@ -13,9 +15,13 @@ import {
   reviewStartInputSchema,
   strategyStartInputSchema,
   strategyApprovalInputSchema,
+  workerServiceSchema,
+  workerServices,
   type PersistedRun,
   type ReviewIssueDecisionResult,
+  type InstanceStatus,
   type WorkerAvailability,
+  type WorkerService,
 } from '../run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from '../schemas';
 import { COMPANY_RESEARCH_RUN_TOKEN_BUDGET } from './local-openai-client';
@@ -32,7 +38,7 @@ export class RunConflictError extends Error {}
 export class RunRejectedError extends Error {}
 export class RunRateLimitError extends Error {}
 export class WorkerUnavailableError extends Error {
-  constructor(readonly service: string) {
+  constructor(readonly service: WorkerService) {
     super(`Worker service ${service} is unavailable.`);
   }
 }
@@ -45,6 +51,39 @@ function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required.');
   return postgres(url, { max: 5, idle_timeout: 5 });
+}
+
+export async function readInstanceStatus(
+  session: RunSession,
+): Promise<InstanceStatus> {
+  const mode = deploymentMode();
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session, 'career_app');
+      const services = await tx<
+        Array<{
+          service: WorkerService;
+          status: 'fresh' | 'stale' | 'missing';
+        }>
+      >`select requested.service, status.status
+        from unnest(${tx.array(workerServices)}::text[])
+          with ordinality requested(service, position)
+        cross join lateral app.worker_service_status(requested.service) status
+        order by requested.position`;
+      return instanceStatusSchema.parse({
+        mode,
+        services,
+      });
+    });
+  } finally {
+    await sql.end();
+  }
+}
+
+function deploymentMode() {
+  const mode = process.env.CAREER_OS_DEPLOYMENT_MODE ?? 'self-hosted';
+  return deploymentModeSchema.parse(mode);
 }
 
 export async function createPersistedRun(
@@ -929,14 +968,15 @@ async function projectWorkerAvailability(
     ['pending', 'leased', 'in_flight'].includes(step.status),
   );
   if (!active) return { state: 'ready' };
+  const activeService = workerServiceSchema.parse(active.stage);
   if (active.status === 'in_flight')
-    return { state: 'ready', service: active.stage };
+    return { state: 'ready', service: activeService };
 
-  const service = await readWorkerServiceStatus(tx, active.stage);
+  const service = await readWorkerServiceStatus(tx, activeService);
   if (!service.available)
     return {
       state: 'unavailable',
-      service: active.stage,
+      service: activeService,
     };
   return {
     state:
@@ -944,13 +984,13 @@ async function projectWorkerAvailability(
       Number(active.pending_for_ms) >= PENDING_WAIT_MS
         ? 'waiting'
         : 'ready',
-    service: active.stage,
+    service: activeService,
   };
 }
 
 async function readWorkerServiceStatus(
   tx: postgres.TransactionSql,
-  service: string,
+  service: WorkerService,
 ) {
   const [status] = await tx<Array<{ status: string }>>`select status
     from app.worker_service_status(${service})`;

@@ -52,12 +52,53 @@ const persistedStepSchema = z
   })
   .strict();
 
+export const workerServiceSchema = z.enum([
+  'company-researcher',
+  'evidence-archivist',
+  'recruiter-strategist',
+  'page-composer',
+  'recruiter-reviewer',
+  'hiring-manager-reviewer',
+  'factuality-reviewer',
+]);
+
+export const workerServices = workerServiceSchema.options;
+export const deploymentModeSchema = z.enum(['self-hosted', 'managed']);
+
 export const workerAvailabilitySchema = z
   .object({
     state: z.enum(['ready', 'waiting', 'unavailable']),
-    service: z.string().min(1).max(100).optional(),
+    service: workerServiceSchema.optional(),
   })
   .strict();
+
+export const instanceStatusSchema = z
+  .object({
+    mode: deploymentModeSchema,
+    services: z
+      .array(
+        z
+          .object({
+            service: workerServiceSchema,
+            status: z.enum(['fresh', 'stale', 'missing']),
+          })
+          .strict(),
+      )
+      .length(workerServices.length),
+  })
+  .strict()
+  .superRefine(({ services }, context) => {
+    const reported = new Set(services.map(({ service }) => service));
+    if (
+      reported.size !== workerServices.length ||
+      workerServices.some((service) => !reported.has(service))
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['services'],
+        message: 'Every worker service must appear exactly once.',
+      });
+  });
 
 const researchSignalSchema = z
   .object({
@@ -241,6 +282,8 @@ export const persistedRunSchema = z
 
 export type PersistedRun = z.infer<typeof persistedRunSchema>;
 export type WorkerAvailability = z.infer<typeof workerAvailabilitySchema>;
+export type WorkerService = z.infer<typeof workerServiceSchema>;
+export type InstanceStatus = z.infer<typeof instanceStatusSchema>;
 
 export const reviewIssueDecisionInputSchema = z
   .object({

@@ -33,7 +33,7 @@ Requirements: Node 22+, pnpm 10+.
 pnpm install
 ```
 
-Copy `.env.example` to `.env.local`, set `DATABASE_URL` and generate a `BETTER_AUTH_SECRET`, then open `http://localhost:3000`.
+Copy `.env.example` to `.env.local`, set `DATABASE_URL` and generate a `BETTER_AUTH_SECRET`. `pnpm dev` starts the interface at `http://localhost:3000`; the seven worker processes below are also required to execute a complete application workflow.
 
 ```bash
 pnpm dev

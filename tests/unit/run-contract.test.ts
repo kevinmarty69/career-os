@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import {
+  instanceStatusSchema,
   createRunInputSchema,
   persistedRunSchema,
   reviewIssueDecisionInputSchema,
@@ -9,10 +10,32 @@ import {
   reviewStartInputSchema,
   strategyApprovalInputSchema,
   strategyStartInputSchema,
+  workerServices,
 } from '../../lib/run-contract';
 import { syntheticProfile } from '../../lib/fixture';
 
 const applicationId = randomUUID();
+
+test('instance status requires one coherent entry per worker', () => {
+  const services = workerServices.map((service) => ({
+    service,
+    status: 'fresh' as const,
+  }));
+  assert.equal(
+    instanceStatusSchema.safeParse({
+      mode: 'self-hosted',
+      services,
+    }).success,
+    true,
+  );
+  assert.equal(
+    instanceStatusSchema.safeParse({
+      mode: 'self-hosted',
+      services: [...services.slice(0, -1), services[0]],
+    }).success,
+    false,
+  );
+});
 
 test('run creation accepts only durable application and profile revisions', () => {
   assert.equal(

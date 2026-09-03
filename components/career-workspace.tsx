@@ -25,9 +25,12 @@ import {
   type Review,
 } from '@/lib/schemas';
 import {
+  instanceStatusSchema,
   persistedRunSchema,
   reviewIssueDecisionResultSchema,
+  type InstanceStatus,
   type PersistedRun,
+  type WorkerService,
 } from '@/lib/run-contract';
 import { persistedRunOperation } from '@/lib/run-operation';
 import {
@@ -79,6 +82,64 @@ type DossierView =
   'board' | 'brief' | 'company' | 'journey' | 'draft' | 'review' | 'share';
 
 type RunPollingState = Record<string, string>;
+
+const workerServiceDetails: Record<
+  WorkerService,
+  {
+    label: string;
+    stage: 'Analyse' | 'Vérification';
+    command: string;
+    databaseVariable: string;
+    requiresModel?: boolean;
+  }
+> = {
+  'company-researcher': {
+    label: 'Lecture de l’entreprise',
+    stage: 'Analyse',
+    command: 'pnpm worker:company-researcher',
+    databaseVariable: 'CAREER_OS_WORKER_DATABASE_URL',
+    requiresModel: true,
+  },
+  'evidence-archivist': {
+    label: 'Sélection des preuves',
+    stage: 'Analyse',
+    command: 'pnpm worker:evidence-archivist',
+    databaseVariable: 'CAREER_OS_EVIDENCE_WORKER_DATABASE_URL',
+  },
+  'recruiter-strategist': {
+    label: 'Stratégie de candidature',
+    stage: 'Analyse',
+    command: 'pnpm worker:recruiter-strategist',
+    databaseVariable: 'CAREER_OS_STRATEGY_WORKER_DATABASE_URL',
+    requiresModel: true,
+  },
+  'page-composer': {
+    label: 'Composition de la page',
+    stage: 'Analyse',
+    command: 'pnpm worker:page-composer',
+    databaseVariable: 'CAREER_OS_PAGE_COMPOSER_DATABASE_URL',
+  },
+  'recruiter-reviewer': {
+    label: 'Revue recrutement',
+    stage: 'Vérification',
+    command: 'pnpm worker:recruiter-reviewer',
+    databaseVariable: 'CAREER_OS_RECRUITER_REVIEWER_DATABASE_URL',
+    requiresModel: true,
+  },
+  'hiring-manager-reviewer': {
+    label: 'Revue hiring manager',
+    stage: 'Vérification',
+    command: 'pnpm worker:hiring-manager-reviewer',
+    databaseVariable: 'CAREER_OS_HIRING_MANAGER_REVIEWER_DATABASE_URL',
+    requiresModel: true,
+  },
+  'factuality-reviewer': {
+    label: 'Contrôle factuel',
+    stage: 'Vérification',
+    command: 'pnpm worker:factuality-reviewer',
+    databaseVariable: 'CAREER_OS_FACTUALITY_REVIEWER_DATABASE_URL',
+  },
+};
 
 const emptyProfile: Profile = {
   name: '',
@@ -168,6 +229,7 @@ export function CareerWorkspace() {
   const generationPending = useRef(false);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
+  const [instanceCheckSuggested, setInstanceCheckSuggested] = useState(false);
   const [runPollingErrors, setRunPollingErrors] = useState<RunPollingState>({});
   const [runRefreshVersion, setRunRefreshVersion] = useState(0);
   const [publishing, setPublishing] = useState(false);
@@ -590,6 +652,7 @@ export function CareerWorkspace() {
     generationPending.current = true;
     setGenerating(true);
     setGenerateError('');
+    setInstanceCheckSuggested(false);
     try {
       const application = persistedWorkspace
         ? await persistApplication(state)
@@ -687,9 +750,12 @@ export function CareerWorkspace() {
       }));
       setDossierView('journey');
     } catch (error) {
+      const workerUnavailable =
+        error instanceof Error && error.message === 'RUN_WORKER_UNAVAILABLE';
+      setInstanceCheckSuggested(workerUnavailable);
       setGenerateError(
-        error instanceof Error && error.message === 'RUN_WORKER_UNAVAILABLE'
-          ? 'Le service de traitement de cette instance n’est pas disponible. Démarrez les workers ou contactez l’administrateur, puis réessayez.'
+        workerUnavailable
+          ? 'Cette instance ne peut pas encore lancer l’analyse. Votre brief est enregistré.'
           : error instanceof Error && error.message === 'RUN_CONFLICT'
             ? 'La candidature ou la mémoire professionnelle a changé dans une autre session. Rechargez avant de relancer.'
             : error instanceof Error && error.message === 'RUN_RATE_LIMITED'
@@ -1480,6 +1546,20 @@ export function CareerWorkspace() {
     setPrimaryView('applications');
   }
 
+  function openInstanceSettings() {
+    setPrimaryView('settings');
+    requestAnimationFrame(() =>
+      document.getElementById('instance-settings-title')?.focus(),
+    );
+  }
+
+  function returnToInstanceError() {
+    openApplications('brief');
+    requestAnimationFrame(() =>
+      document.getElementById('run-generation-error')?.focus(),
+    );
+  }
+
   function openApplication(dossierId: string, view?: DossierView) {
     const dossier = workspace.dossiers.find(({ id }) => id === dossierId);
     if (!dossier) return;
@@ -1488,6 +1568,7 @@ export function CareerWorkspace() {
       selectedDossierId: dossierId,
     }));
     setGenerateError('');
+    setInstanceCheckSuggested(false);
     setDecisionError('');
     setDecisionMessage('');
     setPublishError('');
@@ -1504,6 +1585,7 @@ export function CareerWorkspace() {
       selectedDossierId: dossier.id,
     }));
     setGenerateError('');
+    setInstanceCheckSuggested(false);
     openApplications('brief');
   }
 
@@ -1672,9 +1754,9 @@ export function CareerWorkspace() {
                 : 'Stocké dans ce navigateur'}
           </p>
           <section className="hosting-card" aria-label="État de l’instance">
-            <strong>Auto-hébergé</strong>
-            <span>Vos preuves ne quittent pas votre instance.</span>
-            <button onClick={() => setPrimaryView('settings')} type="button">
+            <strong>Services de l’instance</strong>
+            <span>Vérifiez que les workers de traitement répondent.</span>
+            <button onClick={openInstanceSettings} type="button">
               Voir la config
             </button>
           </section>
@@ -1834,6 +1916,7 @@ export function CareerWorkspace() {
                     error={generateError}
                     generating={generating}
                     hasDraft={Boolean(state.spec)}
+                    instanceCheckSuggested={instanceCheckSuggested}
                     locked={
                       Boolean(state.runId) &&
                       !state.spec &&
@@ -1853,6 +1936,7 @@ export function CareerWorkspace() {
                       }));
                     }}
                     onGenerate={generate}
+                    onCheckInstance={openInstanceSettings}
                   />
                 ) : null}
                 {dossierView === 'company' ? (
@@ -2042,14 +2126,19 @@ export function CareerWorkspace() {
         ) : null}
         {primaryView === 'settings' ? (
           <SettingsView
+            onReturnToApplication={
+              instanceCheckSuggested ? returnToInstanceError : undefined
+            }
+            signedIn={Boolean(activeTenantId)}
             onExport={exportData}
             onReset={() => {
               if (
                 confirm(
-                  'Réinitialiser cet espace local ? La mémoire et les candidatures de ce navigateur seront supprimées.',
+                  'Effacer le cache de ce navigateur ? Les données enregistrées sur le serveur ne seront pas supprimées.',
                 )
               ) {
-                localStorage.removeItem('career-os-demo');
+                localStorage.removeItem(storageKey);
+                sessionStorage.removeItem(onboardingStorageKey);
                 location.reload();
               }
             }}
@@ -4257,19 +4346,23 @@ function BriefView({
   error,
   generating,
   hasDraft,
+  instanceCheckSuggested,
   locked,
   opportunity,
   onChange,
   onGenerate,
+  onCheckInstance,
 }: {
   canImportUrl: boolean;
   error: string;
   generating: boolean;
   hasDraft: boolean;
+  instanceCheckSuggested: boolean;
   locked: boolean;
   opportunity: Opportunity;
   onChange: (opportunity: Opportunity) => void;
   onGenerate: () => void;
+  onCheckInstance: () => void;
 }) {
   const importController = useRef<AbortController | undefined>(undefined);
   const importButton = useRef<HTMLButtonElement>(null);
@@ -4602,9 +4695,23 @@ function BriefView({
         />
       ) : null}
       {error ? (
-        <div className="inline-error" role="alert">
+        <div
+          className="inline-error"
+          id="run-generation-error"
+          role="alert"
+          tabIndex={-1}
+        >
           <strong>Page non générée</strong>
           <p>{error}</p>
+          {instanceCheckSuggested ? (
+            <button
+              className="quiet inline-error-action"
+              onClick={onCheckInstance}
+              type="button"
+            >
+              Vérifier l’instance
+            </button>
+          ) : null}
         </div>
       ) : null}
       <div className="document-actions">
@@ -5649,38 +5756,210 @@ function ActivityView({
 function SettingsView({
   onExport,
   onReset,
+  onReturnToApplication,
+  signedIn,
 }: {
   onExport: () => void;
   onReset: () => void;
+  onReturnToApplication?: () => void;
+  signedIn: boolean;
 }) {
+  const [instanceStatus, setInstanceStatus] = useState<InstanceStatus>();
+  const [statusError, setStatusError] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(signedIn);
+  const [statusVersion, setStatusVersion] = useState(0);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    const controller = new AbortController();
+    void fetch('/api/instance-status', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('INSTANCE_STATUS_UNAVAILABLE');
+        setInstanceStatus(instanceStatusSchema.parse(await response.json()));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setStatusError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setStatusLoading(false);
+      });
+    return () => controller.abort();
+  }, [signedIn, statusVersion]);
+
+  const unavailableServices =
+    instanceStatus?.services.filter(({ status }) => status !== 'fresh') ?? [];
+  const allWorkersActive =
+    instanceStatus?.services.every(({ status }) => status === 'fresh') ?? false;
+
   return (
     <div className="standalone-view settings-view">
       <header className="view-header">
         <div>
           <p className="section-label">Réglages</p>
-          <h1>Espace local</h1>
-          <p>Exportez ou réinitialisez les données locales de ce navigateur.</p>
+          <h1 id="instance-settings-title" tabIndex={-1}>
+            Réglages de l’espace
+          </h1>
+          <p>
+            Contrôlez l’exécution et les données conservées dans ce navigateur.
+          </p>
         </div>
       </header>
+      <section
+        className="settings-row instance-settings"
+        id="instance-execution"
+      >
+        <div className="instance-settings-heading">
+          <div>
+            <h2>Disponibilité des workers</h2>
+            <p>Les sept processus doivent répondre pour terminer un dossier.</p>
+          </div>
+          {signedIn ? (
+            <button
+              className="quiet"
+              disabled={statusLoading}
+              onClick={() => {
+                setStatusLoading(true);
+                setStatusError(false);
+                setStatusVersion((version) => version + 1);
+              }}
+              type="button"
+            >
+              Actualiser
+            </button>
+          ) : null}
+        </div>
+        <div aria-live="polite" className="instance-status">
+          {!signedIn ? (
+            <>
+              <strong>Connexion requise</strong>
+              <p>
+                Connectez-vous pour vérifier les services de votre instance.
+              </p>
+              <Link href="/sign-in?next=/?view=settings">Se connecter</Link>
+            </>
+          ) : statusLoading ? (
+            <>
+              <strong>Vérification de l’instance…</strong>
+              <p>Lecture de l’état des services.</p>
+            </>
+          ) : statusError || !instanceStatus ? (
+            <>
+              <strong>État non disponible</strong>
+              <p>Impossible de vérifier les services pour le moment.</p>
+            </>
+          ) : allWorkersActive ? (
+            <>
+              <strong className="instance-ready">7 workers actifs</strong>
+              <p>
+                Les processus répondent. Le modèle local et ses réponses sont
+                vérifiés pendant l’exécution.
+              </p>
+            </>
+          ) : (
+            <>
+              <strong>Configuration incomplète</strong>
+              <p>
+                {unavailableServices.length} service
+                {unavailableServices.length > 1 ? 's' : ''} ne répond
+                {unavailableServices.length > 1 ? 'ent' : ''} pas actuellement.
+              </p>
+              {instanceStatus.mode === 'self-hosted' ? (
+                <>
+                  <div className="instance-service-groups">
+                    {(['Analyse', 'Vérification'] as const).map((stage) => {
+                      const services = unavailableServices.filter(
+                        ({ service }) =>
+                          workerServiceDetails[service].stage === stage,
+                      );
+                      return services.length ? (
+                        <section key={stage}>
+                          <h3>{stage}</h3>
+                          <ul>
+                            {services.map(({ service, status }) => (
+                              <li key={service}>
+                                <span>
+                                  <strong>
+                                    {workerServiceDetails[service].label}
+                                  </strong>
+                                  <small>
+                                    {status === 'stale'
+                                      ? 'Arrêté ou sans réponse'
+                                      : 'Non détecté'}
+                                  </small>
+                                </span>
+                                <code>
+                                  {workerServiceDetails[service].command}
+                                </code>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      ) : null;
+                    })}
+                  </div>
+                  <details className="instance-setup-help">
+                    <summary>Configurer les services</summary>
+                    <p>
+                      Exportez les variables propres à chaque service avant de
+                      lancer ces commandes. Les workers ne chargent pas le
+                      fichier <code>.env.local</code>.
+                    </p>
+                    <ul>
+                      {unavailableServices.map(({ service }) => (
+                        <li key={service}>
+                          <code>
+                            {workerServiceDetails[service].databaseVariable}
+                          </code>
+                          {workerServiceDetails[service].requiresModel
+                            ? ' + CAREER_OS_LOCAL_MODEL_*'
+                            : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </>
+              ) : (
+                <p>
+                  Le traitement cloud est géré par Career OS. Actualisez ou
+                  contactez l’assistance si l’état persiste.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+        {onReturnToApplication ? (
+          <button
+            className="quiet instance-return"
+            onClick={onReturnToApplication}
+            type="button"
+          >
+            Revenir au brief
+          </button>
+        ) : null}
+      </section>
       <section className="settings-row">
         <div>
-          <h2>Exporter toutes les données</h2>
+          <h2>Exporter le cache de ce navigateur</h2>
           <p>
-            Téléchargez le profil, la candidature, les revues et l’activité.
+            Téléchargez la copie locale du profil, des candidatures et de
+            l’activité.
           </p>
         </div>
         <button onClick={onExport}>Export JSON</button>
       </section>
       <section className="settings-row danger-zone">
         <div>
-          <h2>Réinitialiser l’espace local</h2>
+          <h2>Effacer le cache local</h2>
           <p>
-            Supprimez la mémoire, les candidatures et leurs pages de ce
-            navigateur.
+            Effacez uniquement les données de ce navigateur. Les données
+            synchronisées sur le serveur ne seront pas supprimées.
           </p>
         </div>
         <button className="danger-link" onClick={onReset}>
-          Réinitialiser
+          Effacer le cache
         </button>
       </section>
       <p className="demo-footer">Les fichiers CV bruts ne sont pas exportés.</p>

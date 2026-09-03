@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { syntheticProfile } from '../../lib/fixture';
-import type { PersistedRun } from '../../lib/run-contract';
+import {
+  instanceStatusSchema,
+  type PersistedRun,
+} from '../../lib/run-contract';
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
 const authOrigin = process.env.TEST_AUTH_ORIGIN ?? baseUrl;
@@ -98,8 +101,45 @@ async function main() {
     401,
     'anonymous run',
   );
+  const anonymousStatus = await anonymous.request('/api/instance-status');
+  await expectStatus(anonymousStatus, 401, 'anonymous instance status');
+  assert.equal(
+    anonymousStatus.headers.get('cache-control'),
+    'private, no-store',
+  );
 
   const owner = await createWorkspace('RunOwner');
+  const statusPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await statusPool.query(`delete from app.worker_heartbeats`);
+    const incompleteResponse = await owner.request('/api/instance-status');
+    await expectStatus(incompleteResponse, 200, 'incomplete instance status');
+    assert.equal(
+      incompleteResponse.headers.get('cache-control'),
+      'private, no-store',
+    );
+    const incomplete = instanceStatusSchema.parse(
+      await incompleteResponse.json(),
+    );
+    assert.equal(incomplete.mode, 'self-hosted');
+    assert.equal(incomplete.services.length, 7);
+    assert.ok(incomplete.services.every(({ status }) => status === 'missing'));
+    assert.equal(JSON.stringify(incomplete).includes('last_seen_at'), false);
+
+    await statusPool.query(
+      `insert into app.worker_heartbeats(service,last_seen_at)
+       select service, clock_timestamp()
+       from unnest($1::text[]) service`,
+      [incomplete.services.map(({ service }) => service)],
+    );
+    const readyResponse = await owner.request('/api/instance-status');
+    await expectStatus(readyResponse, 200, 'ready instance status');
+    const ready = instanceStatusSchema.parse(await readyResponse.json());
+    assert.ok(ready.services.every(({ status }) => status === 'fresh'));
+  } finally {
+    await statusPool.end();
+  }
+
   const saved = await owner.request('/api/profile', 'PUT', {
     profile: syntheticProfile,
     expectedRevision: 0,

@@ -4,6 +4,7 @@ import {
   persistedEvidenceArchiveSchema,
   persistedRecruiterStrategySchema,
   persistedResearchSchema,
+  workerAvailabilitySchema,
   type PersistedRun,
 } from './run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from './schemas';
@@ -217,13 +218,7 @@ const applicationDossierSchema: z.ZodType<ApplicationDossier> = z
       )
       .max(20)
       .optional(),
-    workerAvailability: z
-      .object({
-        state: z.enum(['ready', 'waiting', 'unavailable']),
-        service: z.string().min(1).max(100).optional(),
-      })
-      .strict()
-      .optional(),
+    workerAvailability: workerAvailabilitySchema.optional(),
     runProfile: profileSchema.optional(),
     runResearch: persistedResearchSchema.optional(),
     runEvidenceArchive: persistedEvidenceArchiveSchema.optional(),

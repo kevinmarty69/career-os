@@ -389,6 +389,7 @@ test('explains unavailable workers and recovers the same durable run', async ({
   const runId = crypto.randomUUID();
   let attempts = 0;
   let pollUnavailable = false;
+  let instanceMode: 'self-hosted' | 'managed' = 'self-hosted';
   let workerState: 'unavailable' | 'waiting' | 'ready' = 'unavailable';
   const run = () => ({
     runId,
@@ -444,14 +445,49 @@ test('explains unavailable workers and recovers the same durable run', async ({
       body: JSON.stringify(run()),
     });
   });
+  await page.route('**/api/instance-status', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        mode: instanceMode,
+        services: [
+          'company-researcher',
+          'evidence-archivist',
+          'recruiter-strategist',
+          'page-composer',
+          'recruiter-reviewer',
+          'hiring-manager-reviewer',
+          'factuality-reviewer',
+        ].map((service) => ({ service, status: 'missing' })),
+      }),
+    });
+  });
 
   await page.getByRole('button', { name: 'Générer la page' }).click();
   await expect(
     page.getByText(
-      'Le service de traitement de cette instance n’est pas disponible.',
+      'Cette instance ne peut pas encore lancer l’analyse. Votre brief est enregistré.',
     ),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: /Analyse/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Vérifier l’instance' }).click();
+  const settingsTitle = page.getByRole('heading', {
+    name: 'Réglages de l’espace',
+  });
+  await expect(settingsTitle).toBeVisible();
+  await expect(settingsTitle).toBeFocused();
+  await expect(page.getByText('Configuration incomplète')).toBeVisible();
+  await expect(page.getByText('pnpm worker:company-researcher')).toBeVisible();
+  await page.getByText('Configurer les services').click();
+  await expect(page.getByText('CAREER_OS_WORKER_DATABASE_URL')).toBeVisible();
+  instanceMode = 'managed';
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await expect(
+    page.getByText('Le traitement cloud est géré par Career OS.'),
+  ).toBeVisible();
+  await expect(page.getByText('pnpm worker:company-researcher')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Revenir au brief' }).click();
+  await expect(page.locator('#run-generation-error')).toBeFocused();
 
   await page.getByRole('button', { name: 'Réessayer' }).click();
   await expect(
