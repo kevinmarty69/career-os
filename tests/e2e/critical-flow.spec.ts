@@ -303,8 +303,11 @@ test('resumes a durable run and separates polling loss from run failure', async 
   await expect(
     progress
       .getByRole('listitem')
-      .filter({ hasText: 'Sélection des preuves' })
+      .filter({ hasText: 'Composition de la page' })
       .getByText('En cours'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Composition de la page en cours' }),
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Offre', exact: true }).click();
@@ -315,7 +318,7 @@ test('resumes a durable run and separates polling loss from run failure', async 
   await page.reload();
   await expect(
     page.getByRole('heading', {
-      name: 'Analyse de l’offre en cours',
+      name: 'Composition de la page en cours',
     }),
   ).toBeVisible();
   runRead = 'failed';
@@ -339,6 +342,154 @@ test('resumes a durable run and separates polling loss from run failure', async 
     page.getByRole('button', { name: 'Modifier le brief' }),
   ).toBeVisible();
   await expect(progress.getByText('En cours', { exact: true })).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false);
+});
+
+test('keeps the human research checkpoint explicit and retry-safe', async ({
+  page,
+}) => {
+  await createPersistedApplication(page);
+  const profile = await page.evaluate(async () => {
+    const response = await fetch('/api/profile');
+    return ((await response.json()) as { profile: unknown }).profile;
+  });
+  const runId = crypto.randomUUID();
+  const researchArtifactId = crypto.randomUUID();
+  const research = {
+    artifactId: researchArtifactId,
+    artifactHash: 'a'.repeat(64),
+    company: 'Northstar Labs',
+    role: 'Senior Product Engineer',
+    source: {
+      kind: 'job-posting',
+      url: 'https://jobs.example.test/product-engineer',
+      trust: 'untrusted-data',
+    },
+    signals: [
+      {
+        signalId: 'signal-1',
+        statement: 'Piloter un produit de la découverte à la production.',
+        excerpt: 'Own a product from discovery to production.',
+        category: 'responsibility',
+        priority: 'high',
+      },
+      {
+        signalId: 'signal-2',
+        statement: 'Construire des systèmes fiables.',
+        excerpt: 'Build reliable systems.',
+        category: 'requirement',
+        priority: 'medium',
+      },
+    ],
+  };
+  const pausedRun = {
+    runId,
+    status: 'paused',
+    stage: 'evidence_archive',
+    revision: 0,
+    usedTokens: 24,
+    usedCostMicros: 0,
+    profile,
+    research,
+    steps: [{ stage: 'company-researcher', status: 'completed', attempt: 1 }],
+    reviews: [],
+    events: [],
+  };
+  await page.route('**/api/runs', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify(pausedRun),
+    });
+  });
+  let selections = 0;
+  const keys: string[] = [];
+  let releaseFirstSelection!: () => void;
+  let markFirstSelectionStarted!: () => void;
+  const firstSelectionStarted = new Promise<void>((resolve) => {
+    markFirstSelectionStarted = resolve;
+  });
+  const firstSelectionCanFinish = new Promise<void>((resolve) => {
+    releaseFirstSelection = resolve;
+  });
+  await page.route(`**/api/runs/${runId}/evidence-selection`, async (route) => {
+    selections += 1;
+    keys.push(route.request().headers()['idempotency-key'] ?? '');
+    expect(route.request().postDataJSON()).toEqual({
+      researchArtifactId,
+      selectedSignalIds: ['signal-1'],
+    });
+    if (selections === 1) {
+      markFirstSelectionStarted();
+      await firstSelectionCanFinish;
+      await route.fulfill({ status: 503, body: 'Unavailable' });
+      return;
+    }
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...pausedRun,
+        status: 'running',
+        steps: [
+          ...pausedRun.steps,
+          { stage: 'evidence-archivist', status: 'pending', attempt: 1 },
+        ],
+      }),
+    });
+  });
+
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Analyse de l’offre à vérifier' }),
+  ).toBeVisible();
+  const checkboxes = page.getByRole('checkbox');
+  await expect(checkboxes).toHaveCount(2);
+  await expect(checkboxes.nth(0)).toBeChecked();
+  await expect(checkboxes.nth(1)).toBeChecked();
+  await checkboxes.nth(1).uncheck();
+  await page.getByRole('button', { name: 'Confirmer 1 critère' }).click();
+  await firstSelectionStarted;
+  await expect(checkboxes.nth(0)).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Corriger l’offre' }),
+  ).toBeDisabled();
+  await expect(page.locator('form.research-checkpoint')).toHaveAttribute(
+    'aria-busy',
+    'true',
+  );
+  releaseFirstSelection();
+  await expect(
+    page.getByText('Vous pouvez réessayer sans perdre vos choix.'),
+  ).toBeVisible();
+  await expect(checkboxes.nth(0)).toBeChecked();
+  await expect(checkboxes.nth(1)).not.toBeChecked();
+  await page.getByRole('button', { name: 'Corriger l’offre' }).click();
+  await page
+    .getByLabel('Description du poste')
+    .fill('Brief corrigé sans perdre l’analyse précédente.');
+  await page.getByRole('button', { name: 'Parcours', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Analyse de l’offre à vérifier' }),
+  ).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Analyse de l’offre à vérifier' }),
+  ).toBeVisible();
+  await expect(page.getByRole('checkbox').nth(0)).toBeChecked();
+  await expect(page.getByRole('checkbox').nth(1)).not.toBeChecked();
+  await page.getByRole('button', { name: 'Confirmer 1 critère' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Sélection des preuves en cours' }),
+  ).toBeVisible();
+  expect(selections).toBe(2);
+  expect(keys[0]).toBe(keys[1]);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,
@@ -610,6 +761,9 @@ test('requires an explicit workspace choice when several are available', async (
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'Covered by the desktop flow.');
+  await page.context().setExtraHTTPHeaders({
+    'x-forwarded-for': '198.51.100.42',
+  });
   const email = `multi-${crypto.randomUUID()}@example.test`;
   await page.goto('/sign-in');
   await page

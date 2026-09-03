@@ -3,7 +3,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import {
   createRunInputSchema,
+  persistedResearchSchema,
   persistedRunSchema,
+  researchSelectionInputSchema,
   reviewIssueDecisionInputSchema,
   reviewIssueDecisionResultSchema,
   type PersistedRun,
@@ -164,6 +166,38 @@ export async function readPersistedRun(session: RunSession, rawRunId: string) {
       await authorize(tx, session, 'career_app');
       return readRunProjection(tx, session.tenantId, runId);
     });
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function confirmResearchSelection(
+  session: RunSession,
+  rawRunId: string,
+  rawInput: unknown,
+  idempotencyKey: string,
+) {
+  const runId = idempotencyKeySchema(rawRunId);
+  const input = researchSelectionInputSchema.parse(rawInput);
+  const key = idempotencyKeySchema(idempotencyKey);
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session, 'career_app');
+      const [result] = await tx<{ created: boolean }[]>`
+        select app.confirm_research_signal_selection(
+          ${session.tenantId}, ${runId}, ${input.researchArtifactId},
+          ${input.selectedSignalIds}, ${key}
+        ) as created`;
+      return {
+        created: result.created,
+        run: await readRunProjection(tx, session.tenantId, runId),
+      };
+    });
+  } catch (error) {
+    if (isDatabaseConflict(error)) throw new RunConflictError();
+    if (isDatabaseRejection(error)) throw new RunRejectedError();
+    throw error;
   } finally {
     await sql.end();
   }
@@ -584,6 +618,18 @@ async function readRunProjection(
     where tenant_id = ${tenantId} and id = ${run.profile_id}`;
   if (!snapshot) throw new RunRejectedError('Run profile snapshot is missing.');
   const profile = await readProfileGraph(tx, tenantId, snapshot);
+  const [researchArtifact] = await tx<
+    Array<{ id: string; body: unknown; artifact_hash: string }>
+  >`select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
+    from app.artifacts
+    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+      and kind = 'research'
+    order by version desc limit 1`;
+  const [evidenceArtifact] = await tx<Array<{ body: unknown }>>`
+    select body from app.artifacts
+    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+      and kind = 'evidence_archive'
+    order by version desc limit 1`;
   const [pageSpec] = await tx<
     Array<{ id: string; spec: unknown }>
   >`select id, spec from app.page_specs
@@ -638,6 +684,16 @@ async function readRunProjection(
       attempt: step.attempt,
       ...(step.failure_code ? { failureCode: step.failure_code } : {}),
     })),
+    ...(researchArtifact
+      ? {
+          research: researchProjection(
+            researchArtifact.id,
+            researchArtifact.artifact_hash,
+            researchArtifact.body,
+          ),
+        }
+      : {}),
+    ...(evidenceArtifact ? { evidenceArchive: evidenceArtifact.body } : {}),
     ...(pageSpec ? { spec: pageSpecSchema.parse(pageSpec.spec) } : {}),
     reviews: reviews.map((review) => ({
       reviewId: review.id,
@@ -728,6 +784,45 @@ function reviewIssues(value: unknown) {
 
 function fromDatabaseActor(actor: string) {
   return actor.replaceAll('_', '-');
+}
+
+function researchProjection(
+  artifactId: string,
+  artifactHash: string,
+  rawBody: unknown,
+) {
+  if (!rawBody || typeof rawBody !== 'object' || !('signals' in rawBody))
+    throw new RunRejectedError('Run research artifact is invalid.');
+  const body = rawBody as Record<string, unknown>;
+  if (!Array.isArray(body.signals))
+    throw new RunRejectedError('Run research artifact is invalid.');
+  return persistedResearchSchema.parse({
+    artifactId,
+    artifactHash,
+    company: body.company,
+    role: body.role,
+    source: body.source,
+    signals: body.signals.map((signal, index) => ({
+      ...(signal && typeof signal === 'object' ? signal : {}),
+      signalId: `signal-${index + 1}`,
+    })),
+  });
+}
+
+function isDatabaseConflict(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes('selection conflict') ||
+      error.message.includes('idempotency key conflict'))
+  );
+}
+
+function isDatabaseRejection(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes('research selection') ||
+      error.message.includes('evidence archive'))
+  );
 }
 
 function hashJson(value: unknown) {

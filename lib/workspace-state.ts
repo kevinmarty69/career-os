@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Application } from './application-contract';
-import type { PersistedRun } from './run-contract';
+import { persistedResearchSchema, type PersistedRun } from './run-contract';
+import { evidenceArchiveOutputSchema } from './evidence-archive';
 import { pageSpecSchema, profileSchema, type Profile } from './schemas';
 import type { Opportunity, Strategy, WorkflowEvent } from './workflow';
 
@@ -30,6 +31,9 @@ export type ApplicationDossier = {
   runStage?: string;
   runSteps?: PersistedRun['steps'];
   runProfile?: Profile;
+  runResearch?: PersistedRun['research'];
+  runEvidenceArchive?: PersistedRun['evidenceArchive'];
+  selectedResearchSignalIds?: string[];
   reviews: WorkspaceReview[];
   reviewDecisions: ReviewDecision[];
   publicationEligible?: boolean;
@@ -56,6 +60,9 @@ export type DossierStatus =
   | 'Prête à valider'
   | 'Brouillon prêt'
   | 'Analyse en cours'
+  | 'Sélection des preuves'
+  | 'Composition en cours'
+  | 'Vérifications en cours'
   | 'Analyse terminée'
   | 'Génération arrêtée'
   | 'À compléter'
@@ -189,6 +196,12 @@ const applicationDossierSchema: z.ZodType<ApplicationDossier> = z
       .max(20)
       .optional(),
     runProfile: profileSchema.optional(),
+    runResearch: persistedResearchSchema.optional(),
+    runEvidenceArchive: evidenceArchiveOutputSchema.optional(),
+    selectedResearchSignalIds: z
+      .array(z.string().regex(/^signal-(?:[1-9]|1\d|20)$/))
+      .max(20)
+      .optional(),
     reviews: z.array(workspaceReviewSchema),
     reviewDecisions: z.array(reviewDecisionSchema),
     publicationEligible: z.boolean().optional(),
@@ -464,8 +477,34 @@ export function invalidateDossiersAfterProfileChange(
 export function dossierStatus(dossier: ApplicationDossier): DossierStatus {
   if (dossier.capability) return 'Partagée';
   if (dossier.approved) return 'Validée';
-  if (dossier.runId && !dossier.spec && dossier.runStatus === 'running')
+  if (dossier.runId && !dossier.spec && dossier.runStatus === 'running') {
+    const steps = dossier.runSteps ?? [];
+    if (
+      steps.some(
+        (step) =>
+          ['recruiter', 'hiring-manager', 'fact-checker'].includes(
+            step.stage,
+          ) && step.status !== 'completed',
+      )
+    )
+      return 'Vérifications en cours';
+    if (
+      steps.some(
+        (step) =>
+          ['recruiter-strategist', 'page-composer'].includes(step.stage) &&
+          step.status !== 'completed',
+      )
+    )
+      return 'Composition en cours';
+    if (
+      steps.some(
+        (step) =>
+          step.stage === 'evidence-archivist' && step.status !== 'completed',
+      )
+    )
+      return 'Sélection des preuves';
     return 'Analyse en cours';
+  }
   if (dossier.runId && !dossier.spec && dossier.runStatus === 'paused')
     return 'Analyse terminée';
   if (

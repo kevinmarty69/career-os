@@ -11,6 +11,7 @@
 - Keep application briefs mutable only through optimistic revisions. Every run references an immutable opportunity snapshot, and deleting its application revokes all derived publications and share links.
 - Require an exact configured public origin for every state-changing browser request, including when the app runs behind a reverse proxy.
 - Browser-facing database roles are assumed only after authenticated tenant resolution. The company-researcher executor uses a dedicated non-owner login whose only inherited role is `career_company_researcher`; it accepts no browser-supplied tenant selector.
+- Human-confirmed signals are resolved inside PostgreSQL against the immutable run snapshot. The deterministic evidence worker uses a different non-owner login whose only inherited role is `career_evidence_archivist`, has exactly four stage-specific functions (claim, complete, fail and reap expired work), receives no tenant selector, cannot read tables, and cannot persist IDs absent from its permission-filtered input.
 - Store only SHA-256 capability-token hashes. Exchange a URL-fragment token for an HttpOnly, Secure, SameSite=Lax session; recheck expiry/revocation on every request. Private responses are `no-store`, `no-referrer`, `noindex` and expose no cross-navigation.
 - Cloud agents run as non-root in per-run sandboxes with no host shell, minimal scoped secrets, read-only mounts, egress policy, and server-enforced token/cost/time/concurrency budgets.
 

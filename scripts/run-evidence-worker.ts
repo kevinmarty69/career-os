@@ -1,26 +1,17 @@
-import { LocalOpenAICompanyResearchClient } from '../lib/server/local-openai-client';
-import { processCompanyResearchStep } from '../lib/server/run-worker';
+import { processEvidenceArchivistStep } from '../lib/server/evidence-worker';
 
 async function main() {
-  const databaseUrl = required('CAREER_OS_WORKER_DATABASE_URL');
-  const client = new LocalOpenAICompanyResearchClient({
-    baseUrl: required('CAREER_OS_LOCAL_MODEL_BASE_URL'),
-    apiKey: process.env.CAREER_OS_LOCAL_MODEL_API_KEY ?? 'local-only',
-    model: required('CAREER_OS_LOCAL_MODEL'),
-  });
+  const databaseUrl = required('CAREER_OS_EVIDENCE_WORKER_DATABASE_URL');
   const once = process.argv.includes('--once');
 
   do {
     try {
-      const result = await processCompanyResearchStep({
-        databaseUrl,
-        client,
-      });
+      const result = await processEvidenceArchivistStep(databaseUrl);
       console.log(JSON.stringify(result));
       if (once) break;
       await wait(result.status === 'idle' ? 1000 : 50);
     } catch {
-      console.error('Worker iteration failed.');
+      console.error('Evidence worker iteration failed.');
       if (once) {
         process.exitCode = 1;
         break;
@@ -31,7 +22,7 @@ async function main() {
 }
 
 void main().catch(() => {
-  console.error('Worker could not start.');
+  console.error('Evidence worker could not start.');
   process.exitCode = 1;
 });
 

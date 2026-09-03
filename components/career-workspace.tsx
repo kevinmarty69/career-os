@@ -167,6 +167,8 @@ export function CareerWorkspace() {
   const [decisionPending, setDecisionPending] = useState('');
   const [decisionError, setDecisionError] = useState('');
   const [decisionMessage, setDecisionMessage] = useState('');
+  const [selectionPending, setSelectionPending] = useState(false);
+  const [selectionError, setSelectionError] = useState('');
   const [shareLink, setShareLink] = useState<ScopedShareLink>();
   const [shareMessage, setShareMessage] = useState('');
   const [memoryError, setMemoryError] = useState('');
@@ -801,6 +803,61 @@ export function CareerWorkspace() {
       );
     } finally {
       setDecisionPending('');
+    }
+  }
+
+  async function confirmResearchSignals() {
+    if (!activeTenantId || !state.runId || !state.runResearch) return;
+    const selectedSignalIds = state.selectedResearchSignalIds ?? [];
+    if (!selectedSignalIds.length) {
+      setSelectionError('Conservez au moins un critère pour continuer.');
+      return;
+    }
+    const dossierId = state.id;
+    const runId = state.runId;
+    const payload = JSON.stringify({
+      researchArtifactId: state.runResearch.artifactId,
+      selectedSignalIds,
+    });
+    const operation = persistedRunOperation(
+      localStorage,
+      `career-os-evidence-selection:${activeTenantId}:${runId}`,
+      payload,
+    );
+    setSelectionPending(true);
+    setSelectionError('');
+    try {
+      const response = await fetch(`/api/runs/${runId}/evidence-selection`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': operation.key,
+        },
+        body: payload,
+      });
+      if (!response.ok)
+        throw new Error(
+          response.status === 409
+            ? 'SELECTION_CONFLICT'
+            : response.status === 400
+              ? 'SELECTION_REJECTED'
+              : 'SELECTION_FAILED',
+        );
+      const run = persistedRunSchema.parse(await response.json());
+      updateApplicationDossier(dossierId, (current) =>
+        applyPersistedRun(current, run),
+      );
+      setRunRefreshVersion((current) => current + 1);
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error && error.message === 'SELECTION_CONFLICT'
+          ? 'Cette analyse a déjà été confirmée avec une autre sélection.'
+          : error instanceof Error && error.message === 'SELECTION_REJECTED'
+            ? 'La sélection ne correspond plus à cette analyse. Actualisez le dossier.'
+            : 'La sélection n’a pas été enregistrée. Vous pouvez réessayer sans perdre vos choix.',
+      );
+    } finally {
+      setSelectionPending(false);
     }
   }
 
@@ -1603,18 +1660,7 @@ export function CareerWorkspace() {
                       updateApplicationDossier(dossierId, (current) => ({
                         ...current,
                         opportunity,
-                        strategy: undefined,
-                        spec: undefined,
-                        runId: undefined,
-                        runStatus: undefined,
-                        runStage: undefined,
-                        runSteps: undefined,
-                        runProfile: undefined,
-                        reviews: [],
-                        reviewDecisions: [],
-                        publicationEligible: undefined,
                         approved: false,
-                        events: [],
                       }));
                     }}
                     onGenerate={generate}
@@ -1634,6 +1680,29 @@ export function CareerWorkspace() {
                         setRunRefreshVersion((current) => current + 1)
                       }
                       onRetry={() => void generate(true)}
+                      selectionError={selectionError}
+                      selectionPending={selectionPending}
+                      onConfirmResearch={() => void confirmResearchSignals()}
+                      onToggleSignal={(signalId) =>
+                        updateApplicationDossier(state.id, (current) => {
+                          const selected = new Set(
+                            current.selectedResearchSignalIds ?? [],
+                          );
+                          if (selected.has(signalId)) selected.delete(signalId);
+                          else selected.add(signalId);
+                          return {
+                            ...current,
+                            selectedResearchSignalIds:
+                              current.runResearch?.signals
+                                .map((signal) => signal.signalId)
+                                .filter((id) => selected.has(id)) ?? [],
+                          };
+                        })
+                      }
+                      onOpenEvidence={(claimId) => {
+                        setSelectedClaimId(claimId);
+                        setInspectorOpen(true);
+                      }}
                     />
                   ) : (
                     <JourneyView
@@ -3185,12 +3254,12 @@ const runProgressGroups: RunProgressGroup[] = [
   {
     title: 'Sélection des preuves',
     description: 'Retenir uniquement les expériences pertinentes.',
-    stages: ['evidence-archivist', 'recruiter-strategist'],
+    stages: ['evidence-archivist'],
   },
   {
     title: 'Composition de la page',
     description: 'Assembler une candidature adaptée au poste.',
-    stages: ['page-composer'],
+    stages: ['recruiter-strategist', 'page-composer'],
   },
   {
     title: 'Vérifications',
@@ -3205,30 +3274,74 @@ function RunProgressView({
   onOpenBrief,
   onRefresh,
   onRetry,
+  onConfirmResearch,
+  onToggleSignal,
+  onOpenEvidence,
   pollingError,
+  selectionError,
+  selectionPending,
 }: {
   dossier: ApplicationDossier;
   onBack: () => void;
   onOpenBrief: () => void;
   onRefresh: () => void;
   onRetry: () => void;
+  onConfirmResearch: () => void;
+  onToggleSignal: (signalId: string) => void;
+  onOpenEvidence: (claimId: string) => void;
   pollingError?: string;
+  selectionError?: string;
+  selectionPending: boolean;
 }) {
   const status = dossier.runStatus ?? 'running';
   const running = status === 'running';
   const terminalCopy = runTerminalCopy(status);
+  const reviewingResearch = Boolean(
+    status === 'paused' &&
+    dossier.runStage === 'evidence_archive' &&
+    dossier.runResearch &&
+    !dossier.runEvidenceArchive,
+  );
+  const archiveReady = Boolean(
+    status === 'paused' &&
+    dossier.runStage === 'strategy' &&
+    dossier.runEvidenceArchive,
+  );
+  const selectedSignals = new Set(dossier.selectedResearchSignalIds ?? []);
+  const selectedCount = selectedSignals.size;
+  const currentGroup = runProgressGroups.find((group) => {
+    const groupStatus = runProgressGroupStatus(
+      dossier.runSteps ?? [],
+      group.stages,
+    );
+    return groupStatus === 'active' || groupStatus === 'pending';
+  });
+  const matchedSignalCount =
+    dossier.runEvidenceArchive?.signals.filter(
+      (signal) => signal.matches.length,
+    ).length ?? 0;
+  const title = reviewingResearch
+    ? 'Analyse de l’offre à vérifier'
+    : archiveReady
+      ? 'Preuves candidates sélectionnées'
+      : running
+        ? `${currentGroup?.title ?? 'Analyse de la candidature'} en cours`
+        : terminalCopy.title;
+  const description = reviewingResearch
+    ? 'Vérifiez ce que nous avons compris du poste. Vous gardez la main avant que votre parcours soit analysé.'
+    : archiveReady
+      ? 'Les correspondances ci-dessous respectent les permissions de votre mémoire. Cette version s’arrête ici : le stratège recruteur n’est pas encore activé.'
+      : running
+        ? `${currentGroup?.description ?? 'Le traitement continue.'} Vous pouvez quitter ce dossier : son état restera disponible ici.`
+        : terminalCopy.description;
 
   return (
     <section className="run-progress" aria-labelledby="run-progress-title">
       <header>
         <p className="section-label">Analyse de la candidature</p>
-        <h2 id="run-progress-title">
-          {running ? 'Analyse de l’offre en cours' : terminalCopy.title}
-        </h2>
+        <h2 id="run-progress-title">{title}</h2>
         <p className="run-progress-status" role="status" aria-live="polite">
-          {running
-            ? 'Vous pouvez quitter ce dossier. L’analyse continue et son état restera disponible ici.'
-            : terminalCopy.description}
+          {description}
         </p>
       </header>
 
@@ -3265,6 +3378,140 @@ function RunProgressView({
         })}
       </ol>
 
+      {reviewingResearch && dossier.runResearch ? (
+        <form
+          aria-busy={selectionPending}
+          className="research-checkpoint"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onConfirmResearch();
+          }}
+        >
+          <header>
+            <div>
+              <p className="section-label">Votre décision</p>
+              <h3>Quels critères doivent guider la candidature&nbsp;?</h3>
+            </div>
+            <strong aria-live="polite">
+              {selectedCount}/{dossier.runResearch.signals.length} retenus
+            </strong>
+          </header>
+          <fieldset
+            className="research-signal-list"
+            disabled={selectionPending}
+          >
+            <legend className="sr-only">
+              Critères retenus pour guider la candidature
+            </legend>
+            {dossier.runResearch.signals.map((signal) => (
+              <label className="research-signal" key={signal.signalId}>
+                <input
+                  checked={selectedSignals.has(signal.signalId)}
+                  onChange={() => onToggleSignal(signal.signalId)}
+                  type="checkbox"
+                />
+                <span className="research-signal-copy">
+                  <span className="research-signal-meta">
+                    <span>{researchCategoryLabel(signal.category)}</span>
+                    <span>{researchPriorityLabel(signal.priority)}</span>
+                  </span>
+                  <strong>{signal.statement}</strong>
+                  <q>{signal.excerpt}</q>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <p className="research-source">
+            Source analysée&nbsp;:{' '}
+            {dossier.runResearch.source.url ? (
+              <a
+                href={dossier.runResearch.source.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                ouvrir l’offre
+              </a>
+            ) : (
+              'texte importé'
+            )}
+          </p>
+          {selectionError ? (
+            <p className="form-error" role="alert">
+              {selectionError}
+            </p>
+          ) : null}
+          <footer>
+            <button
+              className="quiet"
+              disabled={selectionPending}
+              onClick={onOpenBrief}
+              type="button"
+            >
+              Corriger l’offre
+            </button>
+            <button disabled={!selectedCount || selectionPending} type="submit">
+              {selectionPending
+                ? 'Sélection en cours…'
+                : `Confirmer ${selectedCount} critère${selectedCount > 1 ? 's' : ''}`}
+            </button>
+          </footer>
+          <p className="research-edit-note">
+            Modifier l’offre conservera cette analyse jusqu’au lancement de la
+            suivante.
+          </p>
+        </form>
+      ) : null}
+
+      {archiveReady && dossier.runEvidenceArchive ? (
+        <section className="evidence-selection-result">
+          <header>
+            <p className="section-label">Correspondances auditées</p>
+            <h3>
+              {matchedSignalCount} critère{matchedSignalCount === 1 ? '' : 's'}{' '}
+              sur {dossier.runEvidenceArchive.signals.length} relié
+              {matchedSignalCount === 1 ? '' : 's'} à votre parcours
+            </h3>
+          </header>
+          <ul>
+            {dossier.runEvidenceArchive.signals.map((result) => {
+              const signal = dossier.runResearch?.signals.find(
+                ({ signalId }) => signalId === result.signalId,
+              );
+              return (
+                <li key={result.signalId}>
+                  <div>
+                    <strong>{signal?.statement ?? result.signalId}</strong>
+                    <span>
+                      {result.matches.length
+                        ? `${result.matches.length} preuve${result.matches.length > 1 ? 's' : ''} candidate${result.matches.length > 1 ? 's' : ''}`
+                        : 'Aucune preuve suffisamment proche'}
+                    </span>
+                  </div>
+                  {result.matches.map((match) => {
+                    const claim = dossier.runProfile?.claims.find(
+                      ({ id }) => id === match.claimId,
+                    );
+                    return (
+                      <button
+                        className="quiet"
+                        key={match.claimId}
+                        onClick={() => onOpenEvidence(match.claimId)}
+                        type="button"
+                      >
+                        {claim?.statement ?? 'Voir la preuve'}
+                        <small>
+                          Correspondance lexicale&nbsp;: {match.relevanceScore}%
+                        </small>
+                      </button>
+                    );
+                  })}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
       {pollingError ? (
         <div className="run-polling-warning" role="status" aria-live="polite">
           <p>{pollingError}</p>
@@ -3274,28 +3521,51 @@ function RunProgressView({
         </div>
       ) : null}
 
-      <div className="run-progress-actions">
-        {running ? (
-          <button className="quiet" onClick={onBack} type="button">
-            Retour aux candidatures
-          </button>
-        ) : status === 'paused' ? (
-          <button onClick={onOpenBrief} type="button">
-            Modifier le brief
-          </button>
-        ) : (
-          <>
-            <button onClick={onRetry} type="button">
-              Relancer la génération
+      {!reviewingResearch ? (
+        <div className="run-progress-actions">
+          {running ? (
+            <button className="quiet" onClick={onBack} type="button">
+              Retour aux candidatures
             </button>
-            <button className="quiet" onClick={onOpenBrief} type="button">
+          ) : status === 'paused' ? (
+            <button onClick={onOpenBrief} type="button">
               Modifier le brief
             </button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <button onClick={onRetry} type="button">
+                Relancer la génération
+              </button>
+              <button className="quiet" onClick={onOpenBrief} type="button">
+                Modifier le brief
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function researchCategoryLabel(
+  category: NonNullable<
+    ApplicationDossier['runResearch']
+  >['signals'][number]['category'],
+) {
+  if (category === 'responsibility') return 'Responsabilité';
+  if (category === 'requirement') return 'Attendu';
+  if (category === 'culture') return 'Culture';
+  return 'Contrainte';
+}
+
+function researchPriorityLabel(
+  priority: NonNullable<
+    ApplicationDossier['runResearch']
+  >['signals'][number]['priority'],
+) {
+  if (priority === 'high') return 'Prioritaire';
+  if (priority === 'medium') return 'Important';
+  return 'Secondaire';
 }
 
 function runProgressGroupStatus(
@@ -4938,6 +5208,12 @@ function applyPersistedRun(
     runStage: run.stage,
     runSteps: run.steps,
     runProfile: run.profile,
+    runResearch: run.research,
+    runEvidenceArchive: run.evidenceArchive,
+    selectedResearchSignalIds:
+      dossier.runResearch?.artifactId === run.research?.artifactId
+        ? dossier.selectedResearchSignalIds
+        : run.research?.signals.map((signal) => signal.signalId),
     spec: reviewable ? run.spec : undefined,
     reviews,
     reviewDecisions: [],
@@ -4961,6 +5237,9 @@ function hasCurrentRunProjection(
     dossier.runStatus === run.status &&
     dossier.runStage === run.stage &&
     JSON.stringify(dossier.runSteps ?? []) === JSON.stringify(run.steps) &&
+    JSON.stringify(dossier.runResearch) === JSON.stringify(run.research) &&
+    JSON.stringify(dossier.runEvidenceArchive) ===
+      JSON.stringify(run.evidenceArchive) &&
     JSON.stringify(dossier.events) === JSON.stringify(persistedEvents(run)) &&
     Boolean(dossier.spec) === Boolean(reviewable && run.spec) &&
     dossier.reviews.length === (reviewable ? run.reviews.length : 0)

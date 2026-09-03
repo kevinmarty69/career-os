@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { evidenceArchiveOutputSchema } from './evidence-archive';
 import { pageSpecSchema, profileSchema } from './schemas';
 
 export const runOpportunitySchema = z
@@ -49,6 +50,53 @@ const persistedStepSchema = z
     failureCode: z.string().min(1).max(100).optional(),
   })
   .strict();
+
+const researchSignalSchema = z
+  .object({
+    signalId: z.string().regex(/^signal-(?:[1-9]|1\d|20)$/),
+    statement: z.string().min(1).max(500),
+    excerpt: z.string().min(1).max(1_000),
+    category: z.enum([
+      'responsibility',
+      'requirement',
+      'culture',
+      'constraint',
+    ]),
+    priority: z.enum(['high', 'medium', 'low']),
+  })
+  .strict();
+
+export const persistedResearchSchema = z
+  .object({
+    artifactId: z.string().uuid(),
+    artifactHash: z.string().regex(/^[0-9a-f]{64}$/),
+    company: z.string().min(1).max(200),
+    role: z.string().min(1).max(200),
+    source: z
+      .object({
+        kind: z.literal('job-posting'),
+        url: z.string().url().max(2_048).optional(),
+        trust: z.literal('untrusted-data'),
+      })
+      .strict(),
+    signals: z.array(researchSignalSchema).min(1).max(20),
+  })
+  .strict();
+
+export const researchSelectionInputSchema = z
+  .object({
+    researchArtifactId: z.string().uuid(),
+    selectedSignalIds: z
+      .array(z.string().regex(/^signal-(?:[1-9]|1\d|20)$/))
+      .min(1)
+      .max(20),
+  })
+  .strict()
+  .refine(
+    ({ selectedSignalIds }) =>
+      new Set(selectedSignalIds).size === selectedSignalIds.length,
+    { path: ['selectedSignalIds'], message: 'Signal IDs must be unique.' },
+  );
 
 export const runtimeReviewSchema = z
   .object({
@@ -103,6 +151,8 @@ export const persistedRunSchema = z
     usedCostMicros: z.number().int().nonnegative(),
     profile: profileSchema,
     steps: z.array(persistedStepSchema).max(20),
+    research: persistedResearchSchema.optional(),
+    evidenceArchive: evidenceArchiveOutputSchema.optional(),
     spec: pageSpecSchema.optional(),
     reviews: z.array(persistedReviewSchema),
     events: z.array(eventSchema),
