@@ -15,6 +15,6 @@
 - Start PageSpec reviews only through an authenticated human checkpoint. Recruiter, hiring-manager and factuality workers each use a different non-owner login with stage-specific functions and no direct table access. PostgreSQL serializes the three reviews, binds every result to the current PageSpec artifact and rejects ungrounded issue references. Factuality is deterministic and cannot be overridden.
 - Supervise the seven production workers as separate processes and environments. Each process receives only its matching database URL; systemd restarts crashes and uses `SIGTERM` to let the active iteration drain.
 - Store only SHA-256 capability-token hashes. Exchange a URL-fragment token for an HttpOnly, Secure, SameSite=Lax session; recheck expiry/revocation on every request. Private responses are `no-store`, `no-referrer`, `noindex` and expose no cross-navigation.
-- Cloud agents run as non-root in per-run sandboxes with no host shell, minimal scoped secrets, read-only mounts, egress policy, and server-enforced token/cost/time/concurrency budgets.
+- Planned managed-cloud boundary, not implemented in this repository: agents must run as non-root in per-run sandboxes with no host shell, minimal scoped secrets, read-only mounts, egress policy, and server-enforced token, cost, time, and concurrency budgets.
 
 Report vulnerabilities through GitHub's private vulnerability reporting for this repository. Do not open a public exploit report.

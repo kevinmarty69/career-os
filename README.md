@@ -1,120 +1,107 @@
 # Career OS
 
-> Turn your real work into evidence-backed applications.
+> A resume says you can do the job. Career OS shows its receipts.
 
-Career OS is an AGPL-licensed, self-hostable application for turning structured career evidence into private, company-specific applications. It is not a generic AI résumé generator: every published claim keeps an explicit `verified`, `declared` or `inferred` status and an auditable path back to its source.
+[![CI](https://github.com/kevinmarty69/career-os/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinmarty69/career-os/actions/workflows/ci.yml)
+[![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-5847e8.svg)](LICENSE)
 
-## What runs today
+Career OS turns real career evidence into private, role-specific applications. Every published statement stays attached to a source and carries an explicit status: `verified`, `declared`, or `inferred`.
 
-The first vertical is a real browser workflow that starts with an empty, honest workspace. A synthetic demo remains available only through an explicit action:
+It is deliberately not a generic AI resume generator. Models may research and suggest; typed contracts, PostgreSQL, deterministic checks, and human approval decide what can ship.
 
-1. import a PDF, DOCX or TXT CV locally in a Web Worker, paste its text, or start manually;
-2. review every proposed claim, its source locator, sensitivity and allowed uses before it enters Career Memory;
-3. create and resume multiple applications from pasted offers or a bounded, SSRF-safe URL import that always requires human verification;
-4. enqueue a durable company-research step and follow its persisted progress across reloads;
-5. process that step with a loopback OpenAI-compatible model outside database transactions, under a reserved token budget;
-6. inspect the resulting source-bound research artifact, choose the hiring signals to keep, and resume safely after a failed request or reload;
-7. map the confirmed signals to permitted, source-bound proof with a separate deterministic worker that consumes no model tokens;
-8. approve that immutable evidence archive, run a least-privilege recruiter strategist against a loopback model, and review its IDs-only editorial strategy;
-9. approve the strategy to enqueue a deterministic, zero-token PageSpec composer and inspect the generated draft;
-10. explicitly launch three serialized, durable reviews: recruiter, hiring manager, then a deterministic factuality check;
-11. decide each qualitative objection before publication; factuality failures remain blocking;
-12. inspect or interrupt the bounded agent ledger and export all data.
+## Try the product in two minutes
 
-Email/password accounts, organization membership, Career Memory revisions and application briefs persist in PostgreSQL. Local storage caches the active dossier UI, but it cannot authorize publication. Starting a run locks the current application and Career Memory revisions, writes immutable profile and opportunity snapshots, and atomically enqueues the first workflow step. The browser persists its idempotency key before sending, while PostgreSQL caps each tenant at five active runs and 30 admissions per hour. A dedicated company-researcher worker records one research artifact or one conservative failure settlement. Human confirmation then creates an immutable, permission-filtered input for a second least-privilege worker. That evidence archivist ranks IDs deterministically, writes no generated prose, calls no provider and records zero model usage. A second human checkpoint can enqueue a separately isolated recruiter strategist. Its output is internal editorial direction linked only to exact signal, claim and evidence IDs; PostgreSQL rejects stale or forged lineage before storage. The persisted workflow pauses again for human approval before a fourth isolated worker composes one strict PageSpec from the approved lead and supporting claim IDs. The composer calls no model or network service, consumes no budget and copies its thesis exactly from the approved lead claim. A final explicit checkpoint starts three serialized reviewers with separate database identities. The recruiter and hiring-manager reviewers use the configured loopback model; factuality is deterministic. PostgreSQL keeps publication closed until all three durable reviews exist and every qualitative objection has a human decision. Editing an application creates a new revision without changing earlier runs. Deleting an application revokes its active private links.
-
-CV bytes never leave the browser and are not retained. The local parser validates file signatures, bounds decompression and extracted text, rejects active or externally linked DOCX content and embedded PDF attachments, and marks all accepted statements as `declared` and `untrusted-data`. Only the fields approved by the user are persisted.
-
-## Quick start
-
-Requirements: Node 22+, pnpm 10+.
+The built-in demo uses synthetic data and a deterministic in-browser workflow. It needs no account, database, or model:
 
 ```bash
 pnpm install
-```
-
-Copy `.env.example` to `.env.local`, set `DATABASE_URL` and generate a `BETTER_AUTH_SECRET`. `pnpm dev` starts the interface at `http://localhost:3000`; the seven worker processes below are also required to execute a complete application workflow.
-
-```bash
 pnpm dev
 ```
 
-To execute queued work, provision one dedicated PostgreSQL login for every worker role, configure the loopback OpenAI-compatible model for the four model-backed roles, and start each worker separately. Never reuse the application `DATABASE_URL`: PostgreSQL assigns the next tenant-scoped job globally and returns an opaque lease token.
+Open [localhost:3000](http://localhost:3000), choose **Explorer avec des données fictives**, edit the sample job brief, then generate the application. The demo exercises the evidence, drafting, review, and provenance UI; persistence and private sharing are intentionally disabled until the server is configured.
 
-```sql
-create role career_company_researcher_login login noinherit
-  password '<generate a strong local password>';
-grant career_company_researcher to career_company_researcher_login;
+![Career OS evidence-backed application workspace](docs/career-os-workspace.jpg)
 
-create role career_evidence_archivist_login login noinherit
-  password '<generate another strong local password>';
-grant career_evidence_archivist to career_evidence_archivist_login;
+## The trust boundary is the product
 
-create role career_recruiter_strategist_login login noinherit
-  password '<generate another strong local password>';
-grant career_recruiter_strategist to career_recruiter_strategist_login;
-
-create role career_page_composer_login login noinherit
-  password '<generate another strong local password>';
-grant career_page_composer to career_page_composer_login;
-
-create role career_recruiter_reviewer_login login noinherit
-  password '<generate another strong local password>';
-grant career_recruiter_reviewer to career_recruiter_reviewer_login;
-
-create role career_hiring_manager_reviewer_login login noinherit
-  password '<generate another strong local password>';
-grant career_hiring_manager_reviewer to career_hiring_manager_reviewer_login;
-
-create role career_factuality_reviewer_login login noinherit
-  password '<generate another strong local password>';
-grant career_factuality_reviewer to career_factuality_reviewer_login;
+```mermaid
+flowchart LR
+    CV[CV parsed in browser] --> H1[Human confirms claims]
+    H1 --> DB[(PostgreSQL ledger + RLS)]
+    JOB[Job brief] --> RESEARCH[Bounded research worker]
+    DB --> EVIDENCE[Deterministic evidence selection]
+    RESEARCH --> H2[Human selects signals]
+    H2 --> EVIDENCE
+    EVIDENCE --> STRATEGY[Least-privilege strategy worker]
+    STRATEGY --> H3[Human approves strategy]
+    H3 --> PAGE[Deterministic PageSpec]
+    PAGE --> REVIEW[Recruiter + hiring + factual reviews]
+    REVIEW --> H4[Human resolves objections]
+    H4 --> LINK[Revocable private link]
 ```
 
-The login must not own the database or schema, have `SUPERUSER`, `BYPASSRLS`, `CREATEDB` or `CREATEROLE`, inherit any other role, or hold direct table privileges. The worker checks these conditions before claiming work and fails closed.
+Each durable worker has its own non-owner database login and a narrow function set. Jobs are leased globally without a caller-supplied tenant ID. Model calls happen outside database transactions, under a reserved token budget; an unknown provider outcome fails closed instead of being replayed.
 
-```bash
-pnpm worker:company-researcher
-pnpm worker:evidence-archivist
-pnpm worker:recruiter-strategist
-pnpm worker:page-composer
-pnpm worker:recruiter-reviewer
-pnpm worker:hiring-manager-reviewer
-pnpm worker:factuality-reviewer
-```
+## What is implemented
 
-The canary intentionally accepts loopback endpoints only. It cannot call a remote or paid model. No worker receives a tenant selector or direct table access. Use a distinct login and connection string for each worker.
+- local PDF, DOCX, TXT, and pasted-text import in a Web Worker;
+- explicit review of provenance, sensitivity, and allowed uses;
+- versioned Career Memory and application dossiers;
+- SSRF-resistant job URL previews that remain untrusted until confirmed;
+- durable, resumable workflow steps with idempotency, leases, and admission limits;
+- human gates around research, evidence, strategy, review, and publication;
+- tenant isolation with forced RLS and composite tenant foreign keys;
+- revocable private capabilities exchanged for secure session cookies;
+- export, interruption, worker readiness, and conservative failure settlement.
 
-Worker commands intentionally do not load a shared `.env.local`. For local use, export the required variables before invoking one command. In production, supervise seven separate processes with systemd and give each unit only its matching database URL plus the local-model variables it needs. Use `Restart=on-failure`, send `SIGTERM`, and allow the active iteration to drain before the unit timeout; do not combine all credentials in one supervisor process.
+The repository currently proves the self-hosted implementation. A managed service is a future deployment target; billing, hosted operations, and cloud sandbox infrastructure are not included or claimed as implemented here.
+
+## Proof map
+
+| Claim                                                          | Executable evidence                                                                                                                              |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Generated statements remain source-bound                       | [`schemas.ts`](lib/schemas.ts), [`reviewer.test.ts`](tests/unit/reviewer.test.ts)                                                                |
+| Tenant data cannot cross organization boundaries               | [`tenant_isolation.sql`](supabase/tests/tenant_isolation.sql), [`auth_security.sql`](supabase/tests/auth_security.sql)                           |
+| Retries do not duplicate accepted work or spend                | [`durable-step-concurrency.mjs`](supabase/tests/durable-step-concurrency.mjs), [`budget_concurrency.mjs`](supabase/tests/budget_concurrency.mjs) |
+| URL import resists SSRF and unsafe redirects                   | [`safe-http.ts`](lib/server/safe-http.ts), [`safe-http.test.ts`](tests/unit/safe-http.test.ts)                                                   |
+| CV bytes stay in the browser and hostile documents fail closed | [`profile-import.worker.ts`](lib/profile-import.worker.ts), [`profile-import.test.ts`](tests/unit/profile-import.test.ts)                        |
+| Publication requires complete, current reviews                 | [`durable-reviewers.mjs`](supabase/tests/durable-reviewers.mjs), [`publication-security.test.ts`](tests/unit/publication-security.test.ts)       |
+
+CI runs formatting, linting, TypeScript, the unit suite, a production build, and a production-dependency audit. PostgreSQL isolation, concurrency, worker integration, and browser suites remain separate because they require service processes; their commands are documented below and in the self-hosting guide.
+
+## Run the real workflow
+
+The persisted workflow needs PostgreSQL, seven isolated worker credentials, and a loopback OpenAI-compatible model for the four model-backed roles.
+
+See **[Self-hosting Career OS](docs/SELF_HOSTING.md)** for the complete setup, least-privilege role creation, worker supervision, and verification commands.
+
+## Development
 
 ```bash
 pnpm check
-pnpm exec playwright install chromium
-pnpm test:e2e
+pnpm build
+pnpm audit --prod --audit-level high
 ```
 
-For the Postgres isolation test, start Docker Desktop first:
+Database and browser verification:
 
 ```bash
 pnpm db:up
 pnpm db:test
+pnpm test:integration:worker
+pnpm test:e2e
 pnpm db:down
 ```
 
-Publication and saved Career Memory fail closed when `DATABASE_URL` or `BETTER_AUTH_SECRET` is missing.
+The PostgreSQL test suite also covers migration compatibility on PostgreSQL 17 without pgvector.
 
-The migration also runs on PostgreSQL 17 without pgvector. Embeddings are intentionally deferred.
-
-## Architecture and security
+## Decisions worth inspecting
 
 - [Architecture](ARCHITECTURE.md)
 - [Security model](SECURITY.md)
-- [Agent runtime decision](docs/ADR-001-agent-runtime.md)
+- [Why Career OS owns orchestration](docs/ADR-001-agent-runtime.md)
 - [Agentic stack benchmark](docs/agentic-stack-benchmark.md)
-- [Agentic stack selection](docs/ADR-002-agentic-stack-selection.md)
-
-Self-hosters use their own provider keys or local OpenAI-compatible models. The future managed cloud will run the same product with server-enforced quotas and isolated execution. Hosted-only deployment, billing and operations code is not part of this repository.
-
-## License
+- [Minimum agentic stack proposal](docs/ADR-002-agentic-stack-selection.md)
+- [Authentication and tenancy](docs/ADR-003-authentication.md)
 
 AGPL-3.0-only. See [LICENSE](LICENSE).

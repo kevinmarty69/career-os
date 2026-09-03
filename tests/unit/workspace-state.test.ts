@@ -1,21 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { syntheticProfile } from '../../lib/fixture';
+import type { PersistedRun } from '../../lib/run-contract';
 import { buildPageSpec, buildStrategy, runReviews } from '../../lib/workflow';
 import {
+  applyPersistedRun,
   createDemoDossier,
   createEmptyDossier,
   createEmptyWorkspace,
   dossierNextView,
   dossierStage,
   dossierStatus,
+  hasCurrentRunProjection,
   invalidateDossiersAfterProfileChange,
   mergePersistedApplications,
   opportunityReady,
+  reviewGateReady,
   reviewsComplete,
   restoreWorkspace,
   selectDossier,
   updateDossier,
+  unresolvedReviewIssues,
   visibleShareUrl,
   type ApplicationDossier,
   type SavedWorkspaceV2,
@@ -78,6 +83,52 @@ test('restores V2 safely and normalizes a stale selection', () => {
     }),
   );
   assert.deepEqual(incompleteServerIdentity, createEmptyWorkspace());
+  const unsafeUrl = restoreWorkspace(
+    JSON.stringify({
+      ...stored,
+      dossiers: [
+        {
+          ...first,
+          opportunity: {
+            ...first.opportunity,
+            url: 'javascript:alert(1)',
+          },
+        },
+      ],
+    }),
+  );
+  assert.deepEqual(unsafeUrl, createEmptyWorkspace());
+  const unsafeResearchUrl = restoreWorkspace(
+    JSON.stringify({
+      ...stored,
+      dossiers: [
+        {
+          ...first,
+          runResearch: {
+            artifactId: RUN_ID,
+            artifactHash: 'a'.repeat(64),
+            company: 'Northstar Labs',
+            role: 'Senior Product Engineer',
+            source: {
+              kind: 'job-posting',
+              url: 'javascript:alert(1)',
+              trust: 'untrusted-data',
+            },
+            signals: [
+              {
+                signalId: 'signal-1',
+                statement: 'Ship dependable systems.',
+                excerpt: 'Dependable systems',
+                category: 'requirement',
+                priority: 'high',
+              },
+            ],
+          },
+        },
+      ],
+    }),
+  );
+  assert.deepEqual(unsafeResearchUrl, createEmptyWorkspace());
 });
 
 test('migrates the legacy singleton into one selected dossier', () => {
@@ -340,6 +391,78 @@ test('derives status, stage and next view from each dossier only', () => {
     'Envoyée',
     'share',
   ]);
+});
+
+test('projects persisted runs without reviving stale local approval state', () => {
+  const dossier = generatedDossier({
+    id: DOSSIER_A,
+    approved: true,
+    capability: PUBLICATION_ID,
+  });
+  const run: PersistedRun = {
+    runId: RUN_ID,
+    status: 'running',
+    stage: 'company_research',
+    revision: 0,
+    usedTokens: 0,
+    usedCostMicros: 0,
+    profile: syntheticProfile,
+    steps: [],
+    reviews: [],
+    reviewDecisions: [],
+    publicationEligible: false,
+    events: [
+      {
+        actor: 'evidence-archivist',
+        type: 'started',
+        summary: 'Evidence selection started.',
+        costMicros: 0,
+      },
+    ],
+  };
+
+  const projected = applyPersistedRun(dossier, run);
+  assert.equal(projected.approved, false);
+  assert.equal(projected.capability, undefined);
+  assert.deepEqual(projected.reviews, []);
+  assert.equal(projected.events[0].actor, 'system');
+  assert.equal(hasCurrentRunProjection(projected, run), true);
+  assert.equal(
+    hasCurrentRunProjection({ ...projected, runStatus: 'failed' }, run),
+    false,
+  );
+});
+
+test('resolves review issues by durable review id and index', () => {
+  const reviews = generatedDossier({ id: DOSSIER_A }).reviews.map(
+    (review, index) => ({
+      ...review,
+      reviewId: index === 0 ? REVIEW_ID : review.reviewId,
+      issues:
+        index === 0
+          ? [
+              {
+                section: 'hero.thesis',
+                message: 'Clarify the outcome.',
+                blocking: true,
+              },
+            ]
+          : [],
+    }),
+  );
+
+  assert.equal(reviewGateReady({ reviews, publicationEligible: true }), true);
+  assert.equal(unresolvedReviewIssues(reviews).length, 1);
+  assert.equal(
+    unresolvedReviewIssues(reviews, [
+      {
+        reviewId: REVIEW_ID,
+        issueIndex: 0,
+        decision: 'keep',
+      },
+    ]).length,
+    0,
+  );
 });
 
 test('never exposes an ephemeral share token in another dossier or workspace', () => {

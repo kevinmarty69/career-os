@@ -1,6 +1,6 @@
 # Architecture
 
-Career OS is one Next.js application backed by PostgreSQL/Supabase. The same codebase serves self-hosted and managed cloud installations.
+Career OS is one Next.js application backed by PostgreSQL. This repository implements the self-hosted product. A future managed service may reuse the application and ledger, but its billing, operations, and execution isolation are not implemented here.
 
 ## Source of truth
 

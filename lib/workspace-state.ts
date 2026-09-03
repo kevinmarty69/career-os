@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Application } from './application-contract';
+import { httpUrlSchema } from './http-url';
 import {
   persistedEvidenceArchiveSchema,
   persistedRecruiterStrategySchema,
@@ -110,7 +111,7 @@ const opportunitySchema = z
     company: z.string().max(200),
     role: z.string().max(200),
     description: z.string().max(20_000),
-    url: z.string().url().max(2_048).optional(),
+    url: httpUrlSchema.optional(),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   })
   .strict();
@@ -651,19 +652,23 @@ function normalizeSelection(workspace: SavedWorkspaceV2): SavedWorkspaceV2 {
     : { ...workspace, selectedDossierId: undefined };
 }
 
-function reviewGateReady(dossier: ApplicationDossier): boolean {
+export function reviewGateReady(
+  dossier: Pick<ApplicationDossier, 'publicationEligible' | 'reviews'>,
+): boolean {
   return (
     reviewsComplete(dossier.reviews) && dossier.publicationEligible === true
   );
 }
 
-function unresolvedIssueCount(dossier: ApplicationDossier): number {
+export function unresolvedReviewIssues(
+  reviews: WorkspaceReview[],
+  decisions: ReviewDecision[] = [],
+) {
+  if (!reviewsComplete(reviews)) return [];
   const resolved = new Set(
-    dossier.reviewDecisions.map(
-      ({ issueIndex, reviewId }) => `${reviewId}:${issueIndex}`,
-    ),
+    decisions.map(({ issueIndex, reviewId }) => `${reviewId}:${issueIndex}`),
   );
-  return dossier.reviews.reduce((count, review) => {
+  return reviews.flatMap((review) => {
     const issues = review.issues?.length
       ? review.issues
       : review.findings.map((message) => ({
@@ -671,12 +676,94 @@ function unresolvedIssueCount(dossier: ApplicationDossier): number {
           message,
           blocking: false,
         }));
-    return (
-      count +
-      issues.filter(
-        (_, issueIndex) =>
+    return issues
+      .map((issue, issueIndex) => ({ issue, issueIndex, review }))
+      .filter(
+        ({ issueIndex }) =>
           !review.reviewId || !resolved.has(`${review.reviewId}:${issueIndex}`),
-      ).length
-    );
-  }, 0);
+      );
+  });
+}
+
+export function applyPersistedRun(
+  dossier: ApplicationDossier,
+  run: PersistedRun,
+): ApplicationDossier {
+  const reviewable = Boolean(run.spec);
+  const reviews = reviewable ? run.reviews : [];
+  return {
+    ...dossier,
+    runId: run.runId,
+    runStatus: run.status,
+    runStage: run.stage,
+    runSteps: run.steps,
+    workerAvailability: run.workerAvailability,
+    runProfile: run.profile,
+    runResearch: run.research,
+    runEvidenceArchive: run.evidenceArchive,
+    runStrategy: run.strategy,
+    pageSpecId: run.pageSpecId,
+    pageSpecHash: run.pageSpecHash,
+    pageSpecArtifactId: run.pageSpecArtifactId,
+    pageSpecArtifactHash: run.pageSpecArtifactHash,
+    selectedResearchSignalIds:
+      dossier.runResearch?.artifactId === run.research?.artifactId
+        ? dossier.selectedResearchSignalIds
+        : run.research?.signals.map((signal) => signal.signalId),
+    spec: reviewable ? run.spec : undefined,
+    reviews,
+    reviewDecisions: reviewable ? run.reviewDecisions : [],
+    publicationEligible: reviewable ? run.publicationEligible : false,
+    approved: false,
+    capability: undefined,
+    events: persistedEvents(run),
+  };
+}
+
+export function hasCurrentRunProjection(
+  dossier: ApplicationDossier,
+  run: PersistedRun,
+) {
+  const reviewable = Boolean(run.spec);
+  return (
+    dossier.runId === run.runId &&
+    dossier.runStatus === run.status &&
+    dossier.runStage === run.stage &&
+    JSON.stringify(dossier.runSteps ?? []) === JSON.stringify(run.steps) &&
+    JSON.stringify(dossier.workerAvailability) ===
+      JSON.stringify(run.workerAvailability) &&
+    JSON.stringify(dossier.runResearch) === JSON.stringify(run.research) &&
+    JSON.stringify(dossier.runEvidenceArchive) ===
+      JSON.stringify(run.evidenceArchive) &&
+    JSON.stringify(dossier.runStrategy) === JSON.stringify(run.strategy) &&
+    JSON.stringify(dossier.events) === JSON.stringify(persistedEvents(run)) &&
+    dossier.pageSpecId === run.pageSpecId &&
+    dossier.pageSpecHash === run.pageSpecHash &&
+    dossier.pageSpecArtifactId === run.pageSpecArtifactId &&
+    dossier.pageSpecArtifactHash === run.pageSpecArtifactHash &&
+    Boolean(dossier.spec) === Boolean(reviewable && run.spec) &&
+    JSON.stringify(dossier.reviews) ===
+      JSON.stringify(reviewable ? run.reviews : []) &&
+    JSON.stringify(dossier.reviewDecisions) ===
+      JSON.stringify(reviewable ? run.reviewDecisions : []) &&
+    dossier.publicationEligible ===
+      (reviewable ? run.publicationEligible : false)
+  );
+}
+
+export function persistedEvents(run: PersistedRun): WorkflowEvent[] {
+  return run.events.map((event) => ({
+    actor:
+      event.actor === 'human' || event.actor === 'evidence-archivist'
+        ? 'system'
+        : event.actor,
+    action: event.summary,
+    artifact: event.artifactId,
+    costMicros: event.costMicros,
+  }));
+}
+
+function unresolvedIssueCount(dossier: ApplicationDossier): number {
+  return unresolvedReviewIssues(dossier.reviews, dossier.reviewDecisions)
+    .length;
 }

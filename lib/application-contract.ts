@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrlSchema } from './http-url';
 
 export const applicationStageSchema = z.enum([
   'draft',
@@ -13,7 +14,7 @@ export const applicationFieldsSchema = z
     company: z.string().min(1).max(200),
     role: z.string().min(1).max(200),
     description: z.string().min(1).max(20_000),
-    url: z.string().url().max(2_048).optional(),
+    url: httpUrlSchema.optional(),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     stage: applicationStageSchema.default('draft'),
   })

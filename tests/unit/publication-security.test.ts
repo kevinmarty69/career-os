@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { syntheticProfile } from '../../lib/fixture';
+import { parsePublicationCookie } from '../../lib/publication-cookie';
 import { profileSchema } from '../../lib/schemas';
 import { buildPageSpec, buildStrategy } from '../../lib/workflow';
 import { organizationOptions } from '../../lib/server/auth-config';
@@ -35,23 +36,22 @@ test('organization invitations require a verified email', () => {
   assert.equal(organizationOptions.requireEmailVerificationOnInvitation, true);
 });
 
-test('state-changing requests require an exact origin', () => {
-  assert.equal(
-    isSameOrigin(
-      new Request('https://career.example/api/profile', {
-        headers: { origin: 'https://career.example' },
-      }),
-    ),
-    true,
-  );
-  assert.equal(
-    isSameOrigin(
-      new Request('https://career.example/api/profile', {
-        headers: { origin: 'https://evil.example' },
-      }),
-    ),
-    false,
-  );
+test('state-changing requests fail closed without a configured origin', () => {
+  const previous = process.env.BETTER_AUTH_URL;
+  try {
+    delete process.env.BETTER_AUTH_URL;
+    assert.equal(
+      isSameOrigin(
+        new Request('https://career.example/api/profile', {
+          headers: { origin: 'https://career.example' },
+        }),
+      ),
+      false,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.BETTER_AUTH_URL;
+    else process.env.BETTER_AUTH_URL = previous;
+  }
 });
 
 test('state-changing requests trust the configured public origin behind a proxy', () => {
@@ -62,12 +62,55 @@ test('state-changing requests trust the configured public origin behind a proxy'
       headers: { origin: 'https://career.example' },
     });
     assert.equal(isSameOrigin(proxied), true);
+    assert.equal(
+      isSameOrigin(
+        new Request('http://localhost:3000/api/profile', {
+          headers: { origin: 'https://evil.example' },
+        }),
+      ),
+      false,
+    );
     process.env.BETTER_AUTH_URL = 'not a URL';
     assert.equal(isSameOrigin(proxied), false);
+    process.env.BETTER_AUTH_URL = 'data:text/plain,not-an-origin';
+    assert.equal(
+      isSameOrigin(
+        new Request('http://localhost:3000/api/profile', {
+          headers: { origin: 'null' },
+        }),
+      ),
+      false,
+    );
   } finally {
     if (previous === undefined) delete process.env.BETTER_AUTH_URL;
     else process.env.BETTER_AUTH_URL = previous;
   }
+});
+
+test('publication cookies require a valid UUID and an exact cookie name', () => {
+  const publicationId = randomUUID();
+  assert.deepEqual(
+    parsePublicationCookie(
+      publicationId,
+      `unrelated=1; career_share_${publicationId}=valid-token`,
+    ),
+    { publicationId, token: 'valid-token' },
+  );
+  assert.equal(
+    parsePublicationCookie(
+      publicationId,
+      `career_share_${publicationId}-suffix=wrong-token`,
+    ),
+    undefined,
+  );
+  assert.equal(
+    parsePublicationCookie(
+      '(a+)+b',
+      `career_share_${'a'.repeat(100_000)}=attacker-controlled`,
+    ),
+    undefined,
+  );
+  assert.equal(parsePublicationCookie('[', 'career_share_[=token'), undefined);
 });
 
 test('profile and publication inputs are bounded and separated', () => {

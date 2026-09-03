@@ -24,6 +24,23 @@ test('application mutations are strict and bounded', () => {
     }).success,
     false,
   );
+  for (const url of [
+    'not a URL',
+    'javascript:alert(1)',
+    'data:text/html,unsafe',
+    'ftp://files.example.test/offer',
+  ])
+    assert.equal(
+      applicationFieldsSchema.safeParse({ ...application, url }).success,
+      false,
+    );
+  assert.equal(
+    applicationFieldsSchema.safeParse({
+      ...application,
+      url: 'https://jobs.example.test/offer',
+    }).success,
+    true,
+  );
   assert.equal(
     updateApplicationInputSchema.safeParse({
       ...application,

@@ -1,20 +1,8 @@
 import { z } from 'zod';
+import { httpUrlSchema } from './http-url';
 
 export const MAX_JOB_HTML_CHARS = 1_000_000;
 export const MAX_JOB_DESCRIPTION_CHARS = 20_000;
-
-const httpUrlSchema = z
-  .string()
-  .url()
-  .max(2_048)
-  .refine((value) => {
-    try {
-      const protocol = new URL(value).protocol;
-      return protocol === 'http:' || protocol === 'https:';
-    } catch {
-      return false;
-    }
-  });
 
 export const jobPostingExtractionSchema = z
   .object({

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { evidenceArchiveOutputSchema } from './evidence-archive';
+import { httpUrlSchema } from './http-url';
 import { recruiterStrategyArtifactSchema } from './recruiter-strategy';
 import { pageSpecSchema, profileSchema } from './schemas';
 
@@ -8,7 +9,7 @@ export const runOpportunitySchema = z
     company: z.string().min(1).max(200),
     role: z.string().min(1).max(200),
     description: z.string().min(1).max(20_000),
-    url: z.string().url().max(2_048).optional(),
+    url: httpUrlSchema.optional(),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   })
   .strict();
@@ -124,7 +125,7 @@ export const persistedResearchSchema = z
     source: z
       .object({
         kind: z.literal('job-posting'),
-        url: z.string().url().max(2_048).optional(),
+        url: httpUrlSchema.optional(),
         trust: z.literal('untrusted-data'),
       })
       .strict(),

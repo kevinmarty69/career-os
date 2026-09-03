@@ -2,18 +2,22 @@ import { NextResponse } from 'next/server';
 import { authenticatedPublicationSession } from '@/lib/server/auth';
 import { isSameOrigin } from '@/lib/server/http';
 import { readPublication, revokePublication } from '@/lib/server/publications';
+import { parsePublicationCookie } from '@/lib/publication-cookie';
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ publicationId: string }> },
 ) {
-  const { publicationId } = await context.params;
-  const token = request.headers
-    .get('cookie')
-    ?.match(new RegExp(`(?:^|; )career_share_${publicationId}=([^;]+)`))?.[1];
-  if (!token) return unavailable();
+  const capability = parsePublicationCookie(
+    (await context.params).publicationId,
+    request.headers.get('cookie'),
+  );
+  if (!capability?.token) return unavailable();
   try {
-    const publication = await readPublication(publicationId, token);
+    const publication = await readPublication(
+      capability.publicationId,
+      capability.token,
+    );
     if (!publication) return unavailable();
     const response = NextResponse.json(publication);
     response.headers.set('cache-control', 'private, no-store');
