@@ -628,6 +628,158 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
       status: 'settled',
     });
 
+    const corruptRunId = randomUUID();
+    const corruptStepId = randomUUID();
+    await target.query(
+      `insert into app.workflow_runs
+        (id, tenant_id, opportunity_id, profile_id, state, status,
+         token_budget, cost_budget_micros, deadline_at)
+       values ($1, $2, $3, $4, 'strategy', 'running', 200000, 0,
+         now() + interval '1 hour')`,
+      [corruptRunId, tenantId, opportunityId, profileId],
+    );
+    await target.query(
+      `insert into app.workflow_steps
+        (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
+         input, input_hash)
+       values ($1, $2, $3, 'recruiter-strategist', 'pending', $4,
+         '{}'::jsonb, repeat('c', 64))`,
+      [corruptStepId, tenantId, corruptRunId, randomUUID()],
+    );
+    const callsBeforeCorruptInput = providerCalls;
+    const corruptOutcome = await processRecruiterStrategyStep({
+      databaseUrl: workerUrl.toString(),
+      client,
+    });
+    assert.deepEqual(corruptOutcome, { status: 'idle' });
+    assert.equal(providerCalls, callsBeforeCorruptInput);
+    const corruptState = await target.query(
+      `select run.status run_status, step.status step_status, step.failure_code,
+        step.lease_owner, step.dispatched_at
+       from app.workflow_runs run
+       join app.workflow_steps step on step.workflow_run_id = run.id
+       where run.id = $1`,
+      [corruptRunId],
+    );
+    assert.deepEqual(corruptState.rows[0], {
+      run_status: 'failed',
+      step_status: 'failed',
+      failure_code: 'input_integrity_mismatch',
+      lease_owner: null,
+      dispatched_at: null,
+    });
+
+    const reclaimRunId = randomUUID();
+    const reclaimStepId = randomUUID();
+    await target.query(
+      `insert into app.workflow_runs
+        (id, tenant_id, opportunity_id, profile_id, state, status,
+         token_budget, cost_budget_micros, deadline_at)
+       values ($1, $2, $3, $4, 'strategy', 'running', 200000, 0,
+         now() + interval '1 hour')`,
+      [reclaimRunId, tenantId, opportunityId, profileId],
+    );
+    await target.query(
+      `insert into app.workflow_steps
+        (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
+         input, input_hash)
+       values ($1, $2, $3, 'recruiter-strategist', 'pending', $4,
+         '{}'::jsonb, encode(digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
+      [reclaimStepId, tenantId, reclaimRunId, randomUUID()],
+    );
+    await target.query('set role career_recruiter_strategist');
+    const firstLease = await target.query(
+      'select * from app.claim_recruiter_strategist_step(300)',
+    );
+    assert.equal(firstLease.rows[0].step_id, reclaimStepId);
+    assert.equal(firstLease.rows[0].attempt, 1);
+    await target.query('reset role');
+    await target.query(
+      `update app.workflow_steps set lease_expires_at = now() - interval '1 second'
+       where id = $1`,
+      [reclaimStepId],
+    );
+    await target.query('set role career_recruiter_strategist');
+    const reclaimed = await target.query(
+      'select * from app.claim_recruiter_strategist_step(300)',
+    );
+    assert.equal(reclaimed.rows[0].step_id, reclaimStepId);
+    assert.equal(reclaimed.rows[0].attempt, 2);
+    await target.query(
+      `select app.fail_recruiter_strategist_step($1,$2,'invalid_step_input')`,
+      [reclaimed.rows[0].step_id, reclaimed.rows[0].lease_token],
+    );
+    await target.query('reset role');
+
+    const expiredRunId = randomUUID();
+    const expiredStepId = randomUUID();
+    await target.query(
+      `insert into app.workflow_runs
+        (id, tenant_id, opportunity_id, profile_id, state, status,
+         token_budget, cost_budget_micros, deadline_at)
+       values ($1, $2, $3, $4, 'strategy', 'running', 200000, 0,
+         now() + interval '1 hour')`,
+      [expiredRunId, tenantId, opportunityId, profileId],
+    );
+    await target.query(
+      `insert into app.workflow_steps
+        (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
+         input, input_hash)
+       values ($1, $2, $3, 'recruiter-strategist', 'pending', $4,
+         '{}'::jsonb, encode(digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
+      [expiredStepId, tenantId, expiredRunId, randomUUID()],
+    );
+    await target.query('set role career_recruiter_strategist');
+    const expiredClaim = await target.query(
+      'select * from app.claim_recruiter_strategist_step(300)',
+    );
+    await target.query(
+      `select app.mark_recruiter_strategist_in_flight(
+        $1,$2,'openai-compatible-local','fake-strategist',1000,0
+      )`,
+      [expiredClaim.rows[0].step_id, expiredClaim.rows[0].lease_token],
+    );
+    await target.query('reset role');
+    await target.query(
+      `update app.workflow_steps set lease_expires_at = now() - interval '1 second'
+       where id = $1`,
+      [expiredStepId],
+    );
+    const callsBeforeReap = providerCalls;
+    const reaped = await processRecruiterStrategyStep({
+      databaseUrl: workerUrl.toString(),
+      client,
+    });
+    assert.deepEqual(reaped, { status: 'reaped', stepId: expiredStepId });
+    assert.equal(providerCalls, callsBeforeReap);
+    const expiredState = await target.query(
+      `select run.status run_status, run.reserved_tokens, run.used_tokens,
+        step.status step_status, step.failure_code, reservation.status reservation_status,
+        reservation.actual_tokens, usage.usage_basis
+       from app.workflow_runs run
+       join app.workflow_steps step on step.workflow_run_id = run.id
+       join app.run_budget_reservations reservation on reservation.id = step.reservation_id
+       join app.model_usage usage on usage.workflow_step_id = step.id
+       where run.id = $1`,
+      [expiredRunId],
+    );
+    assert.deepEqual(expiredState.rows[0], {
+      run_status: 'failed',
+      reserved_tokens: 0,
+      used_tokens: 1000,
+      step_status: 'failed',
+      failure_code: 'provider_outcome_unknown',
+      reservation_status: 'settled',
+      actual_tokens: 1000,
+      usage_basis: 'reserved_unknown',
+    });
+    await target.query('set role career_recruiter_strategist');
+    const replayClaim = await target.query(
+      'select * from app.claim_recruiter_strategist_step(300)',
+    );
+    assert.equal(replayClaim.rowCount, 0);
+    await target.query('reset role');
+
     const invalidRunId = randomUUID();
     const invalidStepId = randomUUID();
     await target.query(
@@ -643,7 +795,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
         (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
          input, input_hash)
        values ($1, $2, $3, 'recruiter-strategist', 'pending', $4,
-         '{}'::jsonb, repeat('c', 64))`,
+         '{}'::jsonb, encode(digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
       [invalidStepId, tenantId, invalidRunId, randomUUID()],
     );
     const invalidOutcome = await processRecruiterStrategyStep({
