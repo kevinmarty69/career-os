@@ -308,7 +308,7 @@ try {
   const migrations = (await readdir('supabase/migrations'))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))
     .sort();
-  assert.equal(migrations.at(-1)?.slice(0, 4), '0016');
+  assert.equal(migrations.at(-1)?.slice(0, 4), '0017');
   for (const migration of migrations)
     await target.query(
       await readFile(`supabase/migrations/${migration}`, 'utf8'),
@@ -609,6 +609,7 @@ try {
       'fail_recruiter_reviewer_step',
       'mark_recruiter_reviewer_in_flight',
       'reap_expired_recruiter_reviewer_step',
+      'record_worker_heartbeat',
     ],
     career_hiring_manager_reviewer: [
       'claim_hiring_manager_reviewer_step',
@@ -616,12 +617,14 @@ try {
       'fail_hiring_manager_reviewer_step',
       'mark_hiring_manager_reviewer_in_flight',
       'reap_expired_hiring_manager_reviewer_step',
+      'record_worker_heartbeat',
     ],
     career_factuality_reviewer: [
       'claim_factuality_reviewer_step',
       'complete_factuality_reviewer_step',
       'fail_factuality_reviewer_step',
       'reap_expired_factuality_reviewer_step',
+      'record_worker_heartbeat',
     ],
   };
   for (const row of acl.rows) {

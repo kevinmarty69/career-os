@@ -98,6 +98,10 @@ test('persisted run contract exposes measured zero cost and durable UUIDs', () =
       usedTokens: 42,
       usedCostMicros: 0,
       profile: syntheticProfile,
+      workerAvailability: {
+        state: 'waiting',
+        service: 'company-researcher',
+      },
       steps: [
         {
           stage: 'company-researcher',
@@ -133,6 +137,27 @@ test('persisted run contract exposes measured zero cost and durable UUIDs', () =
       ],
     }).success,
     true,
+  );
+  assert.equal(
+    persistedRunSchema.safeParse({
+      runId: randomUUID(),
+      status: 'running',
+      stage: 'research',
+      revision: 0,
+      usedTokens: 0,
+      usedCostMicros: 0,
+      profile: syntheticProfile,
+      steps: [],
+      workerAvailability: {
+        state: 'offline',
+        service: 'company-researcher',
+      },
+      reviews: [],
+      reviewDecisions: [],
+      publicationEligible: false,
+      events: [],
+    }).success,
+    false,
   );
 });
 

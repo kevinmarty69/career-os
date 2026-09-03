@@ -32,6 +32,14 @@ test('the durable worker dispatches one local call and stores one wrapped result
   const sourceUrl = 'https://jobs.example.test/staff-product-engineer';
   let calls = 0;
   let authorization = '';
+  let releaseProvider!: () => void;
+  let providerStarted!: () => void;
+  const providerRelease = new Promise<void>((resolve) => {
+    releaseProvider = resolve;
+  });
+  const providerRequest = new Promise<void>((resolve) => {
+    providerStarted = resolve;
+  });
 
   const provider = createServer(async (request, response) => {
     calls += 1;
@@ -40,7 +48,8 @@ test('the durable worker dispatches one local call and stores one wrapped result
       // Drain the bounded request before responding.
       void chunk;
     }
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    providerStarted();
+    await providerRelease;
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(
       JSON.stringify({
@@ -220,7 +229,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
        from ${workerLogin}`,
     );
     await target.query(`revoke usage on schema app from ${workerLogin}`);
-    const outcomes = await Promise.all([
+    const outcomesPromise = Promise.all([
       processCompanyResearchStep({
         databaseUrl: workerUrl.toString(),
         client,
@@ -230,6 +239,22 @@ test('the durable worker dispatches one local call and stores one wrapped result
         client,
       }),
     ]);
+    await providerRequest;
+    await target.query(
+      `update app.worker_heartbeats
+       set last_seen_at = clock_timestamp() - interval '16 seconds'
+       where service = 'company-researcher'`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 5_500));
+    await target.query('set role career_app');
+    const availability = await target.query(
+      `select status
+       from app.worker_service_status('company-researcher')`,
+    );
+    await target.query('reset role');
+    assert.equal(availability.rows[0].status, 'fresh');
+    releaseProvider();
+    const outcomes = await outcomesPromise;
 
     assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), [
       'completed',
@@ -323,6 +348,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
       assert.equal(leaked.rows[0].count, 0, `${table} stored the API key`);
     }
   } finally {
+    releaseProvider();
     if (provider.listening)
       await new Promise<void>((resolve) => provider.close(() => resolve()));
     await target.end().catch(() => undefined);

@@ -39,7 +39,7 @@ Copy `.env.example` to `.env.local`, set `DATABASE_URL` and generate a `BETTER_A
 pnpm dev
 ```
 
-To execute queued company research, provision a dedicated PostgreSQL login that is a member only of `career_company_researcher`, put its connection string in `CAREER_OS_WORKER_DATABASE_URL`, configure a loopback OpenAI-compatible model in `.env.local`, and start the worker separately. Never reuse the application `DATABASE_URL`: PostgreSQL assigns the next tenant-scoped job globally and returns an opaque lease token.
+To execute queued work, provision one dedicated PostgreSQL login for every worker role, configure the loopback OpenAI-compatible model for the four model-backed roles, and start each worker separately. Never reuse the application `DATABASE_URL`: PostgreSQL assigns the next tenant-scoped job globally and returns an opaque lease token.
 
 ```sql
 create role career_company_researcher_login login noinherit
@@ -74,16 +74,18 @@ grant career_factuality_reviewer to career_factuality_reviewer_login;
 The login must not own the database or schema, have `SUPERUSER`, `BYPASSRLS`, `CREATEDB` or `CREATEROLE`, inherit any other role, or hold direct table privileges. The worker checks these conditions before claiming work and fails closed.
 
 ```bash
-pnpm worker
-pnpm worker:evidence
-pnpm worker:strategy
-pnpm worker:page
-pnpm worker:review:recruiter
-pnpm worker:review:hiring-manager
-pnpm worker:review:factuality
+pnpm worker:company-researcher
+pnpm worker:evidence-archivist
+pnpm worker:recruiter-strategist
+pnpm worker:page-composer
+pnpm worker:recruiter-reviewer
+pnpm worker:hiring-manager-reviewer
+pnpm worker:factuality-reviewer
 ```
 
 The canary intentionally accepts loopback endpoints only. It cannot call a remote or paid model. No worker receives a tenant selector or direct table access. Use a distinct login and connection string for each worker.
+
+Worker commands intentionally do not load a shared `.env.local`. For local use, export the required variables before invoking one command. In production, supervise seven separate processes with systemd and give each unit only its matching database URL plus the local-model variables it needs. Use `Restart=on-failure`, send `SIGTERM`, and allow the active iteration to drain before the unit timeout; do not combine all credentials in one supervisor process.
 
 ```bash
 pnpm check

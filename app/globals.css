@@ -4391,6 +4391,44 @@ button,
   flex: 0 0 auto;
 }
 
+.worker-availability-notice {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding: 14px 16px;
+  color: #5c4b23;
+  border: 1px solid #e5d8b9;
+  border-radius: 14px;
+  background: #fffaee;
+}
+
+.worker-availability-notice.unavailable {
+  color: #7d3328;
+  border-color: #edc5be;
+  background: #fff3f1;
+}
+
+.worker-availability-notice div {
+  min-width: 0;
+}
+
+.worker-availability-notice strong,
+.worker-availability-notice p {
+  display: block;
+  margin: 0;
+}
+
+.worker-availability-notice p {
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+.worker-availability-notice button {
+  flex: 0 0 auto;
+}
+
 .run-progress-actions {
   display: flex;
   gap: 10px;
@@ -5168,6 +5206,7 @@ button,
   }
 
   .run-polling-warning,
+  .worker-availability-notice,
   .run-progress-actions {
     align-items: stretch;
     flex-direction: column;
@@ -5175,6 +5214,7 @@ button,
 
   .run-progress-actions button,
   .run-polling-warning button,
+  .worker-availability-notice button,
   .research-checkpoint > footer button {
     width: 100%;
   }

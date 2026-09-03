@@ -1,5 +1,6 @@
 import postgres from 'postgres';
 import { composeApprovedStrategyPage } from '../page-composer';
+import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
 
 const STEP_LEASE_SECONDS = 300;
 
@@ -16,10 +17,18 @@ export async function processPageComposerStep(databaseUrl: string) {
   const sql = postgres(databaseUrl, { max: 1, idle_timeout: 5 });
   let claimed: ClaimedStep | undefined;
   let outputBuilt = false;
+  let stopHeartbeat: () => Promise<void> = async () => undefined;
   try {
     await verifyRestrictedWorkerCredential(sql);
+    stopHeartbeat = keepWorkerHeartbeatFresh(() =>
+      sql.begin(async (tx) => {
+        await authorizeWorker(tx);
+        await tx`select app.record_worker_heartbeat('page-composer')`;
+      }),
+    );
     const reapedStepId = await sql.begin(async (tx) => {
       await authorizeWorker(tx);
+      await tx`select app.record_worker_heartbeat('page-composer')`;
       const [result] = await tx<{ id: string | null }[]>`
         select app.reap_expired_page_composer_step() as id`;
       return result.id;
@@ -66,6 +75,7 @@ export async function processPageComposerStep(databaseUrl: string) {
       failureCode: 'invalid_step_input' as const,
     };
   } finally {
+    await stopHeartbeat();
     await sql.end();
   }
 }
@@ -169,7 +179,8 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
             ('claim_page_composer_step', 'lease_seconds integer'),
             ('complete_page_composer_step', 'target_step uuid, target_lease_token uuid, step_output jsonb'),
             ('fail_page_composer_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
-            ('reap_expired_page_composer_step', '')
+            ('reap_expired_page_composer_step', ''),
+            ('record_worker_heartbeat', 'target_service text')
           )
         )
     ) as target_unexpected_function,
@@ -181,7 +192,8 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
           ('claim_page_composer_step', 'lease_seconds integer'),
           ('complete_page_composer_step', 'target_step uuid, target_lease_token uuid, step_output jsonb'),
           ('fail_page_composer_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
-          ('reap_expired_page_composer_step', '')
+          ('reap_expired_page_composer_step', ''),
+          ('record_worker_heartbeat', 'target_service text')
         )) as target_function_count
   from pg_roles login
   join pg_database database_owner on database_owner.datname = current_database()
@@ -201,7 +213,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     identity.target_auth_access ||
     identity.target_unexpected_role ||
     identity.target_unexpected_function ||
-    identity.target_function_count !== 4
+    identity.target_function_count !== 5
   )
     throw new Error(
       'CAREER_OS_PAGE_COMPOSER_DATABASE_URL must use the restricted page composer login.',

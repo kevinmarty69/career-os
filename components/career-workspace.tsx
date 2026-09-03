@@ -465,7 +465,7 @@ export function CareerWorkspace() {
         setRunPollingErrors((current) => ({
           ...current,
           [selectedRunDossierId]:
-            'Impossible d’actualiser pour le moment. Le traitement peut continuer en arrière-plan.',
+            'Impossible d’actualiser l’état. Les informations affichées peuvent être obsolètes.',
         }));
         timer = window.setTimeout(() => void poll(), 4_000);
       }
@@ -626,13 +626,17 @@ export function CareerWorkspace() {
           },
           body: persistedInput,
         });
+        const workerUnavailable =
+          response.status === 503 && (await isWorkerUnavailable(response));
         if (!response.ok)
           throw new Error(
-            response.status === 409
-              ? 'RUN_CONFLICT'
-              : response.status === 429
-                ? 'RUN_RATE_LIMITED'
-                : 'RUN_FAILED',
+            workerUnavailable
+              ? 'RUN_WORKER_UNAVAILABLE'
+              : response.status === 409
+                ? 'RUN_CONFLICT'
+                : response.status === 429
+                  ? 'RUN_RATE_LIMITED'
+                  : 'RUN_FAILED',
           );
         const persisted = persistedRunSchema.parse(await response.json());
         updateApplicationDossier(dossierId, (current) =>
@@ -684,19 +688,22 @@ export function CareerWorkspace() {
       setDossierView('journey');
     } catch (error) {
       setGenerateError(
-        error instanceof Error && error.message === 'RUN_CONFLICT'
-          ? 'La candidature ou la mémoire professionnelle a changé dans une autre session. Rechargez avant de relancer.'
-          : error instanceof Error && error.message === 'RUN_RATE_LIMITED'
-            ? 'La limite d’analyses de cet espace est atteinte. Attendez qu’une analyse se termine ou réessayez plus tard.'
-            : error instanceof Error && error.message === 'APPLICATION_CONFLICT'
-              ? 'Cette candidature a changé dans une autre session. Rechargez-la avant de relancer.'
+        error instanceof Error && error.message === 'RUN_WORKER_UNAVAILABLE'
+          ? 'Le service de traitement de cette instance n’est pas disponible. Démarrez les workers ou contactez l’administrateur, puis réessayez.'
+          : error instanceof Error && error.message === 'RUN_CONFLICT'
+            ? 'La candidature ou la mémoire professionnelle a changé dans une autre session. Rechargez avant de relancer.'
+            : error instanceof Error && error.message === 'RUN_RATE_LIMITED'
+              ? 'La limite d’analyses de cet espace est atteinte. Attendez qu’une analyse se termine ou réessayez plus tard.'
               : error instanceof Error &&
-                  error.message === 'APPLICATION_REJECTED'
-                ? 'Complétez l’entreprise, le poste et la description avant de générer la page.'
+                  error.message === 'APPLICATION_CONFLICT'
+                ? 'Cette candidature a changé dans une autre session. Rechargez-la avant de relancer.'
                 : error instanceof Error &&
-                    error.message.includes('not supported')
-                  ? 'Aucune preuve ne correspond à ce poste. Ajustez le brief ou ajoutez une preuve pertinente, puis réessayez.'
-                  : 'La génération s’est arrêtée sans modifier le brief. Réessayez lorsque vous êtes prêt.',
+                    error.message === 'APPLICATION_REJECTED'
+                  ? 'Complétez l’entreprise, le poste et la description avant de générer la page.'
+                  : error instanceof Error &&
+                      error.message.includes('not supported')
+                    ? 'Aucune preuve ne correspond à ce poste. Ajustez le brief ou ajoutez une preuve pertinente, puis réessayez.'
+                    : 'La génération s’est arrêtée sans modifier le brief. Réessayez lorsque vous êtes prêt.',
       );
     } finally {
       generationPending.current = false;
@@ -1891,6 +1898,7 @@ export function CareerWorkspace() {
                       opportunity={state.opportunity}
                       profile={state.runProfile ?? workspace.profile}
                       pollingError={runPollingErrors[state.id] ?? ''}
+                      workerAvailability={state.workerAvailability}
                       retryError={generateError}
                       retryPending={generating}
                       reviewState={currentReviewState}
@@ -1921,8 +1929,12 @@ export function CareerWorkspace() {
                     reviewsAvailable={reviewsComplete(state.reviews)}
                     reviewState={currentReviewState}
                     spec={state.spec}
+                    workerAvailability={state.workerAvailability}
                     onOpenEvidence={openEvidenceInspector}
                     onOpenReview={() => setDossierView('review')}
+                    onRefresh={() =>
+                      setRunRefreshVersion((current) => current + 1)
+                    }
                     onRetry={() => void generate(true)}
                     onStartReviews={() => void startReviews()}
                   />
@@ -3247,6 +3259,7 @@ function JourneyView({
   onReview,
   opportunity,
   pollingError,
+  workerAvailability,
   profile,
   retryError,
   retryPending,
@@ -3264,6 +3277,7 @@ function JourneyView({
   onReview: () => void;
   opportunity: Opportunity;
   pollingError: string;
+  workerAvailability?: PersistedRun['workerAvailability'];
   profile: Profile;
   retryError: string;
   retryPending: boolean;
@@ -3328,9 +3342,15 @@ function JourneyView({
         <div className="inline-error" role="status">
           <p>{pollingError}</p>
           <button className="quiet" onClick={onRefresh}>
-            Réessayer maintenant
+            Actualiser
           </button>
         </div>
+      ) : null}
+      {!pollingError ? (
+        <WorkerAvailabilityNotice
+          availability={workerAvailability}
+          onRefresh={onRefresh}
+        />
       ) : null}
 
       <section className="journey-board" aria-label="Parcours de candidature">
@@ -3568,7 +3588,11 @@ const runProgressGroups: RunProgressGroup[] = [
   {
     title: 'Vérifications',
     description: 'Contrôler la clarté, la pertinence et les faits.',
-    stages: ['recruiter', 'hiring-manager', 'fact-checker'],
+    stages: [
+      'recruiter-reviewer',
+      'hiring-manager-reviewer',
+      'factuality-reviewer',
+    ],
   },
 ];
 
@@ -3638,28 +3662,46 @@ function RunProgressView({
     dossier.runEvidenceArchive?.signals.filter(
       (signal) => signal.matches.length,
     ).length ?? 0;
-  const title = reviewingResearch
-    ? 'Analyse de l’offre à vérifier'
-    : archiveReady
-      ? 'Preuves candidates sélectionnées'
-      : strategyReady
-        ? 'Angle de candidature à valider'
-        : strategyApproved
-          ? 'Stratégie validée'
-          : running
-            ? `${currentGroup?.title ?? 'Analyse de la candidature'} en cours`
-            : terminalCopy.title;
-  const description = reviewingResearch
-    ? 'Vérifiez ce que nous avons compris du poste. Vous gardez la main avant que votre parcours soit analysé.'
-    : archiveReady
-      ? 'Les correspondances ci-dessous respectent les permissions de votre mémoire. Vérifiez-les avant de demander au stratège de choisir l’angle de candidature.'
-      : strategyReady
-        ? 'Le stratège a hiérarchisé les preuves sans modifier les faits. Vérifiez ce choix avant la composition de la page.'
-        : strategyApproved
-          ? 'Votre décision est enregistrée. Le compositeur de page sera la prochaine étape durable du workflow.'
-          : running
-            ? `${currentGroup?.description ?? 'Le traitement continue.'} Vous pouvez quitter ce dossier : son état restera disponible ici.`
-            : terminalCopy.description;
+  const workerUnavailable =
+    !pollingError &&
+    running &&
+    dossier.workerAvailability?.state === 'unavailable';
+  const workerWaiting =
+    !pollingError && running && dossier.workerAvailability?.state === 'waiting';
+  const title = pollingError
+    ? 'État de l’analyse non actualisé'
+    : reviewingResearch
+      ? 'Analyse de l’offre à vérifier'
+      : archiveReady
+        ? 'Preuves candidates sélectionnées'
+        : strategyReady
+          ? 'Angle de candidature à valider'
+          : strategyApproved
+            ? 'Stratégie validée'
+            : workerUnavailable
+              ? `${currentGroup?.title ?? 'Traitement'} indisponible`
+              : workerWaiting
+                ? `${currentGroup?.title ?? 'Traitement'} en attente`
+                : running
+                  ? `${currentGroup?.title ?? 'Analyse de la candidature'} en cours`
+                  : terminalCopy.title;
+  const description = pollingError
+    ? 'La dernière progression enregistrée reste visible ci-dessous.'
+    : reviewingResearch
+      ? 'Vérifiez ce que nous avons compris du poste. Vous gardez la main avant que votre parcours soit analysé.'
+      : archiveReady
+        ? 'Les correspondances ci-dessous respectent les permissions de votre mémoire. Vérifiez-les avant de demander au stratège de choisir l’angle de candidature.'
+        : strategyReady
+          ? 'Le stratège a hiérarchisé les preuves sans modifier les faits. Vérifiez ce choix avant la composition de la page.'
+          : strategyApproved
+            ? 'Votre décision est enregistrée. Le compositeur de page sera la prochaine étape durable du workflow.'
+            : workerUnavailable
+              ? 'Le service requis n’est pas actif sur cette instance. La progression enregistrée reste intacte.'
+              : workerWaiting
+                ? 'Le service est disponible et prendra en charge cette étape dès que possible.'
+                : running
+                  ? `${currentGroup?.description ?? 'Le traitement continue.'} Vous pouvez quitter ce dossier : son état restera disponible ici.`
+                  : terminalCopy.description;
 
   return (
     <section className="run-progress" aria-labelledby="run-progress-title">
@@ -3951,9 +3993,15 @@ function RunProgressView({
         <div className="run-polling-warning" role="status" aria-live="polite">
           <p>{pollingError}</p>
           <button className="quiet" onClick={onRefresh} type="button">
-            Réessayer maintenant
+            Actualiser
           </button>
         </div>
+      ) : null}
+      {!pollingError ? (
+        <WorkerAvailabilityNotice
+          availability={dossier.workerAvailability}
+          onRefresh={onRefresh}
+        />
       ) : null}
 
       {!reviewingResearch && !archiveReady && !strategyReady ? (
@@ -4043,6 +4091,42 @@ function runProgressStatusLabel(
   if (status === 'cancelled') return 'Annulé';
   if (status === 'future') return 'À venir';
   return 'En attente';
+}
+
+function WorkerAvailabilityNotice({
+  availability,
+  onRefresh,
+}: {
+  availability?: PersistedRun['workerAvailability'];
+  onRefresh: () => void;
+}) {
+  if (!availability || availability.state === 'ready') return null;
+  const unavailable = availability.state === 'unavailable';
+  return (
+    <div
+      className={`worker-availability-notice ${availability.state}`}
+      role={unavailable ? 'alert' : 'status'}
+      aria-live={unavailable ? 'assertive' : 'polite'}
+    >
+      <div>
+        <strong>
+          {unavailable
+            ? 'Traitement indisponible'
+            : 'En attente de prise en charge'}
+        </strong>
+        <p>
+          {unavailable
+            ? 'Le service requis n’est pas actif sur cette instance. Démarrez les workers ou contactez l’administrateur, puis vérifiez à nouveau.'
+            : 'Le service est disponible. Cette étape démarrera dès qu’elle pourra être prise en charge.'}
+        </p>
+      </div>
+      {unavailable ? (
+        <button className="quiet" onClick={onRefresh} type="button">
+          Vérifier à nouveau
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function runTerminalCopy(status: ApplicationDossier['runStatus']) {
@@ -4586,6 +4670,7 @@ function ImportConflictDialog({
 function DraftView({
   onOpenEvidence,
   onOpenReview,
+  onRefresh,
   onRetry,
   onStartReviews,
   profile,
@@ -4596,9 +4681,11 @@ function DraftView({
   reviewPending,
   reviewState,
   spec,
+  workerAvailability,
 }: {
   onOpenEvidence: (claimId: string) => void;
   onOpenReview: () => void;
+  onRefresh: () => void;
   onRetry: () => void;
   onStartReviews: () => void;
   profile: Profile;
@@ -4609,6 +4696,7 @@ function DraftView({
   reviewPending: boolean;
   reviewState: ReturnType<typeof reviewProcessState>;
   spec: PageSpec;
+  workerAvailability?: PersistedRun['workerAvailability'];
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
@@ -4656,6 +4744,10 @@ function DraftView({
           {sourcedCount}/{usedClaimIds.size} sourcées
         </span>
       </section>
+      <WorkerAvailabilityNotice
+        availability={workerAvailability}
+        onRefresh={onRefresh}
+      />
       <p className="section-label">{spec.hero.eyebrow}</p>
       <h2>{spec.hero.title}</h2>
       <p className="draft-thesis">{spec.hero.thesis}</p>
@@ -5800,6 +5892,7 @@ function applyPersistedRun(
     runStatus: run.status,
     runStage: run.stage,
     runSteps: run.steps,
+    workerAvailability: run.workerAvailability,
     runProfile: run.profile,
     runResearch: run.research,
     runEvidenceArchive: run.evidenceArchive,
@@ -5832,6 +5925,8 @@ function hasCurrentRunProjection(
     dossier.runStatus === run.status &&
     dossier.runStage === run.stage &&
     JSON.stringify(dossier.runSteps ?? []) === JSON.stringify(run.steps) &&
+    JSON.stringify(dossier.workerAvailability) ===
+      JSON.stringify(run.workerAvailability) &&
     JSON.stringify(dossier.runResearch) === JSON.stringify(run.research) &&
     JSON.stringify(dossier.runEvidenceArchive) ===
       JSON.stringify(run.evidenceArchive) &&
@@ -5849,6 +5944,20 @@ function hasCurrentRunProjection(
     dossier.publicationEligible ===
       (reviewable ? run.publicationEligible : false)
   );
+}
+
+async function isWorkerUnavailable(response: Response) {
+  try {
+    const body: unknown = await response.json();
+    return (
+      typeof body === 'object' &&
+      body !== null &&
+      'code' in body &&
+      body.code === 'WORKER_UNAVAILABLE'
+    );
+  } catch {
+    return false;
+  }
 }
 
 function reviewGateReady(

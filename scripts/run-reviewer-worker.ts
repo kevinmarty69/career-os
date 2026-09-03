@@ -1,6 +1,7 @@
 import { reviewerSchema, type Reviewer } from '../lib/reviewer';
 import { LocalOpenAIReviewClient } from '../lib/server/local-openai-review-client';
 import { processReviewerStep } from '../lib/server/reviewer-worker';
+import { runWorkerLoop } from './worker-loop';
 
 async function main() {
   const reviewer = reviewerSchema.parse(required('CAREER_OS_REVIEWER'));
@@ -8,28 +9,18 @@ async function main() {
   const once = process.argv.includes('--once');
   const client = qualitativeClient(reviewer);
 
-  do {
-    try {
-      const result =
-        reviewer === 'factuality'
-          ? await processReviewerStep({ reviewer, databaseUrl })
-          : await processReviewerStep({
-              reviewer,
-              databaseUrl,
-              client: client!,
-            });
-      console.log(JSON.stringify(result));
-      if (once) break;
-      await wait(result.status === 'idle' ? 1_000 : 50);
-    } catch {
-      console.error(`${reviewer} reviewer worker iteration failed.`);
-      if (once) {
-        process.exitCode = 1;
-        break;
-      }
-      await wait(1_000);
-    }
-  } while (true);
+  await runWorkerLoop({
+    workerName: `${reviewer} reviewer`,
+    once,
+    iteration: () =>
+      reviewer === 'factuality'
+        ? processReviewerStep({ reviewer, databaseUrl })
+        : processReviewerStep({
+            reviewer,
+            databaseUrl,
+            client: client!,
+          }),
+  });
 }
 
 function reviewerDatabaseUrlName(reviewer: Reviewer) {
@@ -53,10 +44,6 @@ function qualitativeClient(reviewer: Reviewer) {
     apiKey: process.env.CAREER_OS_LOCAL_MODEL_API_KEY ?? 'local-only',
     model: required('CAREER_OS_LOCAL_MODEL'),
   });
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function required(name: string) {

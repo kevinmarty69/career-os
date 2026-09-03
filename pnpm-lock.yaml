@@ -32,6 +32,9 @@ importers:
       server-only:
         specifier: 0.0.1
         version: 0.0.1
+      tsx:
+        specifier: 4.23.13
+        version: 4.23.13
       unpdf:
         specifier: 1.8.1
         version: 1.8.1
@@ -66,9 +69,6 @@ importers:
       prettier:
         specifier: 3.9.6
         version: 3.9.6
-      tsx:
-        specifier: 4.23.13
-        version: 4.23.13
       typescript:
         specifier: 5.9.3
         version: 5.9.3

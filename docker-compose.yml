@@ -25,6 +25,7 @@ services:
       - ./supabase/migrations/0014_durable_recruiter_strategist.sql:/docker-entrypoint-initdb.d/0014_durable_recruiter_strategist.sql:ro
       - ./supabase/migrations/0015_durable_page_composer.sql:/docker-entrypoint-initdb.d/0015_durable_page_composer.sql:ro
       - ./supabase/migrations/0016_durable_reviewers.sql:/docker-entrypoint-initdb.d/0016_durable_reviewers.sql:ro
+      - ./supabase/migrations/0017_worker_heartbeats.sql:/docker-entrypoint-initdb.d/0017_worker_heartbeats.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U career_os']
       interval: 2s

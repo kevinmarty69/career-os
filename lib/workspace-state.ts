@@ -40,6 +40,7 @@ export type ApplicationDossier = {
   runStatus?: PersistedRun['status'];
   runStage?: string;
   runSteps?: PersistedRun['steps'];
+  workerAvailability?: PersistedRun['workerAvailability'];
   runProfile?: Profile;
   runResearch?: PersistedRun['research'];
   runEvidenceArchive?: PersistedRun['evidenceArchive'];
@@ -215,6 +216,13 @@ const applicationDossierSchema: z.ZodType<ApplicationDossier> = z
           .strict(),
       )
       .max(20)
+      .optional(),
+    workerAvailability: z
+      .object({
+        state: z.enum(['ready', 'waiting', 'unavailable']),
+        service: z.string().min(1).max(100).optional(),
+      })
+      .strict()
       .optional(),
     runProfile: profileSchema.optional(),
     runResearch: persistedResearchSchema.optional(),

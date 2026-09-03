@@ -10,6 +10,7 @@ import {
   LocalOpenAIReviewClient,
   REVIEW_MAX_OUTPUT_TOKENS,
 } from './local-openai-review-client';
+import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
 
 const STEP_LEASE_SECONDS = 300;
 
@@ -41,10 +42,18 @@ export async function processReviewerStep(input: ReviewerWorkerInput) {
   let claimed: ClaimedStep | undefined;
   let dispatched = false;
   let deterministicOutputBuilt = false;
+  let stopHeartbeat: () => Promise<void> = async () => undefined;
   try {
     await verifyRestrictedWorkerCredential(sql, input.reviewer);
+    stopHeartbeat = keepWorkerHeartbeatFresh(() =>
+      sql.begin(async (tx) => {
+        await authorizeWorker(tx, input.reviewer);
+        await tx`select app.record_worker_heartbeat(${reviewerService(input.reviewer)})`;
+      }),
+    );
     const reapedStepId = await sql.begin(async (tx) => {
       await authorizeWorker(tx, input.reviewer);
+      await tx`select app.record_worker_heartbeat(${reviewerService(input.reviewer)})`;
       return reapStep(tx, input.reviewer);
     });
     if (reapedStepId)
@@ -129,6 +138,7 @@ export async function processReviewerStep(input: ReviewerWorkerInput) {
     }
     throw error;
   } finally {
+    await stopHeartbeat();
     await sql.end();
   }
 }
@@ -410,6 +420,7 @@ function reviewerAuthority(reviewer: Reviewer) {
         'fail_recruiter_reviewer_step(target_step uuid, target_lease_token uuid, target_failure_code text)',
         'mark_recruiter_reviewer_in_flight(target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint)',
         'reap_expired_recruiter_reviewer_step()',
+        'record_worker_heartbeat(target_service text)',
       ],
     } as const;
   if (reviewer === 'hiring-manager')
@@ -421,6 +432,7 @@ function reviewerAuthority(reviewer: Reviewer) {
         'fail_hiring_manager_reviewer_step(target_step uuid, target_lease_token uuid, target_failure_code text)',
         'mark_hiring_manager_reviewer_in_flight(target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint)',
         'reap_expired_hiring_manager_reviewer_step()',
+        'record_worker_heartbeat(target_service text)',
       ],
     } as const;
   return {
@@ -430,8 +442,15 @@ function reviewerAuthority(reviewer: Reviewer) {
       'complete_factuality_reviewer_step(target_step uuid, target_lease_token uuid, step_output jsonb)',
       'fail_factuality_reviewer_step(target_step uuid, target_lease_token uuid, target_failure_code text)',
       'reap_expired_factuality_reviewer_step()',
+      'record_worker_heartbeat(target_service text)',
     ],
   } as const;
+}
+
+function reviewerService(reviewer: Reviewer) {
+  if (reviewer === 'recruiter') return 'recruiter-reviewer';
+  if (reviewer === 'hiring-manager') return 'hiring-manager-reviewer';
+  return 'factuality-reviewer';
 }
 
 function sameStrings(actual: string[], expected: readonly string[]) {

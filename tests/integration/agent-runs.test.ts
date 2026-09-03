@@ -130,6 +130,27 @@ async function main() {
   };
   const key = randomUUID();
 
+  const availabilityPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await availabilityPool.query(
+      `delete from app.worker_heartbeats where service='company-researcher'`,
+    );
+    const unavailable = await owner.request('/api/runs', 'POST', runInput, {
+      'idempotency-key': key,
+    });
+    await expectStatus(unavailable, 503, 'missing worker preflight');
+    assert.deepEqual(await unavailable.json(), {
+      code: 'WORKER_UNAVAILABLE',
+      service: 'company-researcher',
+    });
+    await availabilityPool.query(
+      `insert into app.worker_heartbeats(service,last_seen_at)
+       values ('company-researcher',clock_timestamp())`,
+    );
+  } finally {
+    await availabilityPool.end();
+  }
+
   const create = await owner.request('/api/runs', 'POST', runInput, {
     'idempotency-key': key,
   });
@@ -142,16 +163,111 @@ async function main() {
   assert.equal(run.usedTokens, 0);
   assert.equal(run.usedCostMicros, 0);
   assert.equal(run.spec, undefined);
+  assert.deepEqual(run.workerAvailability, {
+    state: 'ready',
+    service: 'company-researcher',
+  });
   assert.deepEqual(run.reviews, []);
   assert.deepEqual(run.steps, [
     { stage: 'company-researcher', status: 'pending', attempt: 1 },
   ]);
+
+  const projectionPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await projectionPool.query(
+      `update app.workflow_steps
+       set created_at=clock_timestamp()-interval '11 seconds'
+       where workflow_run_id=$1 and stage='company-researcher'`,
+      [run.runId],
+    );
+    const waiting = await owner.request(`/api/runs/${run.runId}`);
+    await expectStatus(waiting, 200, 'fresh worker with an older pending step');
+    assert.deepEqual(
+      ((await waiting.json()) as PersistedRun).workerAvailability,
+      {
+        state: 'waiting',
+        service: 'company-researcher',
+      },
+    );
+
+    await projectionPool.query(
+      `update app.worker_heartbeats
+       set last_seen_at=clock_timestamp()-interval '16 seconds'
+       where service='company-researcher'`,
+    );
+    const stale = await owner.request(`/api/runs/${run.runId}`);
+    await expectStatus(stale, 200, 'stale worker projection');
+    assert.deepEqual(
+      ((await stale.json()) as PersistedRun).workerAvailability,
+      {
+        state: 'unavailable',
+        service: 'company-researcher',
+      },
+    );
+
+    await projectionPool.query(
+      `update app.workflow_steps set status='in_flight'
+       where workflow_run_id=$1 and stage='company-researcher'`,
+      [run.runId],
+    );
+    const inFlight = await owner.request(`/api/runs/${run.runId}`);
+    await expectStatus(inFlight, 200, 'in-flight step projection');
+    assert.deepEqual(
+      ((await inFlight.json()) as PersistedRun).workerAvailability,
+      { state: 'ready', service: 'company-researcher' },
+    );
+
+    await projectionPool.query(
+      `update app.workflow_steps
+       set status='pending',created_at=clock_timestamp()
+       where workflow_run_id=$1 and stage='company-researcher'`,
+      [run.runId],
+    );
+    await projectionPool.query(
+      `update app.worker_heartbeats set last_seen_at=clock_timestamp()
+       where service='company-researcher'`,
+    );
+  } finally {
+    await projectionPool.end();
+  }
 
   const replay = await owner.request('/api/runs', 'POST', runInput, {
     'idempotency-key': key,
   });
   await expectStatus(replay, 200, 'idempotent replay');
   assert.deepEqual(await replay.json(), run);
+
+  const replayPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await replayPool.query(
+      `update app.worker_heartbeats
+       set last_seen_at=clock_timestamp()-interval '16 seconds'
+       where service='company-researcher'`,
+    );
+    const unavailableReplay = await owner.request(
+      '/api/runs',
+      'POST',
+      runInput,
+      {
+        'idempotency-key': key,
+      },
+    );
+    await expectStatus(
+      unavailableReplay,
+      200,
+      'idempotent replay bypasses worker preflight',
+    );
+    assert.deepEqual(
+      ((await unavailableReplay.json()) as PersistedRun).workerAvailability,
+      { state: 'unavailable', service: 'company-researcher' },
+    );
+    await replayPool.query(
+      `update app.worker_heartbeats set last_seen_at=clock_timestamp()
+       where service='company-researcher'`,
+    );
+  } finally {
+    await replayPool.end();
+  }
 
   for (let index = 0; index < 4; index += 1)
     await expectStatus(

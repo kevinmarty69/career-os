@@ -4,6 +4,7 @@ import {
   COMPANY_RESEARCH_MAX_OUTPUT_TOKENS,
   LocalOpenAICompanyResearchClient,
 } from './local-openai-client';
+import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
 
 const STEP_LEASE_SECONDS = 300;
 
@@ -39,10 +40,18 @@ export async function processCompanyResearchStep(input: {
   const sql = postgres(input.databaseUrl, { max: 1, idle_timeout: 5 });
   let claimed: ClaimedStep | undefined;
   let dispatched = false;
+  let stopHeartbeat: () => Promise<void> = async () => undefined;
   try {
     await verifyRestrictedWorkerCredential(sql);
+    stopHeartbeat = keepWorkerHeartbeatFresh(() =>
+      sql.begin(async (tx) => {
+        await authorizeWorker(tx);
+        await tx`select app.record_worker_heartbeat('company-researcher')`;
+      }),
+    );
     const reapedStepId = await sql.begin(async (tx) => {
       await authorizeWorker(tx);
+      await tx`select app.record_worker_heartbeat('company-researcher')`;
       const [result] = await tx<{ id: string | null }[]>`
         select app.reap_expired_company_researcher_step() as id`;
       return result.id;
@@ -122,6 +131,7 @@ export async function processCompanyResearchStep(input: {
       failureCode: 'provider_outcome_unknown' as const,
     };
   } finally {
+    await stopHeartbeat();
     await sql.end();
   }
 }
@@ -259,11 +269,12 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
             ('mark_company_researcher_in_flight', 'target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint'),
             ('complete_company_researcher_step', 'target_step uuid, target_lease_token uuid, step_output jsonb, actual_input_tokens integer, actual_output_tokens integer, actual_cost bigint, actual_latency integer, was_cache_hit boolean, request_id text'),
             ('fail_company_researcher_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
-            ('reap_expired_company_researcher_step', '')
+            ('reap_expired_company_researcher_step', ''),
+            ('record_worker_heartbeat', 'target_service text')
           )
         )
     ) as target_unexpected_function,
-    (select count(*) <> 5 from pg_proc procedure
+    (select count(*) <> 6 from pg_proc procedure
       join pg_namespace namespace on namespace.oid = procedure.pronamespace
       where namespace.nspname = 'app'
         and has_function_privilege(target.rolname, procedure.oid, 'execute')
@@ -273,7 +284,8 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
             ('mark_company_researcher_in_flight', 'target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint'),
             ('complete_company_researcher_step', 'target_step uuid, target_lease_token uuid, step_output jsonb, actual_input_tokens integer, actual_output_tokens integer, actual_cost bigint, actual_latency integer, was_cache_hit boolean, request_id text'),
             ('fail_company_researcher_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
-            ('reap_expired_company_researcher_step', '')
+            ('reap_expired_company_researcher_step', ''),
+            ('record_worker_heartbeat', 'target_service text')
           )) as target_missing_function
   from pg_roles login
   join pg_database database_owner on database_owner.datname = current_database()

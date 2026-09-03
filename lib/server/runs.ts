@@ -15,6 +15,7 @@ import {
   strategyApprovalInputSchema,
   type PersistedRun,
   type ReviewIssueDecisionResult,
+  type WorkerAvailability,
 } from '../run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from '../schemas';
 import { COMPANY_RESEARCH_RUN_TOKEN_BUDGET } from './local-openai-client';
@@ -30,9 +31,15 @@ export type RunSession = {
 export class RunConflictError extends Error {}
 export class RunRejectedError extends Error {}
 export class RunRateLimitError extends Error {}
+export class WorkerUnavailableError extends Error {
+  constructor(readonly service: string) {
+    super(`Worker service ${service} is unavailable.`);
+  }
+}
 
 const MAX_ACTIVE_RUNS_PER_TENANT = 5;
 const MAX_RUNS_PER_TENANT_HOUR = 30;
+const PENDING_WAIT_MS = 10_000;
 
 function database() {
   const url = process.env.DATABASE_URL;
@@ -69,6 +76,10 @@ export async function createPersistedRun(
           run: await readRunProjection(tx, session.tenantId, existing.id),
         };
       }
+
+      const worker = await readWorkerServiceStatus(tx, 'company-researcher');
+      if (!worker.available)
+        throw new WorkerUnavailableError('company-researcher');
 
       await tx`select pg_advisory_xact_lock(
         hashtextextended(${`${session.tenantId}:run-admission`}, 0)
@@ -804,11 +815,15 @@ async function readRunProjection(
       status: PersistedRun['steps'][number]['status'];
       attempt: number;
       failure_code: string | null;
+      pending_for_ms: string;
     }>
-  >`select stage, status, attempt, failure_code
+  >`select stage, status, attempt, failure_code,
+      greatest(0, extract(epoch from (clock_timestamp() - created_at)) * 1000)::text
+        pending_for_ms
     from app.workflow_steps
     where tenant_id = ${tenantId} and workflow_run_id = ${runId}
     order by created_at, id`;
+  const workerAvailability = await projectWorkerAvailability(tx, steps);
 
   return persistedRunSchema.parse({
     runId: run.id,
@@ -818,6 +833,7 @@ async function readRunProjection(
     usedTokens: run.used_tokens,
     usedCostMicros: Number(run.used_cost_micros),
     profile,
+    workerAvailability,
     steps: steps.map((step) => ({
       stage: step.stage,
       status: step.status,
@@ -899,6 +915,48 @@ async function readRunProjection(
           : 0,
     })),
   });
+}
+
+async function projectWorkerAvailability(
+  tx: postgres.TransactionSql,
+  steps: Array<{
+    stage: string;
+    status: PersistedRun['steps'][number]['status'];
+    pending_for_ms: string;
+  }>,
+): Promise<WorkerAvailability> {
+  const active = steps.find((step) =>
+    ['pending', 'leased', 'in_flight'].includes(step.status),
+  );
+  if (!active) return { state: 'ready' };
+  if (active.status === 'in_flight')
+    return { state: 'ready', service: active.stage };
+
+  const service = await readWorkerServiceStatus(tx, active.stage);
+  if (!service.available)
+    return {
+      state: 'unavailable',
+      service: active.stage,
+    };
+  return {
+    state:
+      active.status === 'pending' &&
+      Number(active.pending_for_ms) >= PENDING_WAIT_MS
+        ? 'waiting'
+        : 'ready',
+    service: active.stage,
+  };
+}
+
+async function readWorkerServiceStatus(
+  tx: postgres.TransactionSql,
+  service: string,
+) {
+  const [status] = await tx<Array<{ status: string }>>`select status
+    from app.worker_service_status(${service})`;
+  return {
+    available: status?.status === 'fresh',
+  };
 }
 
 async function authorize(

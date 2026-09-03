@@ -1,4 +1,22 @@
 import { expect, test, type Page } from '@playwright/test';
+import { Pool } from 'pg';
+
+const e2eDatabaseUrl =
+  process.env.DATABASE_URL ??
+  'postgres://career_os:career_os@127.0.0.1:54329/career_os';
+
+async function markCompanyResearcherAvailable() {
+  const pool = new Pool({ connectionString: e2eDatabaseUrl });
+  try {
+    await pool.query(
+      `insert into app.worker_heartbeats(service,last_seen_at)
+       values ('company-researcher',clock_timestamp())
+       on conflict (service) do update set last_seen_at=excluded.last_seen_at`,
+    );
+  } finally {
+    await pool.end();
+  }
+}
 
 async function openApplications(page: Page) {
   await openApplicationsBoard(page);
@@ -290,14 +308,18 @@ test('resumes a durable run and separates polling loss from run failure', async 
   await page.getByRole('button', { name: 'Générer la page' }).click();
   await expect(
     page.getByRole('heading', {
-      name: 'Analyse de l’offre en cours',
+      name: 'État de l’analyse non actualisé',
     }),
   ).toBeVisible();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  await expect(page.getByText('Le traitement peut continuer')).toBeVisible();
+  await expect(
+    page.getByText(
+      'Impossible d’actualiser l’état. Les informations affichées peuvent être obsolètes.',
+    ),
+  ).toBeVisible();
 
   runRead = 'running';
-  await page.getByRole('button', { name: 'Réessayer maintenant' }).click();
+  await page.getByRole('button', { name: 'Actualiser' }).click();
   const progress = page.getByRole('list', { name: 'Progression enregistrée' });
   await expect(
     progress
@@ -349,6 +371,126 @@ test('resumes a durable run and separates polling loss from run failure', async 
     page.getByRole('button', { name: 'Modifier le brief' }),
   ).toBeVisible();
   await expect(progress.getByText('En cours', { exact: true })).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false);
+});
+
+test('explains unavailable workers and recovers the same durable run', async ({
+  page,
+}) => {
+  await createPersistedApplication(page);
+  const profile = await page.evaluate(async () => {
+    const response = await fetch('/api/profile');
+    return ((await response.json()) as { profile: unknown }).profile;
+  });
+  const runId = crypto.randomUUID();
+  let attempts = 0;
+  let pollUnavailable = false;
+  let workerState: 'unavailable' | 'waiting' | 'ready' = 'unavailable';
+  const run = () => ({
+    runId,
+    status: 'running',
+    stage: 'research',
+    revision: 0,
+    usedTokens: 0,
+    usedCostMicros: 0,
+    profile,
+    workerAvailability: {
+      state: workerState,
+      service: 'company-researcher',
+    },
+    steps: [{ stage: 'company-researcher', status: 'pending', attempt: 1 }],
+    reviews: [],
+    reviewDecisions: [],
+    publicationEligible: false,
+    events: [],
+  });
+  await page.route('**/api/runs', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 'WORKER_UNAVAILABLE',
+          service: 'company-researcher',
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...run(),
+        workerAvailability: {
+          state: 'ready',
+          service: 'company-researcher',
+        },
+      }),
+    });
+  });
+  await page.route(`**/api/runs/${runId}`, async (route) => {
+    if (pollUnavailable) {
+      await route.fulfill({ status: 503, body: 'Run unavailable.' });
+      return;
+    }
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(run()),
+    });
+  });
+
+  await page.getByRole('button', { name: 'Générer la page' }).click();
+  await expect(
+    page.getByText(
+      'Le service de traitement de cette instance n’est pas disponible.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Analyse/ })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Réessayer' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Analyse de l’offre indisponible' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Vérifier à nouveau' }),
+  ).toBeVisible();
+
+  pollUnavailable = true;
+  await page.getByRole('button', { name: 'Vérifier à nouveau' }).click();
+  await expect(
+    page.getByText(
+      'Impossible d’actualiser l’état. Les informations affichées peuvent être obsolètes.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'État de l’analyse non actualisé' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Le service requis n’est pas actif sur cette instance.'),
+  ).toHaveCount(0);
+  await expect(page.getByText('Traitement indisponible')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Actualiser' })).toHaveCount(1);
+
+  pollUnavailable = false;
+  workerState = 'waiting';
+  await page.getByRole('button', { name: 'Actualiser' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Analyse de l’offre en attente' }),
+  ).toBeVisible();
+  await expect(page.getByText('En attente de prise en charge')).toBeVisible();
+
+  workerState = 'ready';
+  await expect(
+    page.getByRole('heading', { name: 'Analyse de l’offre en cours' }),
+  ).toBeVisible({ timeout: 7_000 });
+  await expect(page.getByText('En attente de prise en charge')).toHaveCount(0);
+  expect(attempts).toBe(2);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,
@@ -995,12 +1137,10 @@ test('reviews and approves a durable recruiter strategy', async ({ page }) => {
   await expect(
     page.getByText('0 / 3 vérifications terminées').first(),
   ).toBeVisible();
-  await expect(
-    page.getByText('Impossible d’actualiser pour le moment.'),
-  ).toBeVisible();
+  await expect(page.getByText('Impossible d’actualiser l’état.')).toBeVisible();
   reviewReadUnavailable = false;
   reviewStage = 1;
-  await page.getByRole('button', { name: 'Réessayer maintenant' }).click();
+  await page.getByRole('button', { name: 'Actualiser' }).click();
   await expect(
     page.getByText('1 / 3 vérifications terminées').first(),
   ).toBeVisible();
@@ -1360,6 +1500,7 @@ test('persists onboarding and starts one durable application run', async ({
     'Evidence-backed Product Engineer',
   );
   await openApplications(page);
+  await markCompanyResearcherAvailable();
   await page.getByRole('button', { name: 'Générer la page' }).click();
   await expect(
     page.getByRole('heading', {

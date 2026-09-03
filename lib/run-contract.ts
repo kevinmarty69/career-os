@@ -52,6 +52,13 @@ const persistedStepSchema = z
   })
   .strict();
 
+export const workerAvailabilitySchema = z
+  .object({
+    state: z.enum(['ready', 'waiting', 'unavailable']),
+    service: z.string().min(1).max(100).optional(),
+  })
+  .strict();
+
 const researchSignalSchema = z
   .object({
     signalId: z.string().regex(/^signal-(?:[1-9]|1\d|20)$/),
@@ -194,6 +201,7 @@ export const persistedRunSchema = z
     usedCostMicros: z.number().int().nonnegative(),
     profile: profileSchema,
     steps: z.array(persistedStepSchema).max(20),
+    workerAvailability: workerAvailabilitySchema.optional(),
     research: persistedResearchSchema.optional(),
     evidenceArchive: persistedEvidenceArchiveSchema.optional(),
     strategy: persistedRecruiterStrategySchema.optional(),
@@ -232,6 +240,7 @@ export const persistedRunSchema = z
   });
 
 export type PersistedRun = z.infer<typeof persistedRunSchema>;
+export type WorkerAvailability = z.infer<typeof workerAvailabilitySchema>;
 
 export const reviewIssueDecisionInputSchema = z
   .object({

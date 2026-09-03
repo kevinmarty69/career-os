@@ -1,0 +1,34 @@
+[Unit]
+Description=Career OS worker (%i)
+After=network-online.target
+Wants=network-online.target
+PartOf=career-os-workers.target
+
+[Service]
+Type=simple
+User=career-%i
+Group=career-os
+WorkingDirectory=/opt/career-os
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/career-os/workers/%i.env
+ExecStart=/usr/bin/env pnpm run worker:%i
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGTERM
+TimeoutStopSec=135s
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=career-os-workers.target

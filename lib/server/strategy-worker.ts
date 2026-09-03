@@ -4,6 +4,7 @@ import {
   LocalOpenAIRecruiterStrategyClient,
   RECRUITER_STRATEGY_MAX_OUTPUT_TOKENS,
 } from './local-openai-strategy-client';
+import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
 
 const STEP_LEASE_SECONDS = 300;
 
@@ -23,10 +24,18 @@ export async function processRecruiterStrategyStep(input: {
   const sql = postgres(input.databaseUrl, { max: 1, idle_timeout: 5 });
   let claimed: ClaimedStep | undefined;
   let dispatched = false;
+  let stopHeartbeat: () => Promise<void> = async () => undefined;
   try {
     await verifyRestrictedWorkerCredential(sql);
+    stopHeartbeat = keepWorkerHeartbeatFresh(() =>
+      sql.begin(async (tx) => {
+        await authorizeWorker(tx);
+        await tx`select app.record_worker_heartbeat('recruiter-strategist')`;
+      }),
+    );
     const reapedStepId = await sql.begin(async (tx) => {
       await authorizeWorker(tx);
+      await tx`select app.record_worker_heartbeat('recruiter-strategist')`;
       const [result] = await tx<{ id: string | null }[]>`
         select app.reap_expired_recruiter_strategist_step() as id`;
       return result.id;
@@ -108,6 +117,7 @@ export async function processRecruiterStrategyStep(input: {
       failureCode: 'provider_outcome_unknown' as const,
     };
   } finally {
+    await stopHeartbeat();
     await sql.end();
   }
 }
@@ -211,7 +221,8 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
             ('mark_recruiter_strategist_in_flight', 'target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint'),
             ('complete_recruiter_strategist_step', 'target_step uuid, target_lease_token uuid, step_output jsonb, actual_input_tokens integer, actual_output_tokens integer, actual_cost bigint, actual_latency integer, was_cache_hit boolean, request_id text'),
             ('fail_recruiter_strategist_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
-            ('reap_expired_recruiter_strategist_step', '')
+            ('reap_expired_recruiter_strategist_step', ''),
+            ('record_worker_heartbeat', 'target_service text')
           ))
     ) as target_unexpected_function,
     (select count(*)::integer from pg_proc procedure
@@ -223,7 +234,8 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
           ('mark_recruiter_strategist_in_flight', 'target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint'),
           ('complete_recruiter_strategist_step', 'target_step uuid, target_lease_token uuid, step_output jsonb, actual_input_tokens integer, actual_output_tokens integer, actual_cost bigint, actual_latency integer, was_cache_hit boolean, request_id text'),
           ('fail_recruiter_strategist_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
-          ('reap_expired_recruiter_strategist_step', '')
+          ('reap_expired_recruiter_strategist_step', ''),
+          ('record_worker_heartbeat', 'target_service text')
         )) as target_function_count
   from pg_roles login
   join pg_database database_owner on database_owner.datname = current_database()
@@ -243,7 +255,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     identity.target_auth_access ||
     identity.target_unexpected_role ||
     identity.target_unexpected_function ||
-    identity.target_function_count !== 5
+    identity.target_function_count !== 6
   )
     throw new Error(
       'CAREER_OS_STRATEGY_WORKER_DATABASE_URL must use the restricted recruiter strategist login.',

@@ -10,6 +10,7 @@ import {
   RunConflictError,
   RunRateLimitError,
   RunRejectedError,
+  WorkerUnavailableError,
 } from '@/lib/server/runs';
 
 const MAX_RUN_BYTES = 32 * 1024;
@@ -41,6 +42,14 @@ export async function POST(request: Request) {
         status: 429,
         headers: { 'retry-after': '60' },
       });
+    if (error instanceof WorkerUnavailableError) {
+      const response = Response.json(
+        { code: 'WORKER_UNAVAILABLE', service: error.service },
+        { status: 503 },
+      );
+      response.headers.set('cache-control', 'private, no-store');
+      return response;
+    }
     if (error instanceof ZodError || error instanceof RunRejectedError)
       return new Response('Run rejected.', { status: 400 });
     return new Response('Run unavailable.', { status: 503 });
