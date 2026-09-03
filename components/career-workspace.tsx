@@ -48,6 +48,7 @@ import {
   invalidateDossiersAfterProfileChange,
   mergePersistedApplications,
   opportunityReady,
+  reviewsComplete,
   restoreWorkspace,
   updateDossier,
   type ApplicationDossier,
@@ -412,7 +413,6 @@ export function CareerWorkspace() {
       !workspaceReady ||
       !activeTenantId ||
       !selectedRunId ||
-      selectedRunHasDraft ||
       (selectedRunStatus && selectedRunStatus !== 'running')
     )
       return;
@@ -446,6 +446,7 @@ export function CareerWorkspace() {
           );
         });
         if (
+          !selectedRunHasDraft &&
           run.spec &&
           primaryView === 'applications' &&
           dossierView === 'journey'
@@ -1842,7 +1843,7 @@ export function CareerWorkspace() {
                 {dossierView === 'draft' && state.spec ? (
                   <DraftView
                     profile={state.runProfile ?? workspace.profile}
-                    reviewsAvailable={state.reviews.length === 3}
+                    reviewsAvailable={reviewsComplete(state.reviews)}
                     spec={state.spec}
                     onOpenEvidence={openEvidenceInspector}
                   />
@@ -2577,7 +2578,7 @@ function HomeView({
   const priority =
     findings[0]?.dossier ??
     [...dossiers].sort((left, right) => right.updatedAt - left.updatedAt)[0];
-  const priorityHasReviews = Boolean(priority?.reviews.length);
+  const priorityHasReviews = reviewsComplete(priority?.reviews ?? []);
   const recentEvents = dossiers
     .flatMap((dossier) =>
       dossier.events.map((event, index) => ({
@@ -2888,7 +2889,7 @@ function HomeView({
                         {dossier.spec
                           ? dossierFindings
                             ? 'Trancher'
-                            : dossier.reviews.length
+                            : reviewsComplete(dossier.reviews)
                               ? 'Valider'
                               : 'Relire'
                           : 'Lancer'}{' '}
@@ -3170,7 +3171,7 @@ function JourneyView({
     usedClaimIds.has(claim.id),
   );
   const sourced = usedClaims.filter((claim) => claim.evidenceIds.length);
-  const reviewed = reviews.length === 3;
+  const reviewed = reviewsComplete(reviews);
 
   return (
     <div className="journey-view">
@@ -4681,7 +4682,7 @@ function ReviewView({
   reviews: WorkspaceReview[];
 }) {
   const ready =
-    reviews.length === 3 &&
+    reviewsComplete(reviews) &&
     (publicationEligible || reviews.every((item) => item.passed));
   return (
     <section className="document review-document">
@@ -5306,7 +5307,7 @@ function ActivityView({
                 <p>Les nouvelles objections des agents apparaîtront ici.</p>
               </div>
             ) : null}
-            {active.reviews.length ? (
+            {reviewsComplete(active.reviews) ? (
               <button onClick={() => onOpenReview(active.id)}>
                 Ouvrir la revue de {active.opportunity.company}
               </button>
@@ -5598,7 +5599,7 @@ function applyPersistedRun(
     reviews,
     reviewDecisions: [],
     publicationEligible:
-      reviews.length === 3 && reviews.every((review) => review.passed),
+      reviewsComplete(reviews) && reviews.every((review) => review.passed),
     approved: false,
     capability: undefined,
     events: persistedEvents(run),
@@ -5609,9 +5610,7 @@ function hasCurrentRunProjection(
   dossier: ApplicationDossier,
   run: PersistedRun,
 ) {
-  const reviewable = ['awaiting_approval', 'blocked', 'completed'].includes(
-    run.status,
-  );
+  const reviewable = Boolean(run.spec);
   return (
     dossier.runId === run.runId &&
     dossier.runStatus === run.status &&
@@ -5634,8 +5633,8 @@ function reviewGateReady(
   state: Pick<ApplicationDossier, 'publicationEligible' | 'reviews'>,
 ) {
   return (
-    state.publicationEligible ??
-    (state.reviews.length === 3 &&
+    reviewsComplete(state.reviews) &&
+    (state.publicationEligible ??
       state.reviews.every((review) => review.passed))
   );
 }

@@ -12,6 +12,7 @@ import {
   invalidateDossiersAfterProfileChange,
   mergePersistedApplications,
   opportunityReady,
+  reviewsComplete,
   restoreWorkspace,
   selectDossier,
   updateDossier,
@@ -252,10 +253,19 @@ test('derives status, stage and next view from each dossier only', () => {
     'Brouillon',
     'draft',
   ]);
-
   const blocked = generatedDossier({
     id: DOSSIER_A,
     reviews: [
+      {
+        reviewer: 'recruiter',
+        passed: true,
+        findings: [],
+      },
+      {
+        reviewer: 'hiring-manager',
+        passed: true,
+        findings: [],
+      },
       {
         reviewer: 'factuality',
         passed: false,
@@ -267,13 +277,29 @@ test('derives status, stage and next view from each dossier only', () => {
       },
     ],
   });
+  assert.equal(reviewsComplete(blocked.reviews), true);
   assert.deepEqual(presentation(blocked), [
     'Revue requise',
     'À valider',
     'review',
   ]);
+  const partial = { ...blocked, reviews: [blocked.reviews[2]] };
+  assert.deepEqual(presentation(partial), [
+    'Brouillon prêt',
+    'Brouillon',
+    'draft',
+  ]);
+  assert.equal(
+    reviewsComplete([
+      blocked.reviews[0],
+      blocked.reviews[0],
+      blocked.reviews[0],
+    ]),
+    false,
+  );
 
   const ready = generatedDossier({ id: DOSSIER_A });
+  assert.equal(reviewsComplete(ready.reviews), true);
   assert.deepEqual(presentation(ready), [
     'Prête à valider',
     'À valider',

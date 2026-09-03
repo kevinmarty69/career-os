@@ -531,7 +531,12 @@ export function dossierStatus(dossier: ApplicationDossier): DossierStatus {
     )
   )
     return 'Génération arrêtée';
-  if (dossier.spec && unresolvedIssueCount(dossier) > 0) return 'Revue requise';
+  if (
+    dossier.spec &&
+    reviewsComplete(dossier.reviews) &&
+    unresolvedIssueCount(dossier) > 0
+  )
+    return 'Revue requise';
   if (dossier.spec && reviewGateReady(dossier)) return 'Prête à valider';
   if (dossier.spec) return 'Brouillon prêt';
   return opportunityReady(dossier.opportunity) ? 'Offre prête' : 'À compléter';
@@ -555,14 +560,29 @@ export function visibleShareUrl(
 
 export function dossierStage(dossier: ApplicationDossier): DossierStage {
   if (dossier.capability) return 'Envoyée';
-  return dossier.spec && dossier.reviews.length ? 'À valider' : 'Brouillon';
+  return dossier.spec && reviewsComplete(dossier.reviews)
+    ? 'À valider'
+    : 'Brouillon';
 }
 
 export function dossierNextView(dossier: ApplicationDossier): DossierNextView {
   if (dossier.capability || dossier.approved) return 'share';
-  if (dossier.spec && dossier.reviews.length) return 'review';
+  if (dossier.spec && reviewsComplete(dossier.reviews)) return 'review';
+  if (dossier.spec && dossier.runStatus === 'running') return 'journey';
   if (dossier.spec) return 'draft';
   return dossier.runId ? 'journey' : 'brief';
+}
+
+export function reviewsComplete(
+  reviews: Array<Pick<WorkspaceReview, 'reviewer'>>,
+) {
+  return (
+    reviews.length === 3 &&
+    new Set(reviews.map(({ reviewer }) => reviewer)).size === 3 &&
+    ['recruiter', 'hiring-manager', 'factuality'].every((reviewer) =>
+      reviews.some((review) => review.reviewer === reviewer),
+    )
+  );
 }
 
 function createDossier(
@@ -597,8 +617,8 @@ function normalizeSelection(workspace: SavedWorkspaceV2): SavedWorkspaceV2 {
 
 function reviewGateReady(dossier: ApplicationDossier): boolean {
   return (
-    dossier.publicationEligible ??
-    (dossier.reviews.length === 3 &&
+    reviewsComplete(dossier.reviews) &&
+    (dossier.publicationEligible ??
       dossier.reviews.every((review) => review.passed))
   );
 }
