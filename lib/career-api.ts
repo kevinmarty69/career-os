@@ -5,6 +5,10 @@ export function readProfile(signal: AbortSignal) {
   return fetch('/api/profile', { cache: 'no-store', signal });
 }
 
+export function readProfileHistory(signal: AbortSignal) {
+  return fetch('/api/profile/history', { cache: 'no-store', signal });
+}
+
 export function readApplications(signal: AbortSignal) {
   return fetch('/api/applications', { cache: 'no-store', signal });
 }

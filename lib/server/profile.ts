@@ -14,6 +14,13 @@ type ProfileSession = {
 
 export class ProfileConflictError extends Error {}
 
+export type ProfileRevisionSummary = {
+  revision: number;
+  createdAt: string;
+  sourceCount: number;
+  claimCount: number;
+};
+
 function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required.');
@@ -107,6 +114,36 @@ export async function readLivingProfile(session: ProfileSession) {
         }),
         revision: Number(profile.revision),
       };
+    });
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function readLivingProfileHistory(session: ProfileSession) {
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session);
+      const revisions = await tx<
+        Array<{ revision: string; snapshot: unknown; created_at: Date }>
+      >`select history.revision, history.snapshot, history.created_at
+        from app.profile_revisions history
+        join app.profiles profile
+          on profile.tenant_id = history.tenant_id
+          and profile.id = history.profile_id
+        where history.tenant_id = ${session.tenantId}
+          and profile.profile_kind = 'living'
+        order by history.revision desc limit 50`;
+      return revisions.map((item): ProfileRevisionSummary => {
+        const profile = profileSchema.parse(item.snapshot);
+        return {
+          revision: Number(item.revision),
+          createdAt: item.created_at.toISOString(),
+          sourceCount: profile.sources.length,
+          claimCount: profile.claims.length,
+        };
+      });
     });
   } finally {
     await sql.end();
