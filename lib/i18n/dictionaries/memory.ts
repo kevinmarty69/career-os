@@ -57,6 +57,11 @@ export const memoryMessages = {
   GitHub: 'GitHub',
   Portfolio: 'Portfolio',
   'Couverture expliquée': 'Explained coverage',
+  Expériences: 'Experiences',
+  Projets: 'Projects',
+  Compétences: 'Skills',
+  Résultats: 'Results',
+  Préférences: 'Preferences',
   'catégories documentées, sans score artificiel':
     'documented categories, without an artificial score',
   Affirmations: 'Claims',
@@ -81,6 +86,7 @@ export const memoryMessages = {
   'Importez votre CV ou ajoutez une première information. Rien ne sera publié automatiquement.':
     'Import your resume or add your first item. Nothing is published automatically.',
   'Commencer par une source': 'Start with a source',
+  Couverture: 'Coverage',
   'Dernières corrections': 'Latest changes',
   Révision: 'Revision',
   Sensibilité: 'Sensitivity',

@@ -63,6 +63,22 @@ test('renders every active route in English without a locale cookie', async ({
       ).toBeVisible();
     });
   }
+
+  await page.goto('/memory');
+  for (const label of [
+    'Experiences',
+    'Projects',
+    'Skills',
+    'Results',
+    'Preferences',
+    'Coverage',
+  ])
+    await expect(page.getByText(label, { exact: true })).toBeVisible();
+  if (process.env.CAREER_OS_I18N_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_I18N_SCREENSHOT,
+      fullPage: true,
+    });
 });
 
 test('switches from English to French and persists after reload', async ({
