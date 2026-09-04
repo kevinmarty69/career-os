@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { mockPersistedWorkspace } from './persisted-workspace';
 
 const englishScreens = [
   ['/', 'Start the evidence workflow for Signal Forge.'],
@@ -39,45 +40,12 @@ const englishScreens = [
   ['/settings/data', 'Export & deletion'],
 ] as const;
 
-async function mockDashboard(page: import('@playwright/test').Page) {
-  const applicationId = '988c0a00-0000-4000-8000-000000000041';
-  await page.route(`**/api/applications/${applicationId}/run`, (route) =>
-    route.fulfill({ status: 204 }),
-  );
-  await page.route('**/api/applications', (route) =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        applications: [
-          {
-            applicationId,
-            company: 'Signal Forge',
-            role: 'Staff Platform Engineer',
-            description: 'Build a reliable platform for a small team.',
-            accent: '#5847e8',
-            stage: 'draft',
-            revision: 1,
-            createdAt: '2026-09-04T12:00:00.000Z',
-            updatedAt: '2026-09-04T12:00:00.000Z',
-          },
-        ],
-      }),
-    }),
-  );
-  await page.route('**/api/publications', (route) =>
-    route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ publications: [] }),
-    }),
-  );
-}
-
 test('renders every active route in English without a locale cookie', async ({
   context,
   page,
 }) => {
   await context.clearCookies();
-  await mockDashboard(page);
+  await mockPersistedWorkspace(page);
 
   for (const [route, heading] of englishScreens) {
     await test.step(route, async () => {
@@ -95,7 +63,7 @@ test('switches from English to French and persists after reload', async ({
   page,
 }) => {
   await context.clearCookies();
-  await mockDashboard(page);
+  await mockPersistedWorkspace(page);
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -134,6 +102,30 @@ test('switches from English to French and persists after reload', async ({
       exact: true,
     }),
   ).toBeVisible();
+});
+
+test('separates persisted opportunities from started applications', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page);
+  await page.goto('/applications');
+
+  await expect(
+    page.getByRole('heading', { name: 'Discovered opportunities' }),
+  ).toBeVisible();
+  await expect(page.getByText('Northstar Labs', { exact: true })).toBeVisible();
+  const applications = page.getByRole('region', {
+    name: 'Started applications',
+  });
+  await expect(
+    applications.getByRole('heading', { name: 'Applications' }),
+  ).toBeVisible();
+  await expect(
+    applications.getByText('Signal Forge', { exact: true }),
+  ).toBeVisible();
+  await expect(applications.getByText('Draft', { exact: true })).toBeVisible();
 });
 
 test('localizes authentication and private recipient surfaces', async ({
