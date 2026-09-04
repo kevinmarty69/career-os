@@ -35,6 +35,15 @@ export const dossierMessages = {
   Progression: 'Progress',
   'Journal lisible': 'Readable log',
   'Le premier événement apparaîtra ici.': 'The first event will appear here.',
+  'Décision humaine requise': 'Human decision required',
+  'Quels signaux doivent cadrer la candidature ?':
+    'Which signals should shape this application?',
+  'L’agent a extrait ces éléments. Vérifiez-les avant qu’ils influencent la sélection des preuves et la stratégie.':
+    'The agent extracted these signals. Review them before they influence evidence selection and strategy.',
+  'Données web non fiables jusqu’à votre validation.':
+    'Web data remains untrusted until you approve it.',
+  'La validation n’a pas été enregistrée. Vos choix sont conservés.':
+    'The decision was not saved. Your choices are preserved.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',

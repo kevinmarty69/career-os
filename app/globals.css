@@ -2268,6 +2268,107 @@
   display: block;
 }
 
+.co-research-checkpoint {
+  margin: 24px 0;
+  padding: 20px;
+  background: var(--co-fill-subtle);
+}
+
+.co-research-checkpoint > header,
+.co-research-checkpoint > footer {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.co-research-checkpoint > header p,
+.co-research-checkpoint > header h2 {
+  margin: 0;
+}
+
+.co-research-checkpoint > header p {
+  color: var(--co-accent);
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.co-research-checkpoint > header h2 {
+  margin-top: 5px;
+  font-size: 18px;
+}
+
+.co-research-checkpoint > header > span,
+.co-research-checkpoint > footer > span,
+.co-research-checkpoint > p {
+  color: var(--co-text-4);
+  font-size: 11px;
+}
+
+.co-research-sources {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.co-research-sources a {
+  padding: 6px 9px;
+  color: var(--co-text-3);
+  border: 1px solid var(--co-divider);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 10px;
+  text-decoration: none;
+}
+
+.co-research-signals {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.co-research-signals label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid var(--co-divider);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.co-research-signals input {
+  margin-top: 2px;
+}
+
+.co-research-signals small,
+.co-research-signals strong,
+.co-research-signals q {
+  display: block;
+}
+
+.co-research-signals small,
+.co-research-signals q {
+  color: var(--co-text-4);
+  font-size: 10px;
+}
+
+.co-research-signals strong {
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.co-research-signals q {
+  line-height: 1.45;
+}
+
+.co-research-checkpoint > footer {
+  padding-top: 14px;
+  border-top: 1px solid var(--co-divider);
+}
+
 .co-run-journal article strong {
   font-size: 11px;
 }
@@ -5880,6 +5981,12 @@
 
   .co-run-journal {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .co-research-checkpoint > header,
+  .co-research-checkpoint > footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .co-memory-metrics {

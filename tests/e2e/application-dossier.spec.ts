@@ -19,7 +19,7 @@ const application = {
   updatedAt: '2026-09-04T13:30:00.000Z',
 };
 
-async function mockApplication(page: Page, run?: ReturnType<typeof savedRun>) {
+async function mockApplication(page: Page, run?: unknown) {
   await page.route(`**/api/applications/${applicationId}`, (route) =>
     route.fulfill({
       contentType: 'application/json',
@@ -65,6 +65,42 @@ function savedRun() {
         costMicros: 0,
       },
     ],
+  } as const;
+}
+
+function researchRun() {
+  return {
+    ...savedRun(),
+    status: 'paused',
+    stage: 'evidence_archive',
+    research: {
+      artifactId: '988c0a00-0000-4000-8000-000000000011',
+      artifactHash: 'a'.repeat(64),
+      company: application.company,
+      role: application.role,
+      source: {
+        kind: 'job-posting',
+        url: application.url,
+        trust: 'untrusted-data',
+      },
+      signals: [
+        {
+          signalId: 'signal-1',
+          statement: 'Own platform reliability end to end.',
+          excerpt:
+            'Own the deployment platform and its production reliability.',
+          category: 'responsibility',
+          priority: 'high',
+        },
+        {
+          signalId: 'signal-2',
+          statement: 'Keep the operating model lightweight.',
+          excerpt: 'Systems that remain operable by a small team.',
+          category: 'culture',
+          priority: 'medium',
+        },
+      ],
+    },
   } as const;
 }
 
@@ -173,6 +209,56 @@ test('refreshes an active workflow until its persisted status changes', async ({
     timeout: 5_000,
   });
   expect(reads).toBeGreaterThanOrEqual(2);
+});
+
+test('requires a human selection before evidence matching continues', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const paused = researchRun();
+  let request: { body: unknown; key?: string } | undefined;
+  await mockApplication(page, paused);
+  await page.route(
+    `**/api/runs/${paused.runId}/evidence-selection`,
+    async (route) => {
+      request = {
+        body: route.request().postDataJSON(),
+        key: route.request().headers()['idempotency-key'],
+      };
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...paused,
+          status: 'running',
+          steps: [
+            ...paused.steps,
+            { stage: 'evidence-archivist', status: 'pending', attempt: 1 },
+          ],
+        }),
+      });
+    },
+  );
+
+  await page.goto(`/applications/${applicationId}`);
+  await expect(
+    page.getByRole('heading', {
+      name: 'Which signals should shape this application?',
+    }),
+  ).toBeVisible();
+  const signals = page.getByRole('checkbox');
+  await expect(signals).toHaveCount(2);
+  await expect(signals.nth(0)).toBeChecked();
+  await expect(signals.nth(1)).toBeChecked();
+  await signals.nth(1).uncheck();
+  await page.getByRole('button', { name: 'Confirm 1 signal' }).click();
+  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  expect(request?.body).toEqual({
+    researchArtifactId: paused.research.artifactId,
+    selectedSignalIds: ['signal-1'],
+  });
+  expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
 });
 
 test('keeps the persisted dossier readable on mobile', async ({ page }) => {

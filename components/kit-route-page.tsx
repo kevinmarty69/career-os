@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { ApplicationResearchCheckpoint } from '@/components/applications/application-research-checkpoint';
 import { useApplicationWorkflow } from '@/components/applications/use-application-workflow';
 import { ApplicationsPage } from '@/components/applications/applications-page';
 import {
@@ -941,6 +942,19 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
                 <Link href="/memory">Compléter la mémoire professionnelle</Link>
               ) : null}
             </section>
+            {workflow.run?.research &&
+            workflow.run.status === 'paused' &&
+            !workflow.run.evidenceArchive ? (
+              <ApplicationResearchCheckpoint
+                error={workflow.decisionError}
+                key={workflow.run.research.artifactId}
+                onConfirm={(signalIds) =>
+                  void workflow.confirmResearch(signalIds)
+                }
+                pending={workflow.decisionPending}
+                research={workflow.run.research}
+              />
+            ) : null}
             {application.url ? (
               <a
                 className="co-button"
@@ -3926,6 +3940,14 @@ function workflowErrorLabel(error: string) {
 function runStageLabel(stage: string, locale: 'en' | 'fr') {
   const labels: Record<string, [string, string]> = {
     research: ['Research', 'Recherche entreprise'],
+    evidence_archive: ['Evidence matching', 'Appariement des preuves'],
+    strategy: ['Application strategy', 'Stratégie de candidature'],
+    strategy_review: ['Strategy review', 'Validation de la stratégie'],
+    page_spec: ['Page composition', 'Composition de la page'],
+    page_spec_review: ['Page review', 'Validation de la page'],
+    review_recruiter: ['Recruiter review', 'Revue recruteur'],
+    review_hiring_manager: ['Hiring manager review', 'Revue hiring manager'],
+    review_factuality: ['Factual review', 'Revue factuelle'],
     'company-researcher': ['Company research', 'Recherche entreprise'],
     'evidence-archivist': ['Evidence matching', 'Appariement des preuves'],
     'recruiter-strategist': [

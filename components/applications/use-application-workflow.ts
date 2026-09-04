@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import type { Application } from '@/lib/application-contract';
-import { createRun, readApplicationRun, readProfile } from '@/lib/career-api';
+import {
+  confirmRunResearch,
+  createRun,
+  readApplicationRun,
+  readProfile,
+} from '@/lib/career-api';
 import { persistedRunSchema, type PersistedRun } from '@/lib/run-contract';
 import { persistedRunOperation } from '@/lib/run-operation';
 
@@ -22,6 +27,8 @@ export function useApplicationWorkflow(applicationId: string) {
     error?: WorkflowError;
   }>();
   const [starting, setStarting] = useState(false);
+  const [decisionPending, setDecisionPending] = useState(false);
+  const [decisionError, setDecisionError] = useState(false);
   const current = result?.applicationId === applicationId ? result : undefined;
 
   useEffect(() => {
@@ -155,5 +162,48 @@ export function useApplicationWorkflow(applicationId: string) {
     }
   }
 
-  return { ...current, loading: !current, start, starting };
+  async function confirmResearch(selectedSignalIds: string[]) {
+    if (!current?.run?.research || decisionPending) return;
+    setDecisionPending(true);
+    setDecisionError(false);
+    try {
+      const input = JSON.stringify({
+        researchArtifactId: current.run.research.artifactId,
+        selectedSignalIds,
+      });
+      const operation = persistedRunOperation(
+        localStorage,
+        `career-os-research-selection:${current.run.runId}`,
+        input,
+      );
+      const response = await confirmRunResearch(
+        current.run.runId,
+        input,
+        operation.key,
+      );
+      if (!response.ok) {
+        setDecisionError(true);
+        return;
+      }
+      setResult({
+        ...current,
+        run: persistedRunSchema.parse(await response.json()),
+        error: undefined,
+      });
+    } catch {
+      setDecisionError(true);
+    } finally {
+      setDecisionPending(false);
+    }
+  }
+
+  return {
+    ...current,
+    confirmResearch,
+    decisionError,
+    decisionPending,
+    loading: !current,
+    start,
+    starting,
+  };
 }
