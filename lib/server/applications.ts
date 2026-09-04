@@ -16,6 +16,12 @@ import type { PublicationSession } from './publications';
 export class ApplicationConflictError extends Error {}
 export class ApplicationNotFoundError extends Error {}
 export class ApplicationRejectedError extends Error {}
+export class OpportunityApplicationClosedError extends Error {}
+export class OpportunityApplicationExcludedError extends Error {
+  constructor(readonly disposition: 'ignored' | 'archived') {
+    super();
+  }
+}
 
 type ApplicationRow = {
   id: string;
@@ -26,6 +32,7 @@ type ApplicationRow = {
   accent: string;
   stage: Application['stage'];
   company_sources: unknown;
+  discovered_job_id: string | null;
   revision: string;
   create_input_hash: string;
   created_at: Date;
@@ -65,7 +72,8 @@ export async function createApplication(
         )
         on conflict (id) do update set name = excluded.name`;
       const [existing] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources,
+          discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId}
@@ -88,8 +96,91 @@ export async function createApplication(
           ${id}, ${session.tenantId}, ${input.company}, ${input.role},
           ${input.description}, ${input.url ?? null}, ${input.accent},
           ${input.stage}, ${tx.json(input.companySources ?? [])}, ${idempotencyKey}, ${inputHash}
-        ) returning id, company, role, raw_text, url, accent, stage, company_sources, revision,
+        ) returning id, company, role, raw_text, url, accent, stage, company_sources,
+          discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
+      return { created: true, application: projection(created) };
+    });
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function promoteDiscoveredJobToApplication(
+  session: PublicationSession,
+  rawJobId: string,
+) {
+  const jobId = z.string().uuid().parse(rawJobId);
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session);
+      await tx`select pg_advisory_xact_lock(hashtextextended(
+        ${`${session.tenantId}:opportunity-decision:${jobId}`}, 0
+      ))`;
+      const [job] = await tx<
+        {
+          company: string | null;
+          role: string | null;
+          description: string | null;
+          canonical_url: string;
+          lifecycle: string;
+          revision: string;
+        }[]
+      >`select company, role, description, canonical_url, lifecycle, revision
+        from app.discovered_jobs
+        where tenant_id = ${session.tenantId} and id = ${jobId}
+        for share`;
+      if (!job) throw new ApplicationNotFoundError();
+      if (job.lifecycle === 'closed')
+        throw new OpportunityApplicationClosedError();
+
+      const [decision] = await tx<
+        { disposition: 'saved' | 'ignored' | 'archived' }[]
+      >`
+        select disposition from app.opportunity_decisions
+        where tenant_id = ${session.tenantId} and discovered_job_id = ${jobId}`;
+      if (
+        decision?.disposition === 'ignored' ||
+        decision?.disposition === 'archived'
+      )
+        throw new OpportunityApplicationExcludedError(decision.disposition);
+
+      const [existing] = await tx<ApplicationRow[]>`
+        select id, company, role, raw_text, url, accent, stage, company_sources,
+          discovered_job_id, revision, create_input_hash, created_at, updated_at,
+          deleted_at
+        from app.applications
+        where tenant_id = ${session.tenantId} and discovered_job_id = ${jobId}
+          and deleted_at is null`;
+      if (existing)
+        return { created: false, application: projection(existing) };
+
+      const company = job.company ?? 'Unknown company';
+      const role = job.role ?? 'Unknown role';
+      const input = applicationFieldsSchema.parse({
+        company,
+        role,
+        description: job.description ?? `${company} - ${role}`,
+        url: job.canonical_url,
+        accent: '#5847e8',
+        stage: 'draft',
+      });
+      const [created] = await tx<ApplicationRow[]>`
+        insert into app.applications (
+          tenant_id, discovered_job_id, company, role, raw_text, url, accent,
+          stage, create_idempotency_key, create_input_hash
+        ) values (
+          ${session.tenantId}, ${jobId}, ${input.company}, ${input.role},
+          ${input.description}, ${input.url ?? null}, ${input.accent}, ${input.stage},
+          ${randomUUID()}, ${hashJson(input)}
+        ) returning id, company, role, raw_text, url, accent, stage,
+          company_sources, discovered_job_id, revision, create_input_hash,
+          created_at, updated_at, deleted_at`;
+      await tx`select app.record_human_audit_event(
+        ${session.tenantId}, 'opportunity_promoted', 'application', ${created.id},
+        ${tx.json({ discoveredJobId: jobId, jobRevision: Number(job.revision) })}
+      )`;
       return { created: true, application: projection(created) };
     });
   } finally {
@@ -103,7 +194,8 @@ export async function listApplications(session: PublicationSession) {
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const rows = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources,
+          discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and deleted_at is null
@@ -125,7 +217,8 @@ export async function readApplication(
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [row] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources,
+          discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${applicationId}
@@ -149,7 +242,8 @@ export async function updateApplication(
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [existing] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources,
+          discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${applicationId}
@@ -172,7 +266,8 @@ export async function updateApplication(
           company_sources = ${tx.json(input.companySources ?? companySources(existing.company_sources))},
           revision = revision + 1
         where tenant_id = ${session.tenantId} and id = ${applicationId}
-        returning id, company, role, raw_text, url, accent, stage, company_sources, revision,
+        returning id, company, role, raw_text, url, accent, stage, company_sources,
+          discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
       return projection(updated);
     });
@@ -216,6 +311,9 @@ function projection(row: ApplicationRow): Application {
   const sources = companySources(row.company_sources);
   return applicationSchema.parse({
     applicationId: row.id,
+    ...(row.discovered_job_id
+      ? { discoveredJobId: row.discovered_job_id }
+      : {}),
     company: row.company,
     role: row.role,
     description: row.raw_text,

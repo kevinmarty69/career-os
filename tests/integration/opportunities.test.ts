@@ -333,6 +333,23 @@ async function main() {
   assert.equal(exactReplay.opportunity.sources.length, 1);
   assert.equal(exactReplay.opportunity.sources[0].matchedBy, 'exact_source');
 
+  const applicationPath = `/api/opportunities/${connected.opportunity.opportunityId}/application`;
+  await expectStatus(
+    await anonymous.request(applicationPath, 'POST'),
+    401,
+    'anonymous opportunity promotion',
+  );
+  await expectStatus(
+    await owner.browser.request(applicationPath, 'POST', undefined, {
+      origin: 'https://attacker.example',
+    }),
+    403,
+    'cross-origin opportunity promotion',
+  );
+  const bodyRejected = await owner.browser.request(applicationPath, 'POST', {});
+  await expectStatus(bodyRejected, 400, 'opportunity promotion body');
+  assert.equal(await bodyRejected.text(), 'Request body is not allowed.');
+
   const closed = await storeDiscoveredJob(
     owner.session,
     greenhouseObservation('closed', 'b'.repeat(64)),
@@ -344,6 +361,9 @@ async function main() {
     ),
     true,
   );
+  const closedPromotion = await owner.browser.request(applicationPath, 'POST');
+  await expectStatus(closedPromotion, 409, 'closed opportunity promotion');
+  assert.equal(await closedPromotion.text(), 'Opportunity is closed.');
 
   const noClosureInference = await storeDiscoveredJob(
     owner.session,
@@ -457,6 +477,63 @@ async function main() {
     'unknown',
   );
   assert.equal(persistedMatches[0].livingProfile, null);
+  const promotedResponses = await Promise.all(
+    Array.from({ length: 6 }, () =>
+      owner.browser.request(applicationPath, 'POST'),
+    ),
+  );
+  if (promotedResponses.some(({ status }) => ![200, 201].includes(status)))
+    assert.fail(
+      `concurrent opportunity promotion failed: ${await Promise.all(
+        promotedResponses.map(async (response) => ({
+          status: response.status,
+          body: await response.text(),
+        })),
+      ).then(JSON.stringify)}`,
+    );
+  assert.deepEqual(
+    promotedResponses.map(({ status }) => status).sort(),
+    [200, 200, 200, 200, 200, 201],
+  );
+  const promotedApplications = (await Promise.all(
+    promotedResponses.map((response) => response.json()),
+  )) as Array<{
+    applicationId: string;
+    discoveredJobId: string;
+    company: string;
+    role: string;
+    description: string;
+    url: string;
+    accent: string;
+    stage: string;
+    revision: number;
+  }>;
+  assert.equal(
+    new Set(promotedApplications.map(({ applicationId }) => applicationId))
+      .size,
+    1,
+  );
+  assert.deepEqual(
+    {
+      ...promotedApplications[0],
+      applicationId: undefined,
+      createdAt: undefined,
+      updatedAt: undefined,
+    },
+    {
+      applicationId: undefined,
+      discoveredJobId: connected.opportunity.opportunityId,
+      company: 'Acme Systems',
+      role: 'Senior Engineer',
+      description: 'Build dependable systems.',
+      url: 'https://job-boards.greenhouse.io/acme/jobs/101',
+      accent: '#5847e8',
+      stage: 'draft',
+      revision: 1,
+      createdAt: undefined,
+      updatedAt: undefined,
+    },
+  );
   let semanticCalls = 0;
   const blockedSemantic = await runSemanticAnalysis(
     owner.session,
@@ -829,6 +906,11 @@ async function main() {
     404,
     'cross-tenant semantic analysis',
   );
+  await expectStatus(
+    await other.browser.request(applicationPath, 'POST'),
+    404,
+    'cross-tenant opportunity promotion',
+  );
 
   const pool = new Pool({ connectionString: databaseUrl });
   try {
@@ -837,23 +919,78 @@ async function main() {
       sources: string;
       matches: string;
       applications: string;
+      promotion_audits: string;
     }>(
       `select
         (select count(*) from app.discovered_jobs where tenant_id = $1) jobs,
         (select count(*) from app.job_source_records where tenant_id = $1) sources,
         (select count(*) from app.job_matches where tenant_id = $1) matches,
-        (select count(*) from app.applications where tenant_id = $1) applications`,
+        (select count(*) from app.applications where tenant_id = $1) applications,
+        (select count(*) from app.audit_events where tenant_id = $1
+          and event_type = 'opportunity_promoted') promotion_audits`,
       [owner.session.tenantId],
     );
     assert.deepEqual(counts.rows[0], {
       jobs: '4',
       sources: '5',
       matches: '3',
-      applications: '0',
+      applications: '1',
+      promotion_audits: '1',
     });
   } finally {
     await pool.end();
   }
+
+  await expectStatus(
+    await owner.browser.request(
+      `/api/applications/${promotedApplications[0].applicationId}`,
+      'DELETE',
+      { expectedRevision: 1 },
+    ),
+    204,
+    'delete promoted application',
+  );
+  const rePromotionResponse = await owner.browser.request(
+    applicationPath,
+    'POST',
+  );
+  await expectStatus(
+    rePromotionResponse,
+    201,
+    'promote after application deletion',
+  );
+  const rePromoted = (await rePromotionResponse.json()) as {
+    applicationId: string;
+    discoveredJobId: string;
+  };
+  assert.notEqual(
+    rePromoted.applicationId,
+    promotedApplications[0].applicationId,
+  );
+  assert.equal(rePromoted.discoveredJobId, connected.opportunity.opportunityId);
+
+  const deletionPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await deletionPool.query('delete from app.discovered_jobs where id = $1', [
+      connected.opportunity.opportunityId,
+    ]);
+  } finally {
+    await deletionPool.end();
+  }
+  const preservedResponse = await owner.browser.request(
+    `/api/applications/${rePromoted.applicationId}`,
+  );
+  await expectStatus(
+    preservedResponse,
+    200,
+    'application after source opportunity deletion',
+  );
+  const preserved = (await preservedResponse.json()) as {
+    discoveredJobId?: string;
+    revision: number;
+  };
+  assert.equal(preserved.discoveredJobId, undefined);
+  assert.equal(preserved.revision, 2);
 }
 
 main().then(

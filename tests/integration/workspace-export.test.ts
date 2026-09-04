@@ -124,16 +124,6 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
       await transaction`insert into app.tenants (id, owner_id, name) values
         (${tenantId}, ${ownerId}, 'Export workspace'),
         (${otherTenantId}, ${otherOwnerId}, ${secret})`;
-      await transaction`insert into app.applications (
-        id, tenant_id, company, role, raw_text, accent, create_idempotency_key,
-        create_input_hash, created_at, deleted_at
-      ) values
-        (${applicationId}, ${tenantId}, 'Visible Co', 'Engineer', 'visible application',
-          '#21504b', ${randomUUID()}, ${'a'.repeat(64)},
-          '2026-01-02 03:04:05.123456+00'::timestamptz, now()),
-        (${otherApplicationId}, ${otherTenantId}, ${secret}, 'Engineer', ${secret},
-          '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
-          '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
       await transaction`insert into app.search_profiles (
         id, tenant_id, name, hard_constraints, soft_preferences, active
       ) values (
@@ -160,6 +150,17 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         '2026-01-02 03:04:05+00'::timestamptz,
         '2026-01-02 03:04:06+00'::timestamptz
       )`;
+      await transaction`insert into app.applications (
+        id, tenant_id, discovered_job_id, company, role, raw_text, accent,
+        create_idempotency_key, create_input_hash, created_at, deleted_at
+      ) values
+        (${applicationId}, ${tenantId}, ${discoveredJobId}, 'Visible Co',
+          'Engineer', 'visible application', '#21504b', ${randomUUID()},
+          ${'a'.repeat(64)},
+          '2026-01-02 03:04:05.123456+00'::timestamptz, now()),
+        (${otherApplicationId}, ${otherTenantId}, null, ${secret}, 'Engineer',
+          ${secret}, '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
+          '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
       await transaction`insert into app.job_source_records (
         id, tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
         content_type, bytes, content_sha256, extraction
@@ -334,7 +335,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         (record) =>
           record.type === 'applications' &&
           record.data.id === applicationId &&
-          record.data.deleted_at,
+          record.data.deleted_at &&
+          record.data.discovered_job_id === discoveredJobId,
       ),
       true,
     );

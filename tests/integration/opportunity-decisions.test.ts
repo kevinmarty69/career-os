@@ -250,6 +250,10 @@ async function main() {
   assert.equal(created.decision.revision, 1);
   assert.equal(created.decision.actor, 'human');
   assert.equal(created.decision.history.length, 1);
+  const promotionPath = path.replace('/decision', '/application');
+  const ignoredPromotion = await owner.browser.request(promotionPath, 'POST');
+  await expectStatus(ignoredPromotion, 409, 'ignored opportunity promotion');
+  assert.equal(await ignoredPromotion.text(), 'Opportunity is ignored.');
 
   const replay = await owner.browser.request(path, 'PUT', input, {
     'idempotency-key': key,
@@ -287,6 +291,9 @@ async function main() {
   };
   assert.equal(corrected.decision.revision, 2);
   assert.equal(corrected.decision.history.length, 2);
+  const archivedPromotion = await owner.browser.request(promotionPath, 'POST');
+  await expectStatus(archivedPromotion, 409, 'archived opportunity promotion');
+  assert.equal(await archivedPromotion.text(), 'Opportunity is archived.');
 
   const concurrent = await Promise.all([
     owner.browser.request(

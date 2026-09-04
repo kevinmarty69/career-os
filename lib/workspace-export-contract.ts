@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 8;
+export const workspaceExportVersion = 9;
 
 export const workspaceExportTables = [
   {
@@ -53,6 +53,7 @@ export const workspaceExportTables = [
       'updated_at',
       'deleted_at',
       'company_sources',
+      'discovered_job_id',
     ],
     orderBy: ['id'],
   },

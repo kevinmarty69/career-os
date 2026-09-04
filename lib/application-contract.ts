@@ -56,6 +56,7 @@ export const deleteApplicationInputSchema = z
 export const applicationSchema = applicationFieldsSchema
   .extend({
     applicationId: z.string().uuid(),
+    discoveredJobId: z.string().uuid().optional(),
     revision: z.number().int().positive(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
