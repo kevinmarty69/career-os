@@ -590,12 +590,12 @@ Critères d'acceptation :
 - [x] Extraction du besoin, des responsabilités et des signaux culturels.
 - [x] Validation humaine des signaux structurants.
 - [x] Sélection des expériences et preuves éligibles.
-- [ ] Proposition d'un angle de candidature.
-- [ ] Identification honnête des écarts et objections.
+- [x] Proposition d'un angle de candidature.
+- [x] Identification honnête des écarts et objections.
 - [ ] Questions d'entretien recommandées.
 - [ ] Messages courts pour prise de contact et candidature.
 - [ ] Suggestion facultative d'une preuve de travail proportionnée.
-- [ ] Versionnement de la stratégie validée.
+- [x] Versionnement de la stratégie validée.
 
 Critères d'acceptation :
 

@@ -170,6 +170,47 @@ function evidenceRun() {
   } as const;
 }
 
+function strategyRun() {
+  const paused = evidenceRun();
+  const lead = paused.evidenceArchive.signals[0].matches[0];
+  return {
+    ...paused,
+    stage: 'strategy_review',
+    strategy: {
+      artifactId: '988c0a00-0000-4000-8000-000000000016',
+      artifactHash: 'c'.repeat(64),
+      schemaVersion: 1,
+      purpose: 'application',
+      profileSnapshotId: paused.evidenceArchive.profileSnapshotId,
+      researchArtifactId: paused.research.artifactId,
+      researchArtifactHash: paused.research.artifactHash,
+      evidenceArchiveArtifactId: paused.evidenceArchive.artifactId,
+      evidenceArchiveArtifactHash: paused.evidenceArchive.artifactHash,
+      copyPolicy: 'internal-editorial-direction',
+      positioning: {
+        message:
+          'Lead with end-to-end ownership of a reliable production platform.',
+        sourceSignalIds: ['signal-1'],
+      },
+      lead: {
+        signalId: 'signal-1',
+        claimId: lead.claimId,
+        evidenceIds: lead.evidenceIds,
+        rationale: 'Direct evidence of platform ownership and operation.',
+      },
+      supports: [],
+      gaps: [
+        {
+          signalId: 'signal-2',
+          treatment: 'interview_topic',
+          rationale: 'Clarify small-team operating practices in interview.',
+        },
+      ],
+      omittedSignalIds: [],
+    },
+  } as const;
+}
+
 test('renders the persisted application instead of the Nimbus fixture', async ({
   context,
   page,
@@ -371,6 +412,58 @@ test('shows eligible evidence and requires confirmation before strategy', async 
   expect(request?.body).toEqual({
     evidenceArtifactId: paused.evidenceArchive.artifactId,
     evidenceArtifactHash: paused.evidenceArchive.artifactHash,
+  });
+  expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('shows the grounded strategy and requires human approval before drafting', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const paused = strategyRun();
+  let request: { body: unknown; key?: string } | undefined;
+  await mockApplication(page, paused);
+  await page.route(
+    `**/api/runs/${paused.runId}/strategy/approval`,
+    async (route) => {
+      request = {
+        body: route.request().postDataJSON(),
+        key: route.request().headers()['idempotency-key'],
+      };
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...paused,
+          status: 'running',
+          stage: 'page_spec',
+          steps: [
+            ...paused.steps,
+            { stage: 'page-composer', status: 'pending', attempt: 1 },
+          ],
+        }),
+      });
+    },
+  );
+
+  await page.goto(`/applications/${applicationId}`);
+  await expect(
+    page.getByRole('heading', { name: 'Approve the angle before drafting' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Lead with end-to-end ownership of a reliable production platform.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByText('Topics to address honestly')).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Approve application strategy' })
+    .click();
+  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  expect(request?.body).toEqual({
+    strategyArtifactId: paused.strategy.artifactId,
+    strategyArtifactHash: paused.strategy.artifactHash,
   });
   expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
 });

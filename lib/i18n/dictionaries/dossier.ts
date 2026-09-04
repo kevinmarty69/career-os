@@ -55,6 +55,17 @@ export const dossierMessages = {
     'Strategy did not start. You can retry without creating a duplicate.',
   'Vos faits restent inchangés. Seul leur ordre sera proposé.':
     'Your facts stay unchanged. Only their ordering will be proposed.',
+  'Direction éditoriale interne': 'Internal editorial direction',
+  'Validez l’angle avant la rédaction': 'Approve the angle before drafting',
+  'Cet angle guide la future page. Il ne crée aucun nouveau fait et reste ancré aux preuves ci-dessous.':
+    'This angle guides the future page. It creates no new facts and remains anchored to the evidence below.',
+  'Preuve principale': 'Lead evidence',
+  Appui: 'Supporting evidence',
+  'Sujets à traiter honnêtement': 'Topics to address honestly',
+  'La validation n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.':
+    'Approval was not saved. You can retry without creating a duplicate.',
+  'La rédaction ne démarrera qu’après votre décision.':
+    'Drafting will only start after your decision.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',

@@ -2437,6 +2437,81 @@
   font-size: 10px;
 }
 
+.co-strategy-checkpoint > blockquote {
+  margin: 16px 0 8px;
+  padding: 16px;
+  color: var(--co-text);
+  border-left: 3px solid var(--co-accent);
+  border-radius: 0 11px 11px 0;
+  background: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.co-strategy-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.co-strategy-proof-grid article,
+.co-strategy-gaps {
+  padding: 13px;
+  border: 1px solid var(--co-divider);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.co-strategy-proof-grid small,
+.co-strategy-proof-grid strong,
+.co-strategy-proof-grid span,
+.co-strategy-proof-grid p,
+.co-strategy-gaps article span,
+.co-strategy-gaps article small {
+  display: block;
+}
+
+.co-strategy-proof-grid small {
+  color: var(--co-accent);
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.co-strategy-proof-grid strong {
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.co-strategy-proof-grid span,
+.co-strategy-proof-grid p,
+.co-strategy-gaps article small {
+  color: var(--co-text-4);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.co-strategy-proof-grid p {
+  margin: 7px 0 0;
+}
+
+.co-strategy-gaps > strong {
+  font-size: 11px;
+}
+
+.co-strategy-gaps article {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--co-divider);
+}
+
+.co-strategy-gaps article span {
+  font-size: 11px;
+  font-weight: 650;
+}
+
 .co-run-journal article strong {
   font-size: 11px;
 }
@@ -6055,6 +6130,10 @@
   .co-research-checkpoint > footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .co-strategy-proof-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .co-memory-metrics {

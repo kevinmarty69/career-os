@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Application } from '@/lib/application-contract';
 import {
+  approveRunStrategy,
   confirmRunResearch,
   createRun,
   readApplicationRun,
@@ -233,8 +234,44 @@ export function useApplicationWorkflow(applicationId: string) {
     }
   }
 
+  async function approveStrategy() {
+    if (!current?.run?.strategy || decisionPending) return;
+    setDecisionPending(true);
+    setDecisionError(false);
+    try {
+      const input = JSON.stringify({
+        strategyArtifactId: current.run.strategy.artifactId,
+        strategyArtifactHash: current.run.strategy.artifactHash,
+      });
+      const operation = persistedRunOperation(
+        localStorage,
+        `career-os-strategy-approval:${current.run.runId}`,
+        input,
+      );
+      const response = await approveRunStrategy(
+        current.run.runId,
+        input,
+        operation.key,
+      );
+      if (!response.ok) {
+        setDecisionError(true);
+        return;
+      }
+      setResult({
+        ...current,
+        run: persistedRunSchema.parse(await response.json()),
+        error: undefined,
+      });
+    } catch {
+      setDecisionError(true);
+    } finally {
+      setDecisionPending(false);
+    }
+  }
+
   return {
     ...current,
+    approveStrategy,
     confirmResearch,
     decisionError,
     decisionPending,
