@@ -663,18 +663,23 @@ async function main() {
       await delay(25);
       return {
         output: buildSemanticAnalysis(input, {
-          skills: [],
+          skills: [
+            {
+              statement: 'La preuve produit soutient ce besoin.',
+              factor: 'strong',
+              jobExcerpt: input.job.description,
+              profileReferences: [
+                {
+                  claimId: input.profile.claims[0].claimId,
+                  evidenceIds: [input.profile.claims[0].evidence[0].evidenceId],
+                },
+              ],
+            },
+          ],
           responsibilities: [],
           transfers: [],
           gaps: [],
-          unknowns: [
-            {
-              statement: 'Le niveau de preuve disponible reste à confirmer.',
-              factor: 'unknown',
-              jobExcerpt: input.job.description,
-              profileReferences: [],
-            },
-          ],
+          unknowns: [],
           risks: [],
         }),
         usage: {
@@ -726,6 +731,23 @@ async function main() {
   assert.equal(semantic.analysis.artifact.jobRevision, revised.jobRevision);
   assert.equal(semantic.analysis.usage.costBudgetMicros, 0);
   assert.equal(semantic.analysis.usage.costMicros, 0);
+  assert.equal(semantic.analysis.proofIndex.length, 1);
+  assert.equal(
+    semantic.analysis.proofIndex[0].statement,
+    'Reduced a fictional deployment workflow from 40 to 12 minutes.',
+  );
+  assert.equal(
+    semantic.analysis.proofIndex[0].evidence[0].label,
+    'Synthetic release record',
+  );
+  assert.equal(
+    semantic.analysis.proofIndex[0].evidence[0].sourceTitle,
+    'Synthetic launch postmortem',
+  );
+  assert.equal(
+    JSON.stringify(semantic.analysis.proofIndex).includes('restricted'),
+    false,
+  );
   assert.equal(
     semantic.analysis.usage.providerRequestId,
     'semantic-integration-request',

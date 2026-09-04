@@ -33,7 +33,9 @@ import {
 import { searchProfileSchema, type SearchProfile } from '@/lib/search-profile';
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
+import { semanticAnalysisMessages } from '@/lib/i18n/dictionaries/semantic-analysis';
 import styles from './applications-page.module.css';
+import { SemanticAnalysisPanel } from './semantic-analysis-panel';
 
 type LoadState = 'loading' | 'ready' | 'error';
 type IconComponent = ComponentType<{ children: string }>;
@@ -340,12 +342,16 @@ function OpportunityCard({
   searchProfiles: SearchProfile[];
 }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([applicationsMessages]);
+  const localize = useLocalizer([
+    applicationsMessages,
+    semanticAnalysisMessages,
+  ]);
   const source = opportunity.sources[0];
   const lifecycle = lifecycleCopy(opportunity.lifecycle);
   const [editing, setEditing] = useState<
     OpportunityDecision['disposition'] | undefined
   >();
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   return localize(
     <article
       className={`${styles.opportunityCard} ${styles[`lifecycle-${opportunity.lifecycle}`]}`}
@@ -487,6 +493,19 @@ function OpportunityCard({
             {qualificationCopy(decision.qualification)}
           </span>
         ) : null}
+        <button
+          aria-controls={`semantic-analysis-${opportunity.opportunityId}`}
+          aria-expanded={analysisOpen}
+          className={styles.semanticAction}
+          onClick={() => {
+            setEditing(undefined);
+            setAnalysisOpen((current) => !current);
+          }}
+          type="button"
+        >
+          <Icon>manage_search</Icon>
+          {analysisOpen ? 'Fermer l’analyse' : 'Analyser le matching'}
+        </button>
         <div className={styles.decisionActions}>
           {(['saved', 'ignored', 'archived'] as const).map((disposition) => (
             <button
@@ -496,7 +515,10 @@ function OpportunityCard({
                   : undefined
               }
               key={disposition}
-              onClick={() => setEditing(disposition)}
+              onClick={() => {
+                setAnalysisOpen(false);
+                setEditing(disposition);
+              }}
               type="button"
             >
               {dispositionCopy(disposition)}
@@ -525,6 +547,15 @@ function OpportunityCard({
           searchProfiles={searchProfiles}
         />
       ) : null}
+      {analysisOpen ? (
+        <SemanticAnalysisPanel
+          Icon={Icon}
+          initialSearchProfileId={decision?.searchProfileId}
+          onClose={() => setAnalysisOpen(false)}
+          opportunityId={opportunity.opportunityId}
+          searchProfiles={searchProfiles}
+        />
+      ) : null}
     </article>,
   );
 }
@@ -542,7 +573,10 @@ function ProcessedOpportunities({
   opportunities: DiscoveredJob[];
   searchProfiles: SearchProfile[];
 }) {
-  const localize = useLocalizer([applicationsMessages]);
+  const localize = useLocalizer([
+    applicationsMessages,
+    semanticAnalysisMessages,
+  ]);
   const [filter, setFilter] = useState<'all' | 'ignored' | 'archived'>('all');
   const visible = opportunities.filter(
     (opportunity) =>
@@ -586,6 +620,7 @@ function ProcessedOpportunities({
         {visible.map((opportunity) => (
           <ProcessedOpportunityRow
             decision={decisionsByOpportunity.get(opportunity.opportunityId)!}
+            Icon={Icon}
             key={opportunity.opportunityId}
             onDecisionSaved={onDecisionSaved}
             opportunity={opportunity}
@@ -598,18 +633,24 @@ function ProcessedOpportunities({
 }
 
 function ProcessedOpportunityRow({
+  Icon,
   decision,
   onDecisionSaved,
   opportunity,
   searchProfiles,
 }: {
+  Icon: IconComponent;
   decision: OpportunityDecision;
   onDecisionSaved: (decision: OpportunityDecision) => void;
   opportunity: DiscoveredJob;
   searchProfiles: SearchProfile[];
 }) {
-  const localize = useLocalizer([applicationsMessages]);
+  const localize = useLocalizer([
+    applicationsMessages,
+    semanticAnalysisMessages,
+  ]);
   const [editing, setEditing] = useState(false);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   return localize(
     <article className={styles.processedRow}>
       <div className={styles.companyMark} aria-hidden="true">
@@ -625,8 +666,27 @@ function ProcessedOpportunityRow({
         {dispositionStateCopy(decision.disposition)}
       </span>
       <span>{qualificationCopy(decision.qualification)}</span>
-      <button onClick={() => setEditing((current) => !current)} type="button">
+      <button
+        className={styles.processedEdit}
+        onClick={() => {
+          setAnalysisOpen(false);
+          setEditing((current) => !current);
+        }}
+        type="button"
+      >
         {editing ? 'Fermer' : 'Corriger'}
+      </button>
+      <button
+        aria-controls={`semantic-analysis-${opportunity.opportunityId}`}
+        aria-expanded={analysisOpen}
+        className={styles.processedAnalyze}
+        onClick={() => {
+          setEditing(false);
+          setAnalysisOpen((current) => !current);
+        }}
+        type="button"
+      >
+        {analysisOpen ? 'Fermer l’analyse' : 'Analyser'}
       </button>
       {editing ? (
         <DecisionEditor
@@ -637,6 +697,15 @@ function ProcessedOpportunityRow({
             onDecisionSaved(saved);
             setEditing(false);
           }}
+          opportunityId={opportunity.opportunityId}
+          searchProfiles={searchProfiles}
+        />
+      ) : null}
+      {analysisOpen ? (
+        <SemanticAnalysisPanel
+          Icon={Icon}
+          initialSearchProfileId={decision.searchProfileId}
+          onClose={() => setAnalysisOpen(false)}
           opportunityId={opportunity.opportunityId}
           searchProfiles={searchProfiles}
         />

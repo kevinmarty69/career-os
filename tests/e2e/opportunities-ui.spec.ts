@@ -134,6 +134,99 @@ test('defaults to English and keeps decision controls translated', async ({
   await expect(page.getByRole('button', { name: 'Archive' })).toBeVisible();
 });
 
+test('runs semantic analysis only on request, retries the local model and reads the saved result', async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  const semantic: SemanticMock = {
+    postCalls: 0,
+    postResponses: [
+      { status: 503, body: 'Local semantic model is not configured.' },
+      { status: 200, body: completedSemanticAnalysis() },
+    ],
+  };
+  await mockWorkspace(page, [opportunity()], [], [], semantic);
+  await page.goto('/applications');
+
+  await page.getByRole('button', { name: 'Analyze fit' }).click();
+  await page
+    .getByLabel('Search profile')
+    .selectOption(searchProfile.searchProfileId);
+  expect(semantic.postCalls).toBe(0);
+  await page.getByRole('button', { name: 'Run analysis' }).click();
+  await expect(page.getByText('Local model unavailable')).toBeVisible();
+  await page.getByRole('button', { name: 'Try again' }).click();
+
+  await expect(page.getByText('Interesting', { exact: true })).toBeVisible();
+  await expect(page.getByText('53/100')).toBeVisible();
+  await expect(page.getByText('80% · 4/5')).toBeVisible();
+  await expect(page.getByText('High', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Production agent systems', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Transfers', { exact: true })).toBeVisible();
+  await expect(page.getByText('Real gaps', { exact: true })).toBeVisible();
+  await expect(page.getByText('Unknowns', { exact: true })).toBeVisible();
+  await expect(page.getByText('Risks', { exact: true })).toBeVisible();
+  await page.getByText('Evidence references · 1').first().click();
+  await expect(
+    page.getByText('Built production agent systems.').first(),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByText('MCP production telemetry · Career evidence dossier')
+      .first(),
+  ).toBeVisible();
+  expect(semantic.postCalls).toBe(2);
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Analyze fit' }).click();
+  await page
+    .getByLabel('Search profile')
+    .selectOption(searchProfile.searchProfileId);
+  await page.getByRole('button', { name: 'View latest analysis' }).click();
+  await expect(page.getByText('53/100')).toBeVisible();
+  expect(semantic.postCalls).toBe(2);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+});
+
+test('shows blocked hard constraints without presenting a model result', async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  const semantic: SemanticMock = {
+    postCalls: 0,
+    postResponses: [{ status: 200, body: blockedSemanticAnalysis() }],
+  };
+  await mockWorkspace(page, [opportunity()], [], [], semantic);
+  await page.goto('/applications');
+  await page.getByRole('button', { name: 'Analyze fit' }).click();
+  await page
+    .getByLabel('Search profile')
+    .selectOption(searchProfile.searchProfileId);
+  expect(semantic.postCalls).toBe(0);
+  await page.getByRole('button', { name: 'Run analysis' }).click();
+  await expect(
+    page.getByText('Analysis stopped before the model'),
+  ).toBeVisible();
+  await expect(page.getByText('No model was called.')).toBeVisible();
+  const panel = page.getByRole('region', { name: 'Semantic job analysis' });
+  await expect(
+    panel.locator('strong').filter({ hasText: 'Work mode' }),
+  ).toBeVisible();
+  await expect(panel.getByText('Remote', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Hybrid', { exact: true })).toBeVisible();
+  expect(semantic.postCalls).toBe(1);
+});
+
 type OpportunityDecisionMock = {
   decisionId: string;
   opportunityId: string;
@@ -158,6 +251,12 @@ type OpportunityDecisionMock = {
   createdAt: string;
   updatedAt: string;
   history: unknown[];
+};
+
+type SemanticMock = {
+  postCalls: number;
+  postResponses: Array<{ status: number; body: unknown }>;
+  saved?: unknown;
 };
 
 const searchProfile = {
@@ -192,6 +291,7 @@ async function mockWorkspace(
   opportunities: unknown[],
   decisions: OpportunityDecisionMock[],
   importedUrls: string[],
+  semantic?: SemanticMock,
 ) {
   await page.route('**/api/opportunities/import-url', async (route) => {
     const body = route.request().postDataJSON() as { url: string };
@@ -277,6 +377,44 @@ async function mockWorkspace(
       body: JSON.stringify({ searchProfiles: [searchProfile] }),
     });
   });
+  await page.route(
+    '**/api/opportunities/*/semantic-analysis?*',
+    async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill(
+          semantic?.saved
+            ? {
+                contentType: 'application/json',
+                body: JSON.stringify(semantic.saved),
+              }
+            : { status: 404, body: 'Not found' },
+        );
+        return;
+      }
+      if (!semantic) {
+        await route.fulfill({
+          status: 500,
+          body: 'Unexpected semantic request',
+        });
+        return;
+      }
+      semantic.postCalls += 1;
+      const response = semantic.postResponses.shift() ?? {
+        status: 500,
+        body: 'No mocked semantic response',
+      };
+      if (response.status === 200) semantic.saved = response.body;
+      await route.fulfill({
+        status: response.status,
+        ...(typeof response.body === 'string'
+          ? { body: response.body }
+          : {
+              contentType: 'application/json',
+              body: JSON.stringify(response.body),
+            }),
+      });
+    },
+  );
   await page.route('**/api/applications', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -297,6 +435,146 @@ async function mockWorkspace(
       }),
     });
   });
+}
+
+function completedSemanticAnalysis() {
+  const proofReference = {
+    claimId: 'claim-agent-systems',
+    evidenceIds: ['evidence-mcp-telemetry'],
+  };
+  const factor = (
+    statement: string,
+    kind: 'strong' | 'partial' | 'gap' | 'unknown',
+    references = kind === 'strong' || kind === 'partial'
+      ? [proofReference]
+      : [],
+  ) => ({
+    statement,
+    factor: kind,
+    jobExcerpt: 'Build reliable products with agentic workflows.',
+    profileReferences: references,
+  });
+  return {
+    status: 'completed',
+    analysis: {
+      analysisId: '11111111-1111-4111-8111-111111111111',
+      version: 1,
+      jobMatchId: '22222222-2222-4222-8222-222222222222',
+      opportunityId: 'b22c0a00-0000-4000-8000-000000000002',
+      jobRevision: 1,
+      searchProfileId: searchProfile.searchProfileId,
+      searchProfileRevision: 1,
+      livingProfile: {
+        profileId: '33333333-3333-4333-8333-333333333333',
+        revision: 4,
+      },
+      inputHash: 'f'.repeat(64),
+      artifact: {
+        schemaVersion: 1,
+        purpose: 'application',
+        opportunityId: 'b22c0a00-0000-4000-8000-000000000002',
+        jobRevision: 1,
+        profileSnapshotId: '33333333-3333-4333-8333-333333333333',
+        profileRevision: 4,
+        analysis: {
+          skills: [factor('Production agent systems', 'strong')],
+          responsibilities: [factor('End-to-end ownership', 'partial')],
+          transfers: [factor('Product judgment transfers directly', 'partial')],
+          gaps: [factor('No domain-specific proof yet', 'gap')],
+          unknowns: [factor('Team topology is not explicit', 'unknown')],
+          risks: [factor('Domain ramp-up needs validation', 'partial')],
+        },
+        decomposition: {
+          factors: { strong: 1, partial: 2, gap: 1, unknown: 1 },
+          weights: { strong: 100, partial: 55, gap: 0, unknown: null },
+          knownFactorCount: 4,
+          requirementCount: 5,
+          coveragePercent: 80,
+          confidence: 'high',
+          explanatoryRiskCount: 1,
+          score: 53,
+          recommendation: 'interesting',
+          method: 'bounded-factor-decomposition-v1',
+        },
+      },
+      proofIndex: [
+        {
+          claimId: proofReference.claimId,
+          statement: 'Built production agent systems.',
+          evidence: [
+            {
+              evidenceId: proofReference.evidenceIds[0],
+              label: 'MCP production telemetry',
+              sourceTitle: 'Career evidence dossier',
+              sourceLocator: 'mcp-evidence.md#production-usage',
+            },
+          ],
+        },
+      ],
+      usage: {
+        provider: 'openai-compatible-local',
+        model: 'local-semantic-model',
+        providerRequestId: 'request-1',
+        reservedTokens: 800,
+        inputTokens: 420,
+        outputTokens: 180,
+        costBudgetMicros: 0,
+        costMicros: 0,
+        latencyMs: 740,
+      },
+      createdAt: now,
+    },
+  };
+}
+
+function blockedSemanticAnalysis() {
+  const criteria = [
+    'availability',
+    'role',
+    'seniority',
+    'location',
+    'remoteMode',
+    'timezone',
+    'language',
+    'contractType',
+    'salary',
+    'company',
+    'network',
+  ] as const;
+  return {
+    status: 'blocked',
+    reason: 'hard_constraints',
+    match: {
+      matchId: '44444444-4444-4444-8444-444444444444',
+      opportunityId: 'b22c0a00-0000-4000-8000-000000000002',
+      jobRevision: 1,
+      searchProfileId: searchProfile.searchProfileId,
+      searchProfileRevision: 1,
+      livingProfile: null,
+      evaluation: {
+        decision: 'ineligible',
+        eligibleForPriority: false,
+        criteria: criteria.map((criterion) => ({
+          criterion,
+          state: criterion === 'remoteMode' ? 'blocked' : 'compatible',
+          blocks: criterion === 'remoteMode',
+          expected: criterion === 'remoteMode' ? ['remote'] : ['compatible'],
+          observed: criterion === 'remoteMode' ? 'hybrid' : 'compatible',
+          explanation:
+            criterion === 'remoteMode'
+              ? 'Le mode de travail ne respecte pas les contraintes dures.'
+              : 'Ce critère est compatible.',
+          references: [
+            { entity: 'discovered_job', field: criterion },
+            { entity: 'search_profile', field: `hardConstraints.${criterion}` },
+          ],
+        })),
+        blockedCriteria: ['remoteMode'],
+      },
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
 }
 
 function opportunity(sourceUrl = 'https://jobs.example.test/product-engineer') {

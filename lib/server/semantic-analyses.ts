@@ -2,12 +2,18 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
-import { jobMatchSchema, type JobMatch } from '../hard-match';
+import type { JobMatch } from '../hard-match';
 import {
   prepareSemanticAnalysisInput,
   semanticAnalysisArtifactSchema,
   type SemanticAnalysisInput,
 } from '../semantic-match';
+import {
+  buildSemanticProofIndex,
+  persistedSemanticAnalysisSchema,
+  semanticAnalysisResultSchema,
+  type SemanticAnalysisResult,
+} from '../semantic-analysis-contract';
 import { searchProfileSchema } from '../search-profile';
 import { LocalModelClientError } from './local-openai-client';
 import {
@@ -19,60 +25,6 @@ import type { PublicationSession } from './publications';
 
 export class SemanticAnalysisModelNotConfiguredError extends Error {}
 export class SemanticAnalysisInputUnavailableError extends Error {}
-
-const semanticAnalysisSchema = z
-  .object({
-    analysisId: z.string().uuid(),
-    version: z.number().int().positive(),
-    jobMatchId: z.string().uuid(),
-    opportunityId: z.string().uuid(),
-    jobRevision: z.number().int().positive(),
-    searchProfileId: z.string().uuid(),
-    searchProfileRevision: z.number().int().positive(),
-    livingProfile: z
-      .object({
-        profileId: z.string().uuid(),
-        revision: z.number().int().positive(),
-      })
-      .strict(),
-    inputHash: z.string().regex(/^[0-9a-f]{64}$/),
-    artifact: semanticAnalysisArtifactSchema,
-    usage: z
-      .object({
-        provider: z.literal('openai-compatible-local'),
-        model: z.string().min(1).max(200),
-        providerRequestId: z.string().min(1).max(200).optional(),
-        reservedTokens: z.number().int().nonnegative(),
-        inputTokens: z.number().int().nonnegative().max(1_000_000),
-        outputTokens: z.number().int().nonnegative().max(1_000_000),
-        costBudgetMicros: z.literal(0),
-        costMicros: z.literal(0),
-        latencyMs: z.number().int().nonnegative(),
-      })
-      .strict(),
-    createdAt: z.string().datetime({ offset: true }),
-  })
-  .strict();
-
-export const semanticAnalysisResultSchema = z.discriminatedUnion('status', [
-  z
-    .object({
-      status: z.literal('blocked'),
-      reason: z.literal('hard_constraints'),
-      match: jobMatchSchema,
-    })
-    .strict(),
-  z
-    .object({
-      status: z.literal('completed'),
-      analysis: semanticAnalysisSchema,
-    })
-    .strict(),
-]);
-
-export type SemanticAnalysisResult = z.infer<
-  typeof semanticAnalysisResultSchema
->;
 
 type SemanticClient = Pick<LocalOpenAISemanticMatchClient, 'generate'>;
 
@@ -106,6 +58,7 @@ type AnalysisRow = {
   living_profile_id: string;
   living_profile_revision: string;
   input_hash: string;
+  input: unknown;
   artifact: unknown;
   provider: string;
   model: string;
@@ -344,7 +297,7 @@ function configuredClient() {
 
 function projection(row: AnalysisRow) {
   const artifact = semanticAnalysisArtifactSchema.parse(row.artifact);
-  const result = semanticAnalysisSchema.parse({
+  const result = persistedSemanticAnalysisSchema.parse({
     analysisId: row.id,
     version: Number(row.version),
     jobMatchId: row.job_match_id,
@@ -358,6 +311,7 @@ function projection(row: AnalysisRow) {
     },
     inputHash: row.input_hash,
     artifact,
+    proofIndex: buildSemanticProofIndex(row.input, artifact),
     usage: {
       provider: row.provider,
       model: row.model,
@@ -386,7 +340,7 @@ function projection(row: AnalysisRow) {
 function analysisColumns(tx: postgres.TransactionSql) {
   return tx`id, version, job_match_id, discovered_job_id, job_revision,
     search_profile_id, search_profile_revision, living_profile_id,
-    living_profile_revision, input_hash, artifact, provider, model,
+    living_profile_revision, input_hash, input, artifact, provider, model,
     provider_request_id, reserved_tokens, input_tokens, output_tokens,
     cost_budget_micros, cost_micros, latency_ms, created_at`;
 }

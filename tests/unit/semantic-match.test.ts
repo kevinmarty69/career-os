@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { buildSemanticProofIndex } from '../../lib/semantic-analysis-contract';
 import {
   buildSemanticAnalysis,
   parseSemanticAnalysisInput,
@@ -263,6 +264,38 @@ test('rejects forged excerpts, claims and evidence-to-claim links', () => {
         },
       ],
     }),
+  );
+});
+
+test('projects only human-readable proof labels referenced by the persisted artifact', () => {
+  const artifact = buildSemanticAnalysis(
+    input,
+    output({
+      skills: [item('Grounded match.', 'strong', JOB_EXCERPTS.systems)],
+    }),
+  );
+  assert.deepEqual(buildSemanticProofIndex(input, artifact), [
+    {
+      claimId: 'claim-app',
+      statement: 'Built production agent systems.',
+      evidence: [
+        {
+          evidenceId: 'evidence-app',
+          label: 'Production platform',
+          sourceTitle: 'CV',
+          sourceLocator: 'cv.pdf#page=2',
+        },
+      ],
+    },
+  ]);
+  assert.equal(
+    JSON.stringify(buildSemanticProofIndex(input, artifact)).includes(
+      'This must remain restricted.',
+    ),
+    false,
+  );
+  assert.throws(() =>
+    buildSemanticProofIndex(input, { ...artifact, jobRevision: 999 }),
   );
 });
 

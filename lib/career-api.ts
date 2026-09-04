@@ -41,6 +41,30 @@ export function saveOpportunityDecision(
   });
 }
 
+export function readSemanticAnalysis(
+  opportunityId: string,
+  searchProfileId: string,
+  signal: AbortSignal,
+) {
+  const query = new URLSearchParams({ searchProfileId });
+  return fetch(
+    `/api/opportunities/${opportunityId}/semantic-analysis?${query}`,
+    { cache: 'no-store', signal },
+  );
+}
+
+export function runSemanticAnalysis(
+  opportunityId: string,
+  searchProfileId: string,
+  signal: AbortSignal,
+) {
+  const query = new URLSearchParams({ searchProfileId });
+  return fetch(
+    `/api/opportunities/${opportunityId}/semantic-analysis?${query}`,
+    { method: 'POST', signal },
+  );
+}
+
 export function importOpportunity(url: string, signal: AbortSignal) {
   return fetch('/api/opportunities/import-url', {
     method: 'POST',
