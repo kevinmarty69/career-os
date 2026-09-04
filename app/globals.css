@@ -2232,6 +2232,53 @@
   margin-bottom: 0;
 }
 
+.co-run-journal {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.co-run-journal > section {
+  padding: 14px;
+  border: 1px solid var(--co-divider);
+  border-radius: 12px;
+}
+
+.co-run-journal h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.co-run-journal article {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 9px 0;
+  border-top: 1px solid var(--co-divider);
+}
+
+.co-run-journal article .co-icon {
+  color: var(--co-accent);
+  font-size: 17px;
+}
+
+.co-run-journal article strong,
+.co-run-journal article small {
+  display: block;
+}
+
+.co-run-journal article strong {
+  font-size: 11px;
+}
+
+.co-run-journal article small {
+  margin-top: 2px;
+  color: var(--co-text-4);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .co-live-dossier-card footer {
   margin-top: 24px;
   padding-top: 16px;
@@ -5828,6 +5875,10 @@
   }
 
   .co-live-dossier-card dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .co-run-journal {
     grid-template-columns: minmax(0, 1fr);
   }
 

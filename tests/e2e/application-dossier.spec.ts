@@ -50,11 +50,21 @@ function savedRun() {
     usedTokens: 0,
     usedCostMicros: 0,
     profile: syntheticProfile,
-    steps: [{ stage: 'company-researcher', status: 'pending', attempt: 1 }],
+    steps: [
+      { stage: 'company-researcher', status: 'completed', attempt: 1 },
+      { stage: 'evidence-archivist', status: 'pending', attempt: 1 },
+    ],
     reviews: [],
     reviewDecisions: [],
     publicationEligible: false,
-    events: [],
+    events: [
+      {
+        actor: 'company-researcher',
+        type: 'research_completed',
+        summary: 'Company signals were extracted from the approved sources.',
+        costMicros: 0,
+      },
+    ],
   } as const;
 }
 
@@ -104,6 +114,15 @@ test('starts and restores the persisted workflow for this application', async ({
   await page.goto(`/applications/${applicationId}`);
   await page.getByRole('button', { name: 'Start agent workflow' }).click();
   await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Company research', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Evidence matching', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Company signals were extracted from the approved sources.'),
+  ).toBeVisible();
   expect(created).toBe(true);
   expect(requestBody).toEqual({
     applicationId,

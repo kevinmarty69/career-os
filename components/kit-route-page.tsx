@@ -874,20 +874,61 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
               {workflow.loading ? (
                 <p>Recherche d’un run existant…</p>
               ) : workflow.run ? (
-                <dl>
-                  <div>
-                    <dt>Statut du run</dt>
-                    <dd>{runStatusLabel(workflow.run.status, locale)}</dd>
+                <>
+                  <dl>
+                    <div>
+                      <dt>Statut du run</dt>
+                      <dd>{runStatusLabel(workflow.run.status, locale)}</dd>
+                    </div>
+                    <div>
+                      <dt>Étape active</dt>
+                      <dd>{runStageLabel(workflow.run.stage, locale)}</dd>
+                    </div>
+                    <div>
+                      <dt>Événements persistés</dt>
+                      <dd>{workflow.run.events.length}</dd>
+                    </div>
+                  </dl>
+                  <div className="co-run-journal">
+                    <section>
+                      <h3>Progression</h3>
+                      {workflow.run.steps.map((step) => (
+                        <article key={`${step.stage}-${step.attempt}`}>
+                          <Icon>
+                            {step.status === 'completed'
+                              ? 'check_circle'
+                              : step.status === 'failed'
+                                ? 'error'
+                                : 'pending'}
+                          </Icon>
+                          <span>
+                            <strong>{runStageLabel(step.stage, locale)}</strong>
+                            <small>
+                              {stepStatusLabel(step.status, locale)} ·{' '}
+                              {attemptLabel(step.attempt, locale)}
+                            </small>
+                          </span>
+                        </article>
+                      ))}
+                    </section>
+                    <section>
+                      <h3>Journal lisible</h3>
+                      {workflow.run.events.length ? (
+                        workflow.run.events.slice(-5).map((event, index) => (
+                          <article key={`${event.type}-${index}`}>
+                            <Icon>notes</Icon>
+                            <span>
+                              <strong>{actorLabel(event.actor, locale)}</strong>
+                              <small>{event.summary}</small>
+                            </span>
+                          </article>
+                        ))
+                      ) : (
+                        <p>Le premier événement apparaîtra ici.</p>
+                      )}
+                    </section>
                   </div>
-                  <div>
-                    <dt>Étape active</dt>
-                    <dd>{workflow.run.stage.replaceAll('-', ' ')}</dd>
-                  </div>
-                  <div>
-                    <dt>Événements persistés</dt>
-                    <dd>{workflow.run.events.length}</dd>
-                  </div>
-                </dl>
+                </>
               ) : workflow.error ? (
                 <p role="alert">{workflowErrorLabel(workflow.error)}</p>
               ) : (
@@ -3880,6 +3921,57 @@ function workflowErrorLabel(error: string) {
     unavailable: 'Le workflow est momentanément indisponible.',
   };
   return labels[error] ?? labels.unavailable;
+}
+
+function runStageLabel(stage: string, locale: 'en' | 'fr') {
+  const labels: Record<string, [string, string]> = {
+    research: ['Research', 'Recherche entreprise'],
+    'company-researcher': ['Company research', 'Recherche entreprise'],
+    'evidence-archivist': ['Evidence matching', 'Appariement des preuves'],
+    'recruiter-strategist': [
+      'Application strategy',
+      'Stratégie de candidature',
+    ],
+    'page-composer': ['Page composition', 'Composition de la page'],
+    'recruiter-reviewer': ['Recruiter review', 'Revue recruteur'],
+    'hiring-manager-reviewer': [
+      'Hiring manager review',
+      'Revue hiring manager',
+    ],
+    'factuality-reviewer': ['Factual review', 'Revue factuelle'],
+  };
+  return labels[stage]?.[locale === 'en' ? 0 : 1] ?? stage.replaceAll('-', ' ');
+}
+
+function stepStatusLabel(status: string, locale: 'en' | 'fr') {
+  const labels: Record<string, [string, string]> = {
+    pending: ['Queued', 'En attente'],
+    leased: ['Assigned', 'Assignée'],
+    in_flight: ['Running', 'En cours'],
+    completed: ['Completed', 'Terminée'],
+    failed: ['Failed', 'Échec'],
+    cancelled: ['Cancelled', 'Annulée'],
+  };
+  return labels[status]?.[locale === 'en' ? 0 : 1] ?? status;
+}
+
+function actorLabel(actor: string, locale: 'en' | 'fr') {
+  const labels: Record<string, [string, string]> = {
+    human: ['You', 'Vous'],
+    system: ['Career OS', 'Career OS'],
+    'company-researcher': ['Company researcher', 'Agent de recherche'],
+    'evidence-archivist': ['Evidence archivist', 'Agent de preuves'],
+    'recruiter-strategist': ['Recruiter strategist', 'Agent stratégie'],
+    'hiring-manager': ['Hiring manager reviewer', 'Revue hiring manager'],
+    'page-composer': ['Page composer', 'Agent de rédaction'],
+    'fact-checker': ['Fact checker', 'Agent factuel'],
+    recruiter: ['Recruiter reviewer', 'Revue recruteur'],
+  };
+  return labels[actor]?.[locale === 'en' ? 0 : 1] ?? actor;
+}
+
+function attemptLabel(attempt: number, locale: 'en' | 'fr') {
+  return `${locale === 'en' ? 'Pass' : 'Passe'} ${attempt}`;
 }
 
 export function KitRoutePage({ path, query }: { path: string; query: Query }) {

@@ -32,6 +32,9 @@ export const dossierMessages = {
   'Statut du run': 'Run status',
   'Étape active': 'Active stage',
   'Événements persistés': 'Persisted events',
+  Progression: 'Progress',
+  'Journal lisible': 'Readable log',
+  'Le premier événement apparaîtra ici.': 'The first event will appear here.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',
