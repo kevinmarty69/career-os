@@ -37,7 +37,7 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
   await expect(page.getByText('Greenhouse').first()).toBeVisible();
   await expect(page.getByText('Republiée', { exact: true })).toBeVisible();
   const start = page.getByRole('button', { name: 'Démarrer la candidature' });
-  await expect(start).toBeDisabled();
+  await expect(start).toBeEnabled();
   await page.getByText('Provenance et historique · 4 observations').click();
   await expect(page.getByText('jobs.example.test').first()).toBeVisible();
   await expect(page.getByText('Contenu de l’offre modifié')).toBeVisible();
@@ -132,6 +132,73 @@ test('defaults to English and keeps decision controls translated', async ({
   await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ignore' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Archive' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Start application' }),
+  ).toBeVisible();
+});
+
+test('promotes an opportunity explicitly and opens the idempotent application', async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  await mockWorkspace(page, [opportunity()], [], []);
+  const applicationId = '988c0a00-0000-4000-8000-000000000008';
+  const requests: Array<{ method: string; body: string | null }> = [];
+  let attempt = 0;
+  let releasePromotion!: () => void;
+  const promotionPending = new Promise<void>((resolve) => {
+    releasePromotion = resolve;
+  });
+  await page.route('**/api/opportunities/*/application', async (route) => {
+    requests.push({
+      method: route.request().method(),
+      body: route.request().postData(),
+    });
+    attempt += 1;
+    if (attempt === 1) {
+      await route.fulfill({ status: 409, body: 'Opportunity is closed.' });
+      return;
+    }
+    await promotionPending;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        applicationId,
+        discoveredJobId: opportunity().opportunityId,
+        company: 'Example Labs',
+        role: 'Product Engineer',
+        description: 'Build reliable products.',
+        url: 'https://jobs.example.test/product-engineer',
+        accent: '#5647e0',
+        stage: 'draft',
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    });
+  });
+
+  await page.goto('/applications');
+  await page.getByRole('button', { name: 'Start application' }).click();
+  await expect(
+    page.getByRole('alert').filter({
+      hasText: 'An application cannot be started for this opportunity.',
+    }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Start application' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Starting application…' }),
+  ).toBeDisabled();
+  releasePromotion();
+
+  await expect(page).toHaveURL(`/applications/${applicationId}`);
+  expect(requests).toEqual([
+    { method: 'POST', body: null },
+    { method: 'POST', body: null },
+  ]);
 });
 
 test('runs semantic analysis only on request, retries the local model and reads the saved result', async ({

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   useCallback,
   useEffect,
@@ -14,6 +15,7 @@ import {
 } from '@/lib/application-contract';
 import {
   importOpportunity,
+  promoteOpportunityToApplication,
   readApplications,
   readOpportunityDecisions,
   readOpportunities,
@@ -342,6 +344,7 @@ function OpportunityCard({
   searchProfiles: SearchProfile[];
 }) {
   const { locale } = useI18n();
+  const router = useRouter();
   const localize = useLocalizer([
     applicationsMessages,
     semanticAnalysisMessages,
@@ -352,6 +355,29 @@ function OpportunityCard({
     OpportunityDecision['disposition'] | undefined
   >();
   const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string>();
+
+  async function startApplication() {
+    setStarting(true);
+    setStartError(undefined);
+    try {
+      const response = await promoteOpportunityToApplication(
+        opportunity.opportunityId,
+      );
+      if (!response.ok) {
+        setStartError(promotionError(response.status));
+        return;
+      }
+      const application = applicationSchema.parse(await response.json());
+      router.push(`/applications/${application.applicationId}`);
+    } catch {
+      setStartError('Impossible de démarrer la candidature. Réessayez.');
+    } finally {
+      setStarting(false);
+    }
+  }
+
   return localize(
     <article
       className={`${styles.opportunityCard} ${styles[`lifecycle-${opportunity.lifecycle}`]}`}
@@ -526,12 +552,18 @@ function OpportunityCard({
           ))}
         </div>
         <button
-          disabled
-          title="La promotion vers une candidature sera ajoutée dans une prochaine tranche."
+          aria-busy={starting || undefined}
+          disabled={starting}
+          onClick={() => void startApplication()}
           type="button"
         >
-          Démarrer la candidature
+          {starting ? 'Démarrage…' : 'Démarrer la candidature'}
         </button>
+        {startError ? (
+          <p className={styles.decisionError} role="alert">
+            {startError}
+          </p>
+        ) : null}
       </div>
       {editing ? (
         <DecisionEditor
@@ -1350,6 +1382,14 @@ function decisionError(status: number) {
     return 'Cette décision a changé dans une autre session. Rechargez la page.';
   if (status === 413) return 'La note est trop longue.';
   return 'La décision n’a pas pu être enregistrée.';
+}
+
+function promotionError(status: number) {
+  if (status === 401) return 'Connectez-vous pour démarrer cette candidature.';
+  if (status === 404) return 'Cette opportunité n’existe plus.';
+  if (status === 409)
+    return 'Impossible de démarrer une candidature pour cette opportunité.';
+  return 'Impossible de démarrer la candidature. Réessayez.';
 }
 
 function importError(status: number) {

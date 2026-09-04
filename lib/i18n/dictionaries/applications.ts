@@ -77,6 +77,14 @@ export const applicationsMessages = {
   'La promotion vers une candidature sera ajoutée dans une prochaine tranche.':
     'Starting an application will be added in a later slice.',
   'Démarrer la candidature': 'Start application',
+  'Démarrage…': 'Starting application…',
+  'Connectez-vous pour démarrer cette candidature.':
+    'Sign in to start this application.',
+  'Cette opportunité n’existe plus.': 'This opportunity no longer exists.',
+  'Impossible de démarrer une candidature pour cette opportunité.':
+    'An application cannot be started for this opportunity.',
+  'Impossible de démarrer la candidature. Réessayez.':
+    'The application could not be started. Try again.',
   Enregistrer: 'Save',
   Ignorer: 'Ignore',
   Archiver: 'Archive',

@@ -19,6 +19,12 @@ export function readOpportunities(signal: AbortSignal) {
   return fetch('/api/opportunities', { cache: 'no-store', signal });
 }
 
+export function promoteOpportunityToApplication(opportunityId: string) {
+  return fetch(`/api/opportunities/${opportunityId}/application`, {
+    method: 'POST',
+  });
+}
+
 export function readOpportunityDecisions(signal: AbortSignal) {
   return fetch('/api/opportunities/decisions', {
     cache: 'no-store',
