@@ -647,7 +647,7 @@ Critères d'acceptation :
 
 ### Lot 7 - Dashboard et suivi de candidature
 
-- [ ] Vue d'accueil avec prochaine action prioritaire.
+- [x] Vue d'accueil avec prochaine action prioritaire.
 - [ ] Pipeline des opportunités et candidatures.
 - [x] État en temps réel des workflows.
 - [ ] File des arbitrages humains.

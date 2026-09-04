@@ -22,11 +22,22 @@ import {
 } from '@/lib/application-contract';
 import {
   readApplication,
+  readApplicationRun,
+  readApplications,
   readPublications,
   revokePublication,
   saveApplicationBrand,
 } from '@/lib/career-api';
-import type { PublicationSummary } from '@/lib/server/publication-input';
+import {
+  publicationSummarySchema,
+  type PublicationSummary,
+} from '@/lib/server/publication-input';
+import {
+  dashboardActions,
+  type DashboardAction,
+  type DashboardItem,
+} from '@/lib/dashboard-priority';
+import { persistedRunSchema } from '@/lib/run-contract';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
@@ -432,118 +443,139 @@ function ClaimRow({
   );
 }
 
-function HomeAside() {
+function HomeAside({
+  loading,
+  publications,
+}: {
+  loading: boolean;
+  publications: PublicationSummary[];
+}) {
+  const { locale } = useI18n();
   const localize = useLocalizer([homeMessages]);
+  const active = publications.filter((item) => item.status === 'active');
   return localize(
     <div className="co-home-aside">
-      <section className="co-home-memory-card">
-        <header>
-          <h2>Mémoire pro</h2>
-          <button aria-label="Options de la mémoire" type="button">
-            <Icon>more_horiz</Icon>
-          </button>
-        </header>
-        <div className="co-home-donut">
-          <svg
-            aria-label="92 pour cent de la mémoire est sourcée"
-            role="img"
-            viewBox="0 0 120 120"
-          >
-            <circle cx="60" cy="60" fill="none" r="45" strokeWidth="14" />
-            <circle
-              className="accent"
-              cx="60"
-              cy="60"
-              fill="none"
-              pathLength="100"
-              r="45"
-              strokeDasharray="72 28"
-              strokeWidth="14"
-            />
-            <circle
-              className="ok"
-              cx="60"
-              cy="60"
-              fill="none"
-              pathLength="100"
-              r="45"
-              strokeDasharray="20 80"
-              strokeDashoffset="-72"
-              strokeWidth="14"
-            />
-          </svg>
-          <span>
-            <strong>92 %</strong>
-            <small>sourcé</small>
-          </span>
-        </div>
-        <dl>
-          <div>
-            <dt>
-              <i className="accent" /> Documents importés
-            </dt>
-            <dd>92</dd>
-          </div>
-          <div>
-            <dt>
-              <i className="ok" /> Vérifiées par agent
-            </dt>
-            <dd>26</dd>
-          </div>
-          <div>
-            <dt>
-              <i /> Sans source
-            </dt>
-            <dd>10</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="co-home-responses">
-        <header>
-          <h2>Réponses reçues</h2>
-          <span>6 dernières sem.</span>
-        </header>
-        <div aria-label="Réponses reçues sur six semaines" role="img">
-          {[32, 49, 41, 61, 52, 74].map((height, index) => (
-            <span key={height}>
-              <i style={{ height: `${height}%` }} />
-              <small>S{30 + index}</small>
-            </span>
-          ))}
-        </div>
-      </section>
-
       <section className="co-home-links">
         <header>
           <h2>Liens privés actifs</h2>
           <Link href="/links">Tout voir</Link>
         </header>
-        <Link href="/applications/nimbus">
-          <Icon>visibility</Icon>
-          <span>
-            <strong>/p/8f2c-nimbus</strong>
-            <small>4 vues · expire le 12 oct.</small>
-          </span>
-          <Icon>more_vert</Icon>
-        </Link>
-        <Link href="/applications/atlas">
-          <Icon>visibility_off</Icon>
-          <span>
-            <strong>/p/1a77-atlas</strong>
-            <small>Jamais ouvert</small>
-          </span>
-          <Icon>more_vert</Icon>
-        </Link>
+        {active.slice(0, 3).map((publication) => (
+          <Link
+            href={`/applications/${publication.applicationId}`}
+            key={publication.publicationId}
+          >
+            <Icon>{publication.opens ? 'visibility' : 'visibility_off'}</Icon>
+            <span>
+              <strong>{publication.company}</strong>
+              <small>
+                {publication.opens
+                  ? locale === 'fr'
+                    ? `${publication.opens} ouverture${publication.opens > 1 ? 's' : ''}`
+                    : `${publication.opens} opening${publication.opens > 1 ? 's' : ''}`
+                  : locale === 'fr'
+                    ? 'Jamais ouvert'
+                    : 'Never opened'}
+              </small>
+            </span>
+            <Icon>arrow_forward</Icon>
+          </Link>
+        ))}
+        {loading ? <p>Chargement…</p> : null}
+        {!loading && !active.length ? <p>Aucun lien actif.</p> : null}
+      </section>
+      <section className="co-home-aside-note">
+        <Icon>rule</Icon>
+        <h2>Priorités explicables</h2>
+        <p>
+          La prochaine action vient uniquement de l’état enregistré de vos
+          candidatures et de vos décisions humaines.
+        </p>
       </section>
     </div>,
   );
 }
 
 function HomeScreen() {
+  const { locale } = useI18n();
+  const [dashboard, setDashboard] = useState<{
+    applications: Application[];
+    items: DashboardItem[];
+    publications: PublicationSummary[];
+  }>();
+  const [error, setError] = useState<'auth' | 'unavailable'>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void Promise.all([
+      readApplications(controller.signal),
+      readPublications(controller.signal),
+    ])
+      .then(async ([applicationResponse, publicationResponse]) => {
+        if (
+          applicationResponse.status === 401 ||
+          publicationResponse.status === 401
+        )
+          return setError('auth');
+        if (!applicationResponse.ok || !publicationResponse.ok)
+          return setError('unavailable');
+        const applicationPayload = (await applicationResponse.json()) as {
+          applications?: unknown;
+        };
+        const publicationPayload = (await publicationResponse.json()) as {
+          publications?: unknown;
+        };
+        const applications = applicationSchema
+          .array()
+          .parse(applicationPayload.applications ?? []);
+        const publications = publicationSummarySchema
+          .array()
+          .parse(publicationPayload.publications ?? []);
+        // ponytail: eight recent runs avoid an aggregate endpoint until dashboard latency warrants one.
+        const items = await Promise.all(
+          applications.slice(0, 8).map(async (application) => {
+            const response = await readApplicationRun(
+              application.applicationId,
+              controller.signal,
+            );
+            if (response.status === 204) return { application };
+            if (!response.ok) return { application, unavailable: true };
+            const run = persistedRunSchema.safeParse(await response.json());
+            return run.success
+              ? { application, run: run.data }
+              : { application, unavailable: true };
+          }),
+        );
+        setDashboard({ applications, items, publications });
+      })
+      .catch((caught: unknown) => {
+        if (!(caught instanceof DOMException) || caught.name !== 'AbortError')
+          setError('unavailable');
+      });
+    return () => controller.abort();
+  }, []);
+
+  const actions = dashboardActions(dashboard?.items ?? []);
+  const dashboardError =
+    error ??
+    (dashboard?.items.length &&
+    dashboard.items.every((item) => item.unavailable)
+      ? 'unavailable'
+      : undefined);
+  const priority = actions[0];
+  const activeLinks =
+    dashboard?.publications.filter((item) => item.status === 'active').length ??
+    0;
+  const copy = homePriorityCopy(priority, locale, dashboardError);
+
   return (
     <AppShell
-      aside={<HomeAside />}
+      aside={
+        <HomeAside
+          loading={!dashboard && !dashboardError}
+          publications={dashboard?.publications ?? []}
+        />
+      }
       path="/"
       sidebarFooter={
         <div className="co-home-hosting">
@@ -554,17 +586,21 @@ function HomeScreen() {
       }
     >
       <section className="co-home-hero">
-        <p>Revue humaine · Nimbus Robotics</p>
-        <h1>
-          Trois affirmations à trancher avant d’envoyer votre page privée.
-        </h1>
-        <span>
-          Les agents ont terminé leur passe à 14:03. Un chiffre dépasse ce que
-          votre preuve démontre.
-        </span>
+        <p>{copy.eyebrow}</p>
+        <h1>{copy.title}</h1>
+        <span>{copy.detail}</span>
         <div>
-          <Link className="co-button dark" href="/applications/nimbus/review">
-            Ouvrir la revue <Icon>arrow_forward</Icon>
+          <Link
+            className="co-button dark"
+            href={
+              priority
+                ? `/applications/${priority.application.applicationId}`
+                : dashboardError === 'auth'
+                  ? '/sign-in'
+                  : '/applications'
+            }
+          >
+            {copy.action} <Icon>arrow_forward</Icon>
           </Link>
           <Link className="co-button transparent" href="/runs">
             Voir le journal
@@ -573,70 +609,179 @@ function HomeScreen() {
       </section>
 
       <section className="co-home-stats" aria-label="Indicateurs principaux">
-        <Stat icon="work_history" value="14 actives" label="Candidatures" />
+        <Stat
+          icon="work_history"
+          value={String(dashboard?.applications.length ?? 0)}
+          label="Candidatures"
+        />
         <Stat
           icon="verified"
           tone="ok"
-          value="118 / 128 sourcées"
-          label="Affirmations"
+          value={String(actions.length)}
+          label="Actions prioritaires"
         />
         <Stat
-          icon="trending_up"
+          icon="link"
           tone="warn"
-          value="38 % de réponses"
-          label="Performance"
+          value={String(activeLinks)}
+          label="Liens privés actifs"
         />
       </section>
 
       <section className="co-home-review-queue">
         <header>
-          <h2>À trancher</h2>
-          <div>
-            <button aria-label="Décision précédente" disabled type="button">
-              <Icon>chevron_left</Icon>
-            </button>
-            <button aria-label="Décision suivante" type="button">
-              <Icon>chevron_right</Icon>
-            </button>
-          </div>
+          <h2>À faire maintenant</h2>
         </header>
-        <article className="co-home-review-card">
-          <Icon>shield</Icon>
-          <div>
-            <header>
-              <h3>Le chiffre dépasse la preuve</h3>
-              <Badge tone="warn">Ouverture</Badge>
-            </header>
-            <p>
-              L’agent a écrit « réduit de <strong>42 %</strong> le temps de
-              build ». Votre post-mortem mesure 11 → 7 minutes, soit environ{' '}
-              <strong>35 %</strong>.
-            </p>
-            <Link href="/memory">
-              <Icon>description</Icon>
-              <code>corvid_postmortem.md · §4</code>
-              <span>Ouvrir</span>
+        {actions.slice(0, 3).map((action) => (
+          <article
+            className="co-home-review-card compact"
+            key={action.application.applicationId}
+          >
+            <Icon>{homePriorityIcon(action.kind)}</Icon>
+            <div>
+              <h3>
+                {action.application.company} · {action.application.role}
+              </h3>
+              <p>{homePriorityRow(action, locale)}</p>
+            </div>
+            <Link href={`/applications/${action.application.applicationId}`}>
+              Ouvrir
             </Link>
-            <footer>
-              <button type="button">Utiliser 11 → 7 min</button>
-              <button type="button">Garder ma version</button>
-            </footer>
+          </article>
+        ))}
+        {!actions.length ? (
+          <div className="co-note">
+            <Icon>{dashboardError ? 'cloud_off' : 'check_circle'}</Icon>
+            {dashboardError
+              ? locale === 'fr'
+                ? 'Les priorités ne sont pas disponibles.'
+                : 'Priorities are unavailable.'
+              : locale === 'fr'
+                ? 'Aucune candidature ne demande votre attention.'
+                : 'No application needs your attention.'}
           </div>
-        </article>
-        <article className="co-home-review-card compact">
-          <Icon>link_off</Icon>
-          <div>
-            <h3>Affirmation sans preuve rattachée</h3>
-            <p>
-              « Divisé les coûts d’infrastructure par deux » · section Preuves
-              détaillées.
-            </p>
-          </div>
-          <Link href="/memory">Rattacher</Link>
-        </article>
+        ) : null}
       </section>
     </AppShell>
   );
+}
+
+function homePriorityCopy(
+  priority: DashboardAction | undefined,
+  locale: 'en' | 'fr',
+  error: 'auth' | 'unavailable' | undefined,
+) {
+  if (error === 'auth')
+    return locale === 'fr'
+      ? {
+          eyebrow: 'Espace privé',
+          title: 'Connectez-vous pour retrouver votre prochaine action.',
+          detail: 'Vos candidatures et décisions restent privées.',
+          action: 'Se connecter',
+        }
+      : {
+          eyebrow: 'Private workspace',
+          title: 'Sign in to see your next action.',
+          detail: 'Your applications and decisions remain private.',
+          action: 'Sign in',
+        };
+  if (!priority)
+    return locale === 'fr'
+      ? {
+          eyebrow: error ? 'Données indisponibles' : 'Tout est à jour',
+          title: error
+            ? 'Votre tableau de bord ne peut pas être chargé.'
+            : 'Aucune candidature ne demande votre attention.',
+          detail: error
+            ? 'Réessayez dans quelques instants.'
+            : 'Ajoutez une offre pour démarrer un nouveau parcours.',
+          action: 'Voir les candidatures',
+        }
+      : {
+          eyebrow: error ? 'Data unavailable' : 'All caught up',
+          title: error
+            ? 'Your dashboard could not be loaded.'
+            : 'No application needs your attention.',
+          detail: error
+            ? 'Try again in a moment.'
+            : 'Add a job to start a new application journey.',
+          action: 'View applications',
+        };
+  const { company } = priority.application;
+  const detail = homePriorityRow(priority, locale);
+  const titles: Record<DashboardAction['kind'], [string, string]> = {
+    review: [
+      `${priority.pendingDecisions} decision${priority.pendingDecisions > 1 ? 's' : ''} need your review for ${company}.`,
+      `${priority.pendingDecisions} décision${priority.pendingDecisions > 1 ? 's' : ''} à trancher pour ${company}.`,
+    ],
+    decision: [
+      `${company} is waiting for your decision.`,
+      `${company} attend votre décision.`,
+    ],
+    running: [
+      `The ${company} workflow is running.`,
+      `Le workflow ${company} est en cours.`,
+    ],
+    recover: [
+      `The ${company} workflow needs attention.`,
+      `Le workflow ${company} demande votre attention.`,
+    ],
+    start: [
+      `Start the evidence workflow for ${company}.`,
+      `Lancez le workflow de preuves pour ${company}.`,
+    ],
+    publish: [
+      `The ${company} application is ready to publish.`,
+      `La candidature ${company} est prête à publier.`,
+    ],
+  };
+  return {
+    eyebrow: `${locale === 'fr' ? 'Prochaine action' : 'Next action'} · ${company}`,
+    title: titles[priority.kind][locale === 'en' ? 0 : 1],
+    detail,
+    action: locale === 'fr' ? 'Ouvrir le dossier' : 'Open application',
+  };
+}
+
+function homePriorityRow(action: DashboardAction, locale: 'en' | 'fr') {
+  const labels: Record<DashboardAction['kind'], [string, string]> = {
+    review: [
+      `${action.pendingDecisions} unresolved human decision${action.pendingDecisions > 1 ? 's' : ''}.`,
+      `${action.pendingDecisions} décision${action.pendingDecisions > 1 ? 's humaines non résolues' : ' humaine non résolue'}.`,
+    ],
+    decision: [
+      `Paused at ${runStageLabel(action.run?.stage ?? 'human_approval', locale)}.`,
+      `En pause à l’étape ${runStageLabel(action.run?.stage ?? 'human_approval', locale)}.`,
+    ],
+    running: [
+      `Agents are working on ${runStageLabel(action.run?.stage ?? 'research', locale)}.`,
+      `Les agents travaillent sur ${runStageLabel(action.run?.stage ?? 'research', locale)}.`,
+    ],
+    recover: [
+      `Run status: ${action.run ? runStatusLabel(action.run.status, locale) : 'Unavailable'}.`,
+      `État du run : ${action.run ? runStatusLabel(action.run.status, locale) : 'Indisponible'}.`,
+    ],
+    start: [
+      'No workflow has started yet.',
+      'Aucun workflow n’a encore démarré.',
+    ],
+    publish: [
+      'All publication gates are satisfied.',
+      'Tous les contrôles de publication sont validés.',
+    ],
+  };
+  return labels[action.kind][locale === 'en' ? 0 : 1];
+}
+
+function homePriorityIcon(kind: DashboardAction['kind']) {
+  return {
+    review: 'rule',
+    decision: 'front_hand',
+    running: 'bolt',
+    recover: 'warning',
+    start: 'play_arrow',
+    publish: 'publish',
+  }[kind];
 }
 
 function MemoryScreen() {

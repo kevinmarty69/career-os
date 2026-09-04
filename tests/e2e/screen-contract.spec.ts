@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const screens = [
-  ['/', 'Trois affirmations à trancher avant d’envoyer votre page privée.'],
+  ['/', 'Lancez le workflow de preuves pour Signal Forge.'],
   ['/memory', 'Mémoire professionnelle'],
   ['/applications', 'Candidatures'],
   ['/applications/nimbus/review', '3 modifications proposées'],
@@ -39,7 +39,41 @@ const screens = [
   ['/settings/data', 'Export & suppression'],
 ] as const;
 
+async function mockDashboard(page: import('@playwright/test').Page) {
+  const applicationId = '988c0a00-0000-4000-8000-000000000041';
+  await page.route(`**/api/applications/${applicationId}/run`, (route) =>
+    route.fulfill({ status: 204 }),
+  );
+  await page.route('**/api/applications', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        applications: [
+          {
+            applicationId,
+            company: 'Signal Forge',
+            role: 'Staff Platform Engineer',
+            description: 'Build a reliable platform for a small team.',
+            accent: '#5847e8',
+            stage: 'draft',
+            revision: 1,
+            createdAt: '2026-09-04T12:00:00.000Z',
+            updatedAt: '2026-09-04T12:00:00.000Z',
+          },
+        ],
+      }),
+    }),
+  );
+  await page.route('**/api/publications', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ publications: [] }),
+    }),
+  );
+}
+
 test('renders every routed handoff screen', async ({ page }) => {
+  await mockDashboard(page);
   for (const [route, heading] of screens) {
     await test.step(route, async () => {
       await page.goto(route);
@@ -96,13 +130,14 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
 test('navigates from memory to the kit home without reviving the legacy shell', async ({
   page,
 }) => {
+  await mockDashboard(page);
   await page.goto('/memory');
   await page.getByRole('link', { name: 'Accueil', exact: true }).click();
 
   await expect(page).toHaveURL('/');
   await expect(
     page.getByRole('heading', {
-      name: 'Trois affirmations à trancher avant d’envoyer votre page privée.',
+      name: 'Lancez le workflow de preuves pour Signal Forge.',
     }),
   ).toBeVisible();
   await expect(page.locator('main.co-shell')).toBeVisible();
@@ -184,6 +219,7 @@ test('exposes keyboard navigation and readable informational copy', async ({
 });
 
 test('keeps the main application shell edge to edge', async ({ page }) => {
+  await mockDashboard(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
 
