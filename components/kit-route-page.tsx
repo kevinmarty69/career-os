@@ -59,9 +59,8 @@ import {
 import {
   dashboardActions,
   type DashboardAction,
-  type DashboardItem,
 } from '@/lib/dashboard-priority';
-import { persistedRunSchema } from '@/lib/run-contract';
+import { persistedRunSchema, type PersistedRun } from '@/lib/run-contract';
 import { opportunityListResponseSchema } from '@/lib/discovered-job-contract';
 import {
   opportunityDecisionListResponseSchema,
@@ -176,7 +175,7 @@ export function AppShell({
       : path === '/runs'
         ? [
             ...nav.slice(0, 4),
-            ['/runs', 'bolt', "Runs d'agents"] as const,
+            ['/runs', 'bolt', 'Runs d’agents'] as const,
             ...nav.slice(4),
           ]
         : nav;
@@ -576,7 +575,11 @@ function ClaimRow({
 function useWorkflowDashboard() {
   const [dashboard, setDashboard] = useState<{
     applications: Application[];
-    items: DashboardItem[];
+    items: Array<{
+      application: Application;
+      run?: PersistedRun;
+      unavailable?: boolean;
+    }>;
     publications: PublicationSummary[];
   }>();
   const [error, setError] = useState<'auth' | 'unavailable'>();
@@ -4155,102 +4158,205 @@ function reviewerLabel(value: string, locale: 'en' | 'fr') {
 }
 
 function RunsScreen() {
+  const { locale } = useI18n();
+  const { dashboard, error } = useWorkflowDashboard();
+  const items = dashboard?.items.filter(({ run }) => run) ?? [];
+  const failed = items.filter(({ run }) =>
+    ['blocked', 'budget_exhausted', 'failed'].includes(run!.status),
+  ).length;
+  const copy =
+    locale === 'fr'
+      ? {
+          title: 'Journal des agents',
+          intro: dashboard
+            ? `${items.length} run${items.length > 1 ? 's' : ''} persisté${items.length > 1 ? 's' : ''}, ${failed} en erreur ou bloqué${failed > 1 ? 's' : ''}.`
+            : 'Chargement des runs persistés…',
+          empty:
+            'Aucun run enregistré. Lancez une candidature pour créer le premier journal.',
+          unavailable: 'Le journal est momentanément indisponible.',
+          signIn: 'Connectez-vous pour consulter les runs de votre workspace.',
+          stage: 'Étape active',
+          cost: 'Coût enregistré',
+          tokens: 'Tokens utilisés',
+          sources: 'Sources',
+          steps: 'Étapes',
+          events: 'Décisions et événements',
+          errors: 'Erreurs',
+          noSteps: 'Aucune étape enregistrée.',
+          noEvents: 'Aucun événement enregistré.',
+          noSources: 'Aucune source externe enregistrée.',
+          noErrors: 'Aucune erreur enregistrée.',
+          humanDecision: 'décision humaine',
+          humanDecisions: 'décisions humaines',
+          open: 'Ouvrir la candidature',
+        }
+      : {
+          title: 'Agent run journal',
+          intro: dashboard
+            ? `${items.length} persisted ${items.length === 1 ? 'run' : 'runs'}, ${failed} failed or blocked.`
+            : 'Loading persisted runs…',
+          empty:
+            'No run recorded. Start an application to create the first journal.',
+          unavailable: 'The run journal is temporarily unavailable.',
+          signIn: 'Sign in to review the runs in your workspace.',
+          stage: 'Active stage',
+          cost: 'Recorded cost',
+          tokens: 'Tokens used',
+          sources: 'Sources',
+          steps: 'Steps',
+          events: 'Decisions and events',
+          errors: 'Errors',
+          noSteps: 'No step recorded.',
+          noEvents: 'No event recorded.',
+          noSources: 'No external source recorded.',
+          noErrors: 'No error recorded.',
+          humanDecision: 'human decision',
+          humanDecisions: 'human decisions',
+          open: 'Open application',
+        };
   return (
     <AppShell path="/runs">
-      <PageHeader
-        title="Runs d’agents"
-        copy="3 incidents à traiter. Aucun n’a modifié votre mémoire."
-        actions={<Button>Tout reprendre</Button>}
-      />
-      <div className="co-errors">
-        <article>
+      <PageHeader title={copy.title} copy={copy.intro} />
+      {error ? (
+        <div className="co-note" role="alert">
           <Icon>cloud_off</Icon>
-          <div>
-            <Badge tone="crit">Run interrompu</Badge>
-            <h2>Le modèle distant ne répond pas</h2>
-            <p>Fathom · étape rédaction · 14:47</p>
-            <span>
-              L’API distante a renvoyé une erreur de quota. Les trois premières
-              étapes sont enregistrées et intactes.
-            </span>
-            <div className="co-note">
-              <Icon>swap_horiz</Icon>Basculer la rédaction sur votre modèle
-              local — plus lent, gratuit, sans sortie de données.
-            </div>
-            <footer>
-              <Button>Reprendre en local</Button>
-              <Button quiet>Réessayer l’API</Button>
-            </footer>
-          </div>
-        </article>
-        <article>
-          <Icon>link_off</Icon>
-          <div>
-            <Badge tone="warn">Import bloqué</Badge>
-            <h2>Offre inaccessible derrière une authentification</h2>
-            <p>jobs.keel.io · 403</p>
-            <span>Collez le texte de l’annonce à la place.</span>
-            <footer>
-              <Button>Coller le texte</Button>
-              <Button quiet>Importer un PDF</Button>
-            </footer>
-          </div>
-        </article>
-        <article>
-          <Icon>image_not_supported</Icon>
-          <div>
-            <Badge tone="warn">Document illisible</Badge>
-            <h2>CV scanné : texte non extractible</h2>
-            <p>cv_2019_scan.pdf</p>
-            <span>
-              L’OCR local peut le traiter, mais les dates devront être
-              confirmées.
-            </span>
-            <footer>
-              <Button>Lancer l’OCR</Button>
-              <Button quiet>Saisir manuellement</Button>
-            </footer>
-          </div>
-        </article>
+          {error === 'auth' ? copy.signIn : copy.unavailable}
+        </div>
+      ) : null}
+      {dashboard && !error && !items.length ? (
+        <div className="co-note">
+          <Icon>history</Icon>
+          {copy.empty}
+        </div>
+      ) : null}
+      <div className="co-run-ledger">
+        {items.map(({ application, run }) => {
+          const sources = runSources(application, run!);
+          const failures = run!.steps.filter(
+            ({ status }) => status === 'failed',
+          );
+          return (
+            <article className="co-panel" key={run!.runId}>
+              <header>
+                <Company
+                  initials={initials(application.company)}
+                  name={`${application.company} · ${application.role}`}
+                  sub={`run ${run!.runId.slice(0, 8)}`}
+                />
+                <Badge tone={runStatusTone(run!.status)}>
+                  {runStatusLabel(run!.status, locale)}
+                </Badge>
+              </header>
+              <dl className="co-run-facts">
+                <div>
+                  <dt>{copy.stage}</dt>
+                  <dd>{runStageLabel(run!.stage, locale)}</dd>
+                </div>
+                <div>
+                  <dt>{copy.cost}</dt>
+                  <dd>€{(run!.usedCostMicros / 1_000_000).toFixed(2)}</dd>
+                </div>
+                <div>
+                  <dt>{copy.tokens}</dt>
+                  <dd>{run!.usedTokens.toLocaleString(locale)}</dd>
+                </div>
+                <div>
+                  <dt>{copy.sources}</dt>
+                  <dd>{sources.length}</dd>
+                </div>
+              </dl>
+              <div className="co-run-journal">
+                <section>
+                  <h3>{copy.steps}</h3>
+                  {run!.steps.length ? (
+                    run!.steps.map((step) => (
+                      <article key={`${step.stage}-${step.attempt}`}>
+                        <Icon>{stepIcon(step.status)}</Icon>
+                        <span>
+                          <strong>{runStageLabel(step.stage, locale)}</strong>
+                          <small>
+                            {stepStatusLabel(step.status, locale)} ·{' '}
+                            {attemptLabel(step.attempt, locale)}
+                          </small>
+                        </span>
+                      </article>
+                    ))
+                  ) : (
+                    <p>{copy.noSteps}</p>
+                  )}
+                </section>
+                <section>
+                  <h3>{copy.events}</h3>
+                  {run!.events.length ? (
+                    run!.events.slice(-6).map((event, index) => (
+                      <article key={`${event.type}-${index}`}>
+                        <Icon>notes</Icon>
+                        <span>
+                          <strong>{actorLabel(event.actor, locale)}</strong>
+                          <small>{event.summary}</small>
+                        </span>
+                      </article>
+                    ))
+                  ) : (
+                    <p>{copy.noEvents}</p>
+                  )}
+                  {run!.reviewDecisions.length ? (
+                    <p>
+                      {run!.reviewDecisions.length}{' '}
+                      {run!.reviewDecisions.length === 1
+                        ? copy.humanDecision
+                        : copy.humanDecisions}
+                    </p>
+                  ) : null}
+                </section>
+                <section>
+                  <h3>{copy.sources}</h3>
+                  {sources.length ? (
+                    sources.map((source) => (
+                      <article key={source}>
+                        <Icon>link</Icon>
+                        <span>
+                          <strong>{new URL(source).hostname}</strong>
+                          <small>{source}</small>
+                        </span>
+                      </article>
+                    ))
+                  ) : (
+                    <p>{copy.noSources}</p>
+                  )}
+                </section>
+                <section>
+                  <h3>{copy.errors}</h3>
+                  {failures.length ? (
+                    failures.map((step) => (
+                      <article key={`${step.stage}-${step.attempt}`}>
+                        <Icon>error</Icon>
+                        <span>
+                          <strong>{runStageLabel(step.stage, locale)}</strong>
+                          <small>
+                            {step.failureCode ??
+                              stepStatusLabel(step.status, locale)}
+                          </small>
+                        </span>
+                      </article>
+                    ))
+                  ) : (
+                    <p>{copy.noErrors}</p>
+                  )}
+                </section>
+              </div>
+              <footer>
+                <Link
+                  className="co-button quiet"
+                  href={`/applications/${application.applicationId}`}
+                >
+                  {copy.open}
+                </Link>
+              </footer>
+            </article>
+          );
+        })}
       </div>
-      <section className="co-panel">
-        <h2>Runs récents</h2>
-        <DataTable
-          headers={['Run', 'État', 'Durée', 'Coût', '']}
-          rows={[
-            [
-              <Company
-                key="fathom"
-                initials="FT"
-                name="Fathom · Platform Engineer"
-                sub="run c31a"
-              />,
-              <Badge key="failed" tone="crit">
-                Échec
-              </Badge>,
-              '0 m 51 s',
-              '0,04 €',
-              <Button key="resume">Reprendre</Button>,
-            ],
-            [
-              <Company
-                key="nimbus"
-                initials="NR"
-                name="Nimbus · Staff Product Engineer"
-                sub="run 8f2c"
-              />,
-              <Badge key="done" tone="ok">
-                Terminé
-              </Badge>,
-              '1 m 42 s',
-              '0,18 €',
-              <Button key="open" quiet>
-                Ouvrir
-              </Button>,
-            ],
-          ]}
-        />
-      </section>
     </AppShell>
   );
 }
@@ -5272,6 +5378,35 @@ function actorLabel(actor: string, locale: 'en' | 'fr') {
 
 function attemptLabel(attempt: number, locale: 'en' | 'fr') {
   return `${locale === 'en' ? 'Pass' : 'Passe'} ${attempt}`;
+}
+
+function runStatusTone(status: PersistedRun['status']): Tone {
+  if (status === 'completed') return 'ok';
+  if (['failed', 'blocked', 'budget_exhausted'].includes(status)) return 'crit';
+  if (['paused', 'awaiting_approval'].includes(status)) return 'warn';
+  return 'accent';
+}
+
+function stepIcon(status: PersistedRun['steps'][number]['status']) {
+  if (status === 'completed') return 'check_circle';
+  if (status === 'failed') return 'error';
+  if (status === 'cancelled') return 'cancel';
+  return status === 'in_flight' ? 'autorenew' : 'schedule';
+}
+
+function runSources(application: Application, run: PersistedRun) {
+  const urls = [
+    application.url,
+    ...(application.companySources ?? []).map(({ url }) => url),
+    ...(run.research && 'sources' in run.research
+      ? run.research.sources.flatMap((source) =>
+          'finalUrl' in source ? [source.finalUrl] : [],
+        )
+      : run.research?.source.url
+        ? [run.research.source.url]
+        : []),
+  ].filter((value): value is string => Boolean(value));
+  return [...new Set(urls)];
 }
 
 export function KitRoutePage({ path, query }: { path: string; query: Query }) {

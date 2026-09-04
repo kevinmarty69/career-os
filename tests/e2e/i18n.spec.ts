@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   applicationId,
+  journalRun,
   mockPersistedWorkspace,
   pendingReviewRun,
 } from './persisted-workspace';
@@ -33,7 +34,7 @@ const englishScreens = [
   ],
   ['/interviews/demo/debrief', 'Interview debrief'],
   [`/applications/${applicationId}/versions`, 'Version and decision history'],
-  ['/runs', 'Agent runs'],
+  ['/runs', 'Agent run journal'],
   ['/applications/nimbus/company', 'Company brief'],
   ['/messages', 'Messages'],
   ['/memory/skills', 'Skills'],
@@ -227,6 +228,32 @@ test('shows descriptive response trends without claiming causality', async ({
   if (process.env.CAREER_OS_INSIGHTS_SCREENSHOT)
     await page.screenshot({
       path: process.env.CAREER_OS_INSIGHTS_SCREENSHOT,
+      fullPage: true,
+    });
+});
+
+test('shows a persisted agent run as a readable journal', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page, journalRun);
+  await page.goto('/runs');
+
+  await expect(
+    page.getByRole('heading', { name: 'Agent run journal' }),
+  ).toBeVisible();
+  await expect(page.getByText('€0.18')).toBeVisible();
+  await expect(page.getByText('2,400')).toBeVisible();
+  await expect(page.getByText('source_mismatch')).toBeVisible();
+  await expect(
+    page.getByText('jobs.example.test', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('1 human decision')).toBeVisible();
+  await expect(page.getByText('Fathom')).toHaveCount(0);
+  if (process.env.CAREER_OS_RUNS_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_RUNS_SCREENSHOT,
       fullPage: true,
     });
 });

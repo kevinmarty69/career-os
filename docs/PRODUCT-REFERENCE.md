@@ -609,7 +609,7 @@ Critères d'acceptation :
 - [x] Entrées et sorties strictement validées par schéma.
 - [x] Contexte et outils minimaux par rôle.
 - [x] Exécution durable avec leases, idempotence et reprise.
-- [ ] Journal lisible des étapes, décisions, sources, coûts et erreurs.
+- [x] Journal lisible des étapes, décisions, sources, coûts et erreurs.
 - [x] Reviews recruteur, hiring manager et factuelle.
 - [x] Nombre de corrections automatiques borné.
 - [x] Relance ciblée d'une section sans régénérer toute la candidature.

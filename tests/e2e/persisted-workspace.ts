@@ -37,6 +37,46 @@ export const pendingReviewRun = {
   events: [],
 };
 
+export const journalRun = {
+  ...pendingReviewRun,
+  usedTokens: 2_400,
+  usedCostMicros: 180_000,
+  steps: [
+    {
+      stage: 'company-researcher',
+      status: 'completed',
+      attempt: 1,
+    },
+    {
+      stage: 'factuality-reviewer',
+      status: 'failed',
+      attempt: 2,
+      failureCode: 'source_mismatch',
+    },
+  ],
+  reviewDecisions: [
+    {
+      reviewId: pendingReviewRun.reviews[0]!.reviewId,
+      issueIndex: 0,
+      decision: 'keep',
+    },
+  ],
+  events: [
+    {
+      actor: 'company-researcher',
+      type: 'research.completed',
+      summary: 'Company sources were collected and bounded to this run.',
+      costMicros: 80_000,
+    },
+    {
+      actor: 'fact-checker',
+      type: 'review.failed',
+      summary: 'One claim exceeded the value found in its source.',
+      costMicros: 100_000,
+    },
+  ],
+};
+
 export async function mockPersistedWorkspace(page: Page, run?: unknown) {
   const now = '2026-09-04T12:00:00.000Z';
   const sourceId = '988c0a00-0000-4000-8000-000000000042';
@@ -60,6 +100,7 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
     company: 'Signal Forge',
     role: 'Staff Platform Engineer',
     description: 'Build a reliable platform for a small team.',
+    url: sourceUrl,
     accent: '#5847e8',
     stage: 'draft',
     revision: 1,
