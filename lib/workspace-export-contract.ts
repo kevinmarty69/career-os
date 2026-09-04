@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 3;
+export const workspaceExportVersion = 4;
 
 export const workspaceExportTables = [
   {
@@ -53,6 +53,44 @@ export const workspaceExportTables = [
       'updated_at',
       'deleted_at',
       'company_sources',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'discovered_jobs',
+    table: 'discovered_jobs',
+    columns: [
+      'id',
+      'tenant_id',
+      'company',
+      'role',
+      'description',
+      'canonical_url',
+      'revision',
+      'first_seen_at',
+      'last_seen_at',
+      'created_at',
+      'updated_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'job_source_records',
+    table: 'job_source_records',
+    columns: [
+      'id',
+      'tenant_id',
+      'discovered_job_id',
+      'requested_url',
+      'final_url',
+      'fetched_at',
+      'content_type',
+      'bytes',
+      'content_sha256',
+      'trust',
+      'extraction',
+      'created_at',
+      'updated_at',
     ],
     orderBy: ['id'],
   },

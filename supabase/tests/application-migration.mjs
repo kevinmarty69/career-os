@@ -131,24 +131,28 @@ try {
     },
   );
   assert.equal(migrated.status, 0, migrated.stderr || migrated.stdout);
-  assert.match(migrated.stdout, /Applied 8 migrations; schema at 0030\./);
+  assert.match(migrated.stdout, /Applied 9 migrations; schema at 0031\./);
   const rerun = spawnSync('pnpm', ['exec', 'tsx', 'scripts/migrate.ts'], {
     cwd: process.cwd(),
     env: { ...process.env, DATABASE_URL: testUrl.toString() },
     encoding: 'utf8',
   });
   assert.equal(rerun.status, 0, rerun.stderr || rerun.stdout);
-  assert.match(rerun.stdout, /Applied 0 migrations; schema at 0030\./);
+  assert.match(rerun.stdout, /Applied 0 migrations; schema at 0031\./);
   const migratedState = await target.query(
     `select
       (select count(*)::integer from public.career_os_schema_migrations) as migration_count,
       (select bool_and(company_sources = '[]'::jsonb) from app.applications) as applications_defaulted,
-      (select bool_and(company_sources = '[]'::jsonb) from app.opportunities) as opportunities_defaulted`,
+      (select bool_and(company_sources = '[]'::jsonb) from app.opportunities) as opportunities_defaulted,
+      (select count(*)::integer from information_schema.tables
+        where table_schema = 'app'
+          and table_name in ('discovered_jobs', 'job_source_records')) as discovery_tables`,
   );
   assert.deepEqual(migratedState.rows[0], {
-    migration_count: 30,
+    migration_count: 31,
     applications_defaulted: true,
     opportunities_defaulted: true,
+    discovery_tables: 2,
   });
 
   await target.query(

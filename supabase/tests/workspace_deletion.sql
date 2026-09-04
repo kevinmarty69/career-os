@@ -39,6 +39,26 @@ insert into app.applications (
   'Delete Co', 'Engineer', 'Delete graph', '#21504b', gen_random_uuid(),
   repeat('a', 64)
 );
+insert into app.discovered_jobs (
+  id, tenant_id, company, role, description, canonical_url,
+  first_seen_at, last_seen_at
+) values (
+  'f7050000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'Delete Jobs Co', 'Platform Engineer', 'Delete discovered job',
+  'https://jobs.example.test/platform-engineer', now(), now()
+);
+insert into app.job_source_records (
+  id, tenant_id, discovered_job_id, requested_url, final_url, fetched_at,
+  content_type, bytes, content_sha256, extraction
+) values (
+  'f7060000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'f7050000-0000-4000-8000-000000000001',
+  'https://jobs.example.test/opening',
+  'https://jobs.example.test/platform-engineer', now(), 'text/html', 128,
+  repeat('c', 64), '{"company":"Delete Jobs Co"}'::jsonb
+);
 insert into app.opportunities (
   id, tenant_id, application_id, application_revision, company, role,
   raw_text, extraction_status
@@ -133,6 +153,8 @@ reset role;
 do $$ begin
   if exists(select 1 from app.tenants where id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.sources where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.discovered_jobs where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.job_source_records where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then

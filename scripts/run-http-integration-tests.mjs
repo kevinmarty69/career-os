@@ -41,6 +41,7 @@ const environment = {
 const tests = [
   'tests/integration/auth-publication.test.ts',
   'tests/integration/applications.test.ts',
+  'tests/integration/opportunities.test.ts',
   'tests/integration/agent-runs.test.ts',
 ];
 const workerLogins = [
@@ -82,7 +83,21 @@ try {
   );
   await waitForServer();
   for (const test of tests)
-    await run('pnpm', ['exec', 'tsx', test], environment);
+    await run(
+      'pnpm',
+      ['exec', 'tsx', test],
+      test === 'tests/integration/opportunities.test.ts'
+        ? {
+            ...environment,
+            NODE_OPTIONS: [
+              environment.NODE_OPTIONS,
+              '--conditions=react-server',
+            ]
+              .filter(Boolean)
+              .join(' '),
+          }
+        : environment,
+    );
 } finally {
   await cleanup();
 }

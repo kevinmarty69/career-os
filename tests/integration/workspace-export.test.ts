@@ -68,6 +68,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const otherTenantId = randomUUID();
   const applicationId = randomUUID();
   const otherApplicationId = randomUUID();
+  const discoveredJobId = randomUUID();
+  const sourceRecordId = randomUUID();
   const opportunityId = randomUUID();
   const runId = randomUUID();
   const stepId = randomUUID();
@@ -125,6 +127,25 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         (${otherApplicationId}, ${otherTenantId}, ${secret}, 'Engineer', ${secret},
           '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
           '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
+      await transaction`insert into app.discovered_jobs (
+        id, tenant_id, company, role, description, canonical_url,
+        first_seen_at, last_seen_at
+      ) values (
+        ${discoveredJobId}, ${tenantId}, 'Visible Jobs Co', 'Platform Engineer',
+        'visible discovered job', 'https://jobs.example.test/platform-engineer',
+        '2026-01-02 03:04:05+00'::timestamptz,
+        '2026-01-02 03:04:06+00'::timestamptz
+      )`;
+      await transaction`insert into app.job_source_records (
+        id, tenant_id, discovered_job_id, requested_url, final_url, fetched_at,
+        content_type, bytes, content_sha256, extraction
+      ) values (
+        ${sourceRecordId}, ${tenantId}, ${discoveredJobId},
+        'https://jobs.example.test/opening',
+        'https://jobs.example.test/platform-engineer',
+        '2026-01-02 03:04:06+00'::timestamptz, 'text/html', 128,
+        ${'c'.repeat(64)}, '{"company":"Visible Jobs Co"}'::jsonb
+      )`;
       await transaction`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role, raw_text,
         extraction_status
@@ -236,6 +257,25 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         record.type === 'applications' && record.data.id === applicationId,
     );
     assert.match(exportedApplication.data.created_at, /\.\d{6}\+00$/);
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'discovered_jobs' &&
+          record.data.id === discoveredJobId &&
+          record.data.canonical_url ===
+            'https://jobs.example.test/platform-engineer',
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'job_source_records' &&
+          record.data.id === sourceRecordId &&
+          record.data.content_sha256 === 'c'.repeat(64),
+      ),
+      true,
+    );
     assert.equal(
       records.some(
         (record) =>
