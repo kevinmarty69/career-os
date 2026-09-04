@@ -66,6 +66,15 @@ export const dossierMessages = {
     'Approval was not saved. You can retry without creating a duplicate.',
   'La rédaction ne démarrera qu’après votre décision.':
     'Drafting will only start after your decision.',
+  'Page structurée': 'Structured page',
+  'Relisez le brouillon avant les reviews':
+    'Review the draft before the checks',
+  'Les trois reviewers vérifieront maintenant la lisibilité recruteur, la pertinence hiring manager et chaque affirmation factuelle.':
+    'Three reviewers will now check recruiter readability, hiring-manager relevance, and every factual claim.',
+  'Les reviews n’ont pas démarré. Vous pouvez réessayer sans créer de doublon.':
+    'Reviews did not start. You can retry without creating a duplicate.',
+  'La publication reste bloquée pendant les contrôles.':
+    'Publishing remains blocked during the checks.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',

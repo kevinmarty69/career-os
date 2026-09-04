@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationEvidenceCheckpoint } from '@/components/applications/application-evidence-checkpoint';
+import { ApplicationPageDraftCheckpoint } from '@/components/applications/application-page-draft-checkpoint';
 import { ApplicationResearchCheckpoint } from '@/components/applications/application-research-checkpoint';
 import { ApplicationStrategyCheckpoint } from '@/components/applications/application-strategy-checkpoint';
 import { useApplicationWorkflow } from '@/components/applications/use-application-workflow';
@@ -982,6 +983,17 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
                 profile={workflow.run.profile}
                 research={workflow.run.research}
                 strategy={workflow.run.strategy}
+              />
+            ) : null}
+            {workflow.run?.spec &&
+            workflow.run.status === 'paused' &&
+            workflow.run.stage === 'page_spec_review' ? (
+              <ApplicationPageDraftCheckpoint
+                error={workflow.decisionError}
+                onConfirm={() => void workflow.startReviews()}
+                pending={workflow.decisionPending}
+                profile={workflow.run.profile}
+                spec={workflow.run.spec}
               />
             ) : null}
             {application.url ? (

@@ -211,6 +211,45 @@ function strategyRun() {
   } as const;
 }
 
+function pageDraftRun() {
+  const paused = strategyRun();
+  const claimId = paused.strategy.lead.claimId;
+  return {
+    ...paused,
+    stage: 'page_spec_review',
+    pageSpecId: '988c0a00-0000-4000-8000-000000000017',
+    pageSpecHash: 'd'.repeat(64),
+    pageSpecArtifactId: '988c0a00-0000-4000-8000-000000000018',
+    pageSpecArtifactHash: 'e'.repeat(64),
+    spec: {
+      version: 1,
+      company: {
+        name: application.company,
+        role: application.role,
+        accent: application.accent,
+      },
+      hero: {
+        eyebrow: 'Private application',
+        title: 'Alex Morgan × Signal Forge',
+        thesis:
+          'End-to-end ownership of a reliable production platform, grounded in verified delivery evidence.',
+      },
+      blocks: [
+        {
+          type: 'fit',
+          title: 'Why this experience transfers',
+          claimIds: [claimId],
+        },
+        {
+          type: 'gap',
+          title: 'What to explore together',
+          text: 'Small-team operating practices remain an interview topic.',
+        },
+      ],
+    },
+  } as const;
+}
+
 test('renders the persisted application instead of the Nimbus fixture', async ({
   context,
   page,
@@ -465,6 +504,48 @@ test('shows the grounded strategy and requires human approval before drafting', 
     strategyArtifactId: paused.strategy.artifactId,
     strategyArtifactHash: paused.strategy.artifactHash,
   });
+  expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('shows the structured draft and starts all reviews only after confirmation', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const paused = pageDraftRun();
+  let request: { body: unknown; key?: string } | undefined;
+  await mockApplication(page, paused);
+  await page.route(`**/api/runs/${paused.runId}/reviews`, async (route) => {
+    request = {
+      body: route.request().postDataJSON(),
+      key: route.request().headers()['idempotency-key'],
+    };
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...paused,
+        status: 'running',
+        stage: 'review_recruiter',
+        steps: [
+          ...paused.steps,
+          { stage: 'recruiter-reviewer', status: 'pending', attempt: 1 },
+        ],
+      }),
+    });
+  });
+
+  await page.goto(`/applications/${applicationId}`);
+  await expect(
+    page.getByRole('heading', { name: 'Review the draft before the checks' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Alex Morgan × Signal Forge' }),
+  ).toBeVisible();
+  await expect(page.getByText('What to explore together')).toBeVisible();
+  await page.getByRole('button', { name: 'Start the three reviews' }).click();
+  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  expect(request?.body).toEqual({});
   expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
 });
 

@@ -8,6 +8,7 @@ import {
   createRun,
   readApplicationRun,
   readProfile,
+  startRunReviews,
   startRunStrategy,
 } from '@/lib/career-api';
 import { persistedRunSchema, type PersistedRun } from '@/lib/run-contract';
@@ -269,6 +270,38 @@ export function useApplicationWorkflow(applicationId: string) {
     }
   }
 
+  async function startReviews() {
+    if (!current?.run?.spec || decisionPending) return;
+    setDecisionPending(true);
+    setDecisionError(false);
+    try {
+      const input = '{}';
+      const operation = persistedRunOperation(
+        localStorage,
+        `career-os-review-start:${current.run.runId}`,
+        input,
+      );
+      const response = await startRunReviews(
+        current.run.runId,
+        input,
+        operation.key,
+      );
+      if (!response.ok) {
+        setDecisionError(true);
+        return;
+      }
+      setResult({
+        ...current,
+        run: persistedRunSchema.parse(await response.json()),
+        error: undefined,
+      });
+    } catch {
+      setDecisionError(true);
+    } finally {
+      setDecisionPending(false);
+    }
+  }
+
   return {
     ...current,
     approveStrategy,
@@ -277,6 +310,7 @@ export function useApplicationWorkflow(applicationId: string) {
     decisionPending,
     loading: !current,
     start,
+    startReviews,
     startStrategy,
     starting,
   };
