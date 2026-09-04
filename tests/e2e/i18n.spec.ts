@@ -301,7 +301,27 @@ test('shows only persisted human decisions in the review queue', async ({
   page,
 }) => {
   await context.clearCookies();
-  await mockPersistedWorkspace(page, pendingReviewRun);
+  const run = {
+    ...pendingReviewRun,
+    reviews: [
+      ...pendingReviewRun.reviews,
+      {
+        reviewId: '988c0a00-0000-4000-8000-000000000047',
+        reviewer: 'recruiter',
+        passed: false,
+        findings: ['Remove the weaker supporting claim.'],
+        issues: [
+          {
+            section: 'relevant_experience',
+            message: 'This supporting claim is not useful for the role.',
+            blocking: false,
+            claimId: '988c0a00-0000-4000-8000-000000000048',
+          },
+        ],
+      },
+    ],
+  } as const;
+  await mockPersistedWorkspace(page, run);
   await page.goto('/inbox');
 
   await expect(
@@ -317,7 +337,26 @@ test('shows only persisted human decisions in the review queue', async ({
     page.getByRole('button', { name: 'Correct section' }),
   ).toBeVisible();
   await expect(
+    page.getByRole('link', { name: 'Source in memory' }),
+  ).toHaveCount(2);
+  await expect(
+    page.getByRole('link', { name: 'Source in memory' }).nth(1),
+  ).toHaveAttribute(
+    'href',
+    '/memory#claim-988c0a00-0000-4000-8000-000000000048',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Remove claim' }),
+  ).toBeVisible();
+  await expect(
     page.getByRole('button', { name: 'Keep as written' }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('.co-inbox-list > article', {
+        hasText: 'Use the measured value from the source.',
+      })
+      .getByRole('button', { name: 'Keep as written' }),
   ).toHaveCount(0);
   await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
   if (process.env.CAREER_OS_INBOX_SCREENSHOT)

@@ -4895,6 +4895,7 @@ function InboxScreen() {
               <p>{decision.application.role}</p>
             </div>
             <ApplicationReviewIssueActions
+              issue={issue}
               issueIndex={issueIndex}
               onDecide={(reviewId, targetIssueIndex, reviewDecision) =>
                 void decide(

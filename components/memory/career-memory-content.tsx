@@ -321,6 +321,7 @@ export function CareerMemoryContent() {
                 return (
                   <article
                     className={claim.level === 'unsupported' ? 'unsourced' : ''}
+                    id={`claim-${claim.id}`}
                     key={claim.id}
                   >
                     <span

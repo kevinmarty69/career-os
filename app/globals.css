@@ -6796,7 +6796,7 @@
 
 .co-inbox-list > article {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   padding: 16px;
@@ -6844,8 +6844,14 @@
 .co-review-actions {
   display: flex;
   flex-wrap: wrap;
+  grid-column: 2;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-start;
+}
+
+.co-inbox-list > article > .co-button {
+  grid-column: 2;
+  justify-self: start;
 }
 
 .co-review-actions > button,

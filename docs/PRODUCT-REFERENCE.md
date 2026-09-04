@@ -613,7 +613,7 @@ Critères d'acceptation :
 - [x] Reviews recruteur, hiring manager et factuelle.
 - [x] Nombre de corrections automatiques borné.
 - [x] Relance ciblée d'une section sans régénérer toute la candidature.
-- [ ] File de décisions humaines avec conserver, corriger, sourcer ou supprimer.
+- [x] File de décisions humaines avec conserver, corriger, sourcer ou supprimer.
 - [x] Blocage de publication tant qu'une objection factuelle subsiste.
 
 Critères d'acceptation :

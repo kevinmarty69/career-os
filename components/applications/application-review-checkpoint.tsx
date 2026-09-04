@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
@@ -7,11 +8,13 @@ import type { PersistedRun } from '@/lib/run-contract';
 export type ReviewDecision = 'keep' | 'correct';
 
 export function ApplicationReviewIssueActions({
+  issue,
   issueIndex,
   onDecide,
   pending,
   review,
 }: {
+  issue: PersistedRun['reviews'][number]['issues'][number];
   issueIndex: number;
   onDecide: (
     reviewId: string,
@@ -23,6 +26,7 @@ export function ApplicationReviewIssueActions({
 }) {
   const { locale } = useI18n();
   const key = `${review.reviewId}:${issueIndex}`;
+  const removesClaim = issue.section === 'relevant_experience';
   return (
     <div className="co-review-actions">
       {review.reviewer !== 'factuality' ? (
@@ -34,6 +38,12 @@ export function ApplicationReviewIssueActions({
           {locale === 'en' ? 'Keep as written' : 'Garder tel quel'}
         </button>
       ) : null}
+      <Link
+        className="co-button quiet"
+        href={issue.claimId ? `/memory#claim-${issue.claimId}` : '/memory'}
+      >
+        {locale === 'en' ? 'Source in memory' : 'Sourcer dans la mémoire'}
+      </Link>
       <button
         className="co-button"
         disabled={Boolean(pending)}
@@ -44,9 +54,13 @@ export function ApplicationReviewIssueActions({
           ? locale === 'en'
             ? 'Correcting…'
             : 'Correction…'
-          : locale === 'en'
-            ? 'Correct section'
-            : 'Corriger la section'}
+          : removesClaim
+            ? locale === 'en'
+              ? 'Remove claim'
+              : 'Supprimer l’affirmation'
+            : locale === 'en'
+              ? 'Correct section'
+              : 'Corriger la section'}
       </button>
     </div>
   );
@@ -139,6 +153,7 @@ export function ApplicationReviewCheckpoint({
                       </strong>
                     ) : (
                       <ApplicationReviewIssueActions
+                        issue={issue}
                         issueIndex={index}
                         onDecide={onDecide}
                         pending={pending}
