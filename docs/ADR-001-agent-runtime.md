@@ -25,16 +25,16 @@ This is one product: self-hosters provide model keys or local endpoints; the man
 
 ## Bounded agent team
 
-| Role                 | Minimum context                        | Tools                         | Output                           | Authority                         |
-| -------------------- | -------------------------------------- | ----------------------------- | -------------------------------- | --------------------------------- |
-| Evidence Archivist   | One source plus existing IDs           | parser, private storage write | source/evidence/claim candidates | Cannot mark verified or publish   |
-| Company Researcher   | Offer and allow-listed public URLs     | SSRF-safe fetch/search        | sourced company brief            | Cannot write Career Memory claims |
-| Recruiter Strategist | Offer plus eligible claim summaries    | model only                    | strategy artifact                | Selects, never invents claims     |
-| Hiring Manager       | Strategy, PageSpec and evidence links  | read-only ledger              | structured review issues         | Can fail sections, cannot revise  |
-| Page Composer        | Strategy plus failed section issues    | model only                    | strict PageSpec JSON             | Maximum three versions            |
-| Fact Checker         | PageSpec, claims, evidence, provenance | read-only ledger              | structured factual issues        | Can block publication             |
+| Role                 | Minimum context                        | Tools                         | Output                           | Authority                                     |
+| -------------------- | -------------------------------------- | ----------------------------- | -------------------------------- | --------------------------------------------- |
+| Evidence Archivist   | One source plus existing IDs           | parser, private storage write | source/evidence/claim candidates | Cannot mark verified or publish               |
+| Company Researcher   | Offer and allow-listed public URLs     | SSRF-safe fetch/search        | sourced company brief            | Cannot write Career Memory claims             |
+| Recruiter Strategist | Offer plus eligible claim summaries    | model only                    | strategy artifact                | Selects, never invents claims                 |
+| Hiring Manager       | Strategy, PageSpec and evidence links  | read-only ledger              | structured review issues         | Can fail sections, cannot revise              |
+| Page Composer        | Strategy plus failed section issues    | model only                    | strict PageSpec JSON             | One PageSpec/run; three child corrections max |
+| Fact Checker         | PageSpec, claims, evidence, provenance | read-only ledger              | structured factual issues        | Can block publication                         |
 
-Agents never chat freely. Each run reads versioned artifacts and writes a schema-validated artifact or review issue. Only failed sections return to Page Composer, at most three versions. Afterward, the human may explicitly keep a recruiter or hiring-manager objection, or request a supported targeted correction that creates a new reviewed run. Factual objections must pass and cannot be overridden. Publication still requires explicit human approval.
+Agents never chat freely. Each run reads versioned artifacts and writes a schema-validated artifact or review issue. A run owns exactly one immutable PageSpec. A supported targeted correction creates a child run that reuses the same profile snapshot, opportunity and approved research/evidence/strategy input; only Page Composer and the three reviewers run again. `revision_count` is the child-correction depth (`0..3`), so a lineage can contain the initial PageSpec plus at most three corrected PageSpecs, never three internal versions in one run. Afterward, the human may explicitly keep a recruiter or hiring-manager objection or correct its exact failed section. Factual objections must pass and cannot be overridden. Publication still requires explicit human approval.
 
 ## Control plane / execution plane
 

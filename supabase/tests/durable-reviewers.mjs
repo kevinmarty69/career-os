@@ -308,7 +308,7 @@ try {
   const migrations = (await readdir('supabase/migrations'))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))
     .sort();
-  assert.equal(migrations.at(-1)?.slice(0, 4), '0018');
+  assert.equal(migrations.at(-1)?.slice(0, 4), '0019');
   for (const migration of migrations)
     await target.query(
       await readFile(`supabase/migrations/${migration}`, 'utf8'),

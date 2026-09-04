@@ -221,7 +221,7 @@ export async function readPersistedRun(session: RunSession, rawRunId: string) {
   try {
     return await sql.begin(async (tx) => {
       await authorize(tx, session, 'career_app');
-      return readRunProjection(tx, session.tenantId, runId);
+      return readRunProjection(tx, session.tenantId, runId, true);
     });
   } finally {
     await sql.end();
@@ -408,6 +408,28 @@ export async function decideReviewIssue(
         for update`;
       if (!run || !['blocked', 'awaiting_approval'].includes(run.status))
         throw new RunRejectedError('Run has no actionable review issue.');
+      const [existingIssue] = await tx<
+        Array<StoredReviewDecision>
+      >`select id, workflow_run_id, page_spec_id, review_id, issue_index, decision,
+          corrected_run_id, input_hash
+        from app.review_issue_decisions
+        where tenant_id = ${session.tenantId} and review_id = ${input.reviewId}
+          and issue_index = ${input.issueIndex}`;
+      if (existingIssue) {
+        if (
+          existingIssue.workflow_run_id !== runId ||
+          existingIssue.input_hash !== inputHash
+        )
+          throw new RunConflictError('Review issue already has a decision.');
+        return {
+          created: false,
+          decision: await reviewDecisionProjection(
+            tx,
+            session.tenantId,
+            existingIssue,
+          ),
+        };
+      }
       const [pageSpec] = await tx<
         Array<{ id: string; spec: unknown; spec_hash: string }>
       >`select id, spec, spec_hash from app.page_specs
@@ -434,35 +456,23 @@ export async function decideReviewIssue(
       if (input.decision === 'keep' && review.reviewer === 'factuality')
         throw new RunRejectedError('Factuality objections cannot be kept.');
 
-      const [existingIssue] = await tx<
-        Array<StoredReviewDecision>
-      >`select id, workflow_run_id, page_spec_id, review_id, issue_index, decision,
-          corrected_run_id, input_hash
-        from app.review_issue_decisions
-        where tenant_id = ${session.tenantId} and review_id = ${review.id}
-          and issue_index = ${input.issueIndex}`;
-      if (existingIssue) {
-        if (existingIssue.input_hash !== inputHash)
-          throw new RunConflictError('Review issue already has a decision.');
-        return {
-          created: false,
-          decision: await reviewDecisionProjection(
-            tx,
-            session.tenantId,
-            existingIssue,
-          ),
-        };
-      }
-
       const decisionId = randomUUID();
       let correctedRunId: string | undefined;
-      if (input.decision === 'correct')
-        throw new RunRejectedError(
-          'Durable correction workers are not enabled yet.',
-        );
+      if (input.decision === 'correct') {
+        const worker = await readWorkerServiceStatus(tx, 'page-composer');
+        if (!worker.available)
+          throw new WorkerUnavailableError('page-composer');
+        const [correction] = await tx<Array<{ run_id: string }>>`
+          select app.start_page_spec_correction(
+            ${session.tenantId}, ${runId}, ${pageSpec.id}, ${review.id},
+            ${input.issueIndex}, ${decisionId}, ${key}, ${inputHash}
+          ) as run_id`;
+        correctedRunId = correction.run_id;
+      }
 
-      await authorize(tx, session, 'career_app');
-      await tx`insert into app.review_issue_decisions (
+      if (input.decision === 'keep') {
+        await authorize(tx, session, 'career_app');
+        await tx`insert into app.review_issue_decisions (
         id, tenant_id, workflow_run_id, page_spec_id, review_id, issue_index,
         issue_text, decision, corrected_run_id, decided_by, idempotency_key,
         input_hash
@@ -470,8 +480,8 @@ export async function decideReviewIssue(
         ${decisionId}, ${session.tenantId}, ${runId}, ${pageSpec.id},
         ${review.id}, ${input.issueIndex}, ${issueText}, ${input.decision},
         ${correctedRunId ?? null}, ${session.userId}, ${key}, ${inputHash}
-      )`;
-      await tx`insert into app.workflow_events (
+        )`;
+        await tx`insert into app.workflow_events (
         tenant_id, workflow_run_id, actor, event_type, summary, payload
       ) values (
         ${session.tenantId}, ${runId}, 'human', 'review_issue_decided',
@@ -484,7 +494,8 @@ export async function decideReviewIssue(
           ...(correctedRunId ? { correctedRunId } : {}),
           costMicros: 0,
         })}
-      )`;
+        )`;
+      }
       const publicationEligible =
         input.decision === 'keep' &&
         (await pageSpecReviewGate(
@@ -512,6 +523,10 @@ export async function decideReviewIssue(
         decision: await reviewDecisionProjection(tx, session.tenantId, stored),
       };
     });
+  } catch (error) {
+    if (isDatabaseConflict(error)) throw new RunConflictError();
+    if (isDatabaseRejection(error)) throw new RunRejectedError();
+    throw error;
   } finally {
     await sql.end();
   }
@@ -747,7 +762,22 @@ async function readRunProjection(
   tx: postgres.TransactionSql,
   tenantId: string,
   runId: string,
+  resolveLeaf = false,
 ): Promise<PersistedRun | undefined> {
+  const [leaf] = resolveLeaf
+    ? await tx<Array<{ id: string }>>`with recursive descendants as (
+        select candidate.id, candidate.parent_run_id, candidate.revision_count
+        from app.workflow_runs candidate
+        where candidate.tenant_id = ${tenantId} and candidate.id = ${runId}
+        union all
+        select child.id, child.parent_run_id, child.revision_count
+        from app.workflow_runs child
+        join descendants parent on child.tenant_id = ${tenantId}
+          and child.parent_run_id = parent.id
+      )
+      select id from descendants order by revision_count desc limit 1`
+    : [{ id: runId }];
+  if (!leaf) return;
   const [run] = await tx<
     Array<{
       id: string;
@@ -759,9 +789,22 @@ async function readRunProjection(
       used_cost_micros: string;
     }>
   >`select id, profile_id, status, state, revision_count, used_tokens,
-      used_cost_micros
-    from app.workflow_runs where tenant_id = ${tenantId} and id = ${runId}`;
+      used_cost_micros from app.workflow_runs
+    where tenant_id = ${tenantId} and id = ${leaf.id}`;
   if (!run) return;
+  const ancestors = await tx<Array<{ id: string; depth: number }>>`
+    with recursive lineage as (
+      select candidate.id, candidate.parent_run_id, 0 depth
+      from app.workflow_runs candidate
+      where candidate.tenant_id = ${tenantId} and candidate.id = ${run.id}
+      union all
+      select parent.id, parent.parent_run_id, child.depth + 1
+      from app.workflow_runs parent
+      join lineage child on parent.tenant_id = ${tenantId}
+        and parent.id = child.parent_run_id
+    )
+    select id, depth from lineage order by depth`;
+  const lineageRunIds = ancestors.map(({ id }) => id);
   const [snapshot] = await tx<
     Array<{ id: string; name: string; headline: string }>
   >`select id, name, headline from app.profiles
@@ -772,25 +815,31 @@ async function readRunProjection(
     Array<{ id: string; body: unknown; artifact_hash: string }>
   >`select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
     from app.artifacts
-    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+    where tenant_id = ${tenantId}
+      and workflow_run_id = any(${tx.array(lineageRunIds)}::uuid[])
       and kind = 'research'
-    order by version desc limit 1`;
+    order by array_position(${tx.array(lineageRunIds)}::uuid[], workflow_run_id),
+      version desc limit 1`;
   const [evidenceArtifact] = await tx<
     Array<{ id: string; body: unknown; artifact_hash: string }>
   >`
     select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
     from app.artifacts
-    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+    where tenant_id = ${tenantId}
+      and workflow_run_id = any(${tx.array(lineageRunIds)}::uuid[])
       and kind = 'evidence_archive'
-    order by version desc limit 1`;
+    order by array_position(${tx.array(lineageRunIds)}::uuid[], workflow_run_id),
+      version desc limit 1`;
   const [strategyArtifact] = await tx<
     Array<{ id: string; body: unknown; artifact_hash: string }>
   >`
     select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
     from app.artifacts
-    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+    where tenant_id = ${tenantId}
+      and workflow_run_id = any(${tx.array(lineageRunIds)}::uuid[])
       and kind = 'strategy'
-    order by version desc limit 1`;
+    order by array_position(${tx.array(lineageRunIds)}::uuid[], workflow_run_id),
+      version desc limit 1`;
   const [pageSpec] = await tx<
     Array<{
       id: string;
@@ -804,7 +853,7 @@ async function readRunProjection(
     from app.page_specs page
     join app.artifacts artifact on artifact.tenant_id = page.tenant_id
       and artifact.id = page.source_artifact_id
-    where page.tenant_id = ${tenantId} and page.workflow_run_id = ${runId}
+    where page.tenant_id = ${tenantId} and page.workflow_run_id = ${run.id}
       and page.invalidated_at is null and page.source_artifact_id is not null
     order by page.version desc limit 1`;
   const reviews = pageSpec
@@ -846,8 +895,10 @@ async function readRunProjection(
       payload: { artifactId?: unknown; costMicros?: unknown };
     }>
   >`select actor, event_type, summary, payload from app.workflow_events
-    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
-    order by id`;
+    where tenant_id = ${tenantId}
+      and workflow_run_id = any(${tx.array(lineageRunIds)}::uuid[])
+    order by array_position(${tx.array(lineageRunIds)}::uuid[], workflow_run_id)
+      desc, id`;
   const steps = await tx<
     Array<{
       stage: string;
@@ -860,7 +911,7 @@ async function readRunProjection(
       greatest(0, extract(epoch from (clock_timestamp() - created_at)) * 1000)::text
         pending_for_ms
     from app.workflow_steps
-    where tenant_id = ${tenantId} and workflow_run_id = ${runId}
+    where tenant_id = ${tenantId} and workflow_run_id = ${run.id}
     order by created_at, id`;
   const workerAvailability = await projectWorkerAvailability(tx, steps);
 
@@ -1113,7 +1164,8 @@ function isDatabaseRejection(error: unknown) {
       error.message.includes('review run unavailable') ||
       error.message.includes('review PageSpec unavailable') ||
       error.message.includes('review PageSpec lineage rejected') ||
-      error.message.includes('review input unavailable'))
+      error.message.includes('review input unavailable') ||
+      error.message.includes('page correction'))
   );
 }
 

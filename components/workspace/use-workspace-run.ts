@@ -47,7 +47,6 @@ import {
   dossierStatus,
   hasCurrentRunProjection,
   opportunityReady,
-  persistedEvents,
   reviewGateReady,
   reviewProcessState,
   unresolvedReviewIssues,
@@ -141,13 +140,7 @@ export function useWorkspaceRun({
   const selectedRunHasDraft = Boolean(state.spec);
   const selectedRunDossierId = state.id;
   useEffect(() => {
-    if (
-      !workspaceReady ||
-      !activeTenantId ||
-      !selectedRunId ||
-      (selectedRunStatus && selectedRunStatus !== 'running')
-    )
-      return;
+    if (!workspaceReady || !activeTenantId || !selectedRunId) return;
 
     const controller = new AbortController();
     let timer: number | undefined;
@@ -158,7 +151,7 @@ export function useWorkspaceRun({
         const response = await readRun(selectedRunId, controller.signal);
         if (!response.ok) throw new Error('RUN_POLL_FAILED');
         const run = persistedRunSchema.parse(await response.json());
-        if (stopped || run.runId !== selectedRunId) return;
+        if (stopped) return;
         setRunPollingErrors((current) => {
           if (!current[selectedRunDossierId]) return current;
           const next = { ...current };
@@ -640,24 +633,14 @@ export function useWorkspaceRun({
       );
       pendingDecisions.current.delete(operationKey);
       if (result.correctedRun) {
-        updateApplicationDossier(dossierId, (current) => ({
-          ...current,
-          spec: result.correctedRun!.spec,
-          runId: result.correctedRun!.runId,
-          runProfile: result.correctedRun!.profile,
-          reviews: result.correctedRun!.reviews,
-          reviewDecisions: [],
-          publicationEligible: result.correctedRun!.reviews.every(
-            (item) => item.passed,
-          ),
-          approved: false,
-          capability: undefined,
-          events: persistedEvents(result.correctedRun!),
-        }));
+        const correctedRun = result.correctedRun;
+        updateApplicationDossier(dossierId, (current) =>
+          applyPersistedRun(current, correctedRun),
+        );
         setShareLink(undefined);
         setShareMessage('');
         setDecisionMessage(
-          'Une nouvelle version a été générée et validée par les trois contrôles.',
+          'Nouvelle version lancée. Les trois contrôles vont la vérifier.',
         );
       } else {
         updateApplicationDossier(dossierId, (current) => ({

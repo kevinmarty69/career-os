@@ -19,7 +19,7 @@ const approvedClaimSchema = z
     unique(context, selection.evidenceIds, ['evidenceIds']);
   });
 
-export const pageComposerInputSchema = z
+const pageComposerV1InputSchema = z
   .object({
     schemaVersion: z.literal(1),
     purpose: z.literal('application'),
@@ -44,41 +44,98 @@ export const pageComposerInputSchema = z
   })
   .strict()
   .superRefine((input, context) => {
-    const selections = [input.lead, ...input.supports];
-    unique(
-      context,
-      selections,
-      ['lead', 'supports'],
-      (selection) => selection.signalId,
-    );
-
-    const claims = new Map<string, string>();
-    const claimUse = new Map<string, number>();
-    selections.forEach((selection, index) => {
-      const canonical = JSON.stringify({
-        statement: selection.statement,
-        provenance: selection.provenance,
-        evidenceIds: selection.evidenceIds,
-      });
-      const previous = claims.get(selection.claimId);
-      if (previous !== undefined && previous !== canonical)
-        context.addIssue({
-          code: 'custom',
-          path: selectionPath(index, 'claimId'),
-          message: 'Claim IDs must have consistent canonical content.',
-        });
-      else claims.set(selection.claimId, canonical);
-
-      const uses = (claimUse.get(selection.claimId) ?? 0) + 1;
-      if (uses > 2)
-        context.addIssue({
-          code: 'custom',
-          path: selectionPath(index, 'claimId'),
-          message: 'Approved claims may be selected at most twice.',
-        });
-      claimUse.set(selection.claimId, uses);
-    });
+    validateSelections(input, context);
   });
+
+const correctionIssueSchema = z
+  .object({
+    section: z.enum(['hero', 'relevant_experience']),
+    message: z.string().min(1).max(400),
+    blocking: z.boolean(),
+    claimId: uuidSchema,
+    evidenceIds: z.array(uuidSchema).min(1).max(2),
+  })
+  .strict()
+  .superRefine((issue, context) => {
+    unique(context, issue.evidenceIds, ['evidenceIds']);
+  });
+
+const correctionSchema = z
+  .object({
+    decisionId: uuidSchema,
+    parentRunId: uuidSchema,
+    pageSpecId: uuidSchema,
+    pageSpecHash: hashSchema,
+    pageSpecArtifactId: uuidSchema,
+    pageSpecArtifactHash: hashSchema,
+    reviewId: uuidSchema,
+    issueIndex: z.number().int().min(0).max(4),
+    issue: correctionIssueSchema,
+    pageSpec: z.lazy(() => pageComposerOutputSchema),
+  })
+  .strict();
+
+const pageComposerV2InputSchema = z
+  .object({
+    ...pageComposerV1InputSchema.shape,
+    schemaVersion: z.literal(2),
+    correction: correctionSchema,
+  })
+  .strict()
+  .superRefine((input, context) => {
+    validateSelections(input, context);
+    const source = input.correction.pageSpec;
+    const expectedTitle = `${input.candidateName} × ${input.company.name}`;
+    const selected = [input.lead, ...input.supports];
+    const selectedClaimIds = new Set(selected.map((proof) => proof.claimId));
+    if (
+      JSON.stringify(source.company) !== JSON.stringify(input.company) ||
+      source.hero.title !== expectedTitle ||
+      source.blocks[0].claimIds.some(
+        (claimId) => !selectedClaimIds.has(claimId),
+      ) ||
+      !selected.some(
+        (proof) =>
+          source.blocks[0].claimIds.includes(proof.claimId) &&
+          proof.statement === source.hero.thesis,
+      )
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['correction', 'pageSpec'],
+        message:
+          'The correction source must stay within the approved composer input.',
+      });
+    if (
+      input.correction.issue.section === 'hero' &&
+      ![input.lead, ...input.supports].some(
+        (proof) =>
+          proof.claimId === input.correction.issue.claimId &&
+          proof.statement === input.correction.pageSpec.hero.thesis,
+      )
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['correction', 'issue', 'claimId'],
+        message: 'A hero correction must target the claim used by the hero.',
+      });
+    if (
+      input.correction.issue.section === 'relevant_experience' &&
+      !input.correction.pageSpec.blocks[0].claimIds.includes(
+        input.correction.issue.claimId,
+      )
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['correction', 'issue', 'claimId'],
+        message: 'The corrected claim must exist in the targeted section.',
+      });
+  });
+
+export const pageComposerInputSchema = z.discriminatedUnion('schemaVersion', [
+  pageComposerV1InputSchema,
+  pageComposerV2InputSchema,
+]);
 
 export const pageComposerOutputSchema = z
   .object({
@@ -127,6 +184,15 @@ export function composeApprovedStrategyPage(
   value: unknown,
 ): PageComposerOutput {
   const input = parsePageComposerInput(value);
+  if (input.schemaVersion === 2) return composeCorrection(input);
+  return composeInitialPage(input);
+}
+
+function composeInitialPage(
+  input: Omit<z.infer<typeof pageComposerV1InputSchema>, 'schemaVersion'> & {
+    schemaVersion: 1 | 2;
+  },
+): PageComposerOutput {
   const claimIds = Array.from(
     new Set(
       [input.lead, ...input.supports].map((selection) => selection.claimId),
@@ -148,6 +214,88 @@ export function composeApprovedStrategyPage(
         claimIds,
       },
     ],
+  });
+}
+
+function composeCorrection(
+  input: z.infer<typeof pageComposerV2InputSchema>,
+): PageComposerOutput {
+  const source = input.correction.pageSpec;
+  const target = input.correction.issue;
+  let output: PageComposerOutput;
+  if (target.section === 'hero') {
+    const replacement = input.supports.find(
+      (support) => support.claimId !== target.claimId,
+    );
+    if (!replacement)
+      throw new Error('No different approved support can replace the hero.');
+    output = pageComposerOutputSchema.parse({
+      ...source,
+      hero: { ...source.hero, thesis: replacement.statement },
+    });
+  } else {
+    const claimIds = source.blocks[0].claimIds.filter(
+      (claimId) => claimId !== target.claimId,
+    );
+    if (claimIds.length === 0)
+      throw new Error('A corrected experience section cannot be empty.');
+    const remainingProofs = [input.lead, ...input.supports].filter((proof) =>
+      claimIds.includes(proof.claimId),
+    );
+    if (
+      !remainingProofs.some((proof) => proof.statement === source.hero.thesis)
+    )
+      throw new Error('The correction would detach the hero from its proof.');
+    output = pageComposerOutputSchema.parse({
+      ...source,
+      blocks: [{ ...source.blocks[0], claimIds }],
+    });
+  }
+  if (JSON.stringify(output) === JSON.stringify(source))
+    throw new Error('The correction did not change the PageSpec.');
+  return output;
+}
+
+function validateSelections(
+  input: {
+    lead: z.infer<typeof approvedClaimSchema>;
+    supports: Array<z.infer<typeof approvedClaimSchema>>;
+  },
+  context: z.RefinementCtx,
+) {
+  const selections = [input.lead, ...input.supports];
+  unique(
+    context,
+    selections,
+    ['lead', 'supports'],
+    (selection) => selection.signalId,
+  );
+
+  const claims = new Map<string, string>();
+  const claimUse = new Map<string, number>();
+  selections.forEach((selection, index) => {
+    const canonical = JSON.stringify({
+      statement: selection.statement,
+      provenance: selection.provenance,
+      evidenceIds: selection.evidenceIds,
+    });
+    const previous = claims.get(selection.claimId);
+    if (previous !== undefined && previous !== canonical)
+      context.addIssue({
+        code: 'custom',
+        path: selectionPath(index, 'claimId'),
+        message: 'Claim IDs must have consistent canonical content.',
+      });
+    else claims.set(selection.claimId, canonical);
+
+    const uses = (claimUse.get(selection.claimId) ?? 0) + 1;
+    if (uses > 2)
+      context.addIssue({
+        code: 'custom',
+        path: selectionPath(index, 'claimId'),
+        message: 'Approved claims may be selected at most twice.',
+      });
+    claimUse.set(selection.claimId, uses);
   });
 }
 
