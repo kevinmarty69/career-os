@@ -4,12 +4,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { authClient } from '@/lib/auth-client';
+import {
+  LocaleSwitch,
+  useI18n,
+  useLocalizer,
+} from '@/components/i18n/i18n-provider';
+import { authMessages } from '@/lib/i18n/dictionaries/auth';
 
 type Mode = 'sign-in' | 'sign-up' | 'workspace';
 type OrganizationChoice = { id: string; name: string };
 
 export function AuthForm() {
   const router = useRouter();
+  const { locale } = useI18n();
+  const localize = useLocalizer([authMessages]);
   const [mode, setMode] = useState<Mode>('sign-in');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -52,8 +60,8 @@ export function AuthForm() {
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message === 'WORKSPACE_FAILED'
-          ? 'Your account is ready, but the workspace could not be loaded. Sign in to continue.'
-          : 'Authentication failed. Check your details and retry.',
+          ? 'Votre compte est prêt, mais l’espace n’a pas pu être chargé. Connectez-vous pour continuer.'
+          : 'Échec de l’authentification. Vérifiez vos informations et réessayez.',
       );
       if (cause instanceof Error && cause.message === 'WORKSPACE_FAILED') {
         setMode('sign-in');
@@ -67,7 +75,7 @@ export function AuthForm() {
     setError('');
     const result = await authClient.organization.setActive({ organizationId });
     if (result.error) {
-      setError('The workspace could not be selected. Retry.');
+      setError('L’espace n’a pas pu être sélectionné. Réessayez.');
       setPending(false);
       return;
     }
@@ -86,7 +94,7 @@ export function AuthForm() {
       slug: `personal-${crypto.randomUUID()}`,
     });
     if (result.error) {
-      setError('The workspace could not be created. Retry.');
+      setError('L’espace n’a pas pu être créé. Réessayez.');
       setPending(false);
       return;
     }
@@ -94,7 +102,7 @@ export function AuthForm() {
     router.refresh();
   }
 
-  return (
+  return localize(
     <main className="auth-shell">
       <section className="auth-card" aria-labelledby="auth-title">
         <div className="auth-brand">
@@ -102,9 +110,10 @@ export function AuthForm() {
             C
           </span>
           <strong>Career OS</strong>
+          <LocaleSwitch compact />
         </div>
         {mode !== 'workspace' ? (
-          <div className="auth-tabs" aria-label="Authentication method">
+          <div className="auth-tabs" aria-label="Mode d’authentification">
             <button
               aria-pressed={mode === 'sign-in'}
               className={mode === 'sign-in' ? 'active' : ''}
@@ -114,7 +123,7 @@ export function AuthForm() {
               }}
               type="button"
             >
-              Sign In
+              Se connecter
             </button>
             <button
               aria-pressed={mode === 'sign-up'}
@@ -125,26 +134,26 @@ export function AuthForm() {
               }}
               type="button"
             >
-              Create Account
+              Créer un compte
             </button>
           </div>
         ) : null}
         <header>
           <h1 id="auth-title">
             {mode === 'sign-in'
-              ? 'Welcome back'
+              ? 'Bon retour'
               : mode === 'sign-up'
-                ? 'Create your account'
+                ? 'Créez votre compte'
                 : organizations.length
-                  ? 'Choose a workspace'
-                  : 'Create your workspace'}
+                  ? 'Choisissez un espace'
+                  : 'Créez votre espace'}
           </h1>
           <p>
             {mode === 'sign-in'
-              ? 'Sign in to manage and revoke private application links.'
+              ? 'Connectez-vous pour gérer et révoquer vos liens de candidature privés.'
               : mode === 'sign-up'
-                ? 'Your account keeps applications isolated from every other user.'
-                : 'Private links are always created inside one active workspace.'}
+                ? 'Votre compte isole vos candidatures de celles des autres utilisateurs.'
+                : 'Les liens privés sont toujours créés dans un seul espace actif.'}
           </p>
         </header>
         {mode === 'workspace' && organizations.length ? (
@@ -156,17 +165,21 @@ export function AuthForm() {
                 onClick={() => void selectOrganization(organization.id)}
                 type="button"
               >
-                Use {organization.name}
+                {locale === 'fr' ? 'Utiliser' : 'Use'} {organization.name}
               </button>
             ))}
           </div>
         ) : mode === 'workspace' ? (
           <form onSubmit={createWorkspace}>
             <label>
-              Workspace name
+              Nom de l’espace
               <input
                 autoComplete="organization"
-                defaultValue={`${accountName}'s workspace`}
+                defaultValue={
+                  locale === 'fr'
+                    ? `Espace de ${accountName}`
+                    : `${accountName}'s workspace`
+                }
                 maxLength={80}
                 minLength={2}
                 name="workspace"
@@ -179,14 +192,14 @@ export function AuthForm() {
               </p>
             ) : null}
             <button disabled={pending} type="submit">
-              {pending ? 'Please wait…' : 'Create Workspace'}
+              {pending ? 'Veuillez patienter…' : 'Créer l’espace'}
             </button>
           </form>
         ) : (
           <form onSubmit={submit}>
             {mode === 'sign-up' ? (
               <label>
-                Name
+                Nom
                 <input
                   autoComplete="name"
                   minLength={2}
@@ -208,7 +221,7 @@ export function AuthForm() {
               />
             </label>
             <label>
-              Password
+              Mot de passe
               <input
                 autoComplete={
                   mode === 'sign-in' ? 'current-password' : 'new-password'
@@ -220,7 +233,7 @@ export function AuthForm() {
                 type="password"
               />
               {mode === 'sign-up' ? (
-                <span>Use at least 12 characters.</span>
+                <span>Utilisez au moins 12 caractères.</span>
               ) : null}
             </label>
             {error ? (
@@ -230,17 +243,17 @@ export function AuthForm() {
             ) : null}
             <button disabled={pending} type="submit">
               {pending
-                ? 'Please wait…'
+                ? 'Veuillez patienter…'
                 : mode === 'sign-in'
-                  ? 'Sign In'
-                  : 'Create Account'}
+                  ? 'Se connecter'
+                  : 'Créer un compte'}
             </button>
           </form>
         )}
         <Link className="auth-back" href="/">
-          Back to local workspace
+          Retour à l’espace local
         </Link>
       </section>
-    </main>
+    </main>,
   );
 }

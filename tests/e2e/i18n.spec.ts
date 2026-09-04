@@ -44,3 +44,32 @@ test('switches from English to French and persists after reload', async ({
     }),
   ).toBeVisible();
 });
+
+test('localizes authentication and private recipient surfaces', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+
+  await page.goto('/sign-in');
+  await expect(
+    page.getByRole('heading', { name: 'Welcome back' }),
+  ).toBeVisible();
+  await page
+    .getByRole('group', { name: 'Language' })
+    .getByRole('button', { name: 'FR' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Bon retour' })).toBeVisible();
+
+  await page.goto('/p/not-a-real-link');
+  await expect(
+    page.getByRole('heading', { name: 'Ce lien n’est plus actif.' }),
+  ).toBeVisible();
+  await page
+    .getByRole('group', { name: 'Langue' })
+    .getByRole('button', { name: 'EN' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'This link is no longer active.' }),
+  ).toBeVisible();
+});

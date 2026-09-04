@@ -3,6 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
+  LocaleSwitch,
+  useI18n,
+  useLocalizer,
+} from '@/components/i18n/i18n-provider';
+import { publicationMessages } from '@/lib/i18n/dictionaries/publication';
+import {
   pageSpecSchema,
   profileSchema,
   type PageSpec,
@@ -13,6 +19,8 @@ type Publication = { spec: PageSpec; profile: Profile };
 
 export function PrivatePublication() {
   const { capability } = useParams<{ capability: string }>();
+  const { locale } = useI18n();
+  const localize = useLocalizer([publicationMessages]);
   const [publication, setPublication] = useState<Publication | null>();
 
   useEffect(() => {
@@ -62,17 +70,23 @@ export function PrivatePublication() {
   }, [capability]);
 
   if (publication === undefined)
-    return (
+    return localize(
       <main className="co-public-state" aria-busy="true">
+        <div className="co-public-language">
+          <LocaleSwitch compact />
+        </div>
         <span className="co-public-mark" aria-hidden="true">
           <i />
         </span>
         <p role="status">Vérification du lien privé…</p>
-      </main>
+      </main>,
     );
   if (!publication?.spec)
-    return (
+    return localize(
       <main className="co-public-state">
+        <div className="co-public-language">
+          <LocaleSwitch compact />
+        </div>
         <span className="co-public-mark" aria-hidden="true">
           <i />
         </span>
@@ -89,13 +103,13 @@ export function PrivatePublication() {
           Demander un nouvel accès
         </a>
         <footer>Career OS · les pages privées ne sont jamais indexées</footer>
-      </main>
+      </main>,
     );
 
   const { spec, profile } = publication;
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
 
-  return (
+  return localize(
     <main
       className="co-public-page"
       style={{ '--company-accent': spec.company.accent } as React.CSSProperties}
@@ -105,16 +119,20 @@ export function PrivatePublication() {
           <strong>{profile.name}</strong>
           <small>→ {spec.company.name}</small>
         </span>
-        <span>
-          <span className="material-symbols-rounded" aria-hidden="true">
-            lock
+        <div className="co-public-actions">
+          <span>
+            <span className="material-symbols-rounded" aria-hidden="true">
+              lock
+            </span>
+            Lien privé · non indexable
           </span>
-          Lien privé · non indexable
-        </span>
+          <LocaleSwitch compact />
+        </div>
       </header>
       <section className="co-public-hero">
         <p>
-          Candidature · {spec.company.role} · {spec.company.name}
+          {locale === 'fr' ? 'Candidature' : 'Application'} ·{' '}
+          {spec.company.role} · {spec.company.name}
         </p>
         <h1>{spec.hero.title}</h1>
         <p>{spec.hero.thesis}</p>
@@ -151,8 +169,12 @@ export function PrivatePublication() {
                                 : 'Sans source'}
                           </span>
                           {claim.evidenceIds.length
-                            ? ` · ${claim.evidenceIds.length} preuve${claim.evidenceIds.length > 1 ? 's' : ''} rattachée${claim.evidenceIds.length > 1 ? 's' : ''}`
-                            : ' · aucune preuve indépendante rattachée'}
+                            ? locale === 'fr'
+                              ? ` · ${claim.evidenceIds.length} preuve${claim.evidenceIds.length > 1 ? 's' : ''} rattachée${claim.evidenceIds.length > 1 ? 's' : ''}`
+                              : ` · ${claim.evidenceIds.length} evidence item${claim.evidenceIds.length > 1 ? 's' : ''} attached`
+                            : locale === 'fr'
+                              ? ' · aucune preuve indépendante rattachée'
+                              : ' · no independent evidence attached'}
                         </p>
                         {evidence?.map((item) => {
                           const source = profile.sources.find(
@@ -203,6 +225,6 @@ export function PrivatePublication() {
       <footer>
         Page privée générée avec Career OS. Contenu validé par le candidat.
       </footer>
-    </main>
+    </main>,
   );
 }

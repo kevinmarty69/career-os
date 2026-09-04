@@ -7677,6 +7677,10 @@ summary {
   margin-bottom: 28px;
 }
 
+.auth-brand > .co-locale-switch {
+  margin-left: auto;
+}
+
 .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -12717,6 +12721,26 @@ body {
   font-size: 12px;
 }
 
+.co-public-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.co-public-actions > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #6e7079;
+  font-size: 12px;
+}
+
+.co-public-language {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+}
+
 .co-public-page > header strong {
   color: #15161c;
   font-size: 14px;
@@ -13041,11 +13065,11 @@ body {
     min-height: 62px;
   }
 
-  .co-public-page > header > span:last-child {
+  .co-public-actions > span {
     font-size: 0;
   }
 
-  .co-public-page > header > span:last-child .material-symbols-rounded {
+  .co-public-actions > span .material-symbols-rounded {
     font-size: 18px;
   }
 
