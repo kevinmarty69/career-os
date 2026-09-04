@@ -19,6 +19,7 @@ export const importCandidateGroupLabels = {
   project: 'Projet',
   skill: 'Compétence',
   education: 'Formation',
+  result: 'Résultat',
   other: 'Autre information',
 } as const;
 
