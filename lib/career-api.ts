@@ -1,5 +1,6 @@
 import type { ApplicationDossier } from './workspace-state';
 import { persistedPublicationOperation } from './run-operation';
+import type { SearchProfileFields } from './search-profile';
 
 export function readProfile(signal: AbortSignal) {
   return fetch('/api/profile', { cache: 'no-store', signal });
@@ -11,6 +12,41 @@ export function readProfileHistory(signal: AbortSignal) {
 
 export function readApplications(signal: AbortSignal) {
   return fetch('/api/applications', { cache: 'no-store', signal });
+}
+
+export function readSearchProfiles(signal: AbortSignal) {
+  return fetch('/api/search-profiles', { cache: 'no-store', signal });
+}
+
+export function createSearchProfile(profile: SearchProfileFields) {
+  return fetch('/api/search-profiles', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(profile),
+  });
+}
+
+export function updateSearchProfile(
+  searchProfileId: string,
+  profile: SearchProfileFields,
+  expectedRevision: number,
+) {
+  return fetch(`/api/search-profiles/${searchProfileId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...profile, expectedRevision }),
+  });
+}
+
+export function deleteSearchProfile(
+  searchProfileId: string,
+  expectedRevision: number,
+) {
+  return fetch(`/api/search-profiles/${searchProfileId}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ expectedRevision }),
+  });
 }
 
 export function readRun(runId: string, signal: AbortSignal) {

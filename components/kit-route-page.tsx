@@ -7,7 +7,7 @@ import { CareerMemoryContent } from '@/components/memory/career-memory-content';
 type Query = Record<string, string | string[] | undefined>;
 type Tone = 'ok' | 'warn' | 'crit' | 'accent' | 'muted';
 
-function Icon({ children }: { children: string }) {
+export function Icon({ children }: { children: string }) {
   return (
     <span className="material-symbols-rounded co-icon" aria-hidden="true">
       {children}
@@ -49,13 +49,14 @@ const nav = [
   ['/inbox', 'inbox', 'À trancher'],
   ['/applications', 'work_history', 'Candidatures'],
   ['/memory', 'database', 'Mémoire pro'],
+  ['/search-profiles', 'tune', 'Profils de recherche'],
   ['/interviews/demo', 'record_voice_over', 'Entretiens'],
   ['/links', 'link', 'Liens privés'],
   ['/insights', 'monitoring', 'Insights'],
   ['/settings/models', 'settings', 'Réglages'],
 ] as const;
 
-function AppShell({
+export function AppShell({
   path,
   children,
   aside,
@@ -117,7 +118,6 @@ function AppShell({
             >
               <Icon>{icon}</Icon>
               <span>{label}</span>
-              {href === '/inbox' ? <Badge tone="accent">3</Badge> : null}
             </Link>
           ))}
         </nav>
