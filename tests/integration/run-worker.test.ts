@@ -19,6 +19,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
   const tenantId = randomUUID();
   const ownerId = randomUUID();
   const runId = randomUUID();
+  const retryRunId = randomUUID();
   const opportunityId = randomUUID();
   const applicationId = randomUUID();
   const workerLogin = `career_company_researcher_${randomUUID()
@@ -30,7 +31,11 @@ test('the durable worker dispatches one local call and stores one wrapped result
   workerUrl.password = workerPassword;
   const apiKey = 'sentinel-worker-api-key';
   const sourceUrl = 'https://jobs.example.test/staff-product-engineer';
+  const companyUrl = 'http://www.example.test/about';
+  const companyText =
+    'Northstar builds resilient systems with customer teams worldwide.';
   let calls = 0;
+  const fetchedUrls: string[] = [];
   let authorization = '';
   let releaseProvider!: () => void;
   let providerStarted!: () => void;
@@ -64,8 +69,8 @@ test('the durable worker dispatches one local call and stores one wrapped result
                 signals: [
                   {
                     statement: 'Own reliable delivery end to end.',
-                    excerpt:
-                      'Own reliable delivery from discovery to production.',
+                    excerpt: companyText,
+                    sourceId: 'company-1',
                     category: 'responsibility',
                     priority: 'high',
                   },
@@ -114,23 +119,75 @@ test('the durable worker dispatches one local call and stores one wrapped result
     await target.query(
       `insert into app.applications (
          id, tenant_id, company, role, raw_text, url, accent,
-         create_idempotency_key, create_input_hash
+         company_sources, create_idempotency_key, create_input_hash
        ) values (
          $1, $2, 'Northstar Labs', 'Staff Product Engineer',
          'Own reliable delivery from discovery to production.', $3, '#5847e8',
-         $4, repeat('a', 64)
+         $4::jsonb, $5, repeat('a', 64)
        )`,
-      [applicationId, tenantId, sourceUrl, randomUUID()],
+      [
+        applicationId,
+        tenantId,
+        sourceUrl,
+        JSON.stringify([{ url: companyUrl, origin: 'job-jsonld' }]),
+        randomUUID(),
+      ],
+    );
+    await assert.rejects(
+      target.query(
+        `insert into app.applications (
+           id, tenant_id, company, role, raw_text, accent, company_sources,
+           create_idempotency_key, create_input_hash
+         ) values ($1, $2, 'Invalid', 'Engineer', 'Build.', '#5847e8',
+           $3::jsonb, $4, repeat('b', 64))`,
+        [
+          randomUUID(),
+          tenantId,
+          JSON.stringify(
+            Array.from({ length: 4 }, (_, index) => ({
+              url: `https://example.test/${index}`,
+              origin: 'api',
+            })),
+          ),
+          randomUUID(),
+        ],
+      ),
+      /application_company_sources_valid/,
+    );
+    await assert.rejects(
+      target.query(
+        `insert into app.applications (
+           id, tenant_id, company, role, raw_text, accent, company_sources,
+           create_idempotency_key, create_input_hash
+         ) values ($1, $2, 'Invalid', 'Engineer', 'Build.', '#5847e8',
+           $3::jsonb, $4, repeat('c', 64))`,
+        [
+          randomUUID(),
+          tenantId,
+          JSON.stringify([
+            { url: 'https://user@example.test/', origin: 'api' },
+          ]),
+          randomUUID(),
+        ],
+      ),
+      /application_company_sources_valid/,
     );
     await target.query(
       `insert into app.opportunities (
          id, tenant_id, application_id, application_revision, company, role,
-         raw_text, url, extraction_status
+         raw_text, url, company_sources, extraction_status
        ) values (
          $1, $2, $3, 1, 'Northstar Labs', 'Staff Product Engineer',
-         'Own reliable delivery from discovery to production.', $4, 'ready'
+         'Own reliable delivery from discovery to production.', $4, $5::jsonb,
+         'ready'
        )`,
-      [opportunityId, tenantId, applicationId, sourceUrl],
+      [
+        opportunityId,
+        tenantId,
+        applicationId,
+        sourceUrl,
+        JSON.stringify([{ url: companyUrl, origin: 'job-jsonld' }]),
+      ],
     );
     await target.query(
       `insert into app.workflow_runs (
@@ -155,7 +212,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
         tenantId,
         runId,
         JSON.stringify({
-          schemaVersion: 1,
+          schemaVersion: 2,
           company: 'Northstar Labs',
           role: 'Staff Product Engineer',
           description: 'Own reliable delivery from discovery to production.',
@@ -164,6 +221,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
             url: sourceUrl,
             trust: 'untrusted-data',
           },
+          companySources: [{ url: companyUrl, origin: 'job-jsonld' }],
         }),
       ],
     );
@@ -179,10 +237,21 @@ test('the durable worker dispatches one local call and stores one wrapped result
       apiKey,
       model: 'local-company-researcher',
     });
+    const fetchText = async (url: string) => {
+      fetchedUrls.push(url);
+      return {
+        requestedUrl: url,
+        finalUrl: url,
+        contentType: 'text/html' as const,
+        bytes: Buffer.byteLength(`<main>${companyText}</main>`),
+        text: `<main>${companyText}</main>`,
+      };
+    };
     await assert.rejects(
       processCompanyResearchStep({
         databaseUrl: testUrl.toString(),
         client,
+        fetchText,
       }),
       /restricted company researcher login/,
     );
@@ -194,6 +263,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
       processCompanyResearchStep({
         databaseUrl: workerUrl.toString(),
         client,
+        fetchText,
       }),
       /restricted company researcher login/,
     );
@@ -206,6 +276,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
       processCompanyResearchStep({
         databaseUrl: workerUrl.toString(),
         client,
+        fetchText,
       }),
       /restricted company researcher login/,
     );
@@ -233,10 +304,12 @@ test('the durable worker dispatches one local call and stores one wrapped result
       processCompanyResearchStep({
         databaseUrl: workerUrl.toString(),
         client,
+        fetchText,
       }),
       processCompanyResearchStep({
         databaseUrl: workerUrl.toString(),
         client,
+        fetchText,
       }),
     ]);
     await providerRequest;
@@ -261,6 +334,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
       'idle',
     ]);
     assert.equal(calls, 1);
+    assert.deepEqual(fetchedUrls, [companyUrl]);
     assert.equal(authorization, `Bearer ${apiKey}`);
 
     const run = await target.query(
@@ -279,26 +353,85 @@ test('the durable worker dispatches one local call and stores one wrapped result
     });
 
     const artifacts = await target.query(
-      `select body from app.artifacts where workflow_run_id = $1`,
+      `select id, kind, schema_version, body,
+        encode(digest(body::text, 'sha256'), 'hex') as artifact_hash
+       from app.artifacts where workflow_run_id = $1 order by created_at, kind`,
       [runId],
     );
-    assert.equal(artifacts.rowCount, 1);
-    assert.deepEqual(artifacts.rows[0].body, {
+    assert.equal(artifacts.rowCount, 2);
+    const sourceArtifact = artifacts.rows.find(
+      ({ kind }) => kind === 'research_sources',
+    );
+    const researchArtifact = artifacts.rows.find(
+      ({ kind }) => kind === 'research',
+    );
+    assert.ok(sourceArtifact);
+    assert.ok(researchArtifact);
+    assert.equal(sourceArtifact.schema_version, 1);
+    assert.equal(sourceArtifact.body.coverage, 'company-sourced');
+    assert.deepEqual(sourceArtifact.body.failures, []);
+    assert.deepEqual(sourceArtifact.body.documents[0], {
+      sourceId: 'job-posting',
+      kind: 'job',
+      origin: 'application-snapshot',
+      contentHash:
+        'bbc1e225a329733e7ffed8fb3400fbc7305e4c087c747ba28a49a2bde0a46365',
+      text: 'Own reliable delivery from discovery to production.',
+    });
+    assert.deepEqual(
+      {
+        ...sourceArtifact.body.documents[1],
+        fetchedAt: '<dynamic>',
+      },
+      {
+        sourceId: 'company-1',
+        kind: 'company-web',
+        origin: 'job-jsonld',
+        requestedUrl: companyUrl,
+        finalUrl: companyUrl,
+        fetchedAt: '<dynamic>',
+        contentType: 'text/html',
+        bytes: Buffer.byteLength(`<main>${companyText}</main>`),
+        contentHash:
+          '38ae34542a0948ec9c631df175e6f52c2e6ea54bf102e7cc6c0bc5420254917c',
+        text: companyText,
+      },
+    );
+    assert.equal(researchArtifact.schema_version, 2);
+    assert.deepEqual(researchArtifact.body, {
+      schemaVersion: 2,
       company: 'Northstar Labs',
       role: 'Staff Product Engineer',
+      sourceArtifactId: sourceArtifact.id,
+      sourceArtifactHash: sourceArtifact.artifact_hash,
+      coverage: 'company-sourced',
+      sources: [
+        {
+          sourceId: 'job-posting',
+          kind: 'job',
+          origin: 'application-snapshot',
+          contentHash:
+            'bbc1e225a329733e7ffed8fb3400fbc7305e4c087c747ba28a49a2bde0a46365',
+        },
+        {
+          sourceId: 'company-1',
+          kind: 'company-web',
+          origin: 'job-jsonld',
+          finalUrl: companyUrl,
+          fetchedAt: sourceArtifact.body.documents[1].fetchedAt,
+          contentHash:
+            '38ae34542a0948ec9c631df175e6f52c2e6ea54bf102e7cc6c0bc5420254917c',
+        },
+      ],
       signals: [
         {
           statement: 'Own reliable delivery end to end.',
-          excerpt: 'Own reliable delivery from discovery to production.',
+          excerpt: companyText,
+          sourceId: 'company-1',
           category: 'responsibility',
           priority: 'high',
         },
       ],
-      source: {
-        kind: 'job-posting',
-        url: sourceUrl,
-        trust: 'untrusted-data',
-      },
     });
 
     const usage = await target.query(
@@ -320,17 +453,127 @@ test('the durable worker dispatches one local call and stores one wrapped result
     });
 
     const step = await target.query(
-      `select status, provider, model, output_artifact_id is not null as has_output
+      `select id, status, provider, model, output_artifact_id is not null as has_output,
+        research_source_artifact_id
        from app.workflow_steps where workflow_run_id = $1`,
       [runId],
     );
     assert.equal(step.rowCount, 1);
     assert.deepEqual(step.rows[0], {
+      id: outcomes.find(({ status }) => status === 'completed')?.stepId,
       status: 'completed',
       provider: 'openai-compatible-local',
       model: 'local-company-researcher',
       has_output: true,
+      research_source_artifact_id: sourceArtifact.id,
     });
+
+    for (const forged of [
+      {
+        ...researchArtifact.body,
+        signals: [
+          { ...researchArtifact.body.signals[0], excerpt: 'forged excerpt' },
+        ],
+      },
+      {
+        ...researchArtifact.body,
+        signals: [
+          { ...researchArtifact.body.signals[0], sourceId: 'job-posting' },
+        ],
+      },
+    ]) {
+      const provenanceCheck: { rows: Array<{ valid: boolean }> } =
+        await target.query(
+          `select app.valid_company_researcher_completion($1, $2::jsonb) as valid`,
+          [step.rows[0].id, JSON.stringify(forged)],
+        );
+      assert.equal(provenanceCheck.rows[0].valid, false);
+    }
+
+    await target.query(
+      `insert into app.workflow_runs (
+         id, tenant_id, opportunity_id, state, status, token_budget,
+         cost_budget_micros, deadline_at
+       ) values (
+         $1, $2, $3, 'research', 'running', 30000, 0,
+         now() + interval '1 hour'
+       )`,
+      [retryRunId, tenantId, opportunityId],
+    );
+    await target.query(
+      `select set_config('request.jwt.claim.sub', $1, false),
+        set_config('request.jwt.claim.tenant_id', $2, false)`,
+      [ownerId, tenantId],
+    );
+    await target.query('set role career_app');
+    await target.query(
+      `select app.enqueue_company_researcher_step($1, $2, $3::jsonb)`,
+      [
+        tenantId,
+        retryRunId,
+        JSON.stringify({
+          schemaVersion: 2,
+          company: 'Northstar Labs',
+          role: 'Staff Product Engineer',
+          description: 'Own reliable delivery from discovery to production.',
+          source: {
+            kind: 'job-posting',
+            url: sourceUrl,
+            trust: 'untrusted-data',
+          },
+          companySources: [],
+        }),
+      ],
+    );
+    await target.query('reset role');
+    await target.query('begin');
+    await target.query('set local role career_company_researcher');
+    const retryClaim = await target.query(
+      'select * from app.claim_company_researcher_step(300)',
+    );
+    assert.equal(retryClaim.rowCount, 1);
+    const jobOnlySnapshot = {
+      schemaVersion: 1,
+      purpose: 'company-research-sources',
+      company: 'Northstar Labs',
+      role: 'Staff Product Engineer',
+      coverage: 'job-only',
+      documents: [
+        {
+          sourceId: 'job-posting',
+          kind: 'job',
+          origin: 'application-snapshot',
+          contentHash:
+            'bbc1e225a329733e7ffed8fb3400fbc7305e4c087c747ba28a49a2bde0a46365',
+          text: 'Own reliable delivery from discovery to production.',
+        },
+      ],
+      failures: [],
+    };
+    const preparedOnce = await target.query(
+      `select * from app.prepare_company_researcher_sources($1, $2, $3::jsonb)`,
+      [
+        retryClaim.rows[0].step_id,
+        retryClaim.rows[0].lease_token,
+        JSON.stringify(jobOnlySnapshot),
+      ],
+    );
+    const preparedTwice = await target.query(
+      `select * from app.prepare_company_researcher_sources($1, $2, $3::jsonb)`,
+      [
+        retryClaim.rows[0].step_id,
+        retryClaim.rows[0].lease_token,
+        JSON.stringify(jobOnlySnapshot),
+      ],
+    );
+    await target.query('commit');
+    assert.deepEqual(preparedTwice.rows[0], preparedOnce.rows[0]);
+    const durableSources = await target.query(
+      `select count(*)::integer as count from app.artifacts
+       where workflow_run_id = $1 and kind = 'research_sources'`,
+      [retryRunId],
+    );
+    assert.equal(durableSources.rows[0].count, 1);
 
     for (const table of [
       'workflow_runs',

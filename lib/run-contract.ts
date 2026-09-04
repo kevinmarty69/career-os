@@ -116,22 +116,76 @@ const researchSignalSchema = z
   })
   .strict();
 
-export const persistedResearchSchema = z
+const persistedJobSourceSchema = z
+  .object({
+    kind: z.literal('job-posting'),
+    url: httpUrlSchema.optional(),
+    trust: z.literal('untrusted-data'),
+  })
+  .strict();
+
+const persistedResearchV1Schema = z
   .object({
     artifactId: z.string().uuid(),
     artifactHash: z.string().regex(/^[0-9a-f]{64}$/),
     company: z.string().min(1).max(200),
     role: z.string().min(1).max(200),
-    source: z
-      .object({
-        kind: z.literal('job-posting'),
-        url: httpUrlSchema.optional(),
-        trust: z.literal('untrusted-data'),
-      })
-      .strict(),
+    source: persistedJobSourceSchema,
     signals: z.array(researchSignalSchema).min(1).max(20),
   })
   .strict();
+
+const persistedResearchSourceSchema = z.union([
+  z
+    .object({
+      sourceId: z.literal('job-posting'),
+      kind: z.literal('job'),
+      origin: z.literal('application-snapshot'),
+      contentHash: z.string().regex(/^[0-9a-f]{64}$/),
+    })
+    .strict(),
+  z
+    .object({
+      sourceId: z.string().regex(/^company-[1-3]$/),
+      kind: z.literal('company-web'),
+      origin: z.enum(['job-jsonld', 'api']),
+      finalUrl: httpUrlSchema,
+      fetchedAt: z.string().datetime(),
+      contentHash: z.string().regex(/^[0-9a-f]{64}$/),
+    })
+    .strict(),
+]);
+
+const persistedResearchV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    artifactId: z.string().uuid(),
+    artifactHash: z.string().regex(/^[0-9a-f]{64}$/),
+    company: z.string().min(1).max(200),
+    role: z.string().min(1).max(200),
+    source: persistedJobSourceSchema.default({
+      kind: 'job-posting',
+      trust: 'untrusted-data',
+    }),
+    sourceArtifactId: z.string().uuid(),
+    sourceArtifactHash: z.string().regex(/^[0-9a-f]{64}$/),
+    coverage: z.enum(['job-only', 'company-sourced']),
+    sources: z.array(persistedResearchSourceSchema).min(1).max(4),
+    signals: z
+      .array(
+        researchSignalSchema.extend({
+          sourceId: z.string().min(1).max(200),
+        }),
+      )
+      .min(1)
+      .max(20),
+  })
+  .strict();
+
+export const persistedResearchSchema = z.union([
+  persistedResearchV2Schema,
+  persistedResearchV1Schema,
+]);
 
 export const researchSelectionInputSchema = z
   .object({

@@ -1,26 +1,122 @@
+import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
+import { extractReadablePageText } from '../job-posting-extractor';
 import {
   COMPANY_RESEARCH_MAX_OUTPUT_TOKENS,
   LocalOpenAICompanyResearchClient,
 } from './local-openai-client';
+import { SafeHttpError, safeFetchText, type SafeHttpResult } from './safe-http';
 import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
 
 const STEP_LEASE_SECONDS = 300;
 
-const stepInputSchema = z
+const sourceSchema = z
+  .object({
+    kind: z.literal('job-posting'),
+    url: z.string().url().max(2_048).optional(),
+    trust: z.literal('untrusted-data'),
+  })
+  .strict();
+
+const companySourceSchema = z
+  .object({
+    url: z
+      .string()
+      .url()
+      .max(2_048)
+      .refine((value) => {
+        const url = new URL(value);
+        return (
+          ['http:', 'https:'].includes(url.protocol) &&
+          !url.username &&
+          !url.password
+        );
+      }),
+    origin: z.enum(['job-jsonld', 'api']),
+  })
+  .strict();
+
+const stepInputV1Schema = z
   .object({
     schemaVersion: z.literal(1),
     company: z.string().min(1).max(200),
     role: z.string().min(1).max(200),
     description: z.string().min(1).max(20_000),
-    source: z
-      .object({
-        kind: z.literal('job-posting'),
-        url: z.string().url().max(2_048).optional(),
-        trust: z.literal('untrusted-data'),
-      })
-      .strict(),
+    source: sourceSchema,
+  })
+  .strict();
+
+const stepInputV2Schema = stepInputV1Schema
+  .omit({ schemaVersion: true })
+  .extend({
+    schemaVersion: z.literal(2),
+    companySources: z.array(companySourceSchema).max(3),
+  })
+  .strict()
+  .refine(
+    ({ companySources }) =>
+      new Set(companySources.map(({ url }) => url)).size ===
+      companySources.length,
+    {
+      path: ['companySources'],
+      message: 'Company source URLs must be unique.',
+    },
+  );
+
+const stepInputSchema = z.union([stepInputV2Schema, stepInputV1Schema]);
+
+const hashSchema = z.string().regex(/^[0-9a-f]{64}$/);
+const jobDocumentSchema = z
+  .object({
+    sourceId: z.literal('job-posting'),
+    kind: z.literal('job'),
+    origin: z.literal('application-snapshot'),
+    contentHash: hashSchema,
+    text: z.string().min(1).max(20_000),
+  })
+  .strict();
+const companyDocumentSchema = z
+  .object({
+    sourceId: z.string().regex(/^company-[1-3]$/),
+    kind: z.literal('company-web'),
+    origin: z.enum(['job-jsonld', 'api']),
+    requestedUrl: z.string().url().max(2_048),
+    finalUrl: z.string().url().max(2_048),
+    fetchedAt: z.string().datetime(),
+    contentType: z.enum(['text/html', 'text/plain']),
+    bytes: z.number().int().min(1).max(1_048_576),
+    contentHash: hashSchema,
+    text: z.string().min(1).max(20_000),
+  })
+  .strict();
+const sourceFailureSchema = z
+  .object({
+    sourceId: z.string().regex(/^company-[1-3]$/),
+    origin: z.enum(['job-jsonld', 'api']),
+    requestedUrl: z.string().url().max(2_048),
+    code: z.enum([
+      'blocked',
+      'timeout',
+      'too-large',
+      'unsupported',
+      'unavailable',
+      'unusable-content',
+    ]),
+  })
+  .strict();
+const researchSourcesSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    purpose: z.literal('company-research-sources'),
+    company: z.string().min(1).max(200),
+    role: z.string().min(1).max(200),
+    coverage: z.enum(['job-only', 'company-sourced']),
+    documents: z
+      .array(z.union([jobDocumentSchema, companyDocumentSchema]))
+      .min(1)
+      .max(4),
+    failures: z.array(sourceFailureSchema).max(3),
   })
   .strict();
 
@@ -31,11 +127,15 @@ type ClaimedStep = {
   lease_token: string;
   input: unknown;
   input_hash: string;
+  source_artifact_id: string | null;
+  source_artifact_hash: string | null;
+  source_artifact: unknown | null;
 };
 
 export async function processCompanyResearchStep(input: {
   databaseUrl: string;
   client: LocalOpenAICompanyResearchClient;
+  fetchText?: (url: string) => Promise<SafeHttpResult>;
 }) {
   const sql = postgres(input.databaseUrl, { max: 1, idle_timeout: 5 });
   let claimed: ClaimedStep | undefined;
@@ -70,11 +170,33 @@ export async function processCompanyResearchStep(input: {
     if (!claimed) return { status: 'idle' as const };
 
     const stepInput = stepInputSchema.parse(claimed.input);
+    const preparedSources = claimed.source_artifact
+      ? researchSourcesSchema.parse(claimed.source_artifact)
+      : await buildResearchSources(stepInput, input.fetchText ?? safeFetchText);
+    const sourceArtifact = claimed.source_artifact_id
+      ? {
+          id: claimed.source_artifact_id,
+          hash: hashSchema.parse(claimed.source_artifact_hash),
+        }
+      : await sql.begin(async (tx) => {
+          await authorizeWorker(tx);
+          const [stored] = await tx<
+            Array<{ artifact_id: string; artifact_hash: string }>
+          >`select * from app.prepare_company_researcher_sources(
+            ${claimed!.step_id}, ${claimed!.lease_token},
+            ${tx.json(preparedSources)}
+          )`;
+          return { id: stored.artifact_id, hash: stored.artifact_hash };
+        });
     const offer = {
+      schemaVersion: 2 as const,
       company: stepInput.company,
       role: stepInput.role,
-      description: stepInput.description,
-      ...(stepInput.source.url ? { sourceUrl: stepInput.source.url } : {}),
+      documents: preparedSources.documents.map(({ sourceId, kind, text }) => ({
+        sourceId,
+        kind,
+        text,
+      })),
     };
     const reservation = input.client.reserve(
       offer,
@@ -94,10 +216,24 @@ export async function processCompanyResearchStep(input: {
       maxOutputTokens: COMPANY_RESEARCH_MAX_OUTPUT_TOKENS,
     });
     const artifact = {
+      schemaVersion: 2,
       company: stepInput.company,
       role: stepInput.role,
-      signals: result.output.signals,
-      source: stepInput.source,
+      sourceArtifactId: sourceArtifact.id,
+      sourceArtifactHash: sourceArtifact.hash,
+      coverage: preparedSources.coverage,
+      sources: preparedSources.documents.map((document) => ({
+        sourceId: document.sourceId,
+        kind: document.kind,
+        origin: document.origin,
+        ...('finalUrl' in document ? { finalUrl: document.finalUrl } : {}),
+        ...('fetchedAt' in document ? { fetchedAt: document.fetchedAt } : {}),
+        contentHash: document.contentHash,
+      })),
+      signals: result.output.signals.map((signal) => ({
+        ...signal,
+        sourceId: z.string().min(1).max(200).parse(signal.sourceId),
+      })),
     };
     const artifactId = await sql.begin(async (tx) => {
       await authorizeWorker(tx);
@@ -134,6 +270,96 @@ export async function processCompanyResearchStep(input: {
     await stopHeartbeat();
     await sql.end();
   }
+}
+
+async function buildResearchSources(
+  stepInput: z.infer<typeof stepInputSchema>,
+  fetchText: (url: string) => Promise<SafeHttpResult>,
+) {
+  const documents: Array<
+    z.infer<typeof jobDocumentSchema> | z.infer<typeof companyDocumentSchema>
+  > = [
+    {
+      sourceId: 'job-posting',
+      kind: 'job',
+      origin: 'application-snapshot',
+      contentHash: sha256(stepInput.description),
+      text: stepInput.description,
+    },
+  ];
+  const failures: Array<z.infer<typeof sourceFailureSchema>> = [];
+  const companySources =
+    stepInput.schemaVersion === 2 ? stepInput.companySources : [];
+
+  for (const [index, source] of companySources.entries()) {
+    const sourceId = `company-${index + 1}`;
+    try {
+      const fetched = await fetchText(source.url);
+      const text = extractReadablePageText(fetched.text, fetched.contentType);
+      if (!text) {
+        failures.push({
+          sourceId,
+          origin: source.origin,
+          requestedUrl: source.url,
+          code: 'unusable-content',
+        });
+        continue;
+      }
+      documents.push({
+        sourceId,
+        kind: 'company-web',
+        origin: source.origin,
+        requestedUrl: source.url,
+        finalUrl: fetched.finalUrl,
+        fetchedAt: new Date().toISOString(),
+        contentType: fetched.contentType,
+        bytes: fetched.bytes,
+        contentHash: sha256(text),
+        text,
+      });
+    } catch (error) {
+      failures.push({
+        sourceId,
+        origin: source.origin,
+        requestedUrl: source.url,
+        code: sourceFailureCode(error),
+      });
+    }
+  }
+
+  return researchSourcesSchema.parse({
+    schemaVersion: 1,
+    purpose: 'company-research-sources',
+    company: stepInput.company,
+    role: stepInput.role,
+    coverage: documents.length > 1 ? 'company-sourced' : 'job-only',
+    documents,
+    failures,
+  });
+}
+
+function sourceFailureCode(
+  error: unknown,
+): z.infer<typeof sourceFailureSchema>['code'] {
+  if (!(error instanceof SafeHttpError)) return 'unavailable';
+  switch (error.code) {
+    case 'INVALID_URL':
+    case 'BLOCKED_DESTINATION':
+    case 'REDIRECT_REJECTED':
+      return 'blocked';
+    case 'TIMEOUT':
+      return 'timeout';
+    case 'RESPONSE_TOO_LARGE':
+      return 'too-large';
+    case 'UNSUPPORTED_CONTENT':
+      return 'unsupported';
+    case 'FETCH_FAILED':
+      return 'unavailable';
+  }
+}
+
+function sha256(value: string) {
+  return createHash('sha256').update(value).digest('hex');
 }
 
 async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
@@ -266,6 +492,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
           namespace.nspname = 'app'
           and (procedure.proname, pg_get_function_identity_arguments(procedure.oid)) in (
             ('claim_company_researcher_step', 'lease_seconds integer'),
+            ('prepare_company_researcher_sources', 'target_step uuid, target_lease_token uuid, source_snapshot jsonb'),
             ('mark_company_researcher_in_flight', 'target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint'),
             ('complete_company_researcher_step', 'target_step uuid, target_lease_token uuid, step_output jsonb, actual_input_tokens integer, actual_output_tokens integer, actual_cost bigint, actual_latency integer, was_cache_hit boolean, request_id text'),
             ('fail_company_researcher_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
@@ -274,13 +501,14 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
           )
         )
     ) as target_unexpected_function,
-    (select count(*) <> 6 from pg_proc procedure
+    (select count(*) <> 7 from pg_proc procedure
       join pg_namespace namespace on namespace.oid = procedure.pronamespace
       where namespace.nspname = 'app'
         and has_function_privilege(target.rolname, procedure.oid, 'execute')
         and (procedure.proname, pg_get_function_identity_arguments(procedure.oid))
           in (
             ('claim_company_researcher_step', 'lease_seconds integer'),
+            ('prepare_company_researcher_sources', 'target_step uuid, target_lease_token uuid, source_snapshot jsonb'),
             ('mark_company_researcher_in_flight', 'target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint'),
             ('complete_company_researcher_step', 'target_step uuid, target_lease_token uuid, step_output jsonb, actual_input_tokens integer, actual_output_tokens integer, actual_cost bigint, actual_latency integer, was_cache_hit boolean, request_id text'),
             ('fail_company_researcher_step', 'target_step uuid, target_lease_token uuid, target_failure_code text'),
