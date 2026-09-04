@@ -4,11 +4,33 @@ import { httpUrlSchema } from './http-url';
 export const MAX_JOB_HTML_CHARS = 1_000_000;
 export const MAX_JOB_DESCRIPTION_CHARS = 20_000;
 
+const companySourceSchema = z
+  .object({
+    url: httpUrlSchema.refine((value) => {
+      const url = new URL(value);
+      return !url.username && !url.password;
+    }),
+    origin: z.literal('job-jsonld'),
+  })
+  .strict();
+
+const companySourcesSchema = z
+  .array(companySourceSchema)
+  .min(1)
+  .max(3)
+  .refine(
+    (sources) =>
+      new Set(sources.map(({ url }) => new URL(url).href)).size ===
+      sources.length,
+    'Company source URLs must be unique.',
+  );
+
 export const jobPostingExtractionSchema = z
   .object({
     company: z.string().min(1).max(200).optional(),
     role: z.string().min(1).max(200).optional(),
     description: z.string().min(1).max(MAX_JOB_DESCRIPTION_CHARS).optional(),
+    companySources: companySourcesSchema.optional(),
     sourceUrl: httpUrlSchema,
   })
   .refine(
@@ -24,6 +46,7 @@ export const jobPostingImportResponseSchema = z
     company: z.string().min(1).max(200).optional(),
     role: z.string().min(1).max(200).optional(),
     description: z.string().min(1).max(MAX_JOB_DESCRIPTION_CHARS).optional(),
+    companySources: companySourcesSchema.optional(),
     sourceUrl: httpUrlSchema,
     provenance: z
       .object({
@@ -68,6 +91,7 @@ type JobPostingCandidate = {
   company?: string;
   role?: string;
   description?: string;
+  companySources?: Array<z.infer<typeof companySourceSchema>>;
 };
 
 /**
@@ -85,15 +109,32 @@ export function extractJobPostingFromHtml(
   const company = jsonLd?.company ?? fallback.company;
   const role = jsonLd?.role ?? fallback.role;
   const description = jsonLd?.description ?? fallback.description;
+  const companySources = jsonLd?.companySources;
   const candidate = {
     ...(company ? { company } : {}),
     ...(role ? { role } : {}),
     ...(description ? { description } : {}),
+    ...(companySources ? { companySources } : {}),
     sourceUrl: input.data.sourceUrl,
   };
   const result = jobPostingExtractionSchema.safeParse(candidate);
   if (!result.success) throw new JobPostingExtractionError('NOT_FOUND');
   return result.data;
+}
+
+export function extractReadablePageText(
+  content: string,
+  contentType: 'text/html' | 'text/plain',
+): string | undefined {
+  if (
+    !content ||
+    content.length > MAX_JOB_HTML_CHARS ||
+    !['text/html', 'text/plain'].includes(contentType)
+  )
+    throw new JobPostingExtractionError('INVALID_INPUT');
+  return contentType === 'text/html'
+    ? readablePageText(content)
+    : boundedText(content, MAX_JOB_DESCRIPTION_CHARS);
 }
 
 function extractJsonLdJobPosting(
@@ -124,12 +165,37 @@ function extractJsonLdJobPosting(
         item.description,
         MAX_JOB_DESCRIPTION_CHARS,
       );
-      const candidate = { company, role, description };
+      const companySources = isRecord(organization)
+        ? extractCompanySources(organization)
+        : undefined;
+      const candidate = { company, role, description, companySources };
       if (company && role && description) return candidate;
       if (candidateScore(candidate) > candidateScore(best)) best = candidate;
     }
   }
   return best;
+}
+
+function extractCompanySources(organization: Record<string, unknown>) {
+  const candidates = [
+    organization.url,
+    ...(Array.isArray(organization.sameAs)
+      ? organization.sameAs
+      : [organization.sameAs]),
+  ];
+  const sources: Array<z.infer<typeof companySourceSchema>> = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const parsed = companySourceSchema.shape.url.safeParse(candidate);
+    if (!parsed.success) continue;
+    const url = new URL(parsed.data).href;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    sources.push({ url, origin: 'job-jsonld' });
+    if (sources.length === 3) break;
+  }
+  return sources.length ? sources : undefined;
 }
 
 function candidateScore(candidate: JobPostingCandidate | undefined): number {
@@ -183,7 +249,7 @@ function extractFallback(html: string): JobPostingCandidate {
       split?.company,
     200,
   );
-  const readable = readablePageText(html);
+  const readable = extractReadablePageText(html, 'text/html');
   const metaDescription =
     metadata.get('description') ??
     metadata.get('og:description') ??

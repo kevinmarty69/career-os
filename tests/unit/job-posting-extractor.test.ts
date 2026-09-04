@@ -2,10 +2,42 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   extractJobPostingFromHtml,
+  extractReadablePageText,
   JobPostingExtractionError,
+  jobPostingImportResponseSchema,
   MAX_JOB_DESCRIPTION_CHARS,
   MAX_JOB_HTML_CHARS,
 } from '../../lib/job-posting-extractor';
+
+test('extracts bounded readable text from HTML and plain pages', () => {
+  assert.equal(
+    extractReadablePageText(
+      '<nav>Skip</nav><main><h1>Role</h1><p>Build products.</p></main>',
+      'text/html',
+    ),
+    'Role\n\nBuild products.',
+  );
+  const plainText = extractReadablePageText(
+    ' word '.repeat(10_000),
+    'text/plain',
+  );
+  assert.ok(plainText!.length <= MAX_JOB_DESCRIPTION_CHARS);
+  assert.ok(plainText!.length > 19_000);
+  assert.throws(
+    () =>
+      extractReadablePageText('x'.repeat(MAX_JOB_HTML_CHARS + 1), 'text/html'),
+    (error: unknown) =>
+      error instanceof JobPostingExtractionError &&
+      error.code === 'INVALID_INPUT',
+  );
+  assert.throws(
+    () =>
+      extractReadablePageText('content', 'application/json' as 'text/plain'),
+    (error: unknown) =>
+      error instanceof JobPostingExtractionError &&
+      error.code === 'INVALID_INPUT',
+  );
+});
 
 test('prefers a bounded JSON-LD JobPosting over conflicting page content', () => {
   const html = `
@@ -34,6 +66,89 @@ test('prefers a bounded JSON-LD JobPosting over conflicting page content', () =>
       sourceUrl:
         'https://work.folk.app/join-our-team/principal-software-engineer',
     },
+  );
+});
+
+test('extracts at most three safe deduplicated company sources from JSON-LD', () => {
+  const html = `<script type="application/ld+json">${JSON.stringify({
+    '@type': 'JobPosting',
+    title: 'Engineer',
+    hiringOrganization: {
+      name: 'Folk',
+      url: 'https://folk.app',
+      sameAs: [
+        'https://folk.app/',
+        'https://www.linkedin.com/company/folk/',
+        'ftp://files.example.com/folk',
+        'https://user:secret@example.com/private',
+        'https://github.com/folk',
+        'https://example.com/ignored-fourth-source',
+      ],
+    },
+    description: 'Build dependable product workflows.',
+  })}</script>`;
+
+  assert.deepEqual(
+    extractJobPostingFromHtml(html, 'https://jobs.example.com/engineer')
+      .companySources,
+    [
+      { url: 'https://folk.app/', origin: 'job-jsonld' },
+      {
+        url: 'https://www.linkedin.com/company/folk/',
+        origin: 'job-jsonld',
+      },
+      { url: 'https://github.com/folk', origin: 'job-jsonld' },
+    ],
+  );
+});
+
+test('strictly validates imported company sources', () => {
+  const base = {
+    role: 'Engineer',
+    sourceUrl: 'https://jobs.example.com/engineer',
+  };
+  const extraction = extractJobPostingFromHtml(
+    '<h1>Engineer</h1>',
+    base.sourceUrl,
+  );
+  assert.equal(extraction.companySources, undefined);
+
+  const provenance = {
+    requestedUrl: base.sourceUrl,
+    finalUrl: base.sourceUrl,
+    fetchedAt: new Date(0).toISOString(),
+    contentType: 'text/html',
+    bytes: 1,
+    trust: 'untrusted-data',
+  };
+  assert.equal(
+    jobPostingImportResponseSchema.safeParse({
+      ...base,
+      companySources: [
+        { url: 'https://user:secret@example.com', origin: 'job-jsonld' },
+      ],
+      provenance,
+    }).success,
+    false,
+  );
+  assert.equal(
+    jobPostingImportResponseSchema.safeParse({
+      ...base,
+      companySources: [{ url: 'javascript:alert(1)', origin: 'job-jsonld' }],
+      provenance,
+    }).success,
+    false,
+  );
+  assert.equal(
+    jobPostingImportResponseSchema.safeParse({
+      ...base,
+      companySources: [
+        { url: 'https://example.com', origin: 'job-jsonld' },
+        { url: 'https://example.com/', origin: 'job-jsonld' },
+      ],
+      provenance,
+    }).success,
+    false,
   );
 });
 
