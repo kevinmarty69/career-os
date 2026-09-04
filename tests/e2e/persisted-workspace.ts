@@ -1,8 +1,42 @@
 import type { Page } from '@playwright/test';
 
 export const applicationId = '988c0a00-0000-4000-8000-000000000041';
+export const pendingReviewRun = {
+  runId: '988c0a00-0000-4000-8000-000000000045',
+  status: 'awaiting_approval',
+  stage: 'review_decision',
+  revision: 1,
+  usedTokens: 1_200,
+  usedCostMicros: 0,
+  profile: {
+    name: 'Alex Morgan',
+    headline: 'Staff Platform Engineer',
+    sources: [],
+    evidence: [],
+    claims: [],
+  },
+  steps: [],
+  reviews: [
+    {
+      reviewId: '988c0a00-0000-4000-8000-000000000046',
+      reviewer: 'factuality',
+      passed: false,
+      findings: ['A metric exceeds its source.'],
+      issues: [
+        {
+          section: 'Opening',
+          message: 'Use the measured value from the source.',
+          blocking: true,
+        },
+      ],
+    },
+  ],
+  reviewDecisions: [],
+  publicationEligible: false,
+  events: [],
+};
 
-export async function mockPersistedWorkspace(page: Page) {
+export async function mockPersistedWorkspace(page: Page, run?: unknown) {
   const now = '2026-09-04T12:00:00.000Z';
   const sourceId = '988c0a00-0000-4000-8000-000000000042';
   const sourceUrl = 'https://jobs.example.test/platform-engineer';
@@ -20,7 +54,12 @@ export async function mockPersistedWorkspace(page: Page) {
     lifecycleSignal: 'open',
   };
   await page.route(`**/api/applications/${applicationId}/run`, (route) =>
-    route.fulfill({ status: 204 }),
+    run
+      ? route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify(run),
+        })
+      : route.fulfill({ status: 204 }),
   );
   await page.route('**/api/applications', (route) =>
     route.fulfill({

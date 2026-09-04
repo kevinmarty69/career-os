@@ -443,61 +443,7 @@ function ClaimRow({
   );
 }
 
-function HomeAside({
-  loading,
-  publications,
-}: {
-  loading: boolean;
-  publications: PublicationSummary[];
-}) {
-  const { locale } = useI18n();
-  const localize = useLocalizer([homeMessages]);
-  const active = publications.filter((item) => item.status === 'active');
-  return localize(
-    <div className="co-home-aside">
-      <section className="co-home-links">
-        <header>
-          <h2>Liens privés actifs</h2>
-          <Link href="/links">Tout voir</Link>
-        </header>
-        {active.slice(0, 3).map((publication) => (
-          <Link
-            href={`/applications/${publication.applicationId}`}
-            key={publication.publicationId}
-          >
-            <Icon>{publication.opens ? 'visibility' : 'visibility_off'}</Icon>
-            <span>
-              <strong>{publication.company}</strong>
-              <small>
-                {publication.opens
-                  ? locale === 'fr'
-                    ? `${publication.opens} ouverture${publication.opens > 1 ? 's' : ''}`
-                    : `${publication.opens} opening${publication.opens > 1 ? 's' : ''}`
-                  : locale === 'fr'
-                    ? 'Jamais ouvert'
-                    : 'Never opened'}
-              </small>
-            </span>
-            <Icon>arrow_forward</Icon>
-          </Link>
-        ))}
-        {loading ? <p>Chargement…</p> : null}
-        {!loading && !active.length ? <p>Aucun lien actif.</p> : null}
-      </section>
-      <section className="co-home-aside-note">
-        <Icon>rule</Icon>
-        <h2>Priorités explicables</h2>
-        <p>
-          La prochaine action vient uniquement de l’état enregistré de vos
-          candidatures et de vos décisions humaines.
-        </p>
-      </section>
-    </div>,
-  );
-}
-
-function HomeScreen() {
-  const { locale } = useI18n();
+function useWorkflowDashboard() {
   const [dashboard, setDashboard] = useState<{
     applications: Application[];
     items: DashboardItem[];
@@ -555,13 +501,73 @@ function HomeScreen() {
     return () => controller.abort();
   }, []);
 
-  const actions = dashboardActions(dashboard?.items ?? []);
-  const dashboardError =
+  const unavailable =
     error ??
     (dashboard?.items.length &&
     dashboard.items.every((item) => item.unavailable)
       ? 'unavailable'
       : undefined);
+  return { dashboard, error: unavailable };
+}
+
+function HomeAside({
+  loading,
+  publications,
+}: {
+  loading: boolean;
+  publications: PublicationSummary[];
+}) {
+  const { locale } = useI18n();
+  const localize = useLocalizer([homeMessages]);
+  const active = publications.filter((item) => item.status === 'active');
+  return localize(
+    <div className="co-home-aside">
+      <section className="co-home-links">
+        <header>
+          <h2>Liens privés actifs</h2>
+          <Link href="/links">Tout voir</Link>
+        </header>
+        {active.slice(0, 3).map((publication) => (
+          <Link
+            href={`/applications/${publication.applicationId}`}
+            key={publication.publicationId}
+          >
+            <Icon>{publication.opens ? 'visibility' : 'visibility_off'}</Icon>
+            <span>
+              <strong>{publication.company}</strong>
+              <small>
+                {publication.opens
+                  ? locale === 'fr'
+                    ? `${publication.opens} ouverture${publication.opens > 1 ? 's' : ''}`
+                    : `${publication.opens} opening${publication.opens > 1 ? 's' : ''}`
+                  : locale === 'fr'
+                    ? 'Jamais ouvert'
+                    : 'Never opened'}
+              </small>
+            </span>
+            <Icon>arrow_forward</Icon>
+          </Link>
+        ))}
+        {loading ? <p>Chargement…</p> : null}
+        {!loading && !active.length ? <p>Aucun lien actif.</p> : null}
+      </section>
+      <section className="co-home-aside-note">
+        <Icon>rule</Icon>
+        <h2>Priorités explicables</h2>
+        <p>
+          La prochaine action vient uniquement de l’état enregistré de vos
+          candidatures et de vos décisions humaines.
+        </p>
+      </section>
+    </div>,
+  );
+}
+
+function HomeScreen() {
+  const { locale } = useI18n();
+  const { dashboard, error: dashboardError } = useWorkflowDashboard();
+
+  const actions = dashboardActions(dashboard?.items ?? []);
   const priority = actions[0];
   const activeLinks =
     dashboard?.publications.filter((item) => item.status === 'active').length ??
@@ -3764,108 +3770,100 @@ function HostingScreen() {
 }
 
 function InboxScreen() {
+  const { locale } = useI18n();
+  const { dashboard, error } = useWorkflowDashboard();
+  const decisions = dashboardActions(dashboard?.items ?? []).filter(
+    ({ kind }) => kind === 'review' || kind === 'decision',
+  );
+  const copy =
+    locale === 'fr'
+      ? decisions.length
+        ? `${decisions.length} arbitrage${decisions.length > 1 ? 's' : ''} humain${decisions.length > 1 ? 's' : ''} bloque${decisions.length > 1 ? 'nt' : ''} une candidature.`
+        : 'Aucun arbitrage humain ne bloque vos candidatures.'
+      : decisions.length
+        ? `${decisions.length} human decision${decisions.length > 1 ? 's are' : ' is'} blocking an application.`
+        : 'No human decision is blocking your applications.';
   return (
     <AppShell
       path="/inbox"
       aside={
         <section className="co-stack">
-          <h2>Règles de notification</h2>
-          {[
-            'Un run demande un arbitrage',
-            'Une page privée est ouverte',
-            'Un run échoue',
-            'Une preuve devient périmée',
-            'Un lien approche de son expiration',
-          ].map((x, i) => (
-            <label className="co-toggle" key={x}>
-              <input defaultChecked={i < 3} type="checkbox" />
-              {x}
-            </label>
-          ))}
+          <h2>
+            {locale === 'fr' ? 'Ce qui apparaît ici' : 'What appears here'}
+          </h2>
+          <p>
+            {locale === 'fr'
+              ? 'Uniquement les retours de review non tranchés et les workflows explicitement mis en pause pour votre décision.'
+              : 'Only unresolved review feedback and workflows explicitly paused for your decision.'}
+          </p>
           <div className="co-note">
-            <Icon>shield</Icon>Les emails ne contiennent jamais le texte des
-            preuves.
+            <Icon>shield</Icon>
+            {locale === 'fr'
+              ? 'Aucun agent ne peut valider sa propre affirmation ni publier à votre place.'
+              : 'No agent can approve its own claim or publish on your behalf.'}
           </div>
         </section>
       }
     >
-      <PageHeader
-        title="À trancher"
-        copy="4 décisions bloquent une publication ou une candidature."
-        actions={<Button quiet>Tout marquer comme lu</Button>}
-      />
+      <PageHeader title="À trancher" copy={copy} />
       <div className="co-inbox-list">
-        {[
-          [
-            'gpp_maybe',
-            'Nimbus Robotics',
-            '3 modifications à trancher',
-            'Un chiffre dépasse la preuve · run 8f2c terminé il y a 2 min',
-            'Ouvrir la revue',
-            'crit',
-          ],
-          [
-            'cloud_off',
-            'Fathom',
-            'Run interrompu',
-            'Quota API dépassé. Reprise possible sur modèle local.',
-            'Reprendre',
-            'warn',
-          ],
-          [
-            'schedule_send',
-            'Atlas Health',
-            'Relance prévue aujourd’hui',
-            'Envoyée il y a 8 jours, page ouverte 4 fois.',
-            'Relire le brouillon',
-            'accent',
-          ],
-          [
-            'edit_note',
-            'Helix',
-            'Débrief d’entretien à écrire',
-            'Deux questions restées sans preuve.',
-            'Débriefer',
-            'accent',
-          ],
-        ].map(([icon, company, title, copy, action, tone]) => (
-          <article key={company}>
-            <span className={tone}>
-              <Icon>{icon}</Icon>
+        {decisions.map((decision) => (
+          <article key={decision.application.applicationId}>
+            <span className={decision.kind === 'review' ? 'crit' : 'warn'}>
+              <Icon>
+                {decision.kind === 'review' ? 'gpp_maybe' : 'front_hand'}
+              </Icon>
             </span>
             <div>
-              <small>{company}</small>
-              <h2>{title}</h2>
-              <p>{copy}</p>
+              <small>{decision.application.company}</small>
+              <h2>
+                {decision.kind === 'review'
+                  ? locale === 'fr'
+                    ? `${decision.pendingDecisions} modification${decision.pendingDecisions > 1 ? 's' : ''} à trancher`
+                    : `${decision.pendingDecisions} ${decision.pendingDecisions === 1 ? 'change needs' : 'changes need'} review`
+                  : locale === 'fr'
+                    ? 'Décision humaine requise'
+                    : 'Human decision required'}
+              </h2>
+              <p>{homePriorityRow(decision, locale)}</p>
             </div>
-            <Button>{action}</Button>
+            <Link
+              className="co-button"
+              href={`/applications/${decision.application.applicationId}`}
+            >
+              {locale === 'fr' ? 'Ouvrir le dossier' : 'Open application'}
+            </Link>
           </article>
         ))}
-      </div>
-      <section className="co-panel">
-        <h2>Activité récente</h2>
-        {[
-          [
-            'visibility',
-            'Camille Lefort a ouvert votre page privée et consulté 3 preuves',
-            '09:12',
-          ],
-          ['download', 'CV adapté téléchargé — Nimbus Robotics', '09:15'],
-          [
-            'share',
-            'Lien Atlas Health ouvert depuis une deuxième adresse IP',
-            'hier 17:40',
-          ],
-          ['upload_file', 'review_q2.pdf indexé — 4 affirmations', 'lundi'],
-          ['sync', 'GitHub resynchronisé — aucune nouvelle preuve', 'lundi'],
-        ].map(([icon, label, time]) => (
-          <div className="co-activity" key={label}>
-            <Icon>{icon}</Icon>
-            <span>{label}</span>
-            <small>{time}</small>
+        {!dashboard && !error ? (
+          <div className="co-note">
+            <Icon>hourglass_top</Icon>
+            {locale === 'fr'
+              ? 'Chargement des arbitrages…'
+              : 'Loading decisions…'}
           </div>
-        ))}
-      </section>
+        ) : null}
+        {error ? (
+          <div className="co-note">
+            <Icon>cloud_off</Icon>
+            {error === 'auth'
+              ? locale === 'fr'
+                ? 'Connectez-vous pour retrouver vos arbitrages.'
+                : 'Sign in to access your decisions.'
+              : locale === 'fr'
+                ? 'La file d’arbitrage est momentanément indisponible.'
+                : 'The decision queue is temporarily unavailable.'}
+          </div>
+        ) : null}
+        {dashboard && !error && !decisions.length ? (
+          <div className="co-note">
+            <Icon>check_circle</Icon>
+            {locale === 'fr'
+              ? 'Tout est tranché pour le moment.'
+              : 'Everything is decided for now.'}
+          </div>
+        ) : null}
+      </div>
     </AppShell>
   );
 }

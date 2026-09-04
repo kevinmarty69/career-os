@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { mockPersistedWorkspace } from './persisted-workspace';
+import {
+  applicationId,
+  mockPersistedWorkspace,
+  pendingReviewRun,
+} from './persisted-workspace';
 
 const englishScreens = [
   ['/', 'Start the evidence workflow for Signal Forge.'],
@@ -126,6 +130,27 @@ test('separates persisted opportunities from started applications', async ({
     applications.getByText('Signal Forge', { exact: true }),
   ).toBeVisible();
   await expect(applications.getByText('Draft', { exact: true })).toBeVisible();
+});
+
+test('shows only persisted human decisions in the review queue', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page, pendingReviewRun);
+  await page.goto('/inbox');
+
+  await expect(
+    page.getByRole('heading', { name: 'Needs review', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Signal Forge', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: '1 change needs review' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Open application' }),
+  ).toHaveAttribute('href', `/applications/${applicationId}`);
+  await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
 });
 
 test('localizes authentication and private recipient surfaces', async ({

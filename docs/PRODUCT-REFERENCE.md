@@ -650,7 +650,7 @@ Critères d'acceptation :
 - [x] Vue d'accueil avec prochaine action prioritaire.
 - [x] Pipeline des opportunités et candidatures.
 - [x] État en temps réel des workflows.
-- [ ] File des arbitrages humains.
+- [x] File des arbitrages humains.
 - [x] Gestion des liens privés actifs.
 - [ ] Ajout des contacts, entretiens, réponses et résultats.
 - [ ] Tâches et relances datées.
