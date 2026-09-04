@@ -5,6 +5,7 @@ import { extractReadablePageText } from '../job-posting-extractor';
 import {
   COMPANY_RESEARCH_MAX_OUTPUT_TOKENS,
   LocalOpenAICompanyResearchClient,
+  LocalModelClientError,
 } from './local-openai-client';
 import { SafeHttpError, safeFetchText, type SafeHttpResult } from './safe-http';
 import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
@@ -253,7 +254,27 @@ export async function processCompanyResearchStep(input: {
       artifactId,
     };
   } catch (error) {
-    if (!claimed || !dispatched) throw error;
+    if (!claimed) throw error;
+    if (
+      !dispatched &&
+      (error instanceof z.ZodError ||
+        (error instanceof LocalModelClientError &&
+          error.code === 'INVALID_INPUT'))
+    ) {
+      await sql.begin(async (tx) => {
+        await authorizeWorker(tx);
+        await tx`select app.fail_company_researcher_step(
+          ${claimed!.step_id}, ${claimed!.lease_token}, 'invalid_step_input'
+        )`;
+      });
+      return {
+        status: 'failed' as const,
+        runId: claimed.workflow_run_id,
+        stepId: claimed.step_id,
+        failureCode: 'invalid_step_input' as const,
+      };
+    }
+    if (!dispatched) throw error;
     await sql.begin(async (tx) => {
       await authorizeWorker(tx);
       await tx`select app.fail_company_researcher_step(

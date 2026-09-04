@@ -20,6 +20,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
   const ownerId = randomUUID();
   const runId = randomUUID();
   const retryRunId = randomUUID();
+  const invalidRunId = randomUUID();
   const opportunityId = randomUUID();
   const applicationId = randomUUID();
   const workerLogin = `career_company_researcher_${randomUUID()
@@ -574,6 +575,61 @@ test('the durable worker dispatches one local call and stores one wrapped result
       [retryRunId],
     );
     assert.equal(durableSources.rows[0].count, 1);
+
+    await target.query(
+      `insert into app.workflow_runs (
+         id, tenant_id, opportunity_id, state, status, token_budget,
+         cost_budget_micros, deadline_at
+       ) values ($1, $2, $3, 'research', 'running', 30000, 0,
+         now() + interval '1 hour')`,
+      [invalidRunId, tenantId, opportunityId],
+    );
+    await target.query('set role career_app');
+    await target.query(
+      `select app.enqueue_company_researcher_step($1, $2, $3::jsonb)`,
+      [
+        tenantId,
+        invalidRunId,
+        JSON.stringify({
+          schemaVersion: 2,
+          company: 'Northstar Labs',
+          role: 'Staff Product Engineer',
+          description: 'x'.repeat(20_000),
+          source: { kind: 'job-posting', trust: 'untrusted-data' },
+          companySources: Array.from({ length: 3 }, (_, index) => ({
+            url: `http://www.example.test/${index}`,
+            origin: 'api',
+          })),
+        }),
+      ],
+    );
+    await target.query('reset role');
+    const invalidResult = await processCompanyResearchStep({
+      databaseUrl: workerUrl.toString(),
+      client,
+      fetchText: async (url) => ({
+        requestedUrl: url,
+        finalUrl: url,
+        contentType: 'text/plain',
+        bytes: Buffer.byteLength('🚀'.repeat(10_000)),
+        text: '🚀'.repeat(10_000),
+      }),
+    });
+    assert.equal(invalidResult.status, 'failed');
+    assert.equal(invalidResult.failureCode, 'invalid_step_input');
+    assert.equal(calls, 1);
+    const invalidState = await target.query(
+      `select ws.status as step_status, ws.failure_code, wr.status as run_status
+       from app.workflow_steps ws join app.workflow_runs wr
+         on wr.tenant_id = ws.tenant_id and wr.id = ws.workflow_run_id
+       where ws.workflow_run_id = $1`,
+      [invalidRunId],
+    );
+    assert.deepEqual(invalidState.rows[0], {
+      step_status: 'failed',
+      failure_code: 'invalid_step_input',
+      run_status: 'failed',
+    });
 
     for (const table of [
       'workflow_runs',

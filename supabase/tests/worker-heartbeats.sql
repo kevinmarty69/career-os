@@ -153,6 +153,7 @@ create temporary table expected_worker_functions (
 
 insert into expected_worker_functions (role_name, signature) values
   ('career_company_researcher', 'claim_company_researcher_step(lease_seconds integer)'),
+  ('career_company_researcher', 'prepare_company_researcher_sources(target_step uuid, target_lease_token uuid, source_snapshot jsonb)'),
   ('career_company_researcher', 'mark_company_researcher_in_flight(target_step uuid, target_lease_token uuid, target_provider text, target_model text, reserve_tokens integer, reserve_cost bigint)'),
   ('career_company_researcher', 'complete_company_researcher_step(target_step uuid, target_lease_token uuid, step_output jsonb, actual_input_tokens integer, actual_output_tokens integer, actual_cost bigint, actual_latency integer, was_cache_hit boolean, request_id text)'),
   ('career_company_researcher', 'fail_company_researcher_step(target_step uuid, target_lease_token uuid, target_failure_code text)'),
