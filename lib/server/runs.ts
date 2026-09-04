@@ -635,8 +635,14 @@ async function readLivingProfile(
   session: RunSession,
 ) {
   const [profile] = await tx<
-    { id: string; name: string; headline: string; revision: string }[]
-  >`select id, name, headline, revision from app.profiles
+    {
+      id: string;
+      name: string;
+      headline: string;
+      public_links: unknown;
+      revision: string;
+    }[]
+  >`select id, name, headline, public_links, revision from app.profiles
     where tenant_id = ${session.tenantId} and profile_kind = 'living'
     for share`;
   if (!profile) return;
@@ -650,7 +656,12 @@ async function readLivingProfile(
 async function readProfileGraph(
   tx: postgres.TransactionSql,
   tenantId: string,
-  profile: { id: string; name: string; headline: string },
+  profile: {
+    id: string;
+    name: string;
+    headline: string;
+    public_links: unknown;
+  },
 ) {
   const sources = await tx<
     Array<{
@@ -689,6 +700,7 @@ async function readProfileGraph(
   return profileSchema.parse({
     name: profile.name,
     headline: profile.headline,
+    publicLinks: profile.public_links,
     sources: sources.map((source) => ({
       id: source.id,
       kind: source.kind,
@@ -725,8 +737,11 @@ async function cloneProfileSnapshot(
 ) {
   const id = randomUUID();
   await tx`insert into app.profiles (
-    id, tenant_id, name, headline, profile_kind, revision
-  ) values (${id}, ${tenantId}, ${profile.name}, ${profile.headline}, 'snapshot', ${revision})`;
+    id, tenant_id, name, headline, public_links, profile_kind, revision
+  ) values (
+    ${id}, ${tenantId}, ${profile.name}, ${profile.headline},
+    ${tx.json(profile.publicLinks ?? {})}, 'snapshot', ${revision}
+  )`;
 
   const sourceIds = new Map<string, string>();
   const sources: Profile['sources'] = [];
@@ -791,6 +806,7 @@ async function cloneProfileSnapshot(
     profile: profileSchema.parse({
       name: profile.name,
       headline: profile.headline,
+      publicLinks: profile.publicLinks,
       sources,
       evidence,
       claims,
@@ -846,8 +862,13 @@ async function readRunProjection(
     select id, depth from lineage order by depth`;
   const lineageRunIds = ancestors.map(({ id }) => id);
   const [snapshot] = await tx<
-    Array<{ id: string; name: string; headline: string }>
-  >`select id, name, headline from app.profiles
+    Array<{
+      id: string;
+      name: string;
+      headline: string;
+      public_links: unknown;
+    }>
+  >`select id, name, headline, public_links from app.profiles
     where tenant_id = ${tenantId} and id = ${run.profile_id}`;
   if (!snapshot) throw new RunRejectedError('Run profile snapshot is missing.');
   const profile = await readProfileGraph(tx, tenantId, snapshot);

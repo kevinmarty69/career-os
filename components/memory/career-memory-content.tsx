@@ -40,6 +40,19 @@ export function CareerMemoryContent() {
     ({ level }) => level === 'inferred' || level === 'unsupported',
   ).length;
 
+  function setPublicLink(
+    key: keyof NonNullable<Profile['publicLinks']>,
+    value: string,
+  ) {
+    memory.setProfile((profile) => ({
+      ...profile,
+      publicLinks: {
+        ...profile.publicLinks,
+        [key]: value.trim() || undefined,
+      },
+    }));
+  }
+
   function addManual(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -137,6 +150,74 @@ export function CareerMemoryContent() {
           />
         </label>
       </div>
+      <section className="co-memory-public-links">
+        <header>
+          <div>
+            <h2>Liens partagés sur les pages privées</h2>
+            <p>
+              Seuls les liens renseignés ici seront visibles par les
+              destinataires de vos candidatures.
+            </p>
+          </div>
+          <span>Partage explicite</span>
+        </header>
+        <div>
+          <label>
+            Email
+            <input
+              inputMode="email"
+              onChange={(event) => setPublicLink('email', event.target.value)}
+              placeholder="alex@example.com"
+              type="email"
+              value={memory.profile.publicLinks?.email ?? ''}
+            />
+          </label>
+          <label>
+            CV
+            <input
+              inputMode="url"
+              onChange={(event) => setPublicLink('resume', event.target.value)}
+              placeholder="https://…"
+              type="url"
+              value={memory.profile.publicLinks?.resume ?? ''}
+            />
+          </label>
+          <label>
+            LinkedIn
+            <input
+              inputMode="url"
+              onChange={(event) =>
+                setPublicLink('linkedin', event.target.value)
+              }
+              placeholder="https://linkedin.com/in/…"
+              type="url"
+              value={memory.profile.publicLinks?.linkedin ?? ''}
+            />
+          </label>
+          <label>
+            GitHub
+            <input
+              inputMode="url"
+              onChange={(event) => setPublicLink('github', event.target.value)}
+              placeholder="https://github.com/…"
+              type="url"
+              value={memory.profile.publicLinks?.github ?? ''}
+            />
+          </label>
+          <label>
+            Portfolio
+            <input
+              inputMode="url"
+              onChange={(event) =>
+                setPublicLink('portfolio', event.target.value)
+              }
+              placeholder="https://…"
+              type="url"
+              value={memory.profile.publicLinks?.portfolio ?? ''}
+            />
+          </label>
+        </div>
+      </section>
       <div className="co-memory-metrics">
         <article>
           <span>Couverture expliquée</span>

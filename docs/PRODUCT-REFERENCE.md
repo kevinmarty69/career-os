@@ -630,7 +630,7 @@ Critères d'acceptation :
 - [x] Lecture rapide suivie de preuves en divulgation progressive.
 - [ ] Personnalisation accessible avec logo, couleurs et tonalité.
 - [x] Indication claire de candidature indépendante.
-- [ ] CV, LinkedIn, GitHub, portfolio et contact configurables.
+- [x] CV, LinkedIn, GitHub, portfolio et contact configurables.
 - [x] Aperçu desktop et mobile.
 - [ ] Contrôle de contraste, responsive et navigation clavier.
 - [x] Lien privé non indexable, expirant et révocable.

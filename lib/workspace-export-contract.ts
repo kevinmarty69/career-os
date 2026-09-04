@@ -232,6 +232,7 @@ export const workspaceExportTables = [
       'tenant_id',
       'name',
       'headline',
+      'public_links',
       'profile_kind',
       'revision',
       'created_at',

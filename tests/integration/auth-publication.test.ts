@@ -24,6 +24,10 @@ const opportunity = {
 };
 const livingProfile = structuredClone(syntheticProfile);
 for (const claim of livingProfile.claims) claim.level = 'declared';
+livingProfile.publicLinks = {
+  email: 'alex@example.test',
+  github: 'https://github.com/alex',
+};
 
 class BrowserSession {
   private readonly cookies = new Map<string, string>();
@@ -458,6 +462,7 @@ async function main() {
   };
   assert.equal(savedProfile.revision, 1);
   assert.equal(savedProfile.profile.claims.length, livingProfile.claims.length);
+  assert.deepEqual(savedProfile.profile.publicLinks, livingProfile.publicLinks);
   assert.match(savedProfile.profile.claims[0].id, /^[0-9a-f-]{36}$/);
   const rereadProfile = await owner.get('/api/profile');
   await expectStatus(rereadProfile, 200, 'saved profile read');
@@ -552,6 +557,10 @@ async function main() {
   );
   await expectStatus(publishedSnapshot, 200, 'anonymous capability read');
   const publishedPayload = await publishedSnapshot.json();
+  assert.deepEqual(
+    publishedPayload.profile.publicLinks,
+    livingProfile.publicLinks,
+  );
 
   const updatedProfile = await owner.put('/api/profile', {
     profile: { ...savedProfile.profile, headline: 'Updated after publication' },

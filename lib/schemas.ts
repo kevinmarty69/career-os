@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrlSchema } from './http-url';
 
 export const provenanceLevelSchema = z.enum([
   'verified',
@@ -67,6 +68,16 @@ export const profileSchema = z
   .object({
     name: z.string().min(2).max(200),
     headline: z.string().min(2).max(500),
+    publicLinks: z
+      .object({
+        email: z.email().max(320).optional(),
+        resume: httpUrlSchema.optional(),
+        linkedin: httpUrlSchema.optional(),
+        github: httpUrlSchema.optional(),
+        portfolio: httpUrlSchema.optional(),
+      })
+      .strict()
+      .optional(),
     sources: z.array(sourceSchema).max(50),
     evidence: z.array(evidenceSchema).max(100),
     claims: z.array(claimSchema).max(100),

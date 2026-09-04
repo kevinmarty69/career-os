@@ -33,8 +33,14 @@ export async function readLivingProfile(session: ProfileSession) {
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [profile] = await tx<
-        { id: string; name: string; headline: string; revision: string }[]
-      >`select id, name, headline, revision from app.profiles
+        {
+          id: string;
+          name: string;
+          headline: string;
+          public_links: unknown;
+          revision: string;
+        }[]
+      >`select id, name, headline, public_links, revision from app.profiles
         where tenant_id = ${session.tenantId} and profile_kind = 'living'`;
       if (!profile) return null;
 
@@ -85,6 +91,7 @@ export async function readLivingProfile(session: ProfileSession) {
         profile: profileSchema.parse({
           name: profile.name,
           headline: profile.headline,
+          publicLinks: profile.public_links,
           sources: sources.map((source) => ({
             id: source.id,
             kind: source.kind,
@@ -177,15 +184,18 @@ export async function saveLivingProfile(
       const [storedProfile] = existing
         ? await tx<{ id: string; revision: string }[]>`
             update app.profiles set name = ${profile.name},
-              headline = ${profile.headline}, revision = revision + 1,
+              headline = ${profile.headline},
+              public_links = ${tx.json(profile.publicLinks ?? {})},
+              revision = revision + 1,
               updated_at = now()
             where tenant_id = ${session.tenantId} and id = ${existing.id}
             returning id, revision`
         : await tx<{ id: string; revision: string }[]>`
             insert into app.profiles (
-              tenant_id, name, headline, profile_kind, revision
+              tenant_id, name, headline, public_links, profile_kind, revision
             ) values (
-              ${session.tenantId}, ${profile.name}, ${profile.headline}, 'living', 1
+              ${session.tenantId}, ${profile.name}, ${profile.headline},
+              ${tx.json(profile.publicLinks ?? {})}, 'living', 1
             ) returning id, revision`;
 
       await tx`delete from app.claims where tenant_id = ${session.tenantId}
@@ -262,6 +272,7 @@ export async function saveLivingProfile(
       const stored = profileSchema.parse({
         name: profile.name,
         headline: profile.headline,
+        publicLinks: profile.publicLinks,
         sources: storedSources,
         evidence: storedEvidence,
         claims: storedClaims,

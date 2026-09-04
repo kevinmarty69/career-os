@@ -47,6 +47,14 @@ export const memoryMessages = {
   'Chargement de la mémoire…': 'Loading career memory…',
   Nom: 'Name',
   Positionnement: 'Positioning',
+  'Liens partagés sur les pages privées': 'Links shared on private pages',
+  'Seuls les liens renseignés ici seront visibles par les destinataires de vos candidatures.':
+    'Only the links entered here will be visible to your application recipients.',
+  'Partage explicite': 'Explicit sharing',
+  Email: 'Email',
+  LinkedIn: 'LinkedIn',
+  GitHub: 'GitHub',
+  Portfolio: 'Portfolio',
   'Couverture expliquée': 'Explained coverage',
   'catégories documentées, sans score artificiel':
     'documented categories, without an artificial score',

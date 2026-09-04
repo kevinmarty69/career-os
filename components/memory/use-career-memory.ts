@@ -10,6 +10,7 @@ import { useI18n } from '@/components/i18n/i18n-provider';
 const emptyProfile: Profile = {
   name: '',
   headline: '',
+  publicLinks: {},
   sources: [],
   evidence: [],
   claims: [],

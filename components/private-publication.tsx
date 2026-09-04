@@ -108,6 +108,7 @@ export function PrivatePublication() {
 
   const { spec, profile } = publication;
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
+  const publicLinks = profile.publicLinks ?? {};
 
   return localize(
     <main
@@ -214,19 +215,71 @@ export function PrivatePublication() {
           </span>
           <h2>{profile.name}</h2>
           <p>{profile.headline}</p>
-          <h3>Documents</h3>
+          <h3>Liens du candidat</h3>
           <a href="#strongest-evidence">
             <span className="material-symbols-rounded" aria-hidden="true">
               description
             </span>
             Preuves inspectables
           </a>
-          <a href={`mailto:?subject=${encodeURIComponent(spec.company.role)}`}>
-            Proposer un échange
-            <span className="material-symbols-rounded" aria-hidden="true">
-              north_east
-            </span>
-          </a>
+          {publicLinks.resume ? (
+            <a
+              href={publicLinks.resume}
+              rel="noreferrer noopener"
+              target="_blank"
+            >
+              CV
+              <span className="material-symbols-rounded" aria-hidden="true">
+                north_east
+              </span>
+            </a>
+          ) : null}
+          {publicLinks.linkedin ? (
+            <a
+              href={publicLinks.linkedin}
+              rel="noreferrer noopener"
+              target="_blank"
+            >
+              LinkedIn
+              <span className="material-symbols-rounded" aria-hidden="true">
+                north_east
+              </span>
+            </a>
+          ) : null}
+          {publicLinks.github ? (
+            <a
+              href={publicLinks.github}
+              rel="noreferrer noopener"
+              target="_blank"
+            >
+              GitHub
+              <span className="material-symbols-rounded" aria-hidden="true">
+                north_east
+              </span>
+            </a>
+          ) : null}
+          {publicLinks.portfolio ? (
+            <a
+              href={publicLinks.portfolio}
+              rel="noreferrer noopener"
+              target="_blank"
+            >
+              Portfolio
+              <span className="material-symbols-rounded" aria-hidden="true">
+                north_east
+              </span>
+            </a>
+          ) : null}
+          {publicLinks.email ? (
+            <a
+              href={`mailto:${publicLinks.email}?subject=${encodeURIComponent(spec.company.role)}`}
+            >
+              Proposer un échange
+              <span className="material-symbols-rounded" aria-hidden="true">
+                north_east
+              </span>
+            </a>
+          ) : null}
         </aside>
       </div>
       <footer>

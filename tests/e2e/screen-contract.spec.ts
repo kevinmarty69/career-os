@@ -216,6 +216,13 @@ test('identifies a valid private page as an independent application', async ({
         profile: {
           name: 'Alex Morgan',
           headline: 'Product engineer',
+          publicLinks: {
+            email: 'alex@example.test',
+            resume: 'https://example.test/alex-resume.pdf',
+            linkedin: 'https://linkedin.com/in/alex',
+            github: 'https://github.com/alex',
+            portfolio: 'https://alex.example.test',
+          },
           sources: [],
           evidence: [],
           claims: [],
@@ -253,4 +260,18 @@ test('identifies a valid private page as an independent application', async ({
   await expect(
     page.getByRole('heading', { name: 'Alex Morgan × Signal Forge' }),
   ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Resume' })).toHaveAttribute(
+    'href',
+    'https://example.test/alex-resume.pdf',
+  );
+  await expect(page.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
+    'href',
+    'https://github.com/alex',
+  );
+  await expect(
+    page.getByRole('link', { name: 'Start a conversation' }),
+  ).toHaveAttribute(
+    'href',
+    'mailto:alex@example.test?subject=Staff%20Platform%20Engineer',
+  );
 });

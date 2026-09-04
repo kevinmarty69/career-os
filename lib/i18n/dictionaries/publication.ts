@@ -26,8 +26,12 @@ export const publicationMessages = {
   'aucune preuve indépendante rattachée': 'no independent evidence attached',
   'Extrait partagé volontairement par le candidat. Le document complet n’est pas accessible.':
     'Excerpt voluntarily shared by the candidate. The full document is not accessible.',
-  Documents: 'Documents',
+  'Liens du candidat': 'Candidate links',
   'Preuves inspectables': 'Inspectable evidence',
+  CV: 'Resume',
+  LinkedIn: 'LinkedIn',
+  GitHub: 'GitHub',
+  Portfolio: 'Portfolio',
   'Proposer un échange': 'Start a conversation',
   'Page privée générée avec Career OS. Contenu validé par le candidat.':
     'Private page generated with Career OS. Content approved by the candidate.',

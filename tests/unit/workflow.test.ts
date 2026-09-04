@@ -50,6 +50,26 @@ test('profile references stay inside one unambiguous graph', () => {
   assert.equal(profileSchema.safeParse(duplicate).success, false);
 });
 
+test('candidate links accept only explicit email and HTTP URLs', () => {
+  assert.equal(
+    profileSchema.safeParse({
+      ...syntheticProfile,
+      publicLinks: {
+        email: 'alex@example.com',
+        github: 'https://github.com/alex',
+      },
+    }).success,
+    true,
+  );
+  assert.equal(
+    profileSchema.safeParse({
+      ...syntheticProfile,
+      publicLinks: { resume: 'file:///Users/alex/resume.pdf' },
+    }).success,
+    false,
+  );
+});
+
 test('PageSpec rejects unknown blocks and free-form fields', () => {
   const strategy = buildStrategy(syntheticProfile, opportunity);
   const spec = buildPageSpec(syntheticProfile, opportunity, strategy);
