@@ -560,12 +560,12 @@ Critères d'acceptation :
 
 ### Lot 3 - Découverte et qualification des offres
 
-- [ ] Import direct d'une URL d'annonce.
-- [ ] Connecteurs initiaux pour plusieurs ATS publics et sites carrière.
+- [x] Import direct d'une URL d'annonce.
+- [x] Connecteurs initiaux pour plusieurs ATS publics et sites carrière.
 - [ ] Recherche planifiée selon les profils enregistrés.
-- [ ] Normalisation des postes, lieux, contrats, salaires et dates.
-- [ ] Déduplication multi-source.
-- [ ] Détection des modifications et fermetures.
+- [x] Normalisation des postes, lieux, contrats, salaires et dates.
+- [x] Déduplication multi-source.
+- [x] Détection des modifications et fermetures.
 - [ ] Matching déterministe pour les contraintes dures.
 - [ ] Analyse sémantique pour les compétences, responsabilités et transferts.
 - [ ] Recommandation expliquée avec preuves, gaps, risques et inconnues.
