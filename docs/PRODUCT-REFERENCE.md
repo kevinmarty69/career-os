@@ -570,7 +570,7 @@ Critères d'acceptation :
 - [x] Normalisation des postes, lieux, contrats, salaires et dates.
 - [x] Déduplication multi-source.
 - [x] Détection des modifications et fermetures.
-- [ ] Matching déterministe pour les contraintes dures.
+- [x] Matching déterministe pour les contraintes dures.
 - [ ] Analyse sémantique pour les compétences, responsabilités et transferts.
 - [ ] Recommandation expliquée avec preuves, gaps, risques et inconnues.
 - [ ] Inbox d'opportunités avec enregistrer, ignorer, archiver et corriger.
