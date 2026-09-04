@@ -69,7 +69,25 @@ insert into app.job_observations (
   'f7050000-0000-4000-8000-000000000001',
   'f7060000-0000-4000-8000-000000000001', now(), repeat('c', 64),
   'first_seen', 'unknown', 'new',
-  '{"location":null,"remoteMode":"unknown","contractType":"unknown","salaryMin":null,"salaryMax":null,"salaryCurrency":null,"publishedAt":null,"externalId":null,"sourceKind":"generic_html","lifecycleSignal":"unknown"}'::jsonb
+  '{"location":null,"remoteMode":"unknown","contractType":"unknown","salaryMin":null,"salaryMax":null,"salaryCurrency":null,"salaryPeriod":"unknown","publishedAt":null,"externalId":null,"sourceKind":"generic_html","lifecycleSignal":"unknown"}'::jsonb
+);
+insert into app.search_profiles (
+  id, tenant_id, name, hard_constraints, soft_preferences, active
+) values (
+  'f7080000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'Delete search', '{}'::jsonb, '{}'::jsonb, true
+);
+insert into app.job_matches (
+  id, tenant_id, discovered_job_id, job_revision, search_profile_id,
+  search_profile_revision, decision, job_snapshot, search_profile_snapshot,
+  criteria
+) values (
+  'f7090000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'f7050000-0000-4000-8000-000000000001', 1,
+  'f7080000-0000-4000-8000-000000000001', 1, 'priority',
+  '{"revision":1}'::jsonb, '{"revision":1}'::jsonb, '[]'::jsonb
 );
 insert into app.opportunities (
   id, tenant_id, application_id, application_revision, company, role,
@@ -168,6 +186,7 @@ do $$ begin
     or exists(select 1 from app.discovered_jobs where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.job_source_records where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.job_observations where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.job_matches where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then

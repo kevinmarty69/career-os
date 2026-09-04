@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 5;
+export const workspaceExportVersion = 6;
 
 export const workspaceExportTables = [
   {
@@ -72,6 +72,7 @@ export const workspaceExportTables = [
       'salary_min',
       'salary_max',
       'salary_currency',
+      'salary_period',
       'published_at',
       'external_id',
       'source_kind',
@@ -124,6 +125,27 @@ export const workspaceExportTables = [
       'matched_by',
       'normalized',
       'created_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'job_matches',
+    table: 'job_matches',
+    columns: [
+      'id',
+      'tenant_id',
+      'discovered_job_id',
+      'job_revision',
+      'search_profile_id',
+      'search_profile_revision',
+      'living_profile_id',
+      'living_profile_revision',
+      'decision',
+      'job_snapshot',
+      'search_profile_snapshot',
+      'criteria',
+      'created_at',
+      'updated_at',
     ],
     orderBy: ['id'],
   },

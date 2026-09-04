@@ -71,6 +71,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const discoveredJobId = randomUUID();
   const sourceRecordId = randomUUID();
   const observationId = randomUUID();
+  const searchProfileId = randomUUID();
+  const matchId = randomUUID();
   const opportunityId = randomUUID();
   const runId = randomUUID();
   const stepId = randomUUID();
@@ -128,6 +130,12 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         (${otherApplicationId}, ${otherTenantId}, ${secret}, 'Engineer', ${secret},
           '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
           '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
+      await transaction`insert into app.search_profiles (
+        id, tenant_id, name, hard_constraints, soft_preferences, active
+      ) values (
+        ${searchProfileId}, ${tenantId}, 'Visible search',
+        '{"roles":["Platform Engineer"]}'::jsonb, '{}'::jsonb, true
+      )`;
       await transaction`insert into app.discovered_jobs (
         id, tenant_id, company, role, description, canonical_url,
         first_seen_at, last_seen_at
@@ -162,11 +170,21 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
           salaryMin: null,
           salaryMax: null,
           salaryCurrency: null,
+          salaryPeriod: 'unknown',
           publishedAt: null,
           externalId: null,
           sourceKind: 'generic_html',
           lifecycleSignal: 'unknown',
         })}
+      )`;
+      await transaction`insert into app.job_matches (
+        id, tenant_id, discovered_job_id, job_revision, search_profile_id,
+        search_profile_revision, decision, job_snapshot,
+        search_profile_snapshot, criteria
+      ) values (
+        ${matchId}, ${tenantId}, ${discoveredJobId}, 1, ${searchProfileId}, 1,
+        'priority', '{"revision":1}'::jsonb, '{"revision":1}'::jsonb,
+        '[]'::jsonb
       )`;
       await transaction`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role, raw_text,
@@ -271,6 +289,16 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
           record.type === 'applications' &&
           record.data.id === applicationId &&
           record.data.deleted_at,
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'job_matches' &&
+          record.data.id === matchId &&
+          record.data.search_profile_id === searchProfileId &&
+          record.data.decision === 'priority',
       ),
       true,
     );

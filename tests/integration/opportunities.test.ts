@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { storeDiscoveredJob } from '../../lib/server/discovered-jobs';
+import { syntheticProfile } from '../../lib/fixture';
+import {
+  listDiscoveredJobs,
+  storeDiscoveredJob,
+} from '../../lib/server/discovered-jobs';
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
 const authOrigin = process.env.TEST_AUTH_ORIGIN ?? baseUrl;
@@ -9,6 +13,13 @@ const requestOrigin = process.env.TEST_REQUEST_ORIGIN ?? baseUrl;
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required.');
 const suffix = randomUUID();
+const livingProfileInput = {
+  ...syntheticProfile,
+  claims: syntheticProfile.claims.map((claim) => ({
+    ...claim,
+    level: 'declared' as const,
+  })),
+};
 
 class BrowserSession {
   private readonly cookies = new Map<string, string>();
@@ -128,6 +139,7 @@ function importedJob(
       salaryMin: null,
       salaryMax: null,
       salaryCurrency: null,
+      salaryPeriod: 'unknown' as const,
       publishedAt: null,
       externalId: null,
       sourceKind: 'generic_html' as const,
@@ -156,6 +168,7 @@ function greenhouseObservation(
       salaryMin: 80000,
       salaryMax: 100000,
       salaryCurrency: 'EUR',
+      salaryPeriod: 'unknown' as const,
       publishedAt: '2026-09-01T08:00:00.000Z',
       externalId: 'acme:101',
       sourceKind: 'greenhouse' as const,
@@ -269,6 +282,7 @@ async function main() {
   );
   assert.equal(alias.opportunity.sources.length, 2);
   assert.equal(alias.opportunity.observations.length, 4);
+  assert.equal((await listDiscoveredJobs(owner.session)).length, 1);
 
   const list = await owner.browser.request('/api/opportunities');
   await expectStatus(list, 200, 'opportunity list');
@@ -344,6 +358,153 @@ async function main() {
     true,
   );
   assert.equal(reposted.opportunity.observations.length, 5);
+
+  await expectStatus(
+    await anonymous.request(
+      `/api/opportunities/${connected.opportunity.opportunityId}/match`,
+      'POST',
+      { searchProfileId: randomUUID() },
+    ),
+    401,
+    'anonymous hard match',
+  );
+  const searchProfileInput = {
+    name: 'Senior engineering search',
+    active: true,
+    hardConstraints: {
+      roles: ['Senior Engineer'],
+      seniorities: [],
+      locations: ['Paris, France'],
+      remoteModes: ['remote'],
+      timezones: [],
+      languages: [],
+      contractTypes: [],
+      minimumSalary: { amount: 90_000, currency: 'EUR' },
+      excludedCompanies: [],
+      excludedNetworks: [],
+    },
+    softPreferences: {
+      stacks: [],
+      sectors: [],
+      productTypes: [],
+      companySizes: [],
+      cultures: [],
+    },
+  };
+  const createSearchProfile = await owner.browser.request(
+    '/api/search-profiles',
+    'POST',
+    searchProfileInput,
+  );
+  await expectStatus(createSearchProfile, 201, 'search profile create');
+  const searchProfile = (await createSearchProfile.json()) as {
+    searchProfileId: string;
+    revision: number;
+  };
+  const matchPath = `/api/opportunities/${connected.opportunity.opportunityId}/match`;
+  await expectStatus(
+    await owner.browser.request(
+      matchPath,
+      'POST',
+      { searchProfileId: searchProfile.searchProfileId },
+      { origin: 'https://attacker.example' },
+    ),
+    403,
+    'cross-origin hard match',
+  );
+  const concurrentMatches = await Promise.all(
+    Array.from({ length: 6 }, () =>
+      owner.browser.request(matchPath, 'POST', {
+        searchProfileId: searchProfile.searchProfileId,
+      }),
+    ),
+  );
+  for (const [index, response] of concurrentMatches.entries())
+    await expectStatus(response, 200, `concurrent hard match ${index}`);
+  const persistedMatches = (await Promise.all(
+    concurrentMatches.map((response) => response.json()),
+  )) as Array<{
+    matchId: string;
+    jobRevision: number;
+    searchProfileRevision: number;
+    livingProfile: null | { profileId: string; revision: number };
+    evaluation: {
+      decision: string;
+      blockedCriteria: string[];
+      criteria: Array<{ criterion: string; state: string; blocks: boolean }>;
+    };
+  }>;
+  assert.equal(new Set(persistedMatches.map((match) => match.matchId)).size, 1);
+  assert.equal(persistedMatches[0].evaluation.decision, 'ineligible');
+  assert.deepEqual(persistedMatches[0].evaluation.blockedCriteria, [
+    'remoteMode',
+  ]);
+  assert.equal(
+    persistedMatches[0].evaluation.criteria.find(
+      (criterion) => criterion.criterion === 'salary',
+    )?.state,
+    'unknown',
+  );
+  assert.equal(persistedMatches[0].livingProfile, null);
+  await expectStatus(
+    await owner.browser.request(matchPath),
+    400,
+    'hard match GET requires an explicit search profile',
+  );
+  const readMatch = await owner.browser.request(
+    `${matchPath}?searchProfileId=${searchProfile.searchProfileId}`,
+  );
+  await expectStatus(readMatch, 200, 'hard match read');
+  assert.equal(
+    ((await readMatch.json()) as { matchId: string }).matchId,
+    persistedMatches[0].matchId,
+  );
+  const createLivingProfile = await owner.browser.request(
+    '/api/profile',
+    'PUT',
+    { profile: livingProfileInput, expectedRevision: 0 },
+  );
+  await expectStatus(createLivingProfile, 200, 'living profile create');
+  const livingProfile = (await createLivingProfile.json()) as {
+    revision: number;
+  };
+  assert.equal(livingProfile.revision, 1);
+  const matchWithLivingProfile = await owner.browser.request(
+    matchPath,
+    'POST',
+    { searchProfileId: searchProfile.searchProfileId },
+  );
+  await expectStatus(
+    matchWithLivingProfile,
+    200,
+    'hard match with living profile provenance',
+  );
+  const withLiving =
+    (await matchWithLivingProfile.json()) as (typeof persistedMatches)[number];
+  assert.notEqual(withLiving.matchId, persistedMatches[0].matchId);
+  assert.equal(withLiving.livingProfile?.revision, 1);
+  const updateSearchProfile = await owner.browser.request(
+    `/api/search-profiles/${searchProfile.searchProfileId}`,
+    'PATCH',
+    {
+      ...searchProfileInput,
+      hardConstraints: {
+        ...searchProfileInput.hardConstraints,
+        remoteModes: ['hybrid'],
+      },
+      expectedRevision: 1,
+    },
+  );
+  await expectStatus(updateSearchProfile, 200, 'search profile update');
+  const revisedMatch = await owner.browser.request(matchPath, 'POST', {
+    searchProfileId: searchProfile.searchProfileId,
+  });
+  await expectStatus(revisedMatch, 200, 'revised hard match');
+  const revised =
+    (await revisedMatch.json()) as (typeof persistedMatches)[number];
+  assert.notEqual(revised.matchId, persistedMatches[0].matchId);
+  assert.equal(revised.searchProfileRevision, 2);
+  assert.equal(revised.evaluation.decision, 'priority');
 
   const greenhouse = greenhouseObservation('open', 'd'.repeat(64));
   const syndicatedUrl = 'https://jobs.ashbyhq.com/acme/syndicated-101';
@@ -426,23 +587,33 @@ async function main() {
   const otherList = await other.browser.request('/api/opportunities');
   await expectStatus(otherList, 200, 'other tenant opportunity list');
   assert.deepEqual(await otherList.json(), { opportunities: [] });
+  await expectStatus(
+    await other.browser.request(matchPath, 'POST', {
+      searchProfileId: searchProfile.searchProfileId,
+    }),
+    404,
+    'cross-tenant hard match',
+  );
 
   const pool = new Pool({ connectionString: databaseUrl });
   try {
     const counts = await pool.query<{
       jobs: string;
       sources: string;
+      matches: string;
       applications: string;
     }>(
       `select
         (select count(*) from app.discovered_jobs where tenant_id = $1) jobs,
         (select count(*) from app.job_source_records where tenant_id = $1) sources,
+        (select count(*) from app.job_matches where tenant_id = $1) matches,
         (select count(*) from app.applications where tenant_id = $1) applications`,
       [owner.session.tenantId],
     );
     assert.deepEqual(counts.rows[0], {
       jobs: '4',
       sources: '5',
+      matches: '3',
       applications: '0',
     });
   } finally {

@@ -37,6 +37,24 @@ insert into app.job_observations (
   '50000000-0000-0000-0000-000000000001', now(), repeat('a', 64),
   'first_seen', 'unknown', 'new', '{"sourceKind":"generic_html"}'::jsonb
 );
+insert into app.search_profiles (
+  id, tenant_id, name, hard_constraints, soft_preferences, active
+) values (
+  '70000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  'Tenant A search', '{}'::jsonb, '{}'::jsonb, true
+);
+insert into app.job_matches (
+  id, tenant_id, discovered_job_id, job_revision, search_profile_id,
+  search_profile_revision, decision, job_snapshot, search_profile_snapshot,
+  criteria
+) values (
+  '80000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  '40000000-0000-0000-0000-000000000001', 1,
+  '70000000-0000-0000-0000-000000000001', 1, 'priority',
+  '{"revision":1}'::jsonb, '{"revision":1}'::jsonb, '[]'::jsonb
+);
 
 reset role;
 insert into app.tenants (id, owner_id, name) values
@@ -71,6 +89,24 @@ insert into app.job_observations (
   '50000000-0000-0000-0000-000000000002', now(), repeat('b', 64),
   'first_seen', 'unknown', 'new', '{"sourceKind":"generic_html"}'::jsonb
 );
+insert into app.search_profiles (
+  id, tenant_id, name, hard_constraints, soft_preferences, active
+) values (
+  '70000000-0000-0000-0000-000000000002',
+  '20000000-0000-0000-0000-000000000002',
+  'Tenant B search', '{}'::jsonb, '{}'::jsonb, true
+);
+insert into app.job_matches (
+  id, tenant_id, discovered_job_id, job_revision, search_profile_id,
+  search_profile_revision, decision, job_snapshot, search_profile_snapshot,
+  criteria
+) values (
+  '80000000-0000-0000-0000-000000000002',
+  '20000000-0000-0000-0000-000000000002',
+  '40000000-0000-0000-0000-000000000002', 1,
+  '70000000-0000-0000-0000-000000000002', 1, 'priority',
+  '{"revision":1}'::jsonb, '{"revision":1}'::jsonb, '[]'::jsonb
+);
 set local role career_app;
 
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
@@ -82,6 +118,7 @@ do $$ begin
   if exists(select 1 from app.discovered_jobs where company = 'Tenant B Company') then raise exception 'cross-tenant discovered job leaked'; end if;
   if (select count(*) from app.job_source_records) <> 1 then raise exception 'tenant A source provenance isolation failed'; end if;
   if (select count(*) from app.job_observations) <> 1 then raise exception 'tenant A observation isolation failed'; end if;
+  if (select count(*) from app.job_matches) <> 1 then raise exception 'tenant A match isolation failed'; end if;
 end $$;
 
 do $$ begin
@@ -123,6 +160,24 @@ do $$ begin
       'text/html', 128, repeat('b', 64), '{"company":"Cross Tenant"}'::jsonb
     );
     raise exception 'discovered job provenance accepted a cross-tenant reference';
+  exception when foreign_key_violation then null;
+  end;
+end $$;
+
+reset role;
+do $$ begin
+  begin
+    insert into app.job_matches (
+      tenant_id, discovered_job_id, job_revision, search_profile_id,
+      search_profile_revision, decision, job_snapshot, search_profile_snapshot,
+      criteria
+    ) values (
+      '20000000-0000-0000-0000-000000000001',
+      '40000000-0000-0000-0000-000000000001', 1,
+      '70000000-0000-0000-0000-000000000002', 1, 'priority',
+      '{"revision":1}'::jsonb, '{"revision":1}'::jsonb, '[]'::jsonb
+    );
+    raise exception 'job match accepted a cross-tenant search profile';
   exception when foreign_key_violation then null;
   end;
 end $$;

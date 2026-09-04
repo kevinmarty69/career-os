@@ -24,6 +24,7 @@ export const contractTypeSchema = z.enum([
   'contract',
   'temporary',
 ]);
+export const salaryPeriodSchema = z.enum(['unknown', 'year', 'month', 'hour']);
 export const lifecycleSchema = z.enum([
   'open',
   'changed',
@@ -60,28 +61,41 @@ export const normalizedJobFieldsSchema = z
       .string()
       .regex(/^[A-Z]{3}$/)
       .nullable(),
+    salaryPeriod: salaryPeriodSchema,
     publishedAt: z.string().datetime({ offset: true }).nullable(),
     externalId: nullableText(300),
     sourceKind: jobSourceKindSchema,
     lifecycleSignal: lifecycleSignalSchema,
   })
-  .superRefine(({ salaryMin, salaryMax, salaryCurrency }, context) => {
-    if (salaryMin !== null && salaryMax !== null && salaryMin > salaryMax)
-      context.addIssue({
-        code: 'custom',
-        path: ['salaryMax'],
-        message: 'Maximum salary must be greater than or equal to minimum.',
-      });
-    if (
-      (salaryMin !== null || salaryMax !== null) !==
-      (salaryCurrency !== null)
-    )
-      context.addIssue({
-        code: 'custom',
-        path: ['salaryCurrency'],
-        message: 'Salary values and currency must be supplied together.',
-      });
-  })
+  .superRefine(
+    ({ salaryMin, salaryMax, salaryCurrency, salaryPeriod }, context) => {
+      if (salaryMin !== null && salaryMax !== null && salaryMin > salaryMax)
+        context.addIssue({
+          code: 'custom',
+          path: ['salaryMax'],
+          message: 'Maximum salary must be greater than or equal to minimum.',
+        });
+      if (
+        (salaryMin !== null || salaryMax !== null) !==
+        (salaryCurrency !== null)
+      )
+        context.addIssue({
+          code: 'custom',
+          path: ['salaryCurrency'],
+          message: 'Salary values and currency must be supplied together.',
+        });
+      if (
+        salaryMin === null &&
+        salaryMax === null &&
+        salaryPeriod !== 'unknown'
+      )
+        context.addIssue({
+          code: 'custom',
+          path: ['salaryPeriod'],
+          message: 'Salary period cannot be known without a salary value.',
+        });
+    },
+  )
   .strict();
 
 export const jobSourceRecordSchema = z
@@ -130,6 +144,7 @@ export const discoveredJobSchema = z
       .string()
       .regex(/^[A-Z]{3}$/)
       .nullable(),
+    salaryPeriod: salaryPeriodSchema,
     publishedAt: z.string().datetime().nullable(),
     externalId: nullableText(300),
     sourceKind: jobSourceKindSchema,

@@ -27,6 +27,7 @@ type JobRow = {
   salary_min: string | null;
   salary_max: string | null;
   salary_currency: string | null;
+  salary_period: 'unknown' | 'year' | 'month' | 'hour';
   published_at: Date | null;
   external_id: string | null;
   source_kind: 'generic_html' | 'greenhouse' | 'ashby';
@@ -137,6 +138,7 @@ export async function storeDiscoveredJob(
         [job] = await tx<JobRow[]>`insert into app.discovered_jobs (
           tenant_id, company, role, description, canonical_url, location,
           remote_mode, contract_type, salary_min, salary_max, salary_currency,
+          salary_period,
           published_at, external_id, source_kind, lifecycle, fingerprint,
           first_seen_at, last_seen_at
         ) values (
@@ -145,7 +147,8 @@ export async function storeDiscoveredJob(
           ${input.provenance.finalUrl}, ${input.normalized.location},
           ${input.normalized.remoteMode}, ${input.normalized.contractType},
           ${input.normalized.salaryMin}, ${input.normalized.salaryMax},
-          ${input.normalized.salaryCurrency}, ${input.normalized.publishedAt},
+          ${input.normalized.salaryCurrency}, ${input.normalized.salaryPeriod},
+          ${input.normalized.publishedAt},
           ${input.normalized.externalId}, ${input.normalized.sourceKind},
           ${input.normalized.lifecycleSignal === 'closed' ? 'closed' : 'open'},
           ${fingerprint}, ${input.provenance.fetchedAt},
@@ -175,6 +178,7 @@ export async function storeDiscoveredJob(
           remote_mode = ${current.remoteMode}, contract_type = ${current.contractType},
           salary_min = ${current.salaryMin}, salary_max = ${current.salaryMax},
           salary_currency = ${current.salaryCurrency},
+          salary_period = ${current.salaryPeriod},
           published_at = ${current.publishedAt}, external_id = ${current.externalId},
           source_kind = ${current.sourceKind}, lifecycle = ${lifecycle},
           fingerprint = ${fingerprint ?? job.fingerprint},
@@ -323,6 +327,7 @@ async function projection(
     salaryMin: money(job.salary_min),
     salaryMax: money(job.salary_max),
     salaryCurrency: job.salary_currency,
+    salaryPeriod: job.salary_period,
     publishedAt: job.published_at?.toISOString() ?? null,
     externalId: job.external_id,
     sourceKind: job.source_kind,
@@ -370,6 +375,7 @@ function sameCurrentFields(job: JobRow, input: DiscoveredJobPersistenceInput) {
     current.salaryMin === money(job.salary_min) &&
     current.salaryMax === money(job.salary_max) &&
     current.salaryCurrency === job.salary_currency &&
+    current.salaryPeriod === job.salary_period &&
     current.publishedAt === (job.published_at?.toISOString() ?? null) &&
     current.externalId === job.external_id &&
     current.sourceKind === job.source_kind
@@ -379,6 +385,10 @@ function sameCurrentFields(job: JobRow, input: DiscoveredJobPersistenceInput) {
 function aggregateFields(job: JobRow, input: DiscoveredJobPersistenceInput) {
   const hasSalary =
     input.normalized.salaryMin !== null || input.normalized.salaryMax !== null;
+  const useIncomingSalary =
+    hasSalary &&
+    (input.normalized.salaryPeriod !== 'unknown' ||
+      job.salary_period === 'unknown');
   const useIncomingSource = input.normalized.sourceKind !== 'generic_html';
   return {
     company: input.extraction.company ?? job.company,
@@ -393,11 +403,18 @@ function aggregateFields(job: JobRow, input: DiscoveredJobPersistenceInput) {
       input.normalized.contractType === 'unknown'
         ? job.contract_type
         : input.normalized.contractType,
-    salaryMin: hasSalary ? input.normalized.salaryMin : money(job.salary_min),
-    salaryMax: hasSalary ? input.normalized.salaryMax : money(job.salary_max),
-    salaryCurrency: hasSalary
+    salaryMin: useIncomingSalary
+      ? input.normalized.salaryMin
+      : money(job.salary_min),
+    salaryMax: useIncomingSalary
+      ? input.normalized.salaryMax
+      : money(job.salary_max),
+    salaryCurrency: useIncomingSalary
       ? input.normalized.salaryCurrency
       : job.salary_currency,
+    salaryPeriod: useIncomingSalary
+      ? input.normalized.salaryPeriod
+      : job.salary_period,
     publishedAt:
       input.normalized.publishedAt ?? job.published_at?.toISOString() ?? null,
     externalId: input.normalized.externalId ?? job.external_id,
@@ -449,6 +466,7 @@ function money(value: string | null) {
 function jobColumns(tx: postgres.TransactionSql) {
   return tx`id, company, role, description, canonical_url, location,
     remote_mode, contract_type, salary_min, salary_max, salary_currency,
+    salary_period,
     published_at, external_id, source_kind, lifecycle, fingerprint, revision,
     first_seen_at, last_seen_at`;
 }

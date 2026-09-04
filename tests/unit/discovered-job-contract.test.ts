@@ -27,6 +27,7 @@ const normalized = {
   salaryMin: null,
   salaryMax: null,
   salaryCurrency: null,
+  salaryPeriod: 'unknown' as const,
   publishedAt: null,
   externalId: null,
   sourceKind: 'generic_html' as const,
@@ -56,6 +57,7 @@ test('discovered jobs retain bounded source provenance', () => {
     salaryMin: null,
     salaryMax: null,
     salaryCurrency: null,
+    salaryPeriod: 'unknown',
     publishedAt: null,
     externalId: null,
     sourceKind: 'generic_html',
@@ -99,6 +101,12 @@ test('persistence requires extraction and fetch provenance to share a final URL'
   assert.equal(
     discoveredJobPersistenceInputSchema.parse(valid).extraction.role,
     'Platform Engineer',
+  );
+  assert.throws(() =>
+    discoveredJobPersistenceInputSchema.parse({
+      ...valid,
+      normalized: { ...normalized, salaryPeriod: 'year' },
+    }),
   );
   assert.throws(() =>
     discoveredJobPersistenceInputSchema.parse({
