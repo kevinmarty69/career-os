@@ -37,6 +37,8 @@ export const homeMessages = {
   'Décision suivante': 'Next decision',
   'Le chiffre dépasse la preuve': 'The figure exceeds the evidence',
   Ouverture: 'Opening',
+  '42 %': '42%',
+  '35 %': '35%',
   'L’agent a écrit « réduit de': 'The agent wrote “reduced',
   'le temps de build ». Votre post-mortem mesure 11 → 7 minutes, soit environ':
     'build time.” Your post-mortem measures 11 → 7 minutes, which is about',
