@@ -235,6 +235,49 @@ async function main() {
     1,
   );
 
+  const taskInput = {
+    kind: 'follow_up',
+    title: 'Follow up after the technical interview',
+    dueAt: '2026-09-08T08:00:00.000Z',
+  };
+  const taskCreate = await owner.request(
+    `/api/applications/${application.applicationId}/tasks`,
+    'POST',
+    taskInput,
+  );
+  await expectStatus(taskCreate, 201, 'application task create');
+  const task = (await taskCreate.json()) as {
+    taskId: string;
+    revision: number;
+    completedAt: string | null;
+  };
+  assert.equal(task.revision, 1);
+  assert.equal(task.completedAt, null);
+  const taskComplete = await owner.request(
+    `/api/applications/${application.applicationId}/tasks/${task.taskId}`,
+    'PATCH',
+    { completed: true, expectedRevision: 1 },
+  );
+  await expectStatus(taskComplete, 200, 'application task completion');
+  const completedTask = (await taskComplete.json()) as {
+    revision: number;
+    completedAt: string | null;
+  };
+  assert.equal(completedTask.revision, 2);
+  assert.ok(completedTask.completedAt);
+  const taskReplay = await owner.request(
+    `/api/applications/${application.applicationId}/tasks/${task.taskId}`,
+    'PATCH',
+    { completed: true, expectedRevision: 1 },
+  );
+  await expectStatus(taskReplay, 200, 'application task completion replay');
+  assert.deepEqual(await taskReplay.json(), completedTask);
+  const tasks = await owner.request(
+    `/api/applications/${application.applicationId}/tasks`,
+  );
+  await expectStatus(tasks, 200, 'application task list');
+  assert.equal(((await tasks.json()) as { tasks: unknown[] }).tasks.length, 1);
+
   const saved = await owner.request('/api/profile', 'PUT', {
     profile: livingProfile,
     expectedRevision: 0,
@@ -356,6 +399,11 @@ async function main() {
     ),
     404,
     'cross-tenant application timeline',
+  );
+  await expectStatus(
+    await other.request(`/api/applications/${application.applicationId}/tasks`),
+    404,
+    'cross-tenant application tasks',
   );
 
   await expectStatus(

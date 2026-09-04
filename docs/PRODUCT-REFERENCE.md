@@ -653,7 +653,7 @@ Critères d'acceptation :
 - [x] File des arbitrages humains.
 - [x] Gestion des liens privés actifs.
 - [x] Ajout des contacts, entretiens, réponses et résultats.
-- [ ] Tâches et relances datées.
+- [x] Tâches et relances datées.
 - [ ] Recherche et filtres globaux.
 - [ ] Historique des versions et décisions.
 - [ ] Tendances personnelles sur les réponses, sans fausse causalité.

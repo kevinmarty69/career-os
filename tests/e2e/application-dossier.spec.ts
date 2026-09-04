@@ -786,6 +786,18 @@ test('records application contacts, interviews, responses and outcomes', async (
     createdAt: '2026-09-04T14:31:00.000Z',
   } as const;
   let request: unknown;
+  let taskRequest: unknown;
+  const persistedTask = {
+    taskId: '988c0a00-0000-4000-8000-000000000025',
+    applicationId,
+    kind: 'follow_up',
+    title: 'Follow up with the recruiter',
+    dueAt: '2026-09-08T08:00:00.000Z',
+    completedAt: null,
+    revision: 1,
+    createdAt: '2026-09-04T14:32:00.000Z',
+    updatedAt: '2026-09-04T14:32:00.000Z',
+  } as const;
   await page.route(
     `**/api/applications/${applicationId}/timeline`,
     async (route) => {
@@ -803,6 +815,36 @@ test('records application contacts, interviews, responses and outcomes', async (
       });
     },
   );
+  await page.route(
+    `**/api/applications/${applicationId}/tasks`,
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        taskRequest = route.request().postDataJSON();
+        return route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(persistedTask),
+        });
+      }
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ tasks: [] }),
+      });
+    },
+  );
+  await page.route(
+    `**/api/applications/${applicationId}/tasks/${persistedTask.taskId}`,
+    (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...persistedTask,
+          completedAt: '2026-09-04T14:35:00.000Z',
+          revision: 2,
+          updatedAt: '2026-09-04T14:35:00.000Z',
+        }),
+      }),
+  );
 
   await page.goto(`/applications/${applicationId}/timeline`);
   await expect(
@@ -810,7 +852,7 @@ test('records application contacts, interviews, responses and outcomes', async (
       name: 'Contacts, interviews, and outcomes',
     }),
   ).toBeVisible();
-  await page.getByLabel('Type').selectOption('interview');
+  await page.getByLabel('Type').nth(0).selectOption('interview');
   await page.getByLabel('Date and time').fill('2026-09-04T16:30');
   await page
     .getByLabel('Title')
@@ -826,6 +868,25 @@ test('records application contacts, interviews, responses and outcomes', async (
     note: persisted.note,
     occurredAt: new Date('2026-09-04T16:30').toISOString(),
   });
+  await page.getByLabel('Type').nth(1).selectOption('follow_up');
+  await page.getByLabel('Due date').fill('2026-09-08T10:00');
+  await page.getByLabel('Action').fill(persistedTask.title);
+  await page.getByRole('button', { name: 'Schedule' }).click();
+  await expect(page.getByText(persistedTask.title)).toBeVisible();
+  expect(taskRequest).toEqual({
+    kind: 'follow_up',
+    title: persistedTask.title,
+    dueAt: new Date('2026-09-08T10:00').toISOString(),
+  });
+  const completeTask = page.getByRole('button', {
+    name: `Complete: ${persistedTask.title}`,
+  });
+  await completeTask.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollBy(0, 96));
+  await completeTask.click();
+  await expect(
+    page.getByRole('button', { name: `Reopen: ${persistedTask.title}` }),
+  ).toBeVisible();
   if (process.env.CAREER_OS_MILESTONE_SCREENSHOT)
     await page.screenshot({
       path: 'docs/build-in-public/application-activity-en.png',

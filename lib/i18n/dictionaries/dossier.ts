@@ -40,6 +40,18 @@ export const dossierMessages = {
   'Aucun événement pour le moment': 'No activity yet',
   'Ajoutez le premier contact ou entretien de cette candidature.':
     'Add the first contact or interview for this application.',
+  'Prochaines actions': 'Next actions',
+  'Tâches et relances datées': 'Dated tasks and follow-ups',
+  Tâche: 'Task',
+  Relance: 'Follow-up',
+  Échéance: 'Due date',
+  'Action à réaliser': 'Action',
+  'Relancer la recruteuse après l’entretien':
+    'Follow up with the recruiter after the interview',
+  Planifier: 'Schedule',
+  'La modification n’a pas été enregistrée.': 'The change could not be saved.',
+  'Chargement des prochaines actions…': 'Loading next actions…',
+  'Aucune action planifiée.': 'No action scheduled.',
   'Candidature réelle · données persistées':
     'Real application · persisted data',
   Étape: 'Stage',

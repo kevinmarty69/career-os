@@ -3,6 +3,7 @@ import { persistedPublicationOperation } from './run-operation';
 import type { SearchProfileFields } from './search-profile';
 import type { OpportunityDecisionInput } from './opportunity-decision';
 import type { ApplicationTimelineInput } from './application-timeline';
+import type { ApplicationTask, ApplicationTaskInput } from './application-task';
 
 export function readProfile(signal: AbortSignal) {
   return fetch('/api/profile', { cache: 'no-store', signal });
@@ -45,6 +46,38 @@ export function createApplicationTimelineEvent(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(input),
+  });
+}
+
+export function readApplicationTasks(
+  applicationId: string,
+  signal: AbortSignal,
+) {
+  return fetch(`/api/applications/${applicationId}/tasks`, {
+    cache: 'no-store',
+    signal,
+  });
+}
+
+export function createApplicationTask(
+  applicationId: string,
+  input: ApplicationTaskInput,
+) {
+  return fetch(`/api/applications/${applicationId}/tasks`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export function setApplicationTaskCompleted(
+  task: Pick<ApplicationTask, 'applicationId' | 'taskId' | 'revision'>,
+  completed: boolean,
+) {
+  return fetch(`/api/applications/${task.applicationId}/tasks/${task.taskId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ completed, expectedRevision: task.revision }),
   });
 }
 

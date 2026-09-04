@@ -26,14 +26,22 @@ import {
   type ApplicationTimelineEvent,
 } from '@/lib/application-timeline';
 import {
+  applicationTaskListSchema,
+  applicationTaskSchema,
+  type ApplicationTask,
+} from '@/lib/application-task';
+import {
+  createApplicationTask,
   createApplicationTimelineEvent,
   readApplication,
   readApplicationTimeline,
+  readApplicationTasks,
   readApplicationRun,
   readApplications,
   readPublications,
   revokePublication,
   saveApplicationBrand,
+  setApplicationTaskCompleted,
 } from '@/lib/career-api';
 import {
   publicationSummarySchema,
@@ -1089,10 +1097,187 @@ function ApplicationTimelineScreen({
                 </div>
               )}
             </section>
+            <ApplicationTasksPanel applicationId={applicationId} />
           </>
         )}
       </div>
     </DossierShell>
+  );
+}
+
+function ApplicationTasksPanel({ applicationId }: { applicationId: string }) {
+  const { locale } = useI18n();
+  const localize = useLocalizer([dossierMessages]);
+  const [tasks, setTasks] = useState<ApplicationTask[]>();
+  const [saving, setSaving] = useState(false);
+  const [pendingTaskId, setPendingTaskId] = useState<string>();
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void readApplicationTasks(applicationId, controller.signal)
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const parsed = applicationTaskListSchema.parse(await response.json());
+        setTasks(parsed.tasks);
+      })
+      .catch((requestError: unknown) => {
+        if (
+          !(requestError instanceof DOMException) ||
+          requestError.name !== 'AbortError'
+        )
+          setError(true);
+      });
+    return () => controller.abort();
+  }, [applicationId]);
+
+  async function addTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    setSaving(true);
+    setError(false);
+    try {
+      const response = await createApplicationTask(applicationId, {
+        kind: String(form.get('kind')) as ApplicationTask['kind'],
+        title: String(form.get('title') ?? ''),
+        dueAt: new Date(String(form.get('dueAt'))).toISOString(),
+      });
+      if (!response.ok) throw new Error();
+      const created = applicationTaskSchema.parse(await response.json());
+      setTasks([...(tasks ?? []), created].sort(compareApplicationTasks));
+      formElement.reset();
+    } catch {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleTask(task: ApplicationTask) {
+    if (pendingTaskId) return;
+    setPendingTaskId(task.taskId);
+    setError(false);
+    try {
+      const response = await setApplicationTaskCompleted(
+        task,
+        !task.completedAt,
+      );
+      if (!response.ok) throw new Error();
+      const updated = applicationTaskSchema.parse(await response.json());
+      setTasks(
+        (tasks ?? [])
+          .map((candidate) =>
+            candidate.taskId === updated.taskId ? updated : candidate,
+          )
+          .sort(compareApplicationTasks),
+      );
+    } catch {
+      setError(true);
+    } finally {
+      setPendingTaskId(undefined);
+    }
+  }
+
+  return localize(
+    <section className="co-panel co-application-tasks">
+      <header>
+        <div>
+          <p>Prochaines actions</p>
+          <h2>Tâches et relances datées</h2>
+        </div>
+        <Badge>{tasks?.filter((task) => !task.completedAt).length ?? 0}</Badge>
+      </header>
+      <form onSubmit={addTask}>
+        <label>
+          Type
+          <select defaultValue="follow_up" name="kind">
+            <option value="task">Tâche</option>
+            <option value="follow_up">Relance</option>
+          </select>
+        </label>
+        <label>
+          Échéance
+          <input name="dueAt" required type="datetime-local" />
+        </label>
+        <label className="wide">
+          Action à réaliser
+          <input
+            maxLength={200}
+            name="title"
+            placeholder="Relancer la recruteuse après l’entretien"
+            required
+          />
+        </label>
+        <button className="co-button" disabled={saving} type="submit">
+          {saving ? 'Enregistrement…' : 'Planifier'}
+        </button>
+      </form>
+      {error ? (
+        <p className="co-task-error" role="alert">
+          La modification n’a pas été enregistrée.
+        </p>
+      ) : null}
+      <div className="co-task-list">
+        {tasks === undefined ? (
+          <p>Chargement des prochaines actions…</p>
+        ) : tasks.length ? (
+          tasks.map((task) => (
+            <article
+              className={task.completedAt ? 'done' : ''}
+              key={task.taskId}
+            >
+              <button
+                aria-label={
+                  locale === 'en'
+                    ? `${task.completedAt ? 'Reopen' : 'Complete'}: ${task.title}`
+                    : `${task.completedAt ? 'Rouvrir' : 'Terminer'} : ${task.title}`
+                }
+                disabled={pendingTaskId === task.taskId}
+                onClick={() => void toggleTask(task)}
+                type="button"
+              >
+                <Icon>
+                  {task.completedAt ? 'check_circle' : 'radio_button_unchecked'}
+                </Icon>
+              </button>
+              <div>
+                <p>
+                  <strong>{task.title}</strong>
+                  <Badge tone={task.kind === 'follow_up' ? 'warn' : 'muted'}>
+                    {taskKindLabel(task.kind, locale)}
+                  </Badge>
+                </p>
+                <time dateTime={task.dueAt}>
+                  {new Intl.DateTimeFormat(locale, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  }).format(new Date(task.dueAt))}
+                </time>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p>Aucune action planifiée.</p>
+        )}
+      </div>
+    </section>,
+  );
+}
+
+function taskKindLabel(kind: ApplicationTask['kind'], locale: 'en' | 'fr') {
+  if (kind === 'follow_up') return locale === 'en' ? 'Follow-up' : 'Relance';
+  return locale === 'en' ? 'Task' : 'Tâche';
+}
+
+function compareApplicationTasks(
+  left: ApplicationTask,
+  right: ApplicationTask,
+) {
+  return (
+    Number(Boolean(left.completedAt)) - Number(Boolean(right.completedAt)) ||
+    left.dueAt.localeCompare(right.dueAt)
   );
 }
 

@@ -2454,6 +2454,143 @@
   font-size: 11px;
 }
 
+.co-application-tasks {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 22px;
+  padding: 22px;
+}
+
+.co-application-tasks > header {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.co-application-tasks > header p,
+.co-application-tasks > header h2 {
+  margin: 0;
+}
+
+.co-application-tasks > header p {
+  margin-bottom: 4px;
+  color: var(--co-accent);
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.co-application-tasks > header h2 {
+  font-size: 17px;
+}
+
+.co-application-tasks > form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-content: start;
+}
+
+.co-application-tasks label {
+  display: grid;
+  gap: 7px;
+  color: var(--co-text-3);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.co-application-tasks label.wide,
+.co-application-tasks .co-button {
+  grid-column: 1 / -1;
+}
+
+.co-application-tasks input,
+.co-application-tasks select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: var(--co-text);
+  border: 1px solid var(--co-divider);
+  border-radius: 10px;
+  background: var(--co-surface);
+  font: inherit;
+}
+
+.co-task-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--co-crit-text);
+  font-size: 11px;
+}
+
+.co-task-list {
+  min-width: 0;
+}
+
+.co-task-list > p {
+  margin: 0;
+  padding: 18px;
+  color: var(--co-text-4);
+  border: 1px dashed var(--co-border);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.co-task-list article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--co-divider);
+}
+
+.co-task-list article:last-child {
+  border-bottom: 0;
+}
+
+.co-task-list article > button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  color: var(--co-accent);
+  border: 0;
+  border-radius: 10px;
+  background: var(--co-accent-soft);
+  cursor: pointer;
+}
+
+.co-task-list article > button .co-icon {
+  max-width: none;
+}
+
+.co-task-list article.done {
+  opacity: 0.58;
+}
+
+.co-task-list article.done strong {
+  text-decoration: line-through;
+}
+
+.co-task-list article p {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.co-task-list time {
+  display: block;
+  margin-top: 4px;
+  color: var(--co-text-4);
+  font-size: 11px;
+}
+
 .co-live-dossier-state,
 .co-live-dossier-card {
   max-width: 980px;
@@ -6698,6 +6835,16 @@
     grid-row: auto;
   }
 
+  .co-application-tasks {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .co-application-tasks > header,
+  .co-application-tasks > form,
+  .co-task-list {
+    grid-column: 1;
+  }
+
   .co-surface,
   .co-dossier-shell > section,
   .co-settings-shell > section {
@@ -6926,7 +7073,7 @@
   }
 
   .co-dossier-content {
-    padding: 14px;
+    padding: 14px 14px 96px;
   }
 
   .co-analysis-v2 > * {
