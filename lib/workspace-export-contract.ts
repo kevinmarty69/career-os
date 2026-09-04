@@ -1,7 +1,39 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 1;
+export const workspaceExportVersion = 2;
 
 export const workspaceExportTables = [
+  {
+    type: 'search_profiles',
+    table: 'search_profiles',
+    columns: [
+      'id',
+      'tenant_id',
+      'name',
+      'hard_constraints',
+      'soft_preferences',
+      'active',
+      'revision',
+      'created_at',
+      'updated_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'audit_events',
+    table: 'audit_events',
+    columns: [
+      'id',
+      'tenant_id',
+      'actor',
+      'actor_id',
+      'event_type',
+      'entity_type',
+      'entity_id',
+      'summary',
+      'created_at',
+    ],
+    orderBy: ['id'],
+  },
   {
     type: 'applications',
     table: 'applications',

@@ -8,4 +8,3 @@ Le front historique reste hors du parcours visible. La suite du MVP avancé sera
 
 - `approved-shell-home.png` - accueil et prochaine décision humaine
 - `approved-shell-applications.png` - pipeline des candidatures
-

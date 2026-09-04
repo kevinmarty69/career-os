@@ -220,6 +220,19 @@ export async function saveLivingProfile(
         });
       }
 
+      await tx`select app.record_human_audit_event(
+        ${session.tenantId},
+        ${existing ? 'career_memory.updated' : 'career_memory.created'},
+        'profile',
+        ${storedProfile.id},
+        ${tx.json({
+          revision: Number(storedProfile.revision),
+          sourceCount: storedSources.length,
+          evidenceCount: storedEvidence.length,
+          claimCount: storedClaims.length,
+        })}
+      )`;
+
       return {
         profile: profileSchema.parse({
           name: profile.name,
