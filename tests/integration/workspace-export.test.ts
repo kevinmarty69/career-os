@@ -1,0 +1,312 @@
+import assert from 'node:assert/strict';
+import { createHash, randomUUID } from 'node:crypto';
+import test from 'node:test';
+import postgres from 'postgres';
+import {
+  workspaceExportFormat,
+  workspaceExportTables,
+  workspaceExportVersion,
+} from '../../lib/workspace-export-contract';
+import {
+  exportWorkspace,
+  WorkspaceExportRejectedError,
+  WorkspaceExportSessionNotFreshError,
+} from '../../lib/server/workspace-export';
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error('DATABASE_URL is required.');
+
+test('workspace export contract covers every tenant table and field', async () => {
+  const sql = postgres(databaseUrl, { max: 1 });
+  try {
+    const columns = await sql<
+      { table_name: string; column_name: string }[]
+    >`select table_name, column_name
+       from information_schema.columns
+       where table_schema = 'app' and table_name in (
+         select table_name from information_schema.columns
+         where table_schema = 'app' and column_name = 'tenant_id'
+       )`;
+    const actual = new Map<string, { column_name: string }[]>();
+    for (const { table_name, column_name } of columns)
+      actual.set(table_name, [
+        ...(actual.get(table_name) ?? []),
+        { column_name },
+      ]);
+    assert.deepEqual(
+      [...actual.keys()].sort(),
+      workspaceExportTables.map(({ table }) => table).sort(),
+    );
+    const intentionalExclusions: Record<string, string[]> = {
+      workflow_steps: ['lease_owner'],
+      run_budget_reservations: ['owner_id'],
+      share_links: ['token_hash'],
+    };
+    for (const definition of workspaceExportTables)
+      assert.deepEqual(
+        actual
+          .get(definition.table)
+          ?.map(({ column_name }) => column_name)
+          .sort(),
+        [
+          ...definition.columns,
+          ...(intentionalExclusions[definition.table] ?? []),
+        ].sort(),
+        `${definition.table} export fields drifted`,
+      );
+  } finally {
+    await sql.end();
+  }
+});
+
+test('fresh owners export an isolated, verifiable stream without secrets', async () => {
+  const sql = postgres(databaseUrl, { max: 1 });
+  const ownerId = randomUUID();
+  const memberId = randomUUID();
+  const otherOwnerId = randomUUID();
+  const tenantId = randomUUID();
+  const otherTenantId = randomUUID();
+  const applicationId = randomUUID();
+  const otherApplicationId = randomUUID();
+  const opportunityId = randomUUID();
+  const runId = randomUUID();
+  const stepId = randomUUID();
+  const pageSpecId = randomUUID();
+  const publicationId = randomUUID();
+  const secret = `must-not-export-${randomUUID()}`;
+  const workerOwnerSecret = randomUUID();
+  const largeLogo = `data:image/svg+xml,${'x'.repeat(70_000)}`;
+  try {
+    await sql.begin(async (transaction) => {
+      await transaction`insert into auth."user" (id, name, email, "emailVerified") values
+        (${ownerId}, 'Export Owner', ${`${ownerId}@example.test`}, true),
+        (${memberId}, 'Export Member', ${`${memberId}@example.test`}, true),
+        (${otherOwnerId}, 'Other Owner', ${`${otherOwnerId}@example.test`}, true)`;
+      await transaction`insert into auth.organization (
+        id, name, slug, metadata, "createdAt"
+      ) values
+        (${tenantId}, 'Export workspace', ${`export-${tenantId}`}, ${secret}, now()),
+        (${otherTenantId}, ${secret}, ${`other-${otherTenantId}`}, null, now())`;
+      await transaction`update auth.organization set logo = ${largeLogo}
+        where id = ${tenantId}`;
+      await transaction`insert into auth.member (
+        id, "organizationId", "userId", role, "createdAt"
+      ) values
+        (${randomUUID()}, ${tenantId}, ${ownerId}, 'owner', now()),
+        (${randomUUID()}, ${tenantId}, ${memberId}, 'member', now()),
+        (${randomUUID()}, ${otherTenantId}, ${otherOwnerId}, 'owner', now())`;
+      await transaction`insert into auth.account (
+        id, issuer, "accountId", "providerId", "userId", "accessToken",
+        "refreshToken", "idToken", password, "createdAt", "updatedAt"
+      ) values (
+        ${randomUUID()}, 'career-os', ${ownerId}, 'credential', ${ownerId}, ${secret},
+        ${secret}, ${secret}, ${secret}, now(), now()
+      )`;
+      await transaction`insert into auth.session (
+        id, "expiresAt", token, "createdAt", "updatedAt", "ipAddress", "userAgent",
+        "userId", "activeOrganizationId"
+      ) values (
+        ${randomUUID()}, now() + interval '1 day', ${secret}, now(), now(), ${secret},
+        ${secret}, ${ownerId}, ${tenantId}
+      )`;
+      await transaction`insert into auth.verification (
+        id, identifier, value, "expiresAt", "createdAt", "updatedAt"
+      ) values (${randomUUID()}, ${ownerId}, ${secret}, now() + interval '1 day', now(), now())`;
+      await transaction`insert into app.tenants (id, owner_id, name) values
+        (${tenantId}, ${ownerId}, 'Export workspace'),
+        (${otherTenantId}, ${otherOwnerId}, ${secret})`;
+      await transaction`insert into app.applications (
+        id, tenant_id, company, role, raw_text, accent, create_idempotency_key,
+        create_input_hash, deleted_at
+      ) values
+        (${applicationId}, ${tenantId}, 'Visible Co', 'Engineer', 'visible application',
+          '#21504b', ${randomUUID()}, ${'a'.repeat(64)}, now()),
+        (${otherApplicationId}, ${otherTenantId}, ${secret}, 'Engineer', ${secret},
+          '#21504b', ${randomUUID()}, ${'b'.repeat(64)}, null)`;
+      await transaction`insert into app.opportunities (
+        id, tenant_id, application_id, application_revision, company, role, raw_text,
+        extraction_status
+      ) values (
+        ${opportunityId}, ${tenantId}, ${applicationId}, 1, 'Visible Co', 'Engineer',
+        'visible opportunity', 'ready'
+      )`;
+      await transaction`insert into app.workflow_runs (
+        id, tenant_id, opportunity_id, state, status, token_budget,
+        cost_budget_micros, deadline_at
+      ) values (
+        ${runId}, ${tenantId}, ${opportunityId}, 'publication_ready', 'completed',
+        100, 0, now() + interval '1 hour'
+      )`;
+      await transaction`insert into app.workflow_steps (
+        id, tenant_id, workflow_run_id, stage, status, idempotency_key, lease_owner
+      ) values (${stepId}, ${tenantId}, ${runId}, 'company_researcher', 'completed',
+        ${randomUUID()}, ${secret})`;
+      await transaction`insert into app.workflow_events (
+        tenant_id, workflow_run_id, actor, event_type, summary
+      ) values (${tenantId}, ${runId}, 'system', 'export_test', 'visible event')`;
+      await transaction`insert into app.artifacts (
+        tenant_id, workflow_run_id, kind, version, body, created_by
+      ) values (${tenantId}, ${runId}, 'research', 1, '{"visible":true}', 'company_researcher')`;
+      await transaction`insert into app.run_budget_reservations (
+        tenant_id, workflow_run_id, idempotency_key, owner_id, requested_tokens,
+        requested_cost_micros, lease_expires_at
+      ) values (${tenantId}, ${runId}, ${randomUUID()}, ${workerOwnerSecret}, 10, 0,
+        now() + interval '1 hour')`;
+      await transaction`insert into app.model_usage (
+        tenant_id, workflow_run_id, actor, provider, model, input_tokens,
+        output_tokens, cost_micros, latency_ms, workflow_step_id
+      ) values (${tenantId}, ${runId}, 'company_researcher', 'local', 'test',
+        900719925, 1, 0, 1, ${stepId})`;
+      await transaction`insert into app.page_specs (
+        id, tenant_id, workflow_run_id, version, spec
+      ) values (${pageSpecId}, ${tenantId}, ${runId}, 1, '{"blocks":[]}')`;
+      await transaction.unsafe('set local session_replication_role = replica');
+      await transaction`insert into app.publications (
+        id, tenant_id, page_spec_id, publication_payload
+      ) values (${publicationId}, ${tenantId}, ${pageSpecId}, '{"visible":true}')`;
+      await transaction`insert into app.share_links (
+        tenant_id, publication_id, token_hash, expires_at
+      ) values (${tenantId}, ${publicationId}, digest(${secret}, 'sha256'),
+        now() + interval '1 day')`;
+      await transaction.unsafe('set local session_replication_role = origin');
+      await transaction`insert into app.url_import_attempts (
+        tenant_id, actor_id, status, finished_at
+      ) values (${tenantId}, ${ownerId}, 'succeeded', now())`;
+    });
+
+    await assert.rejects(
+      exportWorkspace({
+        userId: memberId,
+        tenantId,
+        tenantName: 'Export workspace',
+        sessionCreatedAt: new Date(),
+      }),
+      WorkspaceExportRejectedError,
+    );
+    await assert.rejects(
+      exportWorkspace({
+        userId: ownerId,
+        tenantId,
+        tenantName: 'Export workspace',
+        sessionCreatedAt: new Date(Date.now() - 11 * 60_000),
+      }),
+      WorkspaceExportSessionNotFreshError,
+    );
+
+    const exported = await settleWithin(
+      exportWorkspace({
+        userId: ownerId,
+        tenantId,
+        tenantName: 'Export workspace',
+        sessionCreatedAt: new Date(),
+      }),
+      2_000,
+    );
+    const text = await new Response(exported.body).text();
+    assert.equal(text.includes(secret), false);
+    assert.equal(text.includes(workerOwnerSecret), false);
+    assert.equal(text.includes('token_hash'), false);
+    assert.equal(text.includes('lease_owner'), false);
+    assert.equal(text.includes('owner_id\":\"must-not-export'), false);
+    const lines = text.trimEnd().split('\n');
+    const records = lines.map((line) => JSON.parse(line));
+    assert.equal(records[0].type, 'manifest');
+    assert.equal(records[0].data.format, workspaceExportFormat);
+    assert.equal(records[0].data.version, workspaceExportVersion);
+    assert.equal(records.at(-1).type, 'complete');
+    assert.equal(
+      records.at(-1).data.sha256,
+      createHash('sha256')
+        .update(`${lines.slice(0, -1).join('\n')}\n`)
+        .digest('hex'),
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'applications' &&
+          record.data.id === applicationId &&
+          record.data.deleted_at,
+      ),
+      true,
+    );
+    const exportedApplication = records.find(
+      (record) =>
+        record.type === 'applications' && record.data.id === applicationId,
+    );
+    assert.match(exportedApplication.data.created_at, /\.\d{6}\+00$/);
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'share_links' && !('token_hash' in record.data),
+      ),
+      true,
+    );
+    assert.equal(
+      records.some((record) => record.type === 'worker_heartbeats'),
+      false,
+    );
+
+    const cancelled = await exportWorkspace({
+      userId: ownerId,
+      tenantId,
+      tenantName: 'Export workspace',
+      sessionCreatedAt: new Date(),
+    });
+    await cancelled.body.cancel();
+    await waitForExportLockRelease(sql, tenantId);
+    const afterCancellation = await exportWorkspace({
+      userId: ownerId,
+      tenantId,
+      tenantName: 'Export workspace',
+      sessionCreatedAt: new Date(),
+    });
+    assert.match(
+      await new Response(afterCancellation.body).text(),
+      /"type":"complete"/,
+    );
+  } finally {
+    await sql`delete from app.tenants where id in (${tenantId}, ${otherTenantId})`;
+    await sql`delete from auth.organization where id in (${tenantId}, ${otherTenantId})`;
+    await sql`delete from auth."user" where id in (${ownerId}, ${memberId}, ${otherOwnerId})`;
+    await sql`delete from auth.verification where identifier = ${ownerId}`;
+    await sql.end();
+  }
+});
+
+async function waitForExportLockRelease(
+  sql: ReturnType<typeof postgres>,
+  tenantId: string,
+) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const [lock] = await sql<
+      { acquired: boolean }[]
+    >`select pg_try_advisory_lock(
+        hashtextextended('workspace-export:' || ${tenantId}::text, 0)
+      ) as acquired`;
+    if (lock.acquired) {
+      await sql`select pg_advisory_unlock(
+        hashtextextended('workspace-export:' || ${tenantId}::text, 0)
+      )`;
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.fail('cancelled export kept its transaction lock');
+}
+
+async function settleWithin<T>(promise: Promise<T>, milliseconds: number) {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('export headers deadlocked')),
+          milliseconds,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
