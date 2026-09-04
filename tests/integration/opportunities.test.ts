@@ -1,11 +1,22 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { Pool } from 'pg';
 import { syntheticProfile } from '../../lib/fixture';
+import {
+  buildSemanticAnalysis,
+  type SemanticAnalysisInput,
+} from '../../lib/semantic-match';
 import {
   listDiscoveredJobs,
   storeDiscoveredJob,
 } from '../../lib/server/discovered-jobs';
+import { LocalModelClientError } from '../../lib/server/local-openai-client';
+import type { LocalSemanticMatchResult } from '../../lib/server/local-openai-semantic-client';
+import {
+  runSemanticAnalysis,
+  SemanticAnalysisModelNotConfiguredError,
+} from '../../lib/server/semantic-analyses';
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
 const authOrigin = process.env.TEST_AUTH_ORIGIN ?? baseUrl;
@@ -446,6 +457,21 @@ async function main() {
     'unknown',
   );
   assert.equal(persistedMatches[0].livingProfile, null);
+  let semanticCalls = 0;
+  const blockedSemantic = await runSemanticAnalysis(
+    owner.session,
+    connected.opportunity.opportunityId,
+    searchProfile.searchProfileId,
+    {
+      generate: async () => {
+        semanticCalls += 1;
+        throw new Error('blocked semantic analysis called the model');
+      },
+    },
+  );
+  assert.equal(blockedSemantic.status, 'blocked');
+  assert.equal(blockedSemantic.reason, 'hard_constraints');
+  assert.equal(semanticCalls, 0);
   await expectStatus(
     await owner.browser.request(matchPath),
     400,
@@ -505,6 +531,208 @@ async function main() {
   assert.notEqual(revised.matchId, persistedMatches[0].matchId);
   assert.equal(revised.searchProfileRevision, 2);
   assert.equal(revised.evaluation.decision, 'priority');
+
+  const semanticPath = `/api/opportunities/${connected.opportunity.opportunityId}/semantic-analysis?searchProfileId=${searchProfile.searchProfileId}`;
+  await expectStatus(
+    await anonymous.request(semanticPath, 'POST'),
+    401,
+    'anonymous semantic analysis',
+  );
+  await expectStatus(
+    await owner.browser.request(semanticPath, 'POST', undefined, {
+      origin: 'https://attacker.example',
+    }),
+    403,
+    'cross-origin semantic analysis',
+  );
+  await assert.rejects(
+    runSemanticAnalysis(
+      owner.session,
+      connected.opportunity.opportunityId,
+      searchProfile.searchProfileId,
+    ),
+    SemanticAnalysisModelNotConfiguredError,
+  );
+  const unavailable = await owner.browser.request(semanticPath, 'POST');
+  await expectStatus(unavailable, 503, 'unconfigured local semantic model');
+  assert.equal(
+    await unavailable.text(),
+    'Local semantic model is not configured.',
+  );
+  let unavailableCalls = 0;
+  await assert.rejects(
+    runSemanticAnalysis(
+      owner.session,
+      connected.opportunity.opportunityId,
+      searchProfile.searchProfileId,
+      {
+        generate: async () => {
+          unavailableCalls += 1;
+          throw new LocalModelClientError('PROVIDER_UNAVAILABLE');
+        },
+      },
+    ),
+    (error: unknown) =>
+      error instanceof LocalModelClientError &&
+      error.code === 'PROVIDER_UNAVAILABLE',
+  );
+  assert.equal(unavailableCalls, 1);
+
+  const semanticClient = {
+    async generate(
+      input: SemanticAnalysisInput,
+    ): Promise<LocalSemanticMatchResult> {
+      semanticCalls += 1;
+      await delay(25);
+      return {
+        output: buildSemanticAnalysis(input, {
+          skills: [],
+          responsibilities: [],
+          transfers: [],
+          gaps: [],
+          unknowns: [
+            {
+              statement: 'Le niveau de preuve disponible reste à confirmer.',
+              factor: 'unknown',
+              jobExcerpt: input.job.description,
+              profileReferences: [],
+            },
+          ],
+          risks: [],
+        }),
+        usage: {
+          inputTokens: 12,
+          outputTokens: 4,
+          costMicros: 0,
+          latencyMs: 7,
+          reservedTokens: 200,
+          reservedCostMicros: 0,
+        },
+        provider: 'openai-compatible-local',
+        model: 'integration-semantic-model',
+        providerRequestId: 'semantic-integration-request',
+      };
+    },
+  };
+  const analyses = await Promise.all(
+    Array.from({ length: 4 }, () =>
+      runSemanticAnalysis(
+        owner.session,
+        connected.opportunity.opportunityId,
+        searchProfile.searchProfileId,
+        semanticClient,
+      ),
+    ),
+  );
+  assert.equal(semanticCalls, 1);
+  assert.equal(
+    new Set(
+      analyses.map((result) =>
+        result.status === 'completed' ? result.analysis.analysisId : '',
+      ),
+    ).size,
+    1,
+  );
+  const semantic = analyses[0];
+  assert.equal(semantic.status, 'completed');
+  if (semantic.status !== 'completed') throw new Error('analysis blocked');
+  assert.equal(semantic.analysis.jobMatchId, revised.matchId);
+  assert.equal(semantic.analysis.jobRevision, revised.jobRevision);
+  assert.equal(
+    semantic.analysis.searchProfileRevision,
+    revised.searchProfileRevision,
+  );
+  assert.equal(
+    semantic.analysis.livingProfile.revision,
+    revised.livingProfile?.revision,
+  );
+  assert.equal(semantic.analysis.artifact.jobRevision, revised.jobRevision);
+  assert.equal(semantic.analysis.usage.costBudgetMicros, 0);
+  assert.equal(semantic.analysis.usage.costMicros, 0);
+  assert.equal(
+    semantic.analysis.usage.providerRequestId,
+    'semantic-integration-request',
+  );
+  await expectStatus(
+    await owner.browser.request(semanticPath),
+    403,
+    'semantic analysis GET requires same origin',
+  );
+  const readSemantic = await owner.browser.request(
+    semanticPath,
+    'GET',
+    undefined,
+    { origin: requestOrigin },
+  );
+  await expectStatus(readSemantic, 200, 'semantic analysis read');
+  assert.equal(
+    ((await readSemantic.json()) as { analysis: { analysisId: string } })
+      .analysis.analysisId,
+    semantic.analysis.analysisId,
+  );
+  const reobservedInput = greenhouseObservation('open', 'c'.repeat(64));
+  reobservedInput.provenance.fetchedAt = '2026-09-04T12:00:00.000Z';
+  const reobserved = await storeDiscoveredJob(owner.session, reobservedInput);
+  assert.equal(reobserved.opportunity.revision, revised.jobRevision);
+  const replayedSemantic = await runSemanticAnalysis(
+    owner.session,
+    connected.opportunity.opportunityId,
+    searchProfile.searchProfileId,
+    semanticClient,
+  );
+  assert.equal(replayedSemantic.status, 'completed');
+  if (replayedSemantic.status !== 'completed')
+    throw new Error('replay blocked');
+  assert.equal(
+    replayedSemantic.analysis.analysisId,
+    semantic.analysis.analysisId,
+  );
+  assert.equal(semanticCalls, 1);
+
+  const semanticPool = new Pool({ connectionString: databaseUrl });
+  try {
+    const persisted = await semanticPool.query<{
+      count: string;
+      job_match_id: string;
+      job_revision: string;
+      search_profile_revision: string;
+      living_profile_revision: string;
+      provider: string;
+      model: string;
+      provider_request_id: string;
+      cost_budget_micros: string;
+      cost_micros: string;
+    }>(
+      `select count(*) over () count, job_match_id, job_revision,
+        search_profile_revision, living_profile_revision, provider, model,
+        provider_request_id, cost_budget_micros, cost_micros
+       from app.semantic_analyses where tenant_id = $1`,
+      [owner.session.tenantId],
+    );
+    assert.deepEqual(persisted.rows, [
+      {
+        count: '1',
+        job_match_id: revised.matchId,
+        job_revision: String(revised.jobRevision),
+        search_profile_revision: String(revised.searchProfileRevision),
+        living_profile_revision: String(revised.livingProfile?.revision),
+        provider: 'openai-compatible-local',
+        model: 'integration-semantic-model',
+        provider_request_id: 'semantic-integration-request',
+        cost_budget_micros: '0',
+        cost_micros: '0',
+      },
+    ]);
+    await assert.rejects(
+      semanticPool.query(
+        `update app.semantic_analyses set model = 'mutated' where id = $1`,
+        [semantic.analysis.analysisId],
+      ),
+      /semantic_analyses rows are immutable/,
+    );
+  } finally {
+    await semanticPool.end();
+  }
 
   const greenhouse = greenhouseObservation('open', 'd'.repeat(64));
   const syndicatedUrl = 'https://jobs.ashbyhq.com/acme/syndicated-101';
@@ -593,6 +821,13 @@ async function main() {
     }),
     404,
     'cross-tenant hard match',
+  );
+  await expectStatus(
+    await other.browser.request(semanticPath, 'GET', undefined, {
+      origin: requestOrigin,
+    }),
+    404,
+    'cross-tenant semantic analysis',
   );
 
   const pool = new Pool({ connectionString: databaseUrl });

@@ -27,6 +27,20 @@ insert into auth.invitation (
 insert into app.tenants (id, owner_id, name) values
   ('f2000000-0000-4000-8000-000000000001', 'f1000000-0000-4000-8000-000000000001', 'Delete me exactly'),
   ('f2000000-0000-4000-8000-000000000002', 'f1000000-0000-4000-8000-000000000001', 'Keep me');
+insert into app.profiles (
+  id, tenant_id, name, headline, profile_kind, revision
+) values (
+  'f2050000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'Delete profile', 'Engineer', 'living', 1
+);
+insert into app.profile_revisions (
+  tenant_id, profile_id, revision, snapshot
+) values (
+  'f2000000-0000-4000-8000-000000000001',
+  'f2050000-0000-4000-8000-000000000001', 1,
+  '{"name":"Delete profile","headline":"Engineer","sources":[],"evidence":[],"claims":[]}'::jsonb
+);
 insert into app.sources (id, tenant_id, kind, title, sensitivity, allowed_uses) values
   ('f6000000-0000-4000-8000-000000000001', 'f2000000-0000-4000-8000-000000000001', 'manual', 'Delete source', 'private', '{application}'),
   ('f6000000-0000-4000-8000-000000000002', 'f2000000-0000-4000-8000-000000000002', 'manual', 'Keep source', 'private', '{application}');
@@ -105,14 +119,31 @@ insert into app.opportunity_decision_events (
 );
 insert into app.job_matches (
   id, tenant_id, discovered_job_id, job_revision, search_profile_id,
-  search_profile_revision, decision, job_snapshot, search_profile_snapshot,
-  criteria
+  search_profile_revision, living_profile_id, living_profile_revision,
+  decision, job_snapshot, search_profile_snapshot, criteria
 ) values (
   'f7090000-0000-4000-8000-000000000001',
   'f2000000-0000-4000-8000-000000000001',
   'f7050000-0000-4000-8000-000000000001', 1,
-  'f7080000-0000-4000-8000-000000000001', 1, 'priority',
+  'f7080000-0000-4000-8000-000000000001', 1,
+  'f2050000-0000-4000-8000-000000000001', 1, 'priority',
   '{"revision":1}'::jsonb, '{"revision":1}'::jsonb, '[]'::jsonb
+);
+insert into app.semantic_analyses (
+  id, tenant_id, version, schema_version, job_match_id,
+  discovered_job_id, job_revision, search_profile_id,
+  search_profile_revision, living_profile_id, living_profile_revision,
+  input_hash, input, artifact, provider, model, provider_request_id,
+  reserved_tokens, input_tokens, output_tokens, cost_micros, latency_ms
+) values (
+  'f7095000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001', 1, 1,
+  'f7090000-0000-4000-8000-000000000001',
+  'f7050000-0000-4000-8000-000000000001', 1,
+  'f7080000-0000-4000-8000-000000000001', 1,
+  'f2050000-0000-4000-8000-000000000001', 1, repeat('d', 64),
+  '{"delete":true}'::jsonb, '{"delete":true}'::jsonb,
+  'openai-compatible-local', 'local-test', 'delete-request', 20, 12, 4, 0, 7
 );
 insert into app.opportunities (
   id, tenant_id, application_id, application_revision, company, role,
@@ -214,6 +245,7 @@ do $$ begin
     or exists(select 1 from app.job_matches where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.opportunity_decisions where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.opportunity_decision_events where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.semantic_analyses where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then

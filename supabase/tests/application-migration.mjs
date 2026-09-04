@@ -5,6 +5,13 @@ import { Client } from 'pg';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required.');
+const migrationNames = (await readdir('supabase/migrations'))
+  .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/.test(name))
+  .sort();
+const latestMigration = migrationNames.at(-1).slice(0, 4);
+const migrationsAfterBaseline = migrationNames.filter(
+  (name) => name.slice(0, 4) > '0022',
+).length;
 
 const testDatabase = 'career_os_migration_test';
 const admin = new Client({ connectionString: databaseUrl });
@@ -131,14 +138,22 @@ try {
     },
   );
   assert.equal(migrated.status, 0, migrated.stderr || migrated.stdout);
-  assert.match(migrated.stdout, /Applied 12 migrations; schema at 0034\./);
+  assert.match(
+    migrated.stdout,
+    new RegExp(
+      `Applied ${migrationsAfterBaseline} migrations; schema at ${latestMigration}\\.`,
+    ),
+  );
   const rerun = spawnSync('pnpm', ['exec', 'tsx', 'scripts/migrate.ts'], {
     cwd: process.cwd(),
     env: { ...process.env, DATABASE_URL: testUrl.toString() },
     encoding: 'utf8',
   });
   assert.equal(rerun.status, 0, rerun.stderr || rerun.stdout);
-  assert.match(rerun.stdout, /Applied 0 migrations; schema at 0034\./);
+  assert.match(
+    rerun.stdout,
+    new RegExp(`Applied 0 migrations; schema at ${latestMigration}\\.`),
+  );
   const migratedState = await target.query(
     `select
       (select count(*)::integer from public.career_os_schema_migrations) as migration_count,
@@ -149,14 +164,14 @@ try {
           and table_name in (
             'discovered_jobs', 'job_source_records', 'job_observations',
             'job_matches', 'opportunity_decisions',
-            'opportunity_decision_events'
+            'opportunity_decision_events', 'semantic_analyses'
           )) as discovery_tables`,
   );
   assert.deepEqual(migratedState.rows[0], {
-    migration_count: 34,
+    migration_count: migrationNames.length,
     applications_defaulted: true,
     opportunities_defaulted: true,
-    discovery_tables: 6,
+    discovery_tables: 7,
   });
 
   await target.query(

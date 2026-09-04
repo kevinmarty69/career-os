@@ -75,6 +75,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const matchId = randomUUID();
   const opportunityDecisionId = randomUUID();
   const opportunityDecisionEventId = randomUUID();
+  const profileId = randomUUID();
+  const semanticAnalysisId = randomUUID();
   const opportunityId = randomUUID();
   const runId = randomUUID();
   const stepId = randomUUID();
@@ -138,6 +140,17 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         ${searchProfileId}, ${tenantId}, 'Visible search',
         '{"roles":["Platform Engineer"]}'::jsonb, '{}'::jsonb, true
       )`;
+      await transaction`insert into app.profiles (
+        id, tenant_id, name, headline, profile_kind, revision
+      ) values (
+        ${profileId}, ${tenantId}, 'Visible profile', 'Engineer', 'living', 1
+      )`;
+      await transaction`insert into app.profile_revisions (
+        tenant_id, profile_id, revision, snapshot
+      ) values (
+        ${tenantId}, ${profileId}, 1,
+        '{"name":"Visible profile","headline":"Engineer","sources":[],"evidence":[],"claims":[]}'::jsonb
+      )`;
       await transaction`insert into app.discovered_jobs (
         id, tenant_id, company, role, description, canonical_url,
         first_seen_at, last_seen_at
@@ -181,10 +194,11 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
       )`;
       await transaction`insert into app.job_matches (
         id, tenant_id, discovered_job_id, job_revision, search_profile_id,
-        search_profile_revision, decision, job_snapshot,
-        search_profile_snapshot, criteria
+        search_profile_revision, living_profile_id, living_profile_revision,
+        decision, job_snapshot, search_profile_snapshot, criteria
       ) values (
         ${matchId}, ${tenantId}, ${discoveredJobId}, 1, ${searchProfileId}, 1,
+        ${profileId}, 1,
         'priority', '{"revision":1}'::jsonb, '{"revision":1}'::jsonb,
         '[]'::jsonb
       )`;
@@ -205,6 +219,19 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         search_profile_id, disposition, qualification, reason, note, revision,
         actor_id, ${randomUUID()}, ${'d'.repeat(64)}, created_at
       from app.opportunity_decisions where id = ${opportunityDecisionId}`;
+      await transaction`insert into app.semantic_analyses (
+        id, tenant_id, version, schema_version, job_match_id,
+        discovered_job_id, job_revision, search_profile_id,
+        search_profile_revision, living_profile_id, living_profile_revision,
+        input_hash, input, artifact, provider, model, provider_request_id,
+        reserved_tokens, input_tokens, output_tokens, cost_micros, latency_ms
+      ) values (
+        ${semanticAnalysisId}, ${tenantId}, 1, 1, ${matchId},
+        ${discoveredJobId}, 1, ${searchProfileId}, 1, ${profileId}, 1,
+        ${'d'.repeat(64)}, '{"visible":true}'::jsonb,
+        '{"visible":true}'::jsonb, 'openai-compatible-local', 'local-test',
+        'visible-request-id', 20, 12, 4, 0, 7
+      )`;
       await transaction`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role, raw_text,
         extraction_status
@@ -327,6 +354,17 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
           record.type === 'opportunity_decision_events' &&
           record.data.id === opportunityDecisionEventId &&
           record.data.reason === 'strong_fit',
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'semantic_analyses' &&
+          record.data.id === semanticAnalysisId &&
+          record.data.job_match_id === matchId &&
+          record.data.provider_request_id === 'visible-request-id' &&
+          record.data.cost_micros === '0',
       ),
       true,
     );

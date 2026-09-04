@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 7;
+export const workspaceExportVersion = 8;
 
 export const workspaceExportTables = [
   {
@@ -188,6 +188,37 @@ export const workspaceExportTables = [
       'idempotency_key',
       'input_sha256',
       'decision_created_at',
+      'created_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'semantic_analyses',
+    table: 'semantic_analyses',
+    columns: [
+      'id',
+      'tenant_id',
+      'version',
+      'schema_version',
+      'job_match_id',
+      'discovered_job_id',
+      'job_revision',
+      'search_profile_id',
+      'search_profile_revision',
+      'living_profile_id',
+      'living_profile_revision',
+      'input_hash',
+      'input',
+      'artifact',
+      'provider',
+      'model',
+      'provider_request_id',
+      'reserved_tokens',
+      'input_tokens',
+      'output_tokens',
+      'cost_budget_micros',
+      'cost_micros',
+      'latency_ms',
       'created_at',
     ],
     orderBy: ['id'],

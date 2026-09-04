@@ -33,6 +33,8 @@ const environment = {
   CAREER_OS_DEPLOYMENT_MODE: 'self-hosted',
   CAREER_OS_E2E: '1',
   CAREER_OS_HTTP_TEST_SUFFIX: suffix,
+  CAREER_OS_LOCAL_MODEL_BASE_URL: '',
+  CAREER_OS_LOCAL_MODEL: '',
   DATABASE_URL: targetDatabaseUrl.toString(),
   TEST_AUTH_ORIGIN: baseUrl,
   TEST_BASE_URL: baseUrl,
