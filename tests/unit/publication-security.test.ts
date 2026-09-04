@@ -126,7 +126,10 @@ test('profile and publication inputs are bounded and separated', () => {
     false,
   );
   assert.equal(
-    publicationInputSchema.safeParse({ runId: randomUUID() }).success,
+    publicationInputSchema.safeParse({
+      runId: randomUUID(),
+      rawToken: `${randomUUID()}${randomUUID()}`,
+    }).success,
     true,
   );
   assert.equal(
@@ -142,6 +145,7 @@ test('profile and publication inputs are bounded and separated', () => {
   assert.equal(
     publicationInputSchema.safeParse({
       runId: randomUUID(),
+      rawToken: `${randomUUID()}${randomUUID()}`,
       approved: true,
     }).success,
     false,

@@ -28,3 +28,31 @@ export function persistedRunOperation(
   storage.setItem(storageKey, JSON.stringify(operation));
   return operation;
 }
+
+export function persistedPublicationOperation(
+  storage: RunOperationStorage,
+  storageKey: string,
+  runId: string,
+) {
+  try {
+    const stored = JSON.parse(storage.getItem(storageKey) ?? 'null') as {
+      runId?: unknown;
+      rawToken?: unknown;
+    } | null;
+    if (
+      stored?.runId === runId &&
+      typeof stored.rawToken === 'string' &&
+      stored.rawToken.length >= 64 &&
+      stored.rawToken.length <= 128
+    )
+      return { runId, rawToken: stored.rawToken };
+  } catch {
+    // Replace corrupt browser state with a fresh capability below.
+  }
+  const operation = {
+    runId,
+    rawToken: `${crypto.randomUUID()}${crypto.randomUUID()}`,
+  };
+  storage.setItem(storageKey, JSON.stringify(operation));
+  return operation;
+}

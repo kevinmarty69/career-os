@@ -1,4 +1,5 @@
 import type { ApplicationDossier } from './workspace-state';
+import { persistedPublicationOperation } from './run-operation';
 
 export function readProfile(signal: AbortSignal) {
   return fetch('/api/profile', { cache: 'no-store', signal });
@@ -85,10 +86,15 @@ export function startRunReviews(
 }
 
 export function createPublication(runId: string) {
+  const operation = persistedPublicationOperation(
+    sessionStorage,
+    `career-os-publication:${runId}`,
+    runId,
+  );
   return fetch('/api/publications', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ runId }),
+    body: JSON.stringify(operation),
   });
 }
 

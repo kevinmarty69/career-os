@@ -11,5 +11,6 @@ export const publishedPayloadSchema = z
 export const publicationInputSchema = z
   .object({
     runId: z.string().uuid(),
+    rawToken: z.string().min(64).max(128),
   })
   .strict();

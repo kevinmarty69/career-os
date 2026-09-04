@@ -167,7 +167,17 @@ where claim_id = '62000000-0000-4000-8000-000000000001'
   and evidence_id = '52000000-0000-0000-0000-000000000002';
 set local role career_publisher;
 select app.mint_publication('92000000-0000-4000-8000-000000000001', digest('safe-token', 'sha256'), now() + interval '1 day') as audit_publication_id \gset
-select app.mint_publication('92000000-0000-4000-8000-000000000001', digest('retry-token', 'sha256'), now() + interval '1 day') as retry_publication_id \gset
+select app.mint_publication('92000000-0000-4000-8000-000000000001', digest('safe-token', 'sha256'), now() + interval '1 day') as retry_publication_id \gset
+
+do $$ begin
+  begin
+    perform app.mint_publication('92000000-0000-4000-8000-000000000001', digest('different-token', 'sha256'), now() + interval '1 day');
+    raise exception 'publication capability rotated during retry';
+  exception when others then
+    if sqlerrm = 'publication capability rotated during retry' then raise; end if;
+    if sqlerrm <> 'publication already has an active capability' then raise; end if;
+  end;
+end $$;
 
 select 1 / ((:'audit_publication_id' = :'retry_publication_id')::integer)
   as publication_retry_reused_snapshot;
@@ -177,10 +187,10 @@ select 1 / (((select count(*) from app.publications
   as one_publication_per_page_spec;
 select 1 / (((select count(*) from app.share_links
   where publication_id = :'audit_publication_id'::uuid and revoked_at is null) = 1)::integer)
-  as retry_rotated_capability;
+  as retry_kept_one_capability;
 select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid,
-  digest('safe-token', 'sha256')) is null)::integer)
-  as previous_capability_revoked;
+  digest('safe-token', 'sha256')) is not null)::integer)
+  as retry_kept_previous_capability;
 
 set local role career_app;
 update app.claims set statement = 'Changed after publication'
@@ -200,11 +210,11 @@ reset role;
 insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id) values
   ('22000000-0000-0000-0000-000000000001', '92000000-0000-4000-8000-000000000001', '62000000-0000-0000-0000-000000000002');
 set local role career_reader;
-select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid, digest('retry-token', 'sha256')) is not null
-  and position('Allowed claim' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('retry-token', 'sha256'))::text) > 0
-  and position('Changed after publication' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('retry-token', 'sha256'))::text) = 0
-  and position('SECRET-RESTRICTED-EVIDENCE' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('retry-token', 'sha256'))::text) = 0
-  and position('Restricted late claim' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('retry-token', 'sha256'))::text) = 0)::integer)
+select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256')) is not null
+  and position('Allowed claim' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) > 0
+  and position('Changed after publication' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) = 0
+  and position('SECRET-RESTRICTED-EVIDENCE' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) = 0
+  and position('Restricted late claim' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) = 0)::integer)
   as restricted_evidence_not_served;
 
 set local role career_app;
@@ -212,7 +222,7 @@ update app.applications set deleted_at = now(), revision = revision + 1
 where id = '72000000-0000-0000-0000-000000000001';
 set local role career_reader;
 select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid,
-  digest('retry-token', 'sha256')) is null)::integer)
+  digest('safe-token', 'sha256')) is null)::integer)
   as application_deletion_revoked_capability;
 rollback;
 select 'capability writer and immutable publication snapshot ok' as result;

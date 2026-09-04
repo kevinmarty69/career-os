@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
 import {
@@ -25,8 +25,7 @@ export async function mintPublication(
   session: PublicationSession,
   rawInput: unknown,
 ) {
-  const { runId } = publicationInputSchema.parse(rawInput);
-  const rawToken = randomBytes(32).toString('base64url');
+  const { runId, rawToken } = publicationInputSchema.parse(rawInput);
   const tokenHash = createHash('sha256').update(rawToken).digest();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const sql = database();

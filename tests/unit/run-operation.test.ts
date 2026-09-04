@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { persistedRunOperation } from '../../lib/run-operation';
+import {
+  persistedPublicationOperation,
+  persistedRunOperation,
+} from '../../lib/run-operation';
 
 test('reuses a persisted run operation after reload and rotates on retry', () => {
   const values = new Map<string, string>();
@@ -17,4 +20,23 @@ test('reuses a persisted run operation after reload and rotates on retry', () =>
   assert.equal(afterReload.key, first.key);
   assert.notEqual(retry.key, first.key);
   assert.notEqual(changedInput.key, retry.key);
+});
+
+test('reuses the same publication capability after reload', () => {
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  };
+
+  const first = persistedPublicationOperation(storage, 'publication', 'run-1');
+  const retry = persistedPublicationOperation(storage, 'publication', 'run-1');
+  const otherRun = persistedPublicationOperation(
+    storage,
+    'publication',
+    'run-2',
+  );
+
+  assert.equal(retry.rawToken, first.rawToken);
+  assert.notEqual(otherRun.rawToken, first.rawToken);
 });

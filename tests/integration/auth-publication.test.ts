@@ -306,7 +306,10 @@ async function main() {
   await expectStatus(runResponse, 202, 'persisted run');
   const run = (await runResponse.json()) as PersistedRun;
   await makeRunPublishable(run, organization.id);
-  const publishableBody = { runId: run.runId };
+  const publishableBody = {
+    runId: run.runId,
+    rawToken: `${randomUUID()}${randomUUID()}`,
+  };
 
   const publicationResponse = await owner.post(
     '/api/publications',
@@ -324,7 +327,7 @@ async function main() {
     rawToken: string;
   };
   assert.equal(retryPublication.publicationId, publication.publicationId);
-  assert.notEqual(retryPublication.rawToken, publication.rawToken);
+  assert.equal(retryPublication.rawToken, publication.rawToken);
 
   const expiredReader = new BrowserSession();
   await expectStatus(
@@ -332,8 +335,8 @@ async function main() {
       `/api/publications/${publication.publicationId}/exchange`,
       { token: publication.rawToken },
     ),
-    404,
-    'rotated capability rejected',
+    204,
+    'retried capability exchange',
   );
   const capabilityReader = new BrowserSession();
   await expectStatus(
@@ -342,7 +345,7 @@ async function main() {
       { token: retryPublication.rawToken },
     ),
     204,
-    'rotated capability exchange',
+    'same capability exchange',
   );
   const publishedSnapshot = await capabilityReader.get(
     `/api/publications/${publication.publicationId}`,
@@ -484,7 +487,7 @@ async function main() {
       ),
       {
         publication_count: 1,
-        share_count: 2,
+        share_count: 1,
         profile_count: 1,
         opportunity_count: 1,
         run_count: 1,
