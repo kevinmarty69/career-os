@@ -3,6 +3,7 @@ import test from 'node:test';
 import { deflateRawSync } from 'node:zlib';
 import {
   containsPdfEncryptionMarker,
+  buildProfileImportResult,
   decodeUtf8Text,
   detectProfileFileType,
   extractProfileSuggestions,
@@ -192,6 +193,22 @@ test('candidate extraction groups sections and coalesces wrapped prose', () => {
     ),
     false,
   );
+});
+
+test('candidate extraction preserves explicit result sections', () => {
+  const result = buildProfileImportResult({
+    displayName: 'profile.txt',
+    type: 'txt',
+    sha256: 'a'.repeat(64),
+    sections: [
+      {
+        locator: 'document',
+        text: 'Alex Morgan\nProduct Engineer\nResults\nReduced build time from eleven to seven minutes.',
+      },
+    ],
+  });
+
+  assert.equal(result.candidates[0].group, 'result');
 });
 
 test('letter-spaced headings group candidates without merging role dates', () => {
