@@ -240,7 +240,7 @@ function parseAshby(target: JobConnectorTarget, value: unknown): ConnectedJob {
       publishedAt: job.publishedAt ?? null,
       externalId: target.externalId,
       sourceKind: 'ashby',
-      lifecycleSignal: 'open',
+      lifecycleSignal: job.isListed === false ? 'closed' : 'open',
     }),
     hashInput: JSON.stringify(job),
   };

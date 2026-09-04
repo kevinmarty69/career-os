@@ -102,3 +102,16 @@ test('fails closed on an ambiguous Ashby match and keeps generic absences explic
     lifecycleSignal: 'unknown',
   });
 });
+
+test('treats an explicit unlisted Ashby posting as closed', () => {
+  const target = resolveJobConnector(
+    'https://jobs.ashbyhq.com/nimbus/123e4567-e89b-12d3-a456-426614174000',
+  );
+  assert.ok(target);
+  const board = JSON.parse(fixture('ashby-job-board.json')) as {
+    jobs: Array<{ isListed?: boolean }>;
+  };
+  board.jobs[0].isListed = false;
+  const result = parseJobConnector(target, JSON.stringify(board));
+  assert.equal(result.normalized.lifecycleSignal, 'closed');
+});
