@@ -75,6 +75,23 @@ export const dossierMessages = {
     'Reviews did not start. You can retry without creating a duplicate.',
   'La publication reste bloquée pendant les contrôles.':
     'Publishing remains blocked during the checks.',
+  'Contrôles indépendants': 'Independent checks',
+  'Trois regards avant publication': 'Three perspectives before publishing',
+  'Chaque objection reste visible avec son auteur. Une correction crée une nouvelle version ciblée ; garder une formulation reste votre décision.':
+    'Every objection remains visible with its author. A correction creates a targeted new version; keeping wording remains your decision.',
+  Bloquante: 'Blocking',
+  Suggestion: 'Suggestion',
+  'Conservée par vous': 'Kept by you',
+  'Correction lancée': 'Correction started',
+  'Garder tel quel': 'Keep as written',
+  'Corriger cette section': 'Correct this section',
+  'Aucune objection.': 'No objections.',
+  'La décision n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.':
+    'The decision was not saved. You can retry without creating a duplicate.',
+  'Tous les contrôles sont résolus. Prêt pour votre validation finale.':
+    'All checks are resolved. Ready for your final approval.',
+  'La publication reste bloquée tant qu’une décision manque.':
+    'Publishing remains blocked while a decision is missing.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',

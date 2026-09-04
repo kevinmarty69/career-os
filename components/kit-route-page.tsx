@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationEvidenceCheckpoint } from '@/components/applications/application-evidence-checkpoint';
 import { ApplicationPageDraftCheckpoint } from '@/components/applications/application-page-draft-checkpoint';
 import { ApplicationResearchCheckpoint } from '@/components/applications/application-research-checkpoint';
+import { ApplicationReviewCheckpoint } from '@/components/applications/application-review-checkpoint';
 import { ApplicationStrategyCheckpoint } from '@/components/applications/application-strategy-checkpoint';
 import { useApplicationWorkflow } from '@/components/applications/use-application-workflow';
 import { ApplicationsPage } from '@/components/applications/applications-page';
@@ -994,6 +995,18 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
                 pending={workflow.decisionPending}
                 profile={workflow.run.profile}
                 spec={workflow.run.spec}
+              />
+            ) : null}
+            {workflow.run &&
+            workflow.run.reviews.length > 0 &&
+            ['awaiting_approval', 'blocked'].includes(workflow.run.status) ? (
+              <ApplicationReviewCheckpoint
+                error={workflow.reviewError}
+                onDecide={(reviewId, issueIndex, decision) =>
+                  void workflow.decideReview(reviewId, issueIndex, decision)
+                }
+                pending={workflow.reviewPending}
+                run={workflow.run}
               />
             ) : null}
             {application.url ? (
@@ -3989,6 +4002,8 @@ function runStageLabel(stage: string, locale: 'en' | 'fr') {
     review_recruiter: ['Recruiter review', 'Revue recruteur'],
     review_hiring_manager: ['Hiring manager review', 'Revue hiring manager'],
     review_factuality: ['Factual review', 'Revue factuelle'],
+    review_decision: ['Human decisions', 'Décisions humaines'],
+    human_approval: ['Final approval', 'Validation finale'],
     'company-researcher': ['Company research', 'Recherche entreprise'],
     'evidence-archivist': ['Evidence matching', 'Appariement des preuves'],
     'recruiter-strategist': [

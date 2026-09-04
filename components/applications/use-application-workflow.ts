@@ -6,12 +6,17 @@ import {
   approveRunStrategy,
   confirmRunResearch,
   createRun,
+  decideRunReviewIssue,
   readApplicationRun,
   readProfile,
   startRunReviews,
   startRunStrategy,
 } from '@/lib/career-api';
-import { persistedRunSchema, type PersistedRun } from '@/lib/run-contract';
+import {
+  persistedRunSchema,
+  reviewIssueDecisionResultSchema,
+  type PersistedRun,
+} from '@/lib/run-contract';
 import { persistedRunOperation } from '@/lib/run-operation';
 
 type WorkflowError =
@@ -32,6 +37,8 @@ export function useApplicationWorkflow(applicationId: string) {
   const [starting, setStarting] = useState(false);
   const [decisionPending, setDecisionPending] = useState(false);
   const [decisionError, setDecisionError] = useState(false);
+  const [reviewPending, setReviewPending] = useState<string>();
+  const [reviewError, setReviewError] = useState(false);
   const current = result?.applicationId === applicationId ? result : undefined;
 
   useEffect(() => {
@@ -302,13 +309,78 @@ export function useApplicationWorkflow(applicationId: string) {
     }
   }
 
+  async function decideReview(
+    reviewId: string,
+    issueIndex: number,
+    decision: 'keep' | 'correct',
+  ) {
+    if (!current?.run || reviewPending) return;
+    const key = `${reviewId}:${issueIndex}`;
+    setReviewPending(key);
+    setReviewError(false);
+    try {
+      const input = JSON.stringify({ reviewId, issueIndex, decision });
+      const operation = persistedRunOperation(
+        localStorage,
+        `career-os-review-decision:${current.run.runId}:${key}:${decision}`,
+        input,
+      );
+      const response = await decideRunReviewIssue(
+        current.run.runId,
+        input,
+        operation.key,
+      );
+      if (!response.ok) {
+        setReviewError(true);
+        return;
+      }
+      const result = reviewIssueDecisionResultSchema.parse(
+        await response.json(),
+      );
+      if (result.correctedRun) {
+        setResult({ ...current, run: result.correctedRun, error: undefined });
+        return;
+      }
+      setResult({
+        ...current,
+        run: {
+          ...current.run,
+          stage: result.publicationEligible
+            ? 'human_approval'
+            : current.run.stage,
+          reviewDecisions: [
+            ...current.run.reviewDecisions.filter(
+              (item) =>
+                item.reviewId !== result.reviewId ||
+                item.issueIndex !== result.issueIndex,
+            ),
+            {
+              reviewId: result.reviewId,
+              issueIndex: result.issueIndex,
+              decision: result.decision,
+            },
+          ],
+          publicationEligible: result.publicationEligible,
+        },
+        error: undefined,
+      });
+    } catch {
+      setReviewError(true);
+    } finally {
+      setReviewPending(undefined);
+    }
+  }
+
   return {
     ...current,
     approveStrategy,
     confirmResearch,
+    decideReview,
     decisionError,
     decisionPending,
     loading: !current,
+    reviewError,
+    reviewPending,
     start,
     startReviews,
     startStrategy,

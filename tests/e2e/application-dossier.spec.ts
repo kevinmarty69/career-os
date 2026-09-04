@@ -250,6 +250,47 @@ function pageDraftRun() {
   } as const;
 }
 
+function reviewedRun() {
+  const paused = pageDraftRun();
+  const reviewId = '988c0a00-0000-4000-8000-000000000019';
+  return {
+    ...paused,
+    status: 'awaiting_approval',
+    stage: 'review_decision',
+    reviews: [
+      {
+        reviewId,
+        reviewer: 'recruiter',
+        passed: false,
+        findings: ['Make the opening more direct.'],
+        issues: [
+          {
+            section: 'hero',
+            message: 'Make the opening more direct.',
+            blocking: false,
+          },
+        ],
+      },
+      {
+        reviewId: '988c0a00-0000-4000-8000-000000000020',
+        reviewer: 'hiring-manager',
+        passed: true,
+        findings: [],
+        issues: [],
+      },
+      {
+        reviewId: '988c0a00-0000-4000-8000-000000000021',
+        reviewer: 'factuality',
+        passed: true,
+        findings: [],
+        issues: [],
+      },
+    ],
+    reviewDecisions: [],
+    publicationEligible: false,
+  } as const;
+}
+
 test('renders the persisted application instead of the Nimbus fixture', async ({
   context,
   page,
@@ -546,6 +587,55 @@ test('shows the structured draft and starts all reviews only after confirmation'
   await page.getByRole('button', { name: 'Start the three reviews' }).click();
   await expect(page.getByText('Running', { exact: true })).toBeVisible();
   expect(request?.body).toEqual({});
+  expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('keeps review objections visible until the human decides', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const run = reviewedRun();
+  const review = run.reviews[0];
+  let request: { body: unknown; key?: string } | undefined;
+  await mockApplication(page, run);
+  await page.route(
+    `**/api/runs/${run.runId}/review-decisions`,
+    async (route) => {
+      request = {
+        body: route.request().postDataJSON(),
+        key: route.request().headers()['idempotency-key'],
+      };
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          decisionId: '988c0a00-0000-4000-8000-000000000022',
+          runId: run.runId,
+          reviewId: review.reviewId,
+          issueIndex: 0,
+          decision: 'keep',
+          publicationEligible: true,
+        }),
+      });
+    },
+  );
+
+  await page.goto(`/applications/${applicationId}`);
+  await expect(
+    page.getByRole('heading', { name: 'Three perspectives before publishing' }),
+  ).toBeVisible();
+  await expect(page.getByText('Make the opening more direct.')).toBeVisible();
+  await expect(page.getByText('Factual review')).toBeVisible();
+  await page.getByRole('button', { name: 'Keep as written' }).click();
+  await expect(
+    page.getByText('All checks are resolved. Ready for your final approval.'),
+  ).toBeVisible();
+  expect(request?.body).toEqual({
+    reviewId: review.reviewId,
+    issueIndex: 0,
+    decision: 'keep',
+  });
   expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
 });
 
