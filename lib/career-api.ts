@@ -14,6 +14,19 @@ export function readApplications(signal: AbortSignal) {
   return fetch('/api/applications', { cache: 'no-store', signal });
 }
 
+export function readOpportunities(signal: AbortSignal) {
+  return fetch('/api/opportunities', { cache: 'no-store', signal });
+}
+
+export function importOpportunity(url: string, signal: AbortSignal) {
+  return fetch('/api/opportunities/import-url', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ url }),
+    signal,
+  });
+}
+
 export function readSearchProfiles(signal: AbortSignal) {
   return fetch('/api/search-profiles', { cache: 'no-store', signal });
 }

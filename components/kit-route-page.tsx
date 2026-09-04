@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { ApplicationsPage } from '@/components/applications/applications-page';
 import { CareerMemoryContent } from '@/components/memory/career-memory-content';
 
 type Query = Record<string, string | string[] | undefined>;
@@ -606,105 +607,7 @@ function MemoryScreen() {
 }
 
 function ApplicationsScreen() {
-  const columns = [
-    [
-      'Brouillon',
-      [
-        ['KE', 'Keel', 'Infrastructure Engineer', '42 % · Agents en cours…'],
-        ['FT', 'Fathom', 'Platform Engineer', 'Offre importée · à confirmer'],
-      ],
-    ],
-    [
-      'À valider',
-      [
-        [
-          'NR',
-          'Nimbus Robotics',
-          'Staff Product Engineer',
-          '11/12 sourcé · Trancher 3 modifications',
-        ],
-      ],
-    ],
-    [
-      'Envoyée',
-      [
-        [
-          'AH',
-          'Atlas Health',
-          'Lead Product Designer',
-          'Page ouverte 4 fois · relance prête',
-        ],
-        ['OR', 'Orbital', 'Senior Backend Engineer', 'Envoyée il y a 3 j'],
-        ['LU', 'Lumen', 'Staff Engineer, Data', 'Jamais ouverte · J+11'],
-      ],
-    ],
-    [
-      'Entretien',
-      [
-        [
-          'VL',
-          'Vantage Labs',
-          'Research Engineer',
-          '8 sept. · 14:00 · technique',
-        ],
-        ['HE', 'Helix', 'Infra Lead', 'Débrief à écrire'],
-      ],
-    ],
-  ] as const;
-  return (
-    <AppShell path="/applications">
-      <PageHeader
-        title="Candidatures"
-        copy="14 actives · 5 réponses · 3 entretiens"
-        actions={
-          <>
-            <div className="co-segment">
-              <button>Liste</button>
-              <button className="active">Kanban</button>
-              <button>Calendrier</button>
-            </div>
-            <Button>
-              <Icon>add_link</Icon>Coller une offre
-            </Button>
-          </>
-        }
-      />
-      <div className="co-filterbar">
-        <Badge tone="accent">Infra / plateforme</Badge>
-        <Badge>Remote possible</Badge>
-        <button>Effacer</button>
-        <Button quiet>
-          <Icon>filter_list</Icon>Filtres · 2
-        </Button>
-      </div>
-      <div className="co-board">
-        {columns.map(([title, cards]) => (
-          <section key={title}>
-            <header>
-              <h2>{title}</h2>
-              <Badge>{cards.length}</Badge>
-            </header>
-            {cards.map(([initials, company, role, meta]) => (
-              <Link
-                className="co-app-card"
-                href={`/applications/${company.toLowerCase().replaceAll(' ', '-')}`}
-                key={company}
-              >
-                <i>{initials}</i>
-                <small>{company}</small>
-                <strong>{role}</strong>
-                <span>{meta}</span>
-                <Icon>chevron_right</Icon>
-              </Link>
-            ))}
-            <button className="co-add-card">
-              <Icon>add</Icon>Ajouter
-            </button>
-          </section>
-        ))}
-      </div>
-    </AppShell>
-  );
+  return <ApplicationsPage AppShell={AppShell} Icon={Icon} />;
 }
 
 function DossierNav({ active }: { active: string }) {
