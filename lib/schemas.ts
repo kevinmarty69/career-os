@@ -85,6 +85,19 @@ export const profileSchema = z
   })
   .strict();
 
+export const livingProfileInputSchema = profileSchema.superRefine(
+  (profile, context) => {
+    for (const [index, claim] of profile.claims.entries())
+      if (claim.level === 'verified')
+        context.addIssue({
+          code: 'custom',
+          path: ['claims', index, 'level'],
+          message:
+            'Living Career Memory claims remain declared until a trusted server process verifies them.',
+        });
+  },
+);
+
 function uniqueIds(
   context: z.RefinementCtx,
   values: Array<{ id: string }>,

@@ -93,6 +93,7 @@ select '85000000-0000-0000-0000-000000000001',
   '92000000-0000-4000-8000-000000000001'
 from (
   select jsonb_build_object(
+    'schemaVersion', 1,
     'strategyArtifactId', '83000000-0000-0000-0000-000000000001',
     'strategyArtifactHash', encode(digest(body::text, 'sha256'), 'hex'),
     'strategyApprovalId', '84000000-0000-0000-0000-000000000001'

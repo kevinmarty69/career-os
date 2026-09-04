@@ -39,6 +39,23 @@ set local role career_app;
 insert into app.tenants (id, owner_id, name) values
   ('21000000-0000-0000-0000-000000000001', '11000000-0000-0000-0000-000000000001', 'Tenant One'),
   ('21000000-0000-0000-0000-000000000002', '11000000-0000-0000-0000-000000000001', 'Tenant Two');
+insert into app.profiles (id, tenant_id, name, headline, profile_kind) values
+  ('51000000-0000-4000-8000-000000000001', '21000000-0000-0000-0000-000000000001', 'Living profile', 'Engineer', 'living');
+do $$ begin
+  begin
+    insert into app.claims (
+      tenant_id, profile_id, position, statement, level, sensitivity, allowed_uses
+    ) values (
+      '21000000-0000-0000-0000-000000000001',
+      '51000000-0000-4000-8000-000000000001', 0,
+      'Self-asserted verification', 'verified', 'private', '{application}'
+    );
+    raise exception 'living profile accepted self-asserted verification';
+  exception when others then
+    if sqlerrm = 'living profile accepted self-asserted verification' then raise; end if;
+    if sqlerrm <> 'living Career Memory claims cannot self-assert verified provenance' then raise; end if;
+  end;
+end $$;
 insert into app.sources (id, tenant_id, kind, title, sensitivity, allowed_uses) values
   ('41000000-0000-0000-0000-000000000001', '21000000-0000-0000-0000-000000000001', 'manual', 'First organization source', 'private', '{application}');
 

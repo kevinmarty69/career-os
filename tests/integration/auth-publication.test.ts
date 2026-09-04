@@ -20,6 +20,8 @@ const opportunity = {
   description: 'Ship dependable product workflows.',
   accent: '#21504b',
 };
+const livingProfile = structuredClone(syntheticProfile);
+for (const claim of livingProfile.claims) claim.level = 'declared';
 
 class BrowserSession {
   private readonly cookies = new Map<string, string>();
@@ -248,8 +250,16 @@ async function main() {
   const emptyProfile = await owner.get('/api/profile');
   await expectStatus(emptyProfile, 200, 'empty profile read');
   assert.deepEqual(await emptyProfile.json(), { profile: null, revision: 0 });
+  await expectStatus(
+    await owner.put('/api/profile', {
+      profile: syntheticProfile,
+      expectedRevision: 0,
+    }),
+    400,
+    'self-verified profile rejection',
+  );
   const savedProfileResponse = await owner.put('/api/profile', {
-    profile: syntheticProfile,
+    profile: livingProfile,
     expectedRevision: 0,
   });
   await expectStatus(savedProfileResponse, 200, 'profile creation');
@@ -258,10 +268,7 @@ async function main() {
     revision: number;
   };
   assert.equal(savedProfile.revision, 1);
-  assert.equal(
-    savedProfile.profile.claims.length,
-    syntheticProfile.claims.length,
-  );
+  assert.equal(savedProfile.profile.claims.length, livingProfile.claims.length);
   assert.match(savedProfile.profile.claims[0].id, /^[0-9a-f-]{36}$/);
   const rereadProfile = await owner.get('/api/profile');
   await expectStatus(rereadProfile, 200, 'saved profile read');

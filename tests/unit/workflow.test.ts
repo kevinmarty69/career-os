@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { syntheticProfile } from '../../lib/fixture';
-import { pageSpecSchema, profileSchema } from '../../lib/schemas';
+import {
+  livingProfileInputSchema,
+  pageSpecSchema,
+  profileSchema,
+} from '../../lib/schemas';
 import {
   buildPageSpec,
   buildStrategy,
@@ -20,6 +24,16 @@ test('verified claims require linked evidence', () => {
   const profile = structuredClone(syntheticProfile);
   profile.claims[0].evidenceIds = [];
   assert.equal(profileSchema.safeParse(profile).success, false);
+});
+
+test('browser-saved Career Memory cannot self-assert verified claims', () => {
+  assert.equal(
+    livingProfileInputSchema.safeParse(syntheticProfile).success,
+    false,
+  );
+  const declared = structuredClone(syntheticProfile);
+  for (const claim of declared.claims) claim.level = 'declared';
+  assert.equal(livingProfileInputSchema.safeParse(declared).success, true);
 });
 
 test('profile references stay inside one unambiguous graph', () => {

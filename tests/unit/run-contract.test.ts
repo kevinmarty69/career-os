@@ -13,8 +13,17 @@ import {
   workerServices,
 } from '../../lib/run-contract';
 import { syntheticProfile } from '../../lib/fixture';
+import { assertOpenSourceDeploymentMode } from '../../next.config';
 
 const applicationId = randomUUID();
+
+test('the public repository rejects managed deployment mode', () => {
+  assert.doesNotThrow(() => assertOpenSourceDeploymentMode('self-hosted'));
+  assert.throws(
+    () => assertOpenSourceDeploymentMode('managed'),
+    /separate cloud control plane/,
+  );
+});
 
 test('instance status requires one coherent entry per worker', () => {
   const services = workerServices.map((service) => ({

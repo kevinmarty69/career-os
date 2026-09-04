@@ -1,5 +1,16 @@
 import type { NextConfig } from 'next';
 
+export function assertOpenSourceDeploymentMode(mode: string) {
+  if (mode === 'self-hosted') return;
+  throw new Error(
+    'This repository implements self-hosting only; managed mode requires the separate cloud control plane.',
+  );
+}
+
+assertOpenSourceDeploymentMode(
+  process.env.CAREER_OS_DEPLOYMENT_MODE ?? 'self-hosted',
+);
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   async headers() {

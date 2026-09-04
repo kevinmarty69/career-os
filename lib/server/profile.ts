@@ -1,6 +1,10 @@
 import 'server-only';
 import postgres from 'postgres';
-import { profileSchema, type Profile } from '../schemas';
+import {
+  livingProfileInputSchema,
+  profileSchema,
+  type Profile,
+} from '../schemas';
 
 type ProfileSession = {
   userId: string;
@@ -112,7 +116,7 @@ export async function saveLivingProfile(
   input: unknown,
   expectedRevision: number,
 ) {
-  const profile = profileSchema.parse(input);
+  const profile = livingProfileInputSchema.parse(input);
   const sql = database();
   try {
     return await sql.begin(async (tx) => {

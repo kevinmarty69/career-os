@@ -28,6 +28,11 @@ pnpm db:up
 pnpm dev
 ```
 
+The Compose bootstrap applies every versioned SQL migration in filename order
+when it creates a new database volume. Existing installations must back up the
+database and apply only the newly added migration files, in order, before
+restarting the application. Never replay an already applied migration.
+
 Publication and saved Career Memory fail closed when `DATABASE_URL` or `BETTER_AUTH_SECRET` is missing.
 
 ## 2. Create isolated worker logins

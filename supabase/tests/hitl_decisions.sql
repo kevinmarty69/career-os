@@ -169,6 +169,7 @@ select 'ab000000-0000-0000-0000-000000000001',
   'a8000000-0000-0000-0000-000000000001'
 from (
   select jsonb_build_object(
+    'schemaVersion', 1,
     'strategyArtifactId', 'a9000000-0000-0000-0000-000000000001',
     'strategyArtifactHash', encode(digest(body::text, 'sha256'), 'hex'),
     'strategyApprovalId', 'aa000000-0000-0000-0000-000000000001'
@@ -292,7 +293,8 @@ begin
       'c8000000-0000-0000-0000-000000000007', 'self-correction'
     );
     raise exception 'a run was accepted as its own correction';
-  exception when check_violation then null;
+  exception when raise_exception then
+    if sqlerrm <> 'corrected run lineage mismatch' then raise; end if;
   end;
   begin
     insert into app.review_issue_decisions (
