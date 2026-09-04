@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { CareerMemoryContent } from '@/components/memory/career-memory-content';
 
 type Query = Record<string, string | string[] | undefined>;
 type Tone = 'ok' | 'warn' | 'crit' | 'accent' | 'muted';
@@ -570,223 +571,36 @@ function MemoryScreen() {
       path="/memory"
       sidebarContext={
         <>
-          <p className="co-nav-label">Sources</p>
+          <p className="co-nav-label">Mémoire</p>
           <div className="co-sidebar-sources">
             <Link href="/memory/import">
-              <Icon>picture_as_pdf</Icon>
-              <span>Documents</span>
-              <b>18</b>
+              <Icon>upload_file</Icon>
+              <span>Importer une source</span>
             </Link>
-            <Link href="/memory/import">
-              <Icon>badge</Icon>
-              <span>LinkedIn</span>
-              <i className="ok" />
-            </Link>
-            <Link href="/memory/import">
-              <Icon>code</Icon>
-              <span>GitHub</span>
-              <i className="ok" />
-            </Link>
-            <Link className="muted" href="/memory/import">
-              <Icon>cloud_off</Icon>
-              <span>Drive</span>
-              <em>resync</em>
+            <Link href="/memory/interview">
+              <Icon>record_voice_over</Icon>
+              <span>Entretien guidé</span>
             </Link>
           </div>
         </>
       }
       sidebarFooter={
         <div className="co-sidebar-card">
-          <strong>Ajouter une source</strong>
-          <span>PDF, URL, dépôt, ou entretien guidé.</span>
+          <strong>Vos données, vos règles</strong>
+          <span>
+            Chaque affirmation conserve sa source, sa sensibilité et ses usages.
+          </span>
           <Link className="co-button" href="/memory/import">
-            Importer
+            Ajouter une source
           </Link>
         </div>
       }
     >
       <PageHeader
         title="Mémoire professionnelle"
-        copy="128 affirmations issues de 24 sources. Rien n’entre ici sans document daté."
-        actions={
-          <>
-            <Button quiet>
-              <Icon>download</Icon>Exporter
-            </Button>
-            <Button>
-              <Icon>add</Icon>Nouvelle affirmation
-            </Button>
-          </>
-        }
+        copy="Relisez, sourcez et contrôlez les informations utilisables dans vos candidatures."
       />
-      <div className="co-memory-metrics">
-        <article>
-          <span>Complétude</span>
-          <div>
-            <strong>78 %</strong>
-            <b>+6 pts</b>
-          </div>
-          <progress max="100" value="78" />
-        </article>
-        <article>
-          <span>Niveau de preuve</span>
-          <div>
-            <strong>92</strong>
-            <small>vérifiées</small>
-          </div>
-          <footer>
-            <Badge tone="ok">92 vérifié</Badge>
-            <Badge tone="warn">26 déclaré</Badge>
-          </footer>
-        </article>
-        <article>
-          <span>À corriger</span>
-          <div>
-            <strong className="crit">10</strong>
-            <small>sans source</small>
-          </div>
-          <Link href="/inbox">Lancer la revue</Link>
-        </article>
-        <article>
-          <span>Conflits entre sources</span>
-          <div>
-            <strong>2</strong>
-            <small>à arbitrer</small>
-          </div>
-          <Link href="/memory/conflicts">Voir les conflits</Link>
-        </article>
-      </div>
-      <div className="co-memory-body">
-        <section className="co-memory-main">
-          <div className="co-memory-toolbar">
-            <div className="co-segment">
-              <button className="active">Affirmations</button>
-              <button>Expériences</button>
-              <button>Projets</button>
-              <button>Compétences</button>
-            </div>
-            <Button quiet>
-              <Icon>filter_list</Icon>Niveau de preuve
-            </Button>
-            <button className="co-round" aria-label="Rechercher" type="button">
-              <Icon>search</Icon>
-            </button>
-          </div>
-          <div className="co-memory-claims">
-            <article>
-              <Icon>verified</Icon>
-              <div>
-                <header>
-                  <Badge tone="ok">Vérifié</Badge>
-                  <small>Corvid · 2021-2024</small>
-                  <code>2 preuves</code>
-                </header>
-                <strong>
-                  Temps de build ramené de 11 à 7 minutes (p50) sur un monorepo
-                  de 340 services.
-                </strong>
-                <footer>
-                  <span>
-                    <Icon>description</Icon>corvid_postmortem.md
-                  </span>
-                  <span>
-                    <Icon>picture_as_pdf</Icon>cv_2024.pdf · p.2
-                  </span>
-                </footer>
-              </div>
-            </article>
-            <article className="unsourced">
-              <Icon>link_off</Icon>
-              <div>
-                <header>
-                  <Badge tone="crit">Sans source</Badge>
-                  <small>utilisée dans 1 candidature</small>
-                </header>
-                <strong>« Divisé les coûts d’infrastructure par deux. »</strong>
-                <footer>
-                  <Button>Rattacher une preuve</Button>
-                  <Button quiet>Passer en « déclaré »</Button>
-                </footer>
-              </div>
-            </article>
-            <article>
-              <Icon>rule</Icon>
-              <div>
-                <header>
-                  <Badge tone="warn">Conflit</Badge>
-                  <small>LinkedIn ≠ CV</small>
-                </header>
-                <strong>
-                  Taille de l’équipe encadrée : <mark>6</mark> ou <mark>9</mark>{' '}
-                  personnes ?
-                </strong>
-                <Link href="/memory/conflicts">Arbitrer</Link>
-              </div>
-            </article>
-            <article>
-              <Icon>verified</Icon>
-              <div>
-                <header>
-                  <Badge tone="ok">Vérifié</Badge>
-                  <small>open source · depuis 2023</small>
-                  <code>1 preuve</code>
-                </header>
-                <strong>
-                  Mainteneur principal d’un pont ROS2 utilisé en production par
-                  4 entreprises.
-                </strong>
-              </div>
-            </article>
-          </div>
-        </section>
-        <aside className="co-memory-side">
-          <header>
-            <h2>Compléter</h2>
-            <Badge tone="accent">5 pistes</Badge>
-          </header>
-          <section>
-            <strong>Entretien guidé · 8 min</strong>
-            <span>
-              Quatre questions sur Corvid pour transformer vos notes en
-              affirmations sourcées.
-            </span>
-            <Link className="co-button" href="/memory/interview">
-              Commencer
-            </Link>
-          </section>
-          <div className="co-memory-prompt-list">
-            <button>
-              <Icon>query_stats</Icon>Aucune métrique sur 2 projets
-              <Icon>chevron_right</Icon>
-            </button>
-            <button>
-              <Icon>school</Icon>Formations non renseignées
-              <Icon>chevron_right</Icon>
-            </button>
-            <button>
-              <Icon>group</Icon>Aucune recommandation importée
-              <Icon>chevron_right</Icon>
-            </button>
-          </div>
-          <footer>
-            <h2>Confidentialité</h2>
-            <dl>
-              <div>
-                <dt>
-                  <Icon>lock</Icon>Sensibilité par défaut
-                </dt>
-                <dd>privé</dd>
-              </div>
-              <div>
-                <dt>
-                  <Icon>policy</Icon>Usages autorisés
-                </dt>
-                <dd>3 / 5</dd>
-              </div>
-            </dl>
-          </footer>
-        </aside>
-      </div>
+      <CareerMemoryContent />
     </AppShell>
   );
 }
