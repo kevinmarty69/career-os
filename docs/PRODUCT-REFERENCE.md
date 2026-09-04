@@ -589,7 +589,7 @@ Critères d'acceptation :
 - [x] Recherche entreprise bornée et sourcée.
 - [x] Extraction du besoin, des responsabilités et des signaux culturels.
 - [x] Validation humaine des signaux structurants.
-- [ ] Sélection des expériences et preuves éligibles.
+- [x] Sélection des expériences et preuves éligibles.
 - [ ] Proposition d'un angle de candidature.
 - [ ] Identification honnête des écarts et objections.
 - [ ] Questions d'entretien recommandées.

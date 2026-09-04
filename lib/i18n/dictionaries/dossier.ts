@@ -44,6 +44,17 @@ export const dossierMessages = {
     'Web data remains untrusted until you approve it.',
   'La validation n’a pas été enregistrée. Vos choix sont conservés.':
     'The decision was not saved. Your choices are preserved.',
+  'Preuves candidates': 'Candidate evidence',
+  'Ce que votre parcours démontre pour ce poste':
+    'What your experience demonstrates for this role',
+  'Le matching est limité aux affirmations autorisées pour une candidature. Vérifiez la sélection avant de lancer la stratégie.':
+    'Matching is limited to claims authorized for applications. Review the selection before starting strategy.',
+  'Aucune preuve éligible trouvée. Cet écart restera visible.':
+    'No eligible evidence found. This gap will remain visible.',
+  'La stratégie n’a pas démarré. Vous pouvez réessayer sans risque de doublon.':
+    'Strategy did not start. You can retry without creating a duplicate.',
+  'Vos faits restent inchangés. Seul leur ordre sera proposé.':
+    'Your facts stay unchanged. Only their ordering will be proposed.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',

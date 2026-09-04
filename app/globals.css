@@ -2369,6 +2369,74 @@
   border-top: 1px solid var(--co-divider);
 }
 
+.co-evidence-groups {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.co-evidence-groups > article {
+  padding: 13px;
+  border: 1px solid var(--co-divider);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.co-evidence-groups article > header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.co-evidence-groups article > header strong {
+  font-size: 12px;
+}
+
+.co-evidence-groups article > header span {
+  padding: 4px 7px;
+  color: #167852;
+  border-radius: 999px;
+  background: #e4f6ee;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.co-evidence-groups article > header span[data-coverage='unmatched'] {
+  color: #a05e0d;
+  background: #fff2d9;
+}
+
+.co-evidence-groups ul {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.co-evidence-groups li {
+  padding-top: 8px;
+  border-top: 1px solid var(--co-divider);
+}
+
+.co-evidence-groups li strong,
+.co-evidence-groups li small {
+  display: block;
+}
+
+.co-evidence-groups li strong {
+  font-size: 11px;
+}
+
+.co-evidence-groups li small,
+.co-evidence-groups article > p {
+  margin: 4px 0 0;
+  color: var(--co-text-4);
+  font-size: 10px;
+}
+
 .co-run-journal article strong {
   font-size: 11px;
 }

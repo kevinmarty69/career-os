@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { ApplicationEvidenceCheckpoint } from '@/components/applications/application-evidence-checkpoint';
 import { ApplicationResearchCheckpoint } from '@/components/applications/application-research-checkpoint';
 import { useApplicationWorkflow } from '@/components/applications/use-application-workflow';
 import { ApplicationsPage } from '@/components/applications/applications-page';
@@ -952,6 +953,20 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
                   void workflow.confirmResearch(signalIds)
                 }
                 pending={workflow.decisionPending}
+                research={workflow.run.research}
+              />
+            ) : null}
+            {workflow.run?.research &&
+            workflow.run.evidenceArchive &&
+            workflow.run.status === 'paused' &&
+            workflow.run.stage === 'strategy' &&
+            !workflow.run.strategy ? (
+              <ApplicationEvidenceCheckpoint
+                archive={workflow.run.evidenceArchive}
+                error={workflow.decisionError}
+                onConfirm={() => void workflow.startStrategy()}
+                pending={workflow.decisionPending}
+                profile={workflow.run.profile}
                 research={workflow.run.research}
               />
             ) : null}

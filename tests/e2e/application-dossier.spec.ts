@@ -104,6 +104,72 @@ function researchRun() {
   } as const;
 }
 
+function evidenceRun() {
+  const claimId = '988c0a00-0000-4000-8000-000000000012';
+  const evidenceId = '988c0a00-0000-4000-8000-000000000013';
+  const paused = researchRun();
+  return {
+    ...paused,
+    stage: 'strategy',
+    profile: {
+      ...syntheticProfile,
+      sources: [
+        {
+          id: 'source-release-record',
+          kind: 'document',
+          title: 'Release record',
+          sensitivity: 'private',
+          allowedUses: ['application'],
+          trust: 'untrusted-data',
+        },
+      ],
+      evidence: [
+        {
+          id: evidenceId,
+          sourceId: 'source-release-record',
+          label: 'Deployment reliability postmortem',
+          excerpt: 'Owned the deployment platform and production reliability.',
+        },
+      ],
+      claims: [
+        {
+          id: claimId,
+          statement: 'Owned a production deployment platform end to end.',
+          kind: 'experience',
+          level: 'verified',
+          evidenceIds: [evidenceId],
+          sensitivity: 'private',
+          allowedUses: ['application'],
+        },
+      ],
+    },
+    evidenceArchive: {
+      artifactId: '988c0a00-0000-4000-8000-000000000014',
+      artifactHash: 'b'.repeat(64),
+      schemaVersion: 1,
+      purpose: 'application',
+      profileSnapshotId: '988c0a00-0000-4000-8000-000000000015',
+      researchArtifactId: paused.research.artifactId,
+      researchArtifactHash: paused.research.artifactHash,
+      signals: [
+        {
+          signalId: 'signal-1',
+          coverage: 'verified_candidate',
+          matches: [
+            {
+              claimId,
+              evidenceIds: [evidenceId],
+              provenance: 'verified',
+              relevanceScore: 92,
+            },
+          ],
+        },
+        { signalId: 'signal-2', coverage: 'unmatched', matches: [] },
+      ],
+    },
+  } as const;
+}
+
 test('renders the persisted application instead of the Nimbus fixture', async ({
   context,
   page,
@@ -257,6 +323,54 @@ test('requires a human selection before evidence matching continues', async ({
   expect(request?.body).toEqual({
     researchArtifactId: paused.research.artifactId,
     selectedSignalIds: ['signal-1'],
+  });
+  expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('shows eligible evidence and requires confirmation before strategy', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const paused = evidenceRun();
+  let request: { body: unknown; key?: string } | undefined;
+  await mockApplication(page, paused);
+  await page.route(`**/api/runs/${paused.runId}/strategy`, async (route) => {
+    request = {
+      body: route.request().postDataJSON(),
+      key: route.request().headers()['idempotency-key'],
+    };
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...paused,
+        status: 'running',
+        steps: [
+          ...paused.steps,
+          { stage: 'recruiter-strategist', status: 'pending', attempt: 1 },
+        ],
+      }),
+    });
+  });
+
+  await page.goto(`/applications/${applicationId}`);
+  await expect(
+    page.getByRole('heading', {
+      name: 'What your experience demonstrates for this role',
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Owned a production deployment platform end to end.'),
+  ).toBeVisible();
+  await expect(page.getByText('Gap', { exact: true })).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Start application strategy' })
+    .click();
+  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  expect(request?.body).toEqual({
+    evidenceArtifactId: paused.evidenceArchive.artifactId,
+    evidenceArtifactHash: paused.evidenceArchive.artifactHash,
   });
   expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
 });
