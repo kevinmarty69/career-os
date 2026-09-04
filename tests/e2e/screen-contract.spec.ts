@@ -9,7 +9,7 @@ const screens = [
     'L’opérabilité par une petite équipe, pas la performance brute.',
   ],
   ['/applications/nimbus/review', '3 modifications proposées'],
-  ['/memory/import', 'Lecture de votre CV'],
+  ['/memory/import', 'Ajoutez votre parcours'],
   [
     '/applications/nimbus/page',
     'Faire tenir une flotte de 12 000 robots sur une plateforme opérable par trois personnes.',
@@ -114,23 +114,20 @@ test('navigates from memory to the kit home without reviving the legacy shell', 
   await expect(page.locator('.app-shell')).toHaveCount(0);
 });
 
-test('shows a traceable CV import state before human validation', async ({
+test('shows a private source choice before human validation', async ({
   page,
 }) => {
   await page.goto('/memory/import');
   await expect(
-    page.getByRole('progressbar', { name: 'Progression de l’import' }),
-  ).toHaveAttribute('value', '64');
-  await expect(
-    page.getByText('Vous relirez tout avant validation'),
+    page.getByRole('heading', { name: 'Déposez votre CV ici' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Extraction en direct' }),
+    page.getByText('Le fichier brut n’est pas envoyé au serveur.'),
   ).toBeVisible();
   await expect(
-    page.getByText('citation directe', { exact: true }),
+    page.getByRole('heading', { name: 'Ou collez du texte' }),
   ).toBeVisible();
-  await expect(page.getByText('à confirmer', { exact: true })).toBeVisible();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
 });
 
 test('keeps the CV import readable at tablet width', async ({ page }) => {
@@ -146,7 +143,7 @@ test('keeps the CV import readable at tablet width', async ({ page }) => {
   await expect(mobileNavigation).toBeVisible();
   await expect(mobileNavigation.getByRole('link')).toHaveCount(4);
   await expect(
-    page.getByRole('heading', { name: 'Extraction en direct' }),
+    page.getByRole('heading', { name: 'Déposez votre CV ici' }),
   ).toBeVisible();
 
   const overflows = await page.evaluate(
@@ -175,23 +172,19 @@ test('exposes keyboard navigation and readable informational copy', async ({
   await expect(links.nth(4)).toHaveAttribute('href', '/settings/models');
 
   const shell = await page
-    .getByRole('region', { name: 'Import du CV en cours' })
+    .getByRole('region', { name: 'Import de la mémoire' })
     .boundingBox();
   expect(shell).toMatchObject({ x: 0, y: 0, width: 1440, height: 900 });
 
   await page.keyboard.press('Tab');
-  await expect(page.getByText('Aller à la progression')).toBeFocused();
+  await expect(page.getByText('Aller à l’import')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('link', { name: 'Career OS, accueil' }),
+  ).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(links.first()).toBeFocused();
   await expect(links.first()).toHaveCSS('outline-style', 'solid');
-
-  for (const copy of [
-    page.getByText('Étape 1 sur 3'),
-    page.getByText('≈ 15 s restantes'),
-    page.getByText('citation directe', { exact: true }),
-  ]) {
-    await expect(copy).toHaveCSS('color', 'rgb(92, 94, 104)');
-  }
 });
 
 test('keeps the main application shell edge to edge', async ({ page }) => {

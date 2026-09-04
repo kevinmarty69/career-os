@@ -1,37 +1,34 @@
-# Milestone: first CV import screen in code
+# Milestone: local Career Memory import is now a real product flow
 
-The approved `V1 · Import du CV` concept now runs as a real Next.js route at
-`/memory/import`. It deliberately covers one screen only so the mock can be
-judged in a browser before the remaining product surfaces are rebuilt.
+The approved import direction now runs as a functional Next.js flow at
+`/memory/import`. It uses the existing browser-side importer and the existing
+Career Memory save port instead of displaying a simulated parsing screen.
 
 ## What is represented
 
-- the running CV parsing state and its source file;
-- a visible, ordered extraction pipeline;
-- the human-validation guardrail before Career Memory is updated;
-- live claims with direct-citation and needs-confirmation states;
-- the desktop shell from the artifact and a responsive mobile reading order.
+- PDF, DOCX and TXT import through a local Web Worker;
+- guided pasted text for a CV, LinkedIn profile or career notes;
+- honest indeterminate progress without invented percentages or ETAs;
+- editable claims, types, statuses, sensitivity and allowed uses;
+- mandatory selection and human confirmation before the save request;
+- a session-scoped review draft that survives an accidental reload;
+- duplicate merging through the shared Career Memory domain helper.
 
 ## Visual proof
 
-- `cv-import-first-screen-desktop.png`: 1440 × 900 browser viewport;
-- `cv-import-first-screen-mobile.png`: iPhone 13 browser viewport.
+- `cv-import-first-screen-desktop.png`: source choice at 1440 × 900;
+- `cv-import-first-screen-mobile.png`: real extracted-claim review on iPhone 13.
 
 ## Brand assets used
 
-- `public/brand/symbol/careeros-symbol-ink.svg`: application lockup symbol;
+- `public/brand/symbol/careeros-symbol-ink.svg`: application symbol;
 - `public/brand/favicon/favicon.svg`: browser favicon;
 - `public/brand/favicon/apple-touch-icon.svg`: Apple touch icon.
 
-The assets are copied unchanged from the supplied Career OS brand pack. The
-wordmark is composed in HTML with the documented Space Grotesk Medium setting,
-because the supplied SVG lockups contain live text and would otherwise depend
-on the viewer's local font availability.
+The assets remain unchanged from the supplied Career OS brand pack.
 
 ## Design boundary
 
-The new artifact defines this screen's desktop visual language but does not
-include an updated global design-system document or a dedicated mobile V1.
-Desktop values therefore follow the artifact. Mobile follows the existing
-handoff rule of a single content column below 1120 px with bottom navigation;
-it remains a functional adaptation to validate with the designer.
+The page follows the approved Career OS shell and tokens. The file itself never
+leaves the browser. Only the structured selection is sent to the existing
+profile endpoint, and only after the explicit validation action.
