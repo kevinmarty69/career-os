@@ -66,6 +66,25 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
     createdAt: now,
     updatedAt: now,
   };
+  await page.route('**/api/insights', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        totalApplications: 4,
+        sentOrLater: 2,
+        applicationsWithResponse: 1,
+        responseCoveragePct: 50,
+        interviews: 1,
+        outcomes: 1,
+        weekly: Array.from({ length: 8 }, (_, index) => ({
+          weekStart: new Date(Date.UTC(2026, 6, 13 + index * 7)).toISOString(),
+          responses: index === 6 ? 1 : 0,
+          interviews: index === 7 ? 1 : 0,
+          outcomes: index === 7 ? 1 : 0,
+        })),
+      }),
+    }),
+  );
   await page.route(`**/api/applications/${applicationId}/run`, (route) =>
     run
       ? route.fulfill({

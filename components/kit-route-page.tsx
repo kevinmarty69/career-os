@@ -27,6 +27,10 @@ import {
   type ApplicationTimelineEvent,
 } from '@/lib/application-timeline';
 import {
+  applicationInsightsSchema,
+  type ApplicationInsights,
+} from '@/lib/application-insights';
+import {
   applicationTaskListSchema,
   applicationTaskSchema,
   type ApplicationTask,
@@ -35,6 +39,7 @@ import {
   createApplicationTask,
   createApplicationTimelineEvent,
   readApplication,
+  readApplicationInsights,
   readApplicationTimeline,
   readApplicationTasks,
   readApplicationRun,
@@ -2629,101 +2634,144 @@ function DataTable({
 }
 
 function InsightsScreen() {
+  const { locale } = useI18n();
+  const [insights, setInsights] = useState<ApplicationInsights>();
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  useEffect(() => {
+    const controller = new AbortController();
+    void readApplicationInsights(controller.signal)
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        setInsights(applicationInsightsSchema.parse(await response.json()));
+        setState('ready');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState('error');
+      });
+    return () => controller.abort();
+  }, []);
+  const copy =
+    locale === 'fr'
+      ? {
+          intro:
+            'Des tendances descriptives tirées de vos candidatures et événements enregistrés.',
+          total: 'Candidatures suivies',
+          coverage: 'Avec une réponse enregistrée',
+          interviews: 'Entretiens enregistrés',
+          outcomes: 'Résultats enregistrés',
+          trend: 'Activité sur 8 semaines',
+          responses: 'Réponses',
+          noActivity: 'Aucune activité enregistrée sur cette période.',
+          basis: 'Base de lecture',
+          sent: 'candidatures marquées envoyées ou à une étape ultérieure',
+          answered: 'ont au moins une réponse enregistrée',
+          boundary:
+            'Ces chiffres décrivent vos données. Ils n’attribuent aucune réponse à une page privée, une preuve, un wording ou une action des agents.',
+          loading: 'Calcul des tendances…',
+          error: 'Les tendances ne peuvent pas être chargées.',
+        }
+      : {
+          intro:
+            'Descriptive trends from your recorded applications and timeline events.',
+          total: 'Tracked applications',
+          coverage: 'With a recorded response',
+          interviews: 'Recorded interviews',
+          outcomes: 'Recorded outcomes',
+          trend: 'Activity over 8 weeks',
+          responses: 'Responses',
+          noActivity: 'No activity was recorded during this period.',
+          basis: 'Reading basis',
+          sent: 'applications marked sent or at a later stage',
+          answered: 'have at least one recorded response',
+          boundary:
+            'These figures describe your data. They do not attribute any response to a private page, evidence item, wording choice, or agent action.',
+          loading: 'Calculating trends…',
+          error: 'Trends could not be loaded.',
+        };
+  const maximum = Math.max(
+    1,
+    ...(insights?.weekly.map(
+      (week) => week.responses + week.interviews + week.outcomes,
+    ) ?? [1]),
+  );
   return (
     <AppShell path="/insights">
-      <PageHeader
-        title="Insights"
-        copy="14 candidatures sur 90 jours. Ce qui marche, ce qui bloque, ce qui manque en preuves."
-        actions={
-          <Button quiet>
-            <Icon>download</Icon>Exporter
-          </Button>
-        }
-      />
+      <PageHeader title="Insights" copy={copy.intro} />
+      {state === 'loading' ? <p>{copy.loading}</p> : null}
+      {state === 'error' ? (
+        <p className="co-error" role="alert">
+          {copy.error}
+        </p>
+      ) : null}
       <div className="co-stats">
         <Stat
           icon="trending_up"
-          value="38 %"
-          label="Taux de réponse · +12 pts"
+          value={String(insights?.totalApplications ?? '—')}
+          label={copy.total}
         />
-        <Stat icon="schedule" value="6 jours" label="Délai médian de réponse" />
-        <Stat icon="timer" value="22 min" label="Temps par candidature" />
-        <Stat icon="rule" value="74 %" label="Corrections acceptées" />
+        <Stat
+          icon="mark_email_read"
+          value={
+            insights?.responseCoveragePct === null || !insights
+              ? '—'
+              : `${insights.responseCoveragePct}%`
+          }
+          label={copy.coverage}
+        />
+        <Stat
+          icon="record_voice_over"
+          value={String(insights?.interviews ?? '—')}
+          label={copy.interviews}
+        />
+        <Stat
+          icon="flag"
+          value={String(insights?.outcomes ?? '—')}
+          label={copy.outcomes}
+        />
       </div>
       <div className="co-insights-grid">
         <section className="co-panel">
-          <h2>Entonnoir</h2>
-          {[
-            ['Envoyées', '14', '100%'],
-            ['Page ouverte', '9', '64%'],
-            ['Preuve inspectée', '7', '50%'],
-            ['Réponse humaine', '5', '38%'],
-            ['Entretien', '3', '22%'],
-          ].map(([l, v, p]) => (
-            <div className="co-funnel" key={l}>
-              <span>{l}</span>
-              <div>
-                <i style={{ width: p }} />
-              </div>
-              <strong>{v}</strong>
-              <small>{p}</small>
-            </div>
-          ))}
-          <div className="co-note">
-            <Icon>insights</Icon>Quand une preuve est inspectée, la réponse
-            arrive dans 71 % des cas.
+          <h2>{copy.trend}</h2>
+          <div className="co-insight-weeks">
+            {insights?.weekly.map((week) => {
+              const total = week.responses + week.interviews + week.outcomes;
+              return (
+                <div key={week.weekStart}>
+                  <span title={`${total}`}>
+                    <i style={{ height: `${(total / maximum) * 100}%` }} />
+                  </span>
+                  <small>
+                    {new Intl.DateTimeFormat(locale, {
+                      day: 'numeric',
+                      month: 'short',
+                    }).format(new Date(week.weekStart))}
+                  </small>
+                </div>
+              );
+            })}
           </div>
+          {insights &&
+          !insights.weekly.some(
+            (week) => week.responses + week.interviews + week.outcomes,
+          ) ? (
+            <p className="co-insight-empty">{copy.noActivity}</p>
+          ) : null}
         </section>
         <section className="co-panel">
-          <h2>
-            Couverture des preuves <Badge tone="ok">92 %</Badge>
-          </h2>
-          <div className="co-bars">
-            {[42, 56, 49, 70, 62, 84].map((n, i) => (
-              <i key={i} style={{ height: `${n}%` }} />
-            ))}
+          <h2>{copy.basis}</h2>
+          <p className="co-insight-basis">
+            <strong>{insights?.applicationsWithResponse ?? '—'}</strong>{' '}
+            {copy.answered}
+          </p>
+          <p className="co-insight-basis">
+            <strong>{insights?.sentOrLater ?? '—'}</strong> {copy.sent}
+          </p>
+          <div className="co-note">
+            <Icon>info</Icon>
+            {copy.boundary}
           </div>
-          <ClaimRow tone="crit" label="0 preuve" text="Management d’équipe" />
-          <ClaimRow
-            tone="warn"
-            label="1 preuve"
-            text="Impact business chiffré"
-          />
-          <ClaimRow label="11 preuves" text="Fiabilité / infra" />
         </section>
       </div>
-      <section className="co-panel">
-        <h2>Affirmations les plus inspectées</h2>
-        <DataTable
-          headers={['Affirmation', 'Inspections', 'Réponse ensuite', 'Niveau']}
-          rows={[
-            [
-              'Temps de build 11 → 7 min sur 340 services',
-              '9',
-              '78 %',
-              <Badge key="verified" tone="ok">
-                Vérifié
-              </Badge>,
-            ],
-            [
-              'Pont ROS2 en production chez 4 entreprises',
-              '7',
-              '62 %',
-              <Badge key="verified" tone="ok">
-                Vérifié
-              </Badge>,
-            ],
-            [
-              'Formation de l’équipe SRE à l’outillage',
-              '4',
-              '41 %',
-              <Badge key="declared" tone="warn">
-                Déclaré
-              </Badge>,
-            ],
-          ]}
-        />
-      </section>
     </AppShell>
   );
 }

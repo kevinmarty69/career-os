@@ -108,6 +108,11 @@ async function main() {
     401,
     'anonymous application list',
   );
+  await expectStatus(
+    await anonymous.request('/api/insights'),
+    401,
+    'anonymous application insights',
+  );
 
   const owner = await createWorkspace('ApplicationOwner');
   const key = randomUUID();
@@ -234,6 +239,16 @@ async function main() {
     ((await timeline.json()) as { events: unknown[] }).events.length,
     1,
   );
+  const insights = await owner.request('/api/insights');
+  await expectStatus(insights, 200, 'application insights');
+  const insightSummary = (await insights.json()) as {
+    totalApplications: number;
+    interviews: number;
+    weekly: unknown[];
+  };
+  assert.equal(insightSummary.totalApplications, 2);
+  assert.equal(insightSummary.interviews, 1);
+  assert.equal(insightSummary.weekly.length, 8);
 
   const taskInput = {
     kind: 'follow_up',

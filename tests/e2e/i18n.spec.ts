@@ -208,6 +208,29 @@ test('shows persisted publication versions and human decisions', async ({
     });
 });
 
+test('shows descriptive response trends without claiming causality', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page);
+  await page.goto('/insights');
+
+  await expect(
+    page.getByRole('heading', { name: 'Activity over 8 weeks' }),
+  ).toBeVisible();
+  await expect(page.getByText('50%')).toBeVisible();
+  await expect(
+    page.getByText(/They do not attribute any response/),
+  ).toBeVisible();
+  await expect(page.getByText(/When evidence is inspected/)).toHaveCount(0);
+  if (process.env.CAREER_OS_INSIGHTS_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_INSIGHTS_SCREENSHOT,
+      fullPage: true,
+    });
+});
+
 test('shows only persisted human decisions in the review queue', async ({
   context,
   page,

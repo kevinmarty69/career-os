@@ -656,7 +656,7 @@ Critères d'acceptation :
 - [x] Tâches et relances datées.
 - [x] Recherche et filtres globaux.
 - [x] Historique des versions et décisions.
-- [ ] Tendances personnelles sur les réponses, sans fausse causalité.
+- [x] Tendances personnelles sur les réponses, sans fausse causalité.
 
 Critères d'acceptation :
 
