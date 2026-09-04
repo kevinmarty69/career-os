@@ -14,8 +14,18 @@ const applicationInput = {
   company: 'Northstar Labs',
   role: 'Senior Product Engineer',
   description: 'Ship dependable product workflows.',
+  companySources: [
+    { url: 'https://northstar.example/about', origin: 'job-jsonld' },
+  ],
   accent: '#21504b',
   stage: 'draft',
+};
+const livingProfile = {
+  ...syntheticProfile,
+  claims: syntheticProfile.claims.map((claim) => ({
+    ...claim,
+    level: 'declared' as const,
+  })),
 };
 
 class BrowserSession {
@@ -112,8 +122,10 @@ async function main() {
     applicationId: string;
     revision: number;
     company: string;
+    companySources: typeof applicationInput.companySources;
   };
   assert.equal(application.revision, 1);
+  assert.deepEqual(application.companySources, applicationInput.companySources);
 
   const replay = await owner.request(
     '/api/applications',
@@ -188,11 +200,22 @@ async function main() {
   assert.equal(((await unchanged.json()) as { revision: number }).revision, 2);
 
   const saved = await owner.request('/api/profile', 'PUT', {
-    profile: syntheticProfile,
+    profile: livingProfile,
     expectedRevision: 0,
   });
   await expectStatus(saved, 200, 'profile creation');
   const profile = (await saved.json()) as { revision: number };
+  const heartbeatPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await heartbeatPool.query('begin');
+    await heartbeatPool.query('set local role career_company_researcher');
+    await heartbeatPool.query(
+      "select app.record_worker_heartbeat('company-researcher')",
+    );
+    await heartbeatPool.query('commit');
+  } finally {
+    await heartbeatPool.end();
+  }
   const run = await owner.request(
     '/api/runs',
     'POST',
@@ -211,16 +234,23 @@ async function main() {
     const snapshot = await pool.query<{
       company: string;
       application_revision: string;
+      company_sources: typeof applicationInput.companySources;
+      research_sources: typeof applicationInput.companySources;
     }>(
-      `select o.company, o.application_revision
+      `select o.company, o.application_revision, o.company_sources,
+         step.input -> 'companySources' as research_sources
        from app.opportunities o join app.workflow_runs wr
          on wr.opportunity_id = o.id
+       join app.workflow_steps step on step.workflow_run_id = wr.id
+         and step.stage = 'company-researcher'
        where wr.id = $1`,
       [persistedRun.runId],
     );
     assert.deepEqual(snapshot.rows[0], {
       company: 'Updated Company',
       application_revision: '2',
+      company_sources: applicationInput.companySources,
+      research_sources: applicationInput.companySources,
     });
   } finally {
     await pool.end();

@@ -242,7 +242,16 @@ export function useWorkspaceRun({
   function changeOpportunity(
     update: Partial<ApplicationDossier['opportunity']>,
   ) {
-    const next = { ...opportunityRef.current, ...update };
+    const current = opportunityRef.current;
+    const next = {
+      ...current,
+      ...update,
+      ...(update.url !== undefined &&
+      update.url !== current.url &&
+      update.companySources === undefined
+        ? { companySources: undefined }
+        : {}),
+    };
     opportunityRef.current = next;
     if (activeTenantId)
       localStorage.removeItem(
@@ -285,6 +294,7 @@ export function useWorkspaceRun({
           ? (preview.description ?? current.description)
           : current.description,
       url: preview.sourceUrl,
+      companySources: preview.companySources,
     };
     opportunityRef.current = next;
     setPendingJobImport(undefined);
@@ -407,6 +417,9 @@ export function useWorkspaceRun({
         role: application.role,
         description: application.description,
         ...(application.url ? { url: application.url } : {}),
+        ...(application.companySources
+          ? { companySources: application.companySources }
+          : {}),
         accent: application.accent,
       },
     }));

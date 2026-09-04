@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import type { Application } from './application-contract';
+import {
+  applicationCompanySourcesSchema,
+  type Application,
+} from './application-contract';
 import { httpUrlSchema, optionalHttpUrl } from './http-url';
 import {
   persistedEvidenceArchiveSchema,
@@ -112,6 +115,7 @@ const opportunitySchema = z
     role: z.string().max(200),
     description: z.string().max(20_000),
     url: httpUrlSchema.optional(),
+    companySources: applicationCompanySourcesSchema.optional(),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   })
   .strict();
@@ -463,6 +467,9 @@ export function mergePersistedApplications(
       role: application.role,
       description: application.description,
       ...(application.url ? { url: application.url } : {}),
+      ...(application.companySources
+        ? { companySources: application.companySources }
+        : {}),
       accent: application.accent,
     };
     if (existing?.applicationRevision === application.revision)

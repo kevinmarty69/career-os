@@ -5,12 +5,14 @@ import {
   type Profile,
   type Review,
 } from './schemas';
+import type { Application } from './application-contract';
 
 export type Opportunity = {
   company: string;
   role: string;
   description: string;
   url?: string;
+  companySources?: Application['companySources'];
   accent: string;
 };
 

@@ -19,6 +19,7 @@ export function saveApplication(dossier: ApplicationDossier) {
     role: dossier.opportunity.role,
     description: dossier.opportunity.description,
     ...(dossier.opportunity.url ? { url: dossier.opportunity.url } : {}),
+    companySources: dossier.opportunity.companySources ?? [],
     accent: dossier.opportunity.accent,
     stage: 'draft' as const,
   };

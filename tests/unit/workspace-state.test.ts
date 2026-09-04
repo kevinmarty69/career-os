@@ -227,6 +227,9 @@ test('merges server applications without reviving stale generated state', () => 
     company: 'Updated Company',
     role: 'Principal Engineer',
     description: 'Updated brief',
+    companySources: [
+      { url: 'https://updated.example/about', origin: 'job-jsonld' as const },
+    ],
     accent: '#5847e8',
     stage: 'draft' as const,
     revision: 3,
@@ -240,6 +243,10 @@ test('merges server applications without reviving stale generated state', () => 
     (dossier) => dossier.applicationId === APPLICATION_ID,
   )!;
   assert.equal(refreshed.opportunity.company, 'Updated Company');
+  assert.deepEqual(
+    refreshed.opportunity.companySources,
+    application.companySources,
+  );
   assert.equal(refreshed.applicationRevision, 3);
   assert.equal(refreshed.spec, undefined);
   assert.equal(refreshed.runId, undefined);
