@@ -21,7 +21,7 @@ export const dossierMessages = {
   Étape: 'Stage',
   Révision: 'Revision',
   'Dernière mise à jour': 'Last updated',
-  'Ouvrir la source': 'Open source',
+  'Ouvrir la source': 'Open original job',
   'Aucune URL source enregistrée.': 'No source URL saved.',
   'Le dossier est prêt pour la recherche entreprise et le workflow agentique.':
     'This application is ready for company research and the agent workflow.',

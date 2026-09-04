@@ -749,7 +749,6 @@ function DossierShell({
 
 function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([dossierMessages]);
   const [result, setResult] = useState<{
     applicationId: string;
     application?: Application;
@@ -796,7 +795,7 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
         role: 'Chargement…',
       };
 
-  return localize(
+  return (
     <DossierShell
       actions={null}
       active="Brief"
@@ -869,7 +868,7 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
           </section>
         )}
       </div>
-    </DossierShell>,
+    </DossierShell>
   );
 }
 

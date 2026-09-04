@@ -2105,7 +2105,7 @@
   border-bottom: 1px solid var(--co-divider);
 }
 
-.co-dossier-top > div {
+.co-dossier-top > div:first-child {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -2113,7 +2113,7 @@
   align-items: center;
 }
 
-.co-dossier-top > div > span {
+.co-dossier-top > div:first-child > span {
   min-width: 0;
 }
 
