@@ -3,11 +3,15 @@ import { betterAuth } from 'better-auth';
 import { organization } from 'better-auth/plugins';
 import { Pool } from 'pg';
 import { z } from 'zod';
-import { organizationOptions } from './auth-config';
+import {
+  organizationOptions,
+  sensitiveSessionFreshAgeSeconds,
+} from './auth-config';
 
 const authenticatedSessionSchema = z.object({
   userId: z.string().uuid(),
   tenantId: z.string().uuid(),
+  sessionCreatedAt: z.coerce.date(),
 });
 
 export const authPool = new Pool({
@@ -27,6 +31,7 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
   },
+  session: { freshAge: sensitiveSessionFreshAgeSeconds },
   rateLimit: {
     customRules:
       process.env.CAREER_OS_E2E === '1'
@@ -48,6 +53,7 @@ export async function authenticatedPublicationSession(request: Request) {
   const identity = authenticatedSessionSchema.safeParse({
     userId: session?.user.id,
     tenantId: session?.session.activeOrganizationId,
+    sessionCreatedAt: session?.session.createdAt,
   });
   if (!identity.success) return;
   const membership = await authPool.query<{ name: string }>(

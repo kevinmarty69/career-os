@@ -5,7 +5,11 @@ import { syntheticProfile } from '../../lib/fixture';
 import { parsePublicationCookie } from '../../lib/publication-cookie';
 import { profileSchema } from '../../lib/schemas';
 import { buildPageSpec, buildStrategy } from '../../lib/workflow';
-import { organizationOptions } from '../../lib/server/auth-config';
+import {
+  isSensitiveSessionFresh,
+  organizationOptions,
+  sensitiveSessionFreshAgeSeconds,
+} from '../../lib/server/auth-config';
 import {
   isSameOrigin,
   PayloadTooLargeError,
@@ -37,6 +41,20 @@ const spec = buildPageSpec(
 
 test('organization invitations require a verified email', () => {
   assert.equal(organizationOptions.requireEmailVerificationOnInvitation, true);
+  assert.equal(organizationOptions.disableOrganizationDeletion, true);
+});
+
+test('sensitive actions require a session created in the last ten minutes', () => {
+  const now = Date.now();
+  assert.equal(isSensitiveSessionFresh(new Date(now - 60_000), now), true);
+  assert.equal(
+    isSensitiveSessionFresh(
+      new Date(now - sensitiveSessionFreshAgeSeconds * 1000),
+      now,
+    ),
+    false,
+  );
+  assert.equal(isSensitiveSessionFresh(new Date(now + 1), now), false);
 });
 
 test('state-changing requests fail closed without a configured origin', () => {
