@@ -17,14 +17,25 @@ insert into app.discovered_jobs (
   'Tenant A Company', 'Engineer', 'https://a.example.test/job', now(), now()
 );
 insert into app.job_source_records (
-  id, tenant_id, discovered_job_id, requested_url, final_url, fetched_at,
+  id, tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
   content_type, bytes, content_sha256, extraction
 ) values (
   '50000000-0000-0000-0000-000000000001',
   '20000000-0000-0000-0000-000000000001',
   '40000000-0000-0000-0000-000000000001',
-  'https://a.example.test/job', 'https://a.example.test/job', now(),
+  'https://a.example.test/job', 'https://a.example.test/job',
+  'https://a.example.test/job', now(),
   'text/html', 128, repeat('a', 64), '{"company":"Tenant A Company"}'::jsonb
+);
+insert into app.job_observations (
+  id, tenant_id, discovered_job_id, source_record_id, observed_at,
+  content_sha256, change_kind, lifecycle_signal, matched_by, normalized
+) values (
+  '60000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  '40000000-0000-0000-0000-000000000001',
+  '50000000-0000-0000-0000-000000000001', now(), repeat('a', 64),
+  'first_seen', 'unknown', 'new', '{"sourceKind":"generic_html"}'::jsonb
 );
 
 reset role;
@@ -39,6 +50,27 @@ insert into app.discovered_jobs (
   '20000000-0000-0000-0000-000000000002',
   'Tenant B Company', 'Engineer', 'https://b.example.test/job', now(), now()
 );
+insert into app.job_source_records (
+  id, tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
+  content_type, bytes, content_sha256, extraction
+) values (
+  '50000000-0000-0000-0000-000000000002',
+  '20000000-0000-0000-0000-000000000002',
+  '40000000-0000-0000-0000-000000000002',
+  'https://b.example.test/job', 'https://b.example.test/job',
+  'https://b.example.test/job', now(), 'text/html', 128, repeat('b', 64),
+  '{"company":"Tenant B Company"}'::jsonb
+);
+insert into app.job_observations (
+  id, tenant_id, discovered_job_id, source_record_id, observed_at,
+  content_sha256, change_kind, lifecycle_signal, matched_by, normalized
+) values (
+  '60000000-0000-0000-0000-000000000002',
+  '20000000-0000-0000-0000-000000000002',
+  '40000000-0000-0000-0000-000000000002',
+  '50000000-0000-0000-0000-000000000002', now(), repeat('b', 64),
+  'first_seen', 'unknown', 'new', '{"sourceKind":"generic_html"}'::jsonb
+);
 set local role career_app;
 
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
@@ -49,6 +81,7 @@ do $$ begin
   if (select count(*) from app.discovered_jobs) <> 1 then raise exception 'tenant A can read tenant B discovered jobs'; end if;
   if exists(select 1 from app.discovered_jobs where company = 'Tenant B Company') then raise exception 'cross-tenant discovered job leaked'; end if;
   if (select count(*) from app.job_source_records) <> 1 then raise exception 'tenant A source provenance isolation failed'; end if;
+  if (select count(*) from app.job_observations) <> 1 then raise exception 'tenant A observation isolation failed'; end if;
 end $$;
 
 do $$ begin
@@ -80,12 +113,13 @@ reset role;
 do $$ begin
   begin
     insert into app.job_source_records (
-      tenant_id, discovered_job_id, requested_url, final_url, fetched_at,
+      tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
       content_type, bytes, content_sha256, extraction
     ) values (
       '20000000-0000-0000-0000-000000000001',
       '40000000-0000-0000-0000-000000000002',
-      'https://cross.example.test/job', 'https://cross.example.test/job', now(),
+      'https://cross.example.test/job', 'https://cross.example.test/job',
+      'https://cross.example.test/job', now(),
       'text/html', 128, repeat('b', 64), '{"company":"Cross Tenant"}'::jsonb
     );
     raise exception 'discovered job provenance accepted a cross-tenant reference';

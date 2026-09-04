@@ -114,10 +114,62 @@ function importedJob(
     provenance: {
       requestedUrl,
       finalUrl,
+      fetchedUrl: finalUrl,
       fetchedAt: '2026-09-04T10:00:00.000Z',
       contentType: 'text/html' as const,
       bytes: 2_048,
       sha256: 'a'.repeat(64),
+      trust: 'untrusted-data' as const,
+    },
+    normalized: {
+      location: null,
+      remoteMode: 'unknown' as const,
+      contractType: 'unknown' as const,
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: null,
+      publishedAt: null,
+      externalId: null,
+      sourceKind: 'generic_html' as const,
+      lifecycleSignal: 'unknown' as const,
+    },
+  };
+}
+
+function greenhouseObservation(
+  lifecycleSignal: 'open' | 'closed' | 'unknown',
+  sha256: string,
+  requestedUrl = 'https://job-boards.greenhouse.io/acme/jobs/101',
+) {
+  const finalUrl = 'https://job-boards.greenhouse.io/acme/jobs/101';
+  return {
+    extraction: {
+      company: 'Acme Systems',
+      role: 'Senior Engineer',
+      description: 'Build dependable systems.',
+      sourceUrl: finalUrl,
+    },
+    normalized: {
+      location: 'Paris, France',
+      remoteMode: 'hybrid' as const,
+      contractType: 'full_time' as const,
+      salaryMin: 80000,
+      salaryMax: 100000,
+      salaryCurrency: 'EUR',
+      publishedAt: '2026-09-01T08:00:00.000Z',
+      externalId: 'acme:101',
+      sourceKind: 'greenhouse' as const,
+      lifecycleSignal,
+    },
+    provenance: {
+      requestedUrl,
+      finalUrl,
+      fetchedUrl:
+        'https://boards-api.greenhouse.io/v1/boards/acme/jobs/101?pay_transparency=true',
+      fetchedAt: '2026-09-04T11:00:00.000Z',
+      contentType: 'application/json' as const,
+      bytes: 1_024,
+      sha256,
       trust: 'untrusted-data' as const,
     },
   };
@@ -165,6 +217,8 @@ async function main() {
   assert.equal(first.created, true);
   assert.equal(first.opportunity.revision, 1);
   assert.equal(first.opportunity.sources.length, 1);
+  assert.equal(first.opportunity.observations.length, 1);
+  assert.equal(first.opportunity.lifecycle, 'open');
 
   const replay = await storeDiscoveredJob(
     owner.session,
@@ -177,6 +231,13 @@ async function main() {
   );
   assert.equal(replay.opportunity.revision, 1);
   assert.equal(replay.opportunity.sources.length, 1);
+  assert.equal(replay.opportunity.observations.length, 2);
+  assert.equal(
+    replay.opportunity.observations.some(
+      (observation) => observation.change === 'unchanged',
+    ),
+    true,
+  );
 
   const refresh = await storeDiscoveredJob(
     owner.session,
@@ -189,6 +250,13 @@ async function main() {
   );
   assert.equal(refresh.opportunity.revision, 2);
   assert.equal(refresh.opportunity.sources.length, 1);
+  assert.equal(refresh.opportunity.lifecycle, 'changed');
+  assert.equal(
+    refresh.opportunity.observations.some(
+      (observation) => observation.change === 'changed',
+    ),
+    true,
+  );
 
   const alias = await storeDiscoveredJob(
     owner.session,
@@ -200,6 +268,7 @@ async function main() {
     first.opportunity.opportunityId,
   );
   assert.equal(alias.opportunity.sources.length, 2);
+  assert.equal(alias.opportunity.observations.length, 4);
 
   const list = await owner.browser.request('/api/opportunities');
   await expectStatus(list, 200, 'opportunity list');
@@ -212,6 +281,146 @@ async function main() {
     first.opportunity.opportunityId,
   );
   assert.equal(listed.opportunities[0].sources.length, 2);
+
+  const connected = await storeDiscoveredJob(
+    owner.session,
+    greenhouseObservation('open', 'b'.repeat(64)),
+  );
+  assert.equal(connected.created, true);
+  assert.equal(connected.opportunity.location, 'Paris, France');
+  assert.equal(connected.opportunity.remoteMode, 'hybrid');
+  assert.equal(connected.opportunity.salaryMin, 80000);
+  assert.equal(connected.opportunity.fingerprint?.length, 64);
+
+  const exactReplay = await storeDiscoveredJob(
+    owner.session,
+    greenhouseObservation(
+      'open',
+      'b'.repeat(64),
+      'https://job-boards.greenhouse.io/acme/jobs/101?gh_src=campaign',
+    ),
+  );
+  assert.equal(exactReplay.created, false);
+  assert.equal(
+    exactReplay.opportunity.opportunityId,
+    connected.opportunity.opportunityId,
+  );
+  assert.equal(exactReplay.opportunity.sources.length, 1);
+  assert.equal(exactReplay.opportunity.sources[0].matchedBy, 'exact_source');
+
+  const closed = await storeDiscoveredJob(
+    owner.session,
+    greenhouseObservation('closed', 'b'.repeat(64)),
+  );
+  assert.equal(closed.opportunity.lifecycle, 'closed');
+  assert.equal(
+    closed.opportunity.observations.some(
+      (observation) => observation.change === 'closed',
+    ),
+    true,
+  );
+
+  const noClosureInference = await storeDiscoveredJob(
+    owner.session,
+    greenhouseObservation('unknown', 'b'.repeat(64)),
+  );
+  assert.equal(noClosureInference.opportunity.lifecycle, 'closed');
+  assert.equal(
+    noClosureInference.opportunity.observations.some(
+      (observation) => observation.change === 'unchanged',
+    ),
+    true,
+  );
+
+  const reposted = await storeDiscoveredJob(
+    owner.session,
+    greenhouseObservation('open', 'c'.repeat(64)),
+  );
+  assert.equal(reposted.opportunity.lifecycle, 'reposted');
+  assert.equal(
+    reposted.opportunity.observations.some(
+      (observation) => observation.change === 'reposted',
+    ),
+    true,
+  );
+  assert.equal(reposted.opportunity.observations.length, 5);
+
+  const greenhouse = greenhouseObservation('open', 'd'.repeat(64));
+  const syndicatedUrl = 'https://jobs.ashbyhq.com/acme/syndicated-101';
+  const syndicated = {
+    ...greenhouse,
+    extraction: { ...greenhouse.extraction, sourceUrl: syndicatedUrl },
+    normalized: {
+      ...greenhouse.normalized,
+      sourceKind: 'ashby' as const,
+      externalId: 'acme:syndicated-101',
+    },
+    provenance: {
+      ...greenhouse.provenance,
+      requestedUrl: syndicatedUrl,
+      finalUrl: syndicatedUrl,
+      fetchedUrl:
+        'https://api.ashbyhq.com/posting-api/job-board/acme?includeCompensation=true',
+    },
+  };
+  const fingerprintMatch = await storeDiscoveredJob(owner.session, syndicated);
+  assert.equal(fingerprintMatch.created, false);
+  assert.equal(
+    fingerprintMatch.opportunity.opportunityId,
+    connected.opportunity.opportunityId,
+  );
+  assert.equal(fingerprintMatch.opportunity.sources.length, 2);
+  assert.equal(
+    fingerprintMatch.opportunity.sources.some(
+      (source) => source.matchedBy === 'fingerprint',
+    ),
+    true,
+  );
+
+  const ambiguityPool = new Pool({ connectionString: databaseUrl });
+  const duplicateJobId = randomUUID();
+  try {
+    await ambiguityPool.query(
+      `insert into app.discovered_jobs (
+        id, tenant_id, company, role, description, canonical_url, location,
+        fingerprint, first_seen_at, last_seen_at
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())`,
+      [
+        duplicateJobId,
+        owner.session.tenantId,
+        'Acme Systems',
+        'Senior Engineer',
+        'A genuinely separate opening with the same public fields.',
+        'https://careers.acme.test/separate-opening',
+        'Paris, France',
+        connected.opportunity.fingerprint,
+      ],
+    );
+  } finally {
+    await ambiguityPool.end();
+  }
+  const ambiguousUrl = 'https://jobs.ashbyhq.com/acme/ambiguous-opening';
+  const ambiguous = {
+    ...syndicated,
+    extraction: { ...syndicated.extraction, sourceUrl: ambiguousUrl },
+    normalized: {
+      ...syndicated.normalized,
+      externalId: 'acme:ambiguous-opening',
+    },
+    provenance: {
+      ...syndicated.provenance,
+      requestedUrl: ambiguousUrl,
+      finalUrl: ambiguousUrl,
+      sha256: 'e'.repeat(64),
+    },
+  };
+  const ambiguityPreserved = await storeDiscoveredJob(owner.session, ambiguous);
+  assert.equal(ambiguityPreserved.created, true);
+  assert.notEqual(
+    ambiguityPreserved.opportunity.opportunityId,
+    connected.opportunity.opportunityId,
+  );
+  assert.notEqual(ambiguityPreserved.opportunity.opportunityId, duplicateJobId);
 
   const other = await createWorkspace('OpportunityOther');
   const otherList = await other.browser.request('/api/opportunities');
@@ -232,8 +441,8 @@ async function main() {
       [owner.session.tenantId],
     );
     assert.deepEqual(counts.rows[0], {
-      jobs: '1',
-      sources: '2',
+      jobs: '4',
+      sources: '5',
       applications: '0',
     });
   } finally {

@@ -8,6 +8,12 @@ import {
   extractJobPostingFromHtml,
   JobPostingExtractionError,
 } from '@/lib/job-posting-extractor';
+import {
+  genericNormalizedFields,
+  JobConnectorError,
+  parseJobConnector,
+  resolveJobConnector,
+} from '@/lib/job-source-connectors';
 import { authenticatedPublicationSession } from '@/lib/server/auth';
 import { storeDiscoveredJob } from '@/lib/server/discovered-jobs';
 import {
@@ -15,7 +21,11 @@ import {
   PayloadTooLargeError,
   readBoundedJson,
 } from '@/lib/server/http';
-import { SafeHttpError, safeFetchText } from '@/lib/server/safe-http';
+import {
+  normalizeImportUrl,
+  SafeHttpError,
+  safeFetchText,
+} from '@/lib/server/safe-http';
 import {
   finishUrlImport,
   reserveUrlImport,
@@ -35,24 +45,24 @@ export async function POST(request: Request) {
   let attemptId: string | undefined;
   let outcome: 'succeeded' | 'rejected' | 'failed' = 'failed';
   try {
-    const { url } = opportunityImportInputSchema.parse(
+    const input = opportunityImportInputSchema.parse(
       await readBoundedJson(request, MAX_IMPORT_BYTES),
     );
     attemptId = await reserveUrlImport(session);
-    const fetched = await safeFetchText(url);
-    const extraction = extractJobPostingFromHtml(
-      fetched.text,
-      fetched.finalUrl,
+    const imported = await importOpportunity(
+      normalizeImportUrl(input.url).href,
     );
     const stored = await storeDiscoveredJob(session, {
-      extraction,
+      extraction: imported.extraction,
+      normalized: imported.normalized,
       provenance: {
-        requestedUrl: fetched.requestedUrl,
-        finalUrl: fetched.finalUrl,
+        requestedUrl: imported.requestedUrl,
+        finalUrl: imported.extraction.sourceUrl,
+        fetchedUrl: imported.fetched.finalUrl,
         fetchedAt: new Date().toISOString(),
-        contentType: fetched.contentType,
-        bytes: fetched.bytes,
-        sha256: createHash('sha256').update(fetched.text).digest('hex'),
+        contentType: imported.fetched.contentType,
+        bytes: imported.fetched.bytes,
+        sha256: createHash('sha256').update(imported.hashInput).digest('hex'),
         trust: 'untrusted-data',
       },
     });
@@ -77,6 +87,30 @@ export async function POST(request: Request) {
       }
     }
   }
+}
+
+async function importOpportunity(requestedUrl: string) {
+  const connector = resolveJobConnector(requestedUrl);
+  if (connector) {
+    try {
+      const fetched = await safeFetchText(connector.fetchUrl);
+      const connected = parseJobConnector(connector, fetched.text);
+      return { ...connected, requestedUrl, fetched };
+    } catch (error) {
+      if (!(
+        error instanceof JobConnectorError || error instanceof SafeHttpError
+      ))
+        throw error;
+    }
+  }
+  const fetched = await safeFetchText(requestedUrl);
+  return {
+    extraction: extractJobPostingFromHtml(fetched.text, fetched.finalUrl),
+    normalized: genericNormalizedFields(),
+    requestedUrl,
+    fetched,
+    hashInput: fetched.text,
+  };
 }
 
 function rejected(error: unknown) {

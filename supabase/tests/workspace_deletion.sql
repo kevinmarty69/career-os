@@ -49,15 +49,27 @@ insert into app.discovered_jobs (
   'https://jobs.example.test/platform-engineer', now(), now()
 );
 insert into app.job_source_records (
-  id, tenant_id, discovered_job_id, requested_url, final_url, fetched_at,
+  id, tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
   content_type, bytes, content_sha256, extraction
 ) values (
   'f7060000-0000-4000-8000-000000000001',
   'f2000000-0000-4000-8000-000000000001',
   'f7050000-0000-4000-8000-000000000001',
   'https://jobs.example.test/opening',
+  'https://jobs.example.test/platform-engineer',
   'https://jobs.example.test/platform-engineer', now(), 'text/html', 128,
   repeat('c', 64), '{"company":"Delete Jobs Co"}'::jsonb
+);
+insert into app.job_observations (
+  id, tenant_id, discovered_job_id, source_record_id, observed_at,
+  content_sha256, change_kind, lifecycle_signal, matched_by, normalized
+) values (
+  'f7070000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'f7050000-0000-4000-8000-000000000001',
+  'f7060000-0000-4000-8000-000000000001', now(), repeat('c', 64),
+  'first_seen', 'unknown', 'new',
+  '{"location":null,"remoteMode":"unknown","contractType":"unknown","salaryMin":null,"salaryMax":null,"salaryCurrency":null,"publishedAt":null,"externalId":null,"sourceKind":"generic_html","lifecycleSignal":"unknown"}'::jsonb
 );
 insert into app.opportunities (
   id, tenant_id, application_id, application_revision, company, role,
@@ -155,6 +167,7 @@ do $$ begin
     or exists(select 1 from app.sources where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.discovered_jobs where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.job_source_records where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.job_observations where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then

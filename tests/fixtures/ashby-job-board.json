@@ -1,0 +1,48 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "title": "Founding Product Engineer",
+      "location": "Europe",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "descriptionHtml": "<p>Build the product and its agent platform.</p>",
+      "descriptionPlain": "Build the product and its agent platform.",
+      "publishedAt": "2026-08-28T14:00:00.000+00:00",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/nimbus/123e4567-e89b-12d3-a456-426614174000",
+      "applyUrl": "https://jobs.ashbyhq.com/nimbus/123e4567-e89b-12d3-a456-426614174000/application",
+      "compensation": {
+        "summaryComponents": [
+          {
+            "compensationType": "Salary",
+            "interval": "1 YEAR",
+            "currencyCode": "EUR",
+            "minValue": 80000,
+            "maxValue": 110000
+          },
+          {
+            "compensationType": "EquityPercentage",
+            "interval": "NONE",
+            "currencyCode": null,
+            "minValue": 0.1,
+            "maxValue": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "title": "Product Designer",
+      "location": "New York",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "OnSite",
+      "descriptionPlain": "Design the product.",
+      "publishedAt": "2026-08-29T14:00:00.000+00:00",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/nimbus/987e6543-e21b-12d3-a456-426614174999",
+      "applyUrl": "https://jobs.ashbyhq.com/nimbus/987e6543-e21b-12d3-a456-426614174999/application"
+    }
+  ]
+}

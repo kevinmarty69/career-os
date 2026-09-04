@@ -70,6 +70,7 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const otherApplicationId = randomUUID();
   const discoveredJobId = randomUUID();
   const sourceRecordId = randomUUID();
+  const observationId = randomUUID();
   const opportunityId = randomUUID();
   const runId = randomUUID();
   const stepId = randomUUID();
@@ -137,14 +138,35 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         '2026-01-02 03:04:06+00'::timestamptz
       )`;
       await transaction`insert into app.job_source_records (
-        id, tenant_id, discovered_job_id, requested_url, final_url, fetched_at,
+        id, tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
         content_type, bytes, content_sha256, extraction
       ) values (
         ${sourceRecordId}, ${tenantId}, ${discoveredJobId},
         'https://jobs.example.test/opening',
         'https://jobs.example.test/platform-engineer',
+        'https://jobs.example.test/platform-engineer',
         '2026-01-02 03:04:06+00'::timestamptz, 'text/html', 128,
         ${'c'.repeat(64)}, '{"company":"Visible Jobs Co"}'::jsonb
+      )`;
+      await transaction`insert into app.job_observations (
+        id, tenant_id, discovered_job_id, source_record_id, observed_at,
+        content_sha256, change_kind, lifecycle_signal, matched_by, normalized
+      ) values (
+        ${observationId}, ${tenantId}, ${discoveredJobId}, ${sourceRecordId},
+        '2026-01-02 03:04:06+00'::timestamptz, ${'c'.repeat(64)},
+        'first_seen', 'unknown', 'new',
+        ${transaction.json({
+          location: null,
+          remoteMode: 'unknown',
+          contractType: 'unknown',
+          salaryMin: null,
+          salaryMax: null,
+          salaryCurrency: null,
+          publishedAt: null,
+          externalId: null,
+          sourceKind: 'generic_html',
+          lifecycleSignal: 'unknown',
+        })}
       )`;
       await transaction`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role, raw_text,
@@ -249,6 +271,15 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
           record.type === 'applications' &&
           record.data.id === applicationId &&
           record.data.deleted_at,
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'job_observations' &&
+          record.data.id === observationId &&
+          record.data.change_kind === 'first_seen',
       ),
       true,
     );

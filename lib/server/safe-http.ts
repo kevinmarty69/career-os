@@ -51,7 +51,7 @@ for (const [network, prefix] of [
 export type SafeHttpResult = {
   requestedUrl: string;
   finalUrl: string;
-  contentType: 'text/html' | 'text/plain';
+  contentType: 'text/html' | 'text/plain' | 'application/json';
   bytes: number;
   text: string;
 };
@@ -191,7 +191,7 @@ export async function requestPinned(
     return await new Promise<{
       status: number;
       location?: string;
-      contentType: 'text/html' | 'text/plain';
+      contentType: 'text/html' | 'text/plain' | 'application/json';
       body: Uint8Array;
     }>((resolve, reject) => {
       const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
@@ -202,7 +202,7 @@ export async function requestPinned(
           path: `${url.pathname}${url.search}`,
           method: 'GET',
           headers: {
-            accept: 'text/html,text/plain;q=0.9',
+            accept: 'application/json,text/html;q=0.9,text/plain;q=0.8',
             'accept-encoding': 'identity',
             'user-agent': 'CareerOS/0.1 job-import',
           },
@@ -311,7 +311,11 @@ export function decodeUtf8(body: Uint8Array) {
 
 function parseContentType(value: string | undefined) {
   const mime = value?.split(';', 1)[0].trim().toLowerCase();
-  return mime === 'text/html' || mime === 'text/plain' ? mime : undefined;
+  return mime === 'text/html' ||
+    mime === 'text/plain' ||
+    mime === 'application/json'
+    ? mime
+    : undefined;
 }
 
 function singleHeader(value: string | string[] | undefined) {

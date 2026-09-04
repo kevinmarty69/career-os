@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 4;
+export const workspaceExportVersion = 5;
 
 export const workspaceExportTables = [
   {
@@ -66,6 +66,17 @@ export const workspaceExportTables = [
       'role',
       'description',
       'canonical_url',
+      'location',
+      'remote_mode',
+      'contract_type',
+      'salary_min',
+      'salary_max',
+      'salary_currency',
+      'published_at',
+      'external_id',
+      'source_kind',
+      'lifecycle',
+      'fingerprint',
       'revision',
       'first_seen_at',
       'last_seen_at',
@@ -83,6 +94,10 @@ export const workspaceExportTables = [
       'discovered_job_id',
       'requested_url',
       'final_url',
+      'fetched_url',
+      'source_kind',
+      'external_id',
+      'matched_by',
       'fetched_at',
       'content_type',
       'bytes',
@@ -91,6 +106,24 @@ export const workspaceExportTables = [
       'extraction',
       'created_at',
       'updated_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'job_observations',
+    table: 'job_observations',
+    columns: [
+      'id',
+      'tenant_id',
+      'discovered_job_id',
+      'source_record_id',
+      'observed_at',
+      'content_sha256',
+      'change_kind',
+      'lifecycle_signal',
+      'matched_by',
+      'normalized',
+      'created_at',
     ],
     orderBy: ['id'],
   },

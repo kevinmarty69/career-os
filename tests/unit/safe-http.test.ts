@@ -63,6 +63,11 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
       response.write('ignored');
       return;
     }
+    if (request.url === '/json') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end('{"ok":true}');
+      return;
+    }
     response.writeHead(200, { 'content-type': 'text/html' });
     response.end(Buffer.alloc(MAX_RESPONSE_BYTES + 1, 97));
   });
@@ -79,6 +84,14 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
     assert.equal(redirect.status, 302);
     await new Promise((resolve) => setTimeout(resolve, 10));
     assert.equal(redirectSocketClosed, true);
+
+    const json = await requestPinned(
+      new URL(`http://127.0.0.1:${address.port}/json`),
+      target,
+      Date.now() + 2_000,
+    );
+    assert.equal(json.contentType, 'application/json');
+    assert.equal(new TextDecoder().decode(json.body), '{"ok":true}');
 
     await assert.rejects(
       requestPinned(

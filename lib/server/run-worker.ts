@@ -316,6 +316,15 @@ async function buildResearchSources(
     const sourceId = `company-${index + 1}`;
     try {
       const fetched = await fetchText(source.url);
+      if (fetched.contentType === 'application/json') {
+        failures.push({
+          sourceId,
+          origin: source.origin,
+          requestedUrl: source.url,
+          code: 'unusable-content',
+        });
+        continue;
+      }
       const text = extractReadablePageText(fetched.text, fetched.contentType);
       if (!text) {
         failures.push({
