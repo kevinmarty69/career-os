@@ -574,7 +574,7 @@ Critères d'acceptation :
 - [x] Analyse sémantique pour les compétences, responsabilités et transferts.
 - [x] Recommandation expliquée avec preuves, gaps, risques et inconnues.
 - [x] Inbox d'opportunités avec enregistrer, ignorer, archiver et corriger.
-- [ ] Feedback utilisateur réutilisé pour le classement futur.
+- [x] Feedback utilisateur réutilisé pour le classement futur.
 - [ ] Alertes configurables uniquement au-dessus du seuil choisi.
 
 Critères d'acceptation :

@@ -32,6 +32,10 @@ import {
   opportunityDecisionMutationResponseSchema,
   type OpportunityDecision,
 } from '@/lib/opportunity-decision';
+import {
+  rankOpportunitiesByHumanFeedback,
+  type OpportunityFeedbackRanking,
+} from '@/lib/opportunity-ranking';
 import { searchProfileSchema, type SearchProfile } from '@/lib/search-profile';
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
@@ -60,6 +64,7 @@ export function ApplicationsPage({
   const [applications, setApplications] = useState<Application[]>([]);
   const [decisions, setDecisions] = useState<OpportunityDecision[]>([]);
   const [searchProfiles, setSearchProfiles] = useState<SearchProfile[]>([]);
+  const [rankingProfileId, setRankingProfileId] = useState('');
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState<string>();
   const [importOpen, setImportOpen] = useState(false);
@@ -118,16 +123,23 @@ export function ApplicationsPage({
       setOpportunities(opportunityPayload.opportunities);
       setApplications(parsedApplications);
       setDecisions(decisionPayload.decisions);
-      setSearchProfiles(
-        searchProfileSchema
-          .array()
-          .parse(
-            typeof searchProfilePayload === 'object' &&
-              searchProfilePayload !== null &&
-              'searchProfiles' in searchProfilePayload
-              ? searchProfilePayload.searchProfiles
-              : [],
-          ),
+      const parsedSearchProfiles = searchProfileSchema
+        .array()
+        .parse(
+          typeof searchProfilePayload === 'object' &&
+            searchProfilePayload !== null &&
+            'searchProfiles' in searchProfilePayload
+            ? searchProfilePayload.searchProfiles
+            : [],
+        );
+      setSearchProfiles(parsedSearchProfiles);
+      setRankingProfileId((current) =>
+        parsedSearchProfiles.some(
+          ({ searchProfileId }) => searchProfileId === current,
+        )
+          ? current
+          : (parsedSearchProfiles.find(({ active }) => active)
+              ?.searchProfileId ?? ''),
       );
       setLoadState('ready');
     } catch (caught) {
@@ -187,8 +199,13 @@ export function ApplicationsPage({
     )?.disposition;
     return disposition === 'ignored' || disposition === 'archived';
   });
-  const visibleActiveOpportunities = activeOpportunities.filter(
-    (opportunity) =>
+  const visibleActiveOpportunities = rankOpportunitiesByHumanFeedback(
+    activeOpportunities,
+    opportunities,
+    decisions,
+    rankingProfileId,
+  ).filter(
+    ({ opportunity }) =>
       scope !== 'applications' &&
       matchesSearchTerms(
         query,
@@ -301,6 +318,26 @@ export function ApplicationsPage({
               <option value="closed">Clôturée</option>
             </select>
           </label>
+          <label>
+            <span>Classement</span>
+            <select
+              aria-label="Profil de classement"
+              onChange={(event) => setRankingProfileId(event.target.value)}
+              value={rankingProfileId}
+            >
+              <option value="">Ordre de découverte</option>
+              {searchProfiles
+                .filter(({ active }) => active)
+                .map((profile) => (
+                  <option
+                    key={profile.searchProfileId}
+                    value={profile.searchProfileId}
+                  >
+                    {profile.name}
+                  </option>
+                ))}
+            </select>
+          </label>
         </div>
 
         {error ? (
@@ -333,15 +370,16 @@ export function ApplicationsPage({
             <LoadingRows label="Chargement des opportunités" />
           ) : visibleActiveOpportunities.length ? (
             <div className={styles.opportunityList}>
-              {visibleActiveOpportunities.map((opportunity) => (
+              {visibleActiveOpportunities.map((ranking) => (
                 <OpportunityCard
                   decision={decisionsByOpportunity.get(
-                    opportunity.opportunityId,
+                    ranking.opportunity.opportunityId,
                   )}
                   Icon={Icon}
-                  key={opportunity.opportunityId}
+                  key={ranking.opportunity.opportunityId}
                   onDecisionSaved={decisionSaved}
-                  opportunity={opportunity}
+                  opportunity={ranking.opportunity}
+                  ranking={ranking}
                   searchProfiles={searchProfiles}
                 />
               ))}
@@ -446,12 +484,14 @@ function OpportunityCard({
   Icon,
   onDecisionSaved,
   opportunity,
+  ranking,
   searchProfiles,
 }: {
   decision?: OpportunityDecision;
   Icon: IconComponent;
   onDecisionSaved: (decision: OpportunityDecision) => void;
   opportunity: DiscoveredJob;
+  ranking: OpportunityFeedbackRanking<DiscoveredJob>;
   searchProfiles: SearchProfile[];
 }) {
   const { locale } = useI18n();
@@ -622,6 +662,11 @@ function OpportunityCard({
       </div>
       <div className={styles.opportunityActions}>
         <span>Découverte {formatDate(opportunity.firstSeenAt, locale)}</span>
+        {ranking.direction ? (
+          <small className={styles.feedbackSignal}>
+            {feedbackRankingCopy(ranking, locale)}
+          </small>
+        ) : null}
         {decision ? (
           <span
             className={`${styles.decisionBadge} ${styles[decision.disposition]}`}
@@ -1414,6 +1459,30 @@ function matchCopy(
     canonical_url: 'Même URL canonique',
     fingerprint: 'Même empreinte',
   }[matchedBy];
+}
+
+function feedbackRankingCopy(
+  ranking: OpportunityFeedbackRanking<DiscoveredJob>,
+  locale: 'en' | 'fr',
+) {
+  const direction = {
+    up: ['Raised', 'Remontée'],
+    neutral: ['Informed', 'Éclairée'],
+    down: ['Lowered', 'Abaissée'],
+  }[ranking.direction!][locale === 'en' ? 0 : 1];
+  const scopeLabels = {
+    role: ['same role', 'même rôle'],
+    company: ['same company', 'même entreprise'],
+    location: ['same location', 'même lieu'],
+  } as const;
+  const scopes = ranking.scopes
+    .map((scope) => scopeLabels[scope][locale === 'en' ? 0 : 1])
+    .join(', ');
+  const decisions =
+    locale === 'en'
+      ? `${ranking.exampleCount} related decision${ranking.exampleCount === 1 ? '' : 's'}`
+      : `${ranking.exampleCount} décision${ranking.exampleCount === 1 ? '' : 's'} liée${ranking.exampleCount === 1 ? '' : 's'}`;
+  return `${direction} ${locale === 'en' ? 'by' : 'par'} ${decisions} · ${scopes}`;
 }
 
 const decisionReasons: OpportunityDecision['reason'][] = [

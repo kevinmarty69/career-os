@@ -128,6 +128,9 @@ export const applicationsMessages = {
   'Offre fermée': 'Closed job',
   'Autre raison': 'Other reason',
   'Profil de recherche': 'Search profile',
+  Classement: 'Ranking',
+  'Profil de classement': 'Ranking profile',
+  'Ordre de découverte': 'Discovery order',
   'Aucun profil associé': 'No linked profile',
   'Note facultative': 'Optional note',
   'Ajoutez uniquement le contexte utile à vos prochaines décisions.':

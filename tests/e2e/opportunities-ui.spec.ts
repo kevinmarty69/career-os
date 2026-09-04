@@ -26,7 +26,9 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
     .fill('https://jobs.example.test/product-engineer');
   await dialog.getByRole('button', { name: 'Importer l’offre' }).click();
 
-  await expect(page.getByText('Product Engineer')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Product Engineer' }),
+  ).toBeVisible();
   await expect(page.getByText('Example Labs')).toBeVisible();
   await expect(page.getByText('Paris, France')).toBeVisible();
   await expect(page.getByText('Hybride')).toBeVisible();
@@ -104,7 +106,9 @@ test('keeps the real opportunity workspace inside a mobile viewport', async ({
   await mockWorkspace(page, opportunities, [], []);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/applications');
-  await expect(page.getByText('Product Engineer')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Product Engineer' }),
+  ).toBeVisible();
   await expect(page.getByText('À vérifier').first()).toBeVisible();
   await page.getByRole('button', { name: 'Coller une offre' }).first().click();
   await expect(
@@ -135,6 +139,67 @@ test('defaults to English and keeps decision controls translated', async ({
   await expect(
     page.getByRole('button', { name: 'Start application' }),
   ).toBeVisible();
+});
+
+test('reuses related human decisions to rank future opportunities', async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  const prior = opportunity();
+  const unrelated = {
+    ...opportunity('https://jobs.example.test/designer'),
+    opportunityId: 'b22c0a00-0000-4000-8000-000000000010',
+    company: 'Unrelated Studio',
+    role: 'Designer',
+  };
+  const related = {
+    ...opportunity('https://jobs.example.test/product-engineer-2'),
+    opportunityId: 'b22c0a00-0000-4000-8000-000000000011',
+    company: 'Future Labs',
+  };
+  const decisions: OpportunityDecisionMock[] = [
+    {
+      decisionId: 'f66c0a00-0000-4000-8000-000000000012',
+      opportunityId: prior.opportunityId,
+      searchProfileId: searchProfile.searchProfileId,
+      disposition: 'archived',
+      qualification: 'priority',
+      reason: 'strong_fit',
+      note: null,
+      revision: 1,
+      actor: 'human',
+      actorId: 'a77c0a00-0000-4000-8000-000000000013',
+      createdAt: now,
+      updatedAt: now,
+      history: [],
+    },
+  ];
+  await mockWorkspace(page, [unrelated, related, prior], decisions, []);
+  await page.goto('/applications');
+
+  await expect(page.getByLabel('Ranking profile')).toHaveValue(
+    searchProfile.searchProfileId,
+  );
+  const active = page.getByRole('region', {
+    name: 'Opportunities and applications',
+  });
+  await expect(active.locator('article').first()).toContainText('Future Labs');
+  await expect(active.locator('article').first()).toContainText(
+    'Raised by 1 related decision · same role',
+  );
+  if (process.env.CAREER_OS_RANKING_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_RANKING_SCREENSHOT,
+      fullPage: true,
+    });
+  await page
+    .getByRole('group', { name: 'Language' })
+    .getByRole('button', { name: 'FR' })
+    .click();
+  await expect(
+    page.locator('article').filter({ hasText: 'Future Labs' }).first(),
+  ).toContainText('Remontée par 1 décision liée · même rôle');
 });
 
 test('promotes an opportunity explicitly and opens the idempotent application', async ({
