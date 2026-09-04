@@ -6,6 +6,7 @@ import { ApplicationsPage } from '@/components/applications/applications-page';
 import { LocaleSwitch, useLocalizer } from '@/components/i18n/i18n-provider';
 import { CareerMemoryContent } from '@/components/memory/career-memory-content';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
+import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import { homeMessages } from '@/lib/i18n/dictionaries/home';
 import { inboxMessages } from '@/lib/i18n/dictionaries/inbox';
@@ -73,6 +74,7 @@ const activeFrontMessages = [
   searchProfilesMessages,
   inboxMessages,
   dossierMessages,
+  activeRoutesMessages,
 ] as const;
 
 export function AppShell({
@@ -1524,7 +1526,8 @@ function InsightsScreen() {
 }
 
 function InterviewMemoryScreen() {
-  return (
+  const localize = useLocalizer(activeFrontMessages);
+  return localize(
     <main className="co-guided-shell">
       <aside className="co-guided-nav">
         <header>
@@ -1690,7 +1693,7 @@ function InterviewMemoryScreen() {
           <small>Rien n’est ajouté à la mémoire sans votre « Garder ».</small>
         </footer>
       </aside>
-    </main>
+    </main>,
   );
 }
 
@@ -1848,7 +1851,8 @@ function InterviewPrepScreen({ debrief = false }: { debrief?: boolean }) {
 }
 
 function InterviewSchedule() {
-  return (
+  const localize = useLocalizer(activeFrontMessages);
+  return localize(
     <div className="co-interview-schedule">
       <p className="co-nav-label">À venir</p>
       <Link className="active" href="/interviews/demo">
@@ -1880,7 +1884,7 @@ function InterviewSchedule() {
         <Icon>check_circle</Icon>
         <span>Orbital · débriefé</span>
       </Link>
-    </div>
+    </div>,
   );
 }
 
@@ -2081,7 +2085,8 @@ function AssetsScreen() {
 }
 
 function SettingsNav({ active }: { active: string }) {
-  return (
+  const localize = useLocalizer(activeFrontMessages);
+  return localize(
     <aside className="co-settings-nav">
       <Link href="/">
         <Icon>arrow_back</Icon>Retour à l’app
@@ -2100,7 +2105,7 @@ function SettingsNav({ active }: { active: string }) {
           {l}
         </Link>
       ))}
-    </aside>
+    </aside>,
   );
 }
 function SettingsShell({
@@ -2112,7 +2117,8 @@ function SettingsShell({
   children: ReactNode;
   side?: ReactNode;
 }) {
-  return (
+  const localize = useLocalizer(activeFrontMessages);
+  return localize(
     <main className="co-settings-shell">
       <SettingsNav active={active} />
       <section>
@@ -2128,7 +2134,7 @@ function SettingsShell({
         <div className="co-settings-content">{children}</div>
       </section>
       {side ? <aside className="co-settings-side">{side}</aside> : null}
-    </main>
+    </main>,
   );
 }
 
@@ -2810,7 +2816,8 @@ function CompanyScreen() {
 }
 
 function MessagesScreen() {
-  return (
+  const localize = useLocalizer(activeFrontMessages);
+  return localize(
     <main className="co-messages">
       <aside>
         <Link className="co-brand" href="/">
@@ -2949,7 +2956,7 @@ function MessagesScreen() {
           jours pour la relance.
         </div>
       </aside>
-    </main>
+    </main>,
   );
 }
 
@@ -3040,7 +3047,8 @@ function SkillsScreen() {
 }
 
 function HostingScreen() {
-  return (
+  const localize = useLocalizer(activeFrontMessages);
+  return localize(
     <main className="co-hosting">
       <header>
         <Link className="co-brand" href="/">
@@ -3095,7 +3103,7 @@ function HostingScreen() {
         <Icon>import_export</Icon>Le format d’export est identique : Markdown et
         JSON, lisibles sans Career OS. Migrer prend une commande.
       </div>
-    </main>
+    </main>,
   );
 }
 
