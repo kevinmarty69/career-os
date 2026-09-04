@@ -208,6 +208,22 @@ export function AppShell({
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
       {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
+      <nav aria-label="Navigation mobile" className="co-mobile-nav">
+        {screenNav.slice(0, 4).map(([href, icon, label]) => (
+          <Link
+            className={
+              path === href || (href !== '/' && path.startsWith(href))
+                ? 'active'
+                : ''
+            }
+            href={href}
+            key={href}
+          >
+            <Icon>{icon}</Icon>
+            <span>{label}</span>
+          </Link>
+        ))}
+      </nav>
       <div className="co-mobile-locale">
         <LocaleSwitch compact />
       </div>
@@ -756,6 +772,23 @@ function DossierShell({
         </header>
         {children}
       </section>
+      <nav aria-label="Navigation mobile" className="co-mobile-nav">
+        {[
+          ['/applications', 'arrow_back', 'Candidatures'],
+          [`/applications/${identity.applicationId}`, 'description', 'Brief'],
+          [
+            `/applications/${identity.applicationId}/company`,
+            'domain',
+            'Entreprise',
+          ],
+          [`/applications/${identity.applicationId}/page`, 'web', 'Livrables'],
+        ].map(([href, icon, label]) => (
+          <Link href={href} key={href}>
+            <Icon>{icon}</Icon>
+            <span>{label}</span>
+          </Link>
+        ))}
+      </nav>
     </main>,
   );
 }

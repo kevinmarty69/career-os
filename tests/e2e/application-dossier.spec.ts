@@ -602,6 +602,9 @@ test('shows the structured draft and starts all reviews only after confirmation'
     page.getByRole('heading', { name: 'Alex Morgan × Signal Forge' }),
   ).toBeVisible();
   await expect(page.getByText('What to explore together')).toBeVisible();
+  await page.getByRole('button', { name: 'Mobile' }).click();
+  await expect(page.locator('.co-page-draft-preview')).toHaveClass(/mobile/);
+  await page.getByRole('button', { name: 'Desktop' }).click();
   await page.getByRole('button', { name: 'Start the three reviews' }).click();
   await expect(page.getByText('Running', { exact: true })).toBeVisible();
   expect(request?.body).toEqual({});

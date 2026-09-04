@@ -202,3 +202,55 @@ test('shows the privacy-safe expired-link screen', async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
 });
+
+test('identifies a valid private page as an independent application', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const publicationId = '988c0a00-0000-4000-8000-000000000024';
+  await page.route(`**/api/publications/${publicationId}`, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        profile: {
+          name: 'Alex Morgan',
+          headline: 'Product engineer',
+          sources: [],
+          evidence: [],
+          claims: [],
+        },
+        spec: {
+          version: 1,
+          company: {
+            name: 'Signal Forge',
+            role: 'Staff Platform Engineer',
+            accent: '#5847e8',
+          },
+          hero: {
+            eyebrow: 'Private application',
+            title: 'Alex Morgan × Signal Forge',
+            thesis: 'A focused application for a reliable platform role.',
+          },
+          blocks: [
+            {
+              type: 'gap',
+              title: 'What to explore together',
+              text: 'Small-team operations remain an interview topic.',
+            },
+          ],
+        },
+      }),
+    }),
+  );
+
+  await page.goto(`/p/${publicationId}`);
+  await expect(
+    page.getByText(
+      'Independent application prepared and approved by Alex Morgan',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Alex Morgan × Signal Forge' }),
+  ).toBeVisible();
+});

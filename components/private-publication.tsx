@@ -116,8 +116,13 @@ export function PrivatePublication() {
     >
       <header>
         <span>
-          <strong>{profile.name}</strong>
-          <small>→ {spec.company.name}</small>
+          <i aria-hidden="true">
+            {spec.company.name.slice(0, 2).toUpperCase()}
+          </i>
+          <span>
+            <strong>{profile.name}</strong>
+            <small>→ {spec.company.name}</small>
+          </span>
         </span>
         <div className="co-public-actions">
           <span>
@@ -131,9 +136,11 @@ export function PrivatePublication() {
       </header>
       <section className="co-public-hero">
         <p>
-          {locale === 'fr' ? 'Candidature' : 'Application'} ·{' '}
-          {spec.company.role} · {spec.company.name}
+          {spec.hero.eyebrow} · {spec.company.role} · {spec.company.name}
         </p>
+        <span className="co-public-independent">
+          Candidature indépendante préparée et validée par {profile.name}
+        </span>
         <h1>{spec.hero.title}</h1>
         <p>{spec.hero.thesis}</p>
         <a href="#strongest-evidence">Voir les preuves principales</a>

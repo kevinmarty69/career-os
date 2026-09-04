@@ -629,9 +629,9 @@ Critères d'acceptation :
 - [x] Hero spécifique au rôle et à l'entreprise.
 - [x] Lecture rapide suivie de preuves en divulgation progressive.
 - [ ] Personnalisation accessible avec logo, couleurs et tonalité.
-- [ ] Indication claire de candidature indépendante.
+- [x] Indication claire de candidature indépendante.
 - [ ] CV, LinkedIn, GitHub, portfolio et contact configurables.
-- [ ] Aperçu desktop et mobile.
+- [x] Aperçu desktop et mobile.
 - [ ] Contrôle de contraste, responsive et navigation clavier.
 - [x] Lien privé non indexable, expirant et révocable.
 - [x] Session privée sans secret persistant dans l'URL.

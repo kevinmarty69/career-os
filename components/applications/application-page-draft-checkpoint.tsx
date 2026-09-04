@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
@@ -23,6 +23,7 @@ export function ApplicationPageDraftCheckpoint({
   const { locale } = useI18n();
   const localize = useLocalizer([dossierMessages]);
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
+  const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop');
 
   return localize(
     <section className="co-panel co-research-checkpoint co-page-draft-checkpoint">
@@ -37,8 +38,28 @@ export function ApplicationPageDraftCheckpoint({
             : `${spec.blocks.length} bloc${spec.blocks.length === 1 ? '' : 's'} déterministe${spec.blocks.length === 1 ? '' : 's'}`}
         </span>
       </header>
+      <div
+        aria-label={locale === 'en' ? 'Preview size' : 'Taille de l’aperçu'}
+        className="co-preview-toolbar"
+        role="group"
+      >
+        <button
+          aria-pressed={viewport === 'desktop'}
+          onClick={() => setViewport('desktop')}
+          type="button"
+        >
+          Desktop
+        </button>
+        <button
+          aria-pressed={viewport === 'mobile'}
+          onClick={() => setViewport('mobile')}
+          type="button"
+        >
+          Mobile
+        </button>
+      </div>
       <section
-        className="co-page-draft-preview"
+        className={`co-page-draft-preview ${viewport}`}
         style={{ '--co-preview-accent': spec.company.accent } as CSSProperties}
       >
         <header>

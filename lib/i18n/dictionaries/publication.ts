@@ -12,6 +12,8 @@ export const publicationMessages = {
   'Career OS · les pages privées ne sont jamais indexées':
     'Career OS · private pages are never indexed',
   'Lien privé · non indexable': 'Private link · not indexed',
+  'Candidature indépendante préparée et validée par':
+    'Independent application prepared and approved by',
   Candidature: 'Application',
   'Voir les preuves principales': 'View key evidence',
   Sourcé: 'Sourced',
