@@ -77,6 +77,146 @@ export const journalRun = {
   ],
 };
 
+const positioningRun = {
+  ...pendingReviewRun,
+  pageSpecId: '988c0a00-0000-4000-8000-000000000071',
+  pageSpecHash: 'a'.repeat(64),
+  pageSpecArtifactId: '988c0a00-0000-4000-8000-000000000072',
+  pageSpecArtifactHash: 'b'.repeat(64),
+  spec: {
+    version: 1,
+    company: {
+      name: 'Signal Forge',
+      role: 'Staff Platform Engineer',
+      accent: '#5847e8',
+    },
+    hero: {
+      eyebrow: 'Independent application',
+      title: 'Reliable systems for small teams.',
+      thesis: 'Production ownership with explicit evidence boundaries.',
+    },
+    blocks: [
+      {
+        type: 'fit',
+        title: 'Relevant proof',
+        claimIds: ['claim-result'],
+      },
+    ],
+  },
+};
+
+export async function mockPositioningAuditWorkspace(page: Page) {
+  await mockPersistedWorkspace(page, positioningRun);
+  await page.route('**/api/search-profiles', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        searchProfiles: [
+          {
+            searchProfileId: '988c0a00-0000-4000-8000-000000000073',
+            revision: 1,
+            createdAt: '2026-09-04T12:00:00.000Z',
+            updatedAt: '2026-09-04T12:00:00.000Z',
+            name: 'Platform roles',
+            active: true,
+            hardConstraints: {
+              roles: ['Staff Platform Engineer'],
+              seniorities: [],
+              locations: [],
+              remoteModes: [],
+              timezones: [],
+              languages: [],
+              contractTypes: [],
+              excludedCompanies: [],
+              excludedNetworks: [],
+            },
+            softPreferences: {
+              stacks: ['Kubernetes'],
+              sectors: [],
+              productTypes: [],
+              companySizes: [],
+              cultures: [],
+            },
+          },
+        ],
+      }),
+    }),
+  );
+  await page.route('**/api/profile', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        revision: 1,
+        profile: {
+          name: 'Alex Morgan',
+          headline: 'Platform engineer',
+          sources: [
+            {
+              id: 'source-cv',
+              kind: 'document',
+              title: 'Alex Morgan CV 2026.pdf',
+              sensitivity: 'private',
+              allowedUses: ['resume', 'application'],
+              trust: 'untrusted-data',
+            },
+            {
+              id: 'source-linkedin',
+              kind: 'linkedin',
+              title: 'LinkedIn export',
+              sensitivity: 'private',
+              allowedUses: ['linkedin', 'application'],
+              trust: 'untrusted-data',
+            },
+          ],
+          evidence: [
+            {
+              id: 'evidence-cv',
+              sourceId: 'source-cv',
+              label: 'Experience',
+              excerpt: 'Helped improve deployment reliability.',
+            },
+            {
+              id: 'evidence-linkedin',
+              sourceId: 'source-linkedin',
+              label: 'About',
+              excerpt: 'Built a platform used by product teams.',
+            },
+          ],
+          claims: [
+            {
+              id: 'claim-result',
+              statement: 'Helped improve deployment reliability.',
+              kind: 'result',
+              level: 'declared',
+              evidenceIds: ['evidence-cv'],
+              sensitivity: 'private',
+              allowedUses: ['resume', 'application'],
+            },
+            {
+              id: 'claim-linkedin',
+              statement: 'Built a platform used by product teams.',
+              kind: 'experience',
+              level: 'declared',
+              evidenceIds: ['evidence-linkedin'],
+              sensitivity: 'private',
+              allowedUses: ['linkedin', 'application'],
+            },
+            {
+              id: 'claim-kubernetes',
+              statement: 'Owned Kubernetes operations.',
+              kind: 'skill',
+              level: 'unsupported',
+              evidenceIds: [],
+              sensitivity: 'private',
+              allowedUses: ['resume', 'linkedin', 'application'],
+            },
+          ],
+        },
+      }),
+    }),
+  );
+}
+
 export async function mockPersistedWorkspace(page: Page, run?: unknown) {
   const now = '2026-09-04T12:00:00.000Z';
   const sourceId = '988c0a00-0000-4000-8000-000000000042';

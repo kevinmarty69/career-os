@@ -4,6 +4,7 @@ export const memoryMessages = {
   Mémoire: 'Career memory',
   'Importer une source': 'Import a source',
   'Entretien guidé': 'Guided interview',
+  'Audit de positionnement': 'Positioning audit',
   'Vos données, vos règles': 'Your data, your rules',
   'Chaque affirmation conserve sa source, sa sensibilité et ses usages.':
     'Every claim keeps its source, sensitivity, and allowed uses.',

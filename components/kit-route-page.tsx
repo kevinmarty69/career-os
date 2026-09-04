@@ -939,6 +939,10 @@ function MemoryScreen() {
               <Icon>record_voice_over</Icon>
               <span>Entretien guidé</span>
             </Link>
+            <Link href="/memory/audit">
+              <Icon>fact_check</Icon>
+              <span>Audit de positionnement</span>
+            </Link>
           </div>
         </>
       }

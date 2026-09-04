@@ -3,12 +3,14 @@ import {
   applicationId,
   journalRun,
   mockPersistedWorkspace,
+  mockPositioningAuditWorkspace,
   pendingReviewRun,
 } from './persisted-workspace';
 
 const englishScreens = [
   ['/', 'Start the evidence workflow for Signal Forge.'],
   ['/memory', 'Career memory'],
+  ['/memory/audit', 'Align your evidence before editing your profile.'],
   ['/applications', 'Applications'],
   ['/applications/nimbus/review', '3 suggested changes'],
   ['/memory/import', 'Add your background'],
@@ -256,6 +258,42 @@ test('shows a persisted agent run as a readable journal', async ({
       path: process.env.CAREER_OS_RUNS_SCREENSHOT,
       fullPage: true,
     });
+});
+
+test('audits positioning from persisted sources, goals and application claims', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPositioningAuditWorkspace(page);
+  await page.goto('/memory/audit');
+
+  await expect(page.getByText('Staff Platform Engineer')).toBeVisible();
+  await expect(
+    page.locator('.co-audit-targets > div > span', {
+      hasText: 'Kubernetes',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('1 supported claim').first()).toBeVisible();
+  await expect(page.getByText('Owned Kubernetes operations.')).toBeVisible();
+  await expect(page.getByText(/\[measured outcome\]/)).toBeVisible();
+  await expect(
+    page.getByText(/does not infer recruiter intent or response causality/),
+  ).toBeVisible();
+  if (process.env.CAREER_OS_POSITIONING_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_POSITIONING_SCREENSHOT,
+      fullPage: true,
+    });
+  await page
+    .getByRole('group', { name: 'Language' })
+    .getByRole('button', { name: 'FR' })
+    .click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Alignez vos preuves avant de modifier votre profil.',
+    }),
+  ).toBeVisible();
 });
 
 test('shows only persisted human decisions in the review queue', async ({

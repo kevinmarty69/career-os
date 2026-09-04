@@ -666,13 +666,13 @@ Critères d'acceptation :
 
 ### Lot 8 - Coaching de positionnement
 
-- [ ] Audit du CV contre les objectifs enregistrés.
-- [ ] Audit du contenu LinkedIn importé.
-- [ ] Détection des affirmations vagues, redondantes ou non soutenues.
-- [ ] Recommandations de positionnement reliées à la mémoire.
-- [ ] Suggestions de formulations avec validation humaine.
-- [ ] Analyse de cohérence entre CV, LinkedIn et candidatures.
-- [ ] Liste priorisée des preuves manquantes à documenter.
+- [x] Audit du CV contre les objectifs enregistrés.
+- [x] Audit du contenu LinkedIn importé.
+- [x] Détection des affirmations vagues, redondantes ou non soutenues.
+- [x] Recommandations de positionnement reliées à la mémoire.
+- [x] Suggestions de formulations avec validation humaine.
+- [x] Analyse de cohérence entre CV, LinkedIn et candidatures.
+- [x] Liste priorisée des preuves manquantes à documenter.
 
 Critères d'acceptation :
 
