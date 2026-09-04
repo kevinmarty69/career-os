@@ -27,6 +27,7 @@ test('puts unresolved human decisions before running and new applications', () =
         applicationId: base.applicationId.replace('41', '44'),
       },
       run: {
+        runId: base.applicationId.replace('41', '45'),
         status: 'running',
         stage: 'research',
         publicationEligible: false,
@@ -37,6 +38,7 @@ test('puts unresolved human decisions before running and new applications', () =
     {
       application: base,
       run: {
+        runId: base.applicationId.replace('41', '46'),
         status: 'awaiting_approval',
         stage: 'review',
         publicationEligible: false,

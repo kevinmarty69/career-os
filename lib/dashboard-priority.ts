@@ -8,7 +8,12 @@ export type DashboardItem = {
   >;
   run?: Pick<
     PersistedRun,
-    'status' | 'stage' | 'reviews' | 'reviewDecisions' | 'publicationEligible'
+    | 'runId'
+    | 'status'
+    | 'stage'
+    | 'reviews'
+    | 'reviewDecisions'
+    | 'publicationEligible'
   >;
   unavailable?: boolean;
 };

@@ -8,7 +8,11 @@ import { ApplicationKitPanel } from '@/components/applications/application-kit-p
 import { ApplicationPageDraftCheckpoint } from '@/components/applications/application-page-draft-checkpoint';
 import { ApplicationPublicationCheckpoint } from '@/components/applications/application-publication-checkpoint';
 import { ApplicationResearchCheckpoint } from '@/components/applications/application-research-checkpoint';
-import { ApplicationReviewCheckpoint } from '@/components/applications/application-review-checkpoint';
+import {
+  ApplicationReviewCheckpoint,
+  ApplicationReviewIssueActions,
+  type ReviewDecision,
+} from '@/components/applications/application-review-checkpoint';
 import { ApplicationStrategyCheckpoint } from '@/components/applications/application-strategy-checkpoint';
 import { useApplicationWorkflow } from '@/components/applications/use-application-workflow';
 import { ApplicationsPage } from '@/components/applications/applications-page';
@@ -39,6 +43,7 @@ import {
 import {
   createApplicationTask,
   createApplicationTimelineEvent,
+  decideRunReviewIssue,
   readApplication,
   readApplicationInsights,
   readApplicationTimeline,
@@ -61,7 +66,12 @@ import {
   dashboardActions,
   type DashboardAction,
 } from '@/lib/dashboard-priority';
-import { persistedRunSchema, type PersistedRun } from '@/lib/run-contract';
+import {
+  persistedRunSchema,
+  reviewIssueDecisionResultSchema,
+  type PersistedRun,
+} from '@/lib/run-contract';
+import { persistedRunOperation } from '@/lib/run-operation';
 import { opportunityListResponseSchema } from '@/lib/discovered-job-contract';
 import {
   opportunityDecisionListResponseSchema,
@@ -584,6 +594,7 @@ function useWorkflowDashboard() {
     publications: PublicationSummary[];
   }>();
   const [error, setError] = useState<'auth' | 'unavailable'>();
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -633,7 +644,7 @@ function useWorkflowDashboard() {
           setError('unavailable');
       });
     return () => controller.abort();
-  }, []);
+  }, [reload]);
 
   const unavailable =
     error ??
@@ -641,7 +652,11 @@ function useWorkflowDashboard() {
     dashboard.items.every((item) => item.unavailable)
       ? 'unavailable'
       : undefined);
-  return { dashboard, error: unavailable };
+  return {
+    dashboard,
+    error: unavailable,
+    refresh: () => setReload((value) => value + 1),
+  };
 }
 
 function HomeAside({
@@ -4782,18 +4797,66 @@ function HostingScreen() {
 
 function InboxScreen() {
   const { locale } = useI18n();
-  const { dashboard, error } = useWorkflowDashboard();
+  const { dashboard, error, refresh } = useWorkflowDashboard();
+  const [pending, setPending] = useState<string>();
+  const [decisionError, setDecisionError] = useState(false);
   const decisions = dashboardActions(dashboard?.items ?? []).filter(
     ({ kind }) => kind === 'review' || kind === 'decision',
   );
+  const reviewIssues = decisions.flatMap((decision) => {
+    if (decision.kind !== 'review' || !decision.run) return [];
+    const decided = new Set(
+      decision.run.reviewDecisions.map(
+        ({ reviewId, issueIndex }) => `${reviewId}:${issueIndex}`,
+      ),
+    );
+    return decision.run.reviews.flatMap((review) =>
+      review.issues.flatMap((issue, issueIndex) =>
+        decided.has(`${review.reviewId}:${issueIndex}`)
+          ? []
+          : [{ decision, issue, issueIndex, review }],
+      ),
+    );
+  });
+  const paused = decisions.filter(({ kind }) => kind === 'decision');
+  const decisionCount = reviewIssues.length + paused.length;
   const copy =
     locale === 'fr'
-      ? decisions.length
-        ? `${decisions.length} arbitrage${decisions.length > 1 ? 's' : ''} humain${decisions.length > 1 ? 's' : ''} bloque${decisions.length > 1 ? 'nt' : ''} une candidature.`
+      ? decisionCount
+        ? `${decisionCount} arbitrage${decisionCount > 1 ? 's' : ''} humain${decisionCount > 1 ? 's' : ''} bloque${decisionCount > 1 ? 'nt' : ''} une candidature.`
         : 'Aucun arbitrage humain ne bloque vos candidatures.'
-      : decisions.length
-        ? `${decisions.length} human decision${decisions.length > 1 ? 's are' : ' is'} blocking an application.`
+      : decisionCount
+        ? `${decisionCount} human decision${decisionCount > 1 ? 's are' : ' is'} blocking an application.`
         : 'No human decision is blocking your applications.';
+
+  async function decide(
+    runId: string,
+    reviewId: string,
+    issueIndex: number,
+    decision: ReviewDecision,
+  ) {
+    if (pending) return;
+    const key = `${reviewId}:${issueIndex}`;
+    setPending(key);
+    setDecisionError(false);
+    try {
+      const input = JSON.stringify({ reviewId, issueIndex, decision });
+      const operation = persistedRunOperation(
+        localStorage,
+        `career-os-review-decision:${runId}:${key}:${decision}`,
+        input,
+      );
+      const response = await decideRunReviewIssue(runId, input, operation.key);
+      if (!response.ok) return setDecisionError(true);
+      reviewIssueDecisionResultSchema.parse(await response.json());
+      refresh();
+    } catch {
+      setDecisionError(true);
+    } finally {
+      setPending(undefined);
+    }
+  }
+
   return (
     <AppShell
       path="/inbox"
@@ -4818,23 +4881,45 @@ function InboxScreen() {
     >
       <PageHeader title="À trancher" copy={copy} />
       <div className="co-inbox-list">
-        {decisions.map((decision) => (
+        {reviewIssues.map(({ decision, issue, issueIndex, review }) => (
+          <article key={`${review.reviewId}:${issueIndex}`}>
+            <span className={issue.blocking ? 'crit' : 'warn'}>
+              <Icon>{issue.blocking ? 'gpp_maybe' : 'rate_review'}</Icon>
+            </span>
+            <div>
+              <small>
+                {decision.application.company} ·{' '}
+                {reviewerLabel(review.reviewer, locale)} · {issue.section}
+              </small>
+              <h2>{issue.message}</h2>
+              <p>{decision.application.role}</p>
+            </div>
+            <ApplicationReviewIssueActions
+              issueIndex={issueIndex}
+              onDecide={(reviewId, targetIssueIndex, reviewDecision) =>
+                void decide(
+                  decision.run!.runId,
+                  reviewId,
+                  targetIssueIndex,
+                  reviewDecision,
+                )
+              }
+              pending={pending}
+              review={review}
+            />
+          </article>
+        ))}
+        {paused.map((decision) => (
           <article key={decision.application.applicationId}>
-            <span className={decision.kind === 'review' ? 'crit' : 'warn'}>
-              <Icon>
-                {decision.kind === 'review' ? 'gpp_maybe' : 'front_hand'}
-              </Icon>
+            <span className="warn">
+              <Icon>front_hand</Icon>
             </span>
             <div>
               <small>{decision.application.company}</small>
               <h2>
-                {decision.kind === 'review'
-                  ? locale === 'fr'
-                    ? `${decision.pendingDecisions} modification${decision.pendingDecisions > 1 ? 's' : ''} à trancher`
-                    : `${decision.pendingDecisions} ${decision.pendingDecisions === 1 ? 'change needs' : 'changes need'} review`
-                  : locale === 'fr'
-                    ? 'Décision humaine requise'
-                    : 'Human decision required'}
+                {locale === 'fr'
+                  ? 'Décision humaine requise'
+                  : 'Human decision required'}
               </h2>
               <p>{homePriorityRow(decision, locale)}</p>
             </div>
@@ -4846,6 +4931,13 @@ function InboxScreen() {
             </Link>
           </article>
         ))}
+        {decisionError ? (
+          <p className="co-error" role="alert">
+            {locale === 'fr'
+              ? 'La décision n’a pas été enregistrée. Réessayez sans risque de doublon.'
+              : 'The decision was not saved. You can retry safely.'}
+          </p>
+        ) : null}
         {!dashboard && !error ? (
           <div className="co-note">
             <Icon>hourglass_top</Icon>
@@ -4866,7 +4958,7 @@ function InboxScreen() {
                 : 'The decision queue is temporarily unavailable.'}
           </div>
         ) : null}
-        {dashboard && !error && !decisions.length ? (
+        {dashboard && !error && !decisionCount ? (
           <div className="co-note">
             <Icon>check_circle</Icon>
             {locale === 'fr'

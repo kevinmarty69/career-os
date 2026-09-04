@@ -6841,6 +6841,19 @@
   font-size: 11px;
 }
 
+.co-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.co-review-actions > button,
+.co-review-actions > a {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
 .co-plan {
   position: relative;
   display: grid;
@@ -7957,6 +7970,11 @@
   .co-inbox-list > article > .co-button {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .co-inbox-list .co-review-actions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 }
 

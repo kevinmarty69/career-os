@@ -307,14 +307,24 @@ test('shows only persisted human decisions in the review queue', async ({
   await expect(
     page.getByRole('heading', { name: 'Needs review', exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('Signal Forge', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Signal Forge · factuality/)).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: '1 change needs review' }),
+    page.getByRole('heading', {
+      name: 'Use the measured value from the source.',
+    }),
   ).toBeVisible();
   await expect(
-    page.getByRole('link', { name: 'Open application' }),
-  ).toHaveAttribute('href', `/applications/${applicationId}`);
+    page.getByRole('button', { name: 'Correct section' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Keep as written' }),
+  ).toHaveCount(0);
   await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
+  if (process.env.CAREER_OS_INBOX_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_INBOX_SCREENSHOT,
+      fullPage: true,
+    });
 });
 
 test('localizes authentication and private recipient surfaces', async ({

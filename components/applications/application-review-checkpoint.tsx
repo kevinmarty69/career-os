@@ -4,7 +4,53 @@ import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
 
-type ReviewDecision = 'keep' | 'correct';
+export type ReviewDecision = 'keep' | 'correct';
+
+export function ApplicationReviewIssueActions({
+  issueIndex,
+  onDecide,
+  pending,
+  review,
+}: {
+  issueIndex: number;
+  onDecide: (
+    reviewId: string,
+    issueIndex: number,
+    decision: ReviewDecision,
+  ) => void;
+  pending?: string;
+  review: PersistedRun['reviews'][number];
+}) {
+  const { locale } = useI18n();
+  const key = `${review.reviewId}:${issueIndex}`;
+  return (
+    <div className="co-review-actions">
+      {review.reviewer !== 'factuality' ? (
+        <button
+          disabled={Boolean(pending)}
+          onClick={() => onDecide(review.reviewId, issueIndex, 'keep')}
+          type="button"
+        >
+          {locale === 'en' ? 'Keep as written' : 'Garder tel quel'}
+        </button>
+      ) : null}
+      <button
+        className="co-button"
+        disabled={Boolean(pending)}
+        onClick={() => onDecide(review.reviewId, issueIndex, 'correct')}
+        type="button"
+      >
+        {pending === key
+          ? locale === 'en'
+            ? 'Correcting…'
+            : 'Correction…'
+          : locale === 'en'
+            ? 'Correct section'
+            : 'Corriger la section'}
+      </button>
+    </div>
+  );
+}
 
 export function ApplicationReviewCheckpoint({
   error,
@@ -92,31 +138,12 @@ export function ApplicationReviewCheckpoint({
                           : 'Correction lancée'}
                       </strong>
                     ) : (
-                      <div>
-                        {review.reviewer !== 'factuality' ? (
-                          <button
-                            disabled={Boolean(pending)}
-                            onClick={() =>
-                              onDecide(review.reviewId, index, 'keep')
-                            }
-                            type="button"
-                          >
-                            Garder tel quel
-                          </button>
-                        ) : null}
-                        <button
-                          className="co-button"
-                          disabled={Boolean(pending)}
-                          onClick={() =>
-                            onDecide(review.reviewId, index, 'correct')
-                          }
-                          type="button"
-                        >
-                          {pending === key
-                            ? 'Correction…'
-                            : 'Corriger cette section'}
-                        </button>
-                      </div>
+                      <ApplicationReviewIssueActions
+                        issueIndex={index}
+                        onDecide={onDecide}
+                        pending={pending}
+                        review={review}
+                      />
                     )}
                   </section>
                 );
