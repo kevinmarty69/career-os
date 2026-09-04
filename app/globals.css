@@ -5642,6 +5642,21 @@
   background: var(--co-fill-subtle);
 }
 
+.co-versions > aside > h2 {
+  margin: 0 8px 12px;
+  color: var(--co-text-3);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.co-versions > aside > p {
+  margin: 8px;
+  color: var(--co-text-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .co-versions > aside button {
   display: grid;
   grid-template-columns: 34px 1fr;
@@ -5693,6 +5708,128 @@
   gap: 8px;
   padding-left: 22px;
   font-size: 12px;
+}
+
+.co-history-record > header {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.co-history-record > header > .co-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  color: var(--co-accent);
+  border-radius: 11px;
+  background: var(--co-accent-soft);
+  place-items: center;
+}
+
+.co-history-record h2,
+.co-history-record small {
+  display: block;
+  margin: 0;
+}
+
+.co-history-record h2 {
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+.co-history-record small,
+.co-history-record dt {
+  color: var(--co-text-3);
+  font-size: 9.5px;
+}
+
+.co-history-record dl {
+  display: flex;
+  gap: 28px;
+  margin: 14px 0 0 46px;
+}
+
+.co-history-record dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.co-history-record dd {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.co-history-record > p {
+  margin: 14px 0 0 46px;
+}
+
+.co-history-decisions {
+  overflow: hidden;
+  border: 1px solid var(--co-border);
+  border-radius: 17px;
+}
+
+.co-history-decisions > h2,
+.co-history-decisions > p {
+  margin: 0;
+  padding: 15px 17px;
+}
+
+.co-history-decisions > h2 {
+  border-bottom: 1px solid var(--co-divider);
+  font-size: 14px;
+}
+
+.co-history-decisions > p {
+  color: var(--co-text-3);
+  font-size: 11px;
+}
+
+.co-history-decisions > article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--co-divider);
+}
+
+.co-history-decisions > article:last-child {
+  border-bottom: 0;
+}
+
+.co-history-decisions article > .co-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  color: var(--co-ok-text);
+  border-radius: 10px;
+  background: var(--co-ok-bg);
+  place-items: center;
+}
+
+.co-history-decisions :is(small, strong, p) {
+  display: block;
+  margin: 0;
+}
+
+.co-history-decisions small,
+.co-history-decisions :is(time, article > span) {
+  color: var(--co-text-3);
+  font-size: 9.5px;
+}
+
+.co-history-decisions strong {
+  margin-top: 2px;
+  font-size: 11.5px;
+}
+
+.co-history-decisions article p {
+  margin-top: 3px;
+  color: var(--co-text-3);
+  font-size: 10.5px;
 }
 
 .co-errors {
@@ -7294,6 +7431,14 @@
     display: flex;
     gap: 5px;
     overflow-x: auto;
+  }
+
+  .co-versions > aside > h2 {
+    display: none;
+  }
+
+  .co-versions > aside > p {
+    min-width: 180px;
   }
 
   .co-versions > aside button {

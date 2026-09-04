@@ -655,7 +655,7 @@ Critères d'acceptation :
 - [x] Ajout des contacts, entretiens, réponses et résultats.
 - [x] Tâches et relances datées.
 - [x] Recherche et filtres globaux.
-- [ ] Historique des versions et décisions.
+- [x] Historique des versions et décisions.
 - [ ] Tendances personnelles sur les réponses, sans fausse causalité.
 
 Critères d'acceptation :

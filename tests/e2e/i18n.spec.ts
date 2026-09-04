@@ -32,7 +32,7 @@ const englishScreens = [
     'Your private page for Nimbus Robotics is live.',
   ],
   ['/interviews/demo/debrief', 'Interview debrief'],
-  ['/applications/nimbus/versions', '3 changes · 1 section added'],
+  [`/applications/${applicationId}/versions`, 'Version and decision history'],
   ['/runs', 'Agent runs'],
   ['/applications/nimbus/company', 'Company brief'],
   ['/messages', 'Messages'],
@@ -178,6 +178,34 @@ test('searches the persisted workspace and filters the application pipeline', as
     .getByPlaceholder('Search a company, role, or location…')
     .fill('Northstar');
   await expect(page.getByText('Northstar Labs', { exact: true })).toBeVisible();
+});
+
+test('shows persisted publication versions and human decisions', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page);
+  await page.goto(`/applications/${applicationId}/versions`);
+
+  await expect(
+    page.getByRole('heading', { name: 'Version and decision history' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /v1 active current/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Strong platform ownership match.'),
+  ).toBeVisible();
+  await expect(page.getByText('Application record')).toBeVisible();
+  await expect(
+    page.getByText('No human decision has been recorded.'),
+  ).toHaveCount(0);
+  if (process.env.CAREER_OS_HISTORY_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_HISTORY_SCREENSHOT,
+      fullPage: true,
+    });
 });
 
 test('shows only persisted human decisions in the review queue', async ({

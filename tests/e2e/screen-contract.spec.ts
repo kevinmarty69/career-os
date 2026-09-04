@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockPersistedWorkspace } from './persisted-workspace';
+import { applicationId, mockPersistedWorkspace } from './persisted-workspace';
 
 const screens = [
   ['/', 'Lancez le workflow de preuves pour Signal Forge.'],
@@ -28,7 +28,10 @@ const screens = [
     'Votre page privée est en ligne pour Nimbus Robotics.',
   ],
   ['/interviews/demo/debrief', 'Débrief d’entretien'],
-  ['/applications/nimbus/versions', '3 modifications · 1 section ajoutée'],
+  [
+    `/applications/${applicationId}/versions`,
+    'Historique des versions et décisions',
+  ],
   ['/runs', 'Runs d’agents'],
   ['/applications/nimbus/company', 'Dossier entreprise'],
   ['/messages', 'Messages'],
@@ -79,6 +82,7 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
     '/interviews/demo',
     '/assets',
     '/memory/import',
+    `/applications/${applicationId}/versions`,
     '/settings/billing',
     '/settings/integrations',
     '/settings/data',

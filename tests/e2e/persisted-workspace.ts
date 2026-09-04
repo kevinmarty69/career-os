@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 
 export const applicationId = '988c0a00-0000-4000-8000-000000000041';
+export const opportunityId = '988c0a00-0000-4000-8000-000000000043';
 export const pendingReviewRun = {
   runId: '988c0a00-0000-4000-8000-000000000045',
   status: 'awaiting_approval',
@@ -53,6 +54,18 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
     sourceKind: 'generic_html',
     lifecycleSignal: 'open',
   };
+  const application = {
+    applicationId,
+    discoveredJobId: opportunityId,
+    company: 'Signal Forge',
+    role: 'Staff Platform Engineer',
+    description: 'Build a reliable platform for a small team.',
+    accent: '#5847e8',
+    stage: 'draft',
+    revision: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
   await page.route(`**/api/applications/${applicationId}/run`, (route) =>
     run
       ? route.fulfill({
@@ -64,21 +77,13 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
   await page.route('**/api/applications', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({
-        applications: [
-          {
-            applicationId,
-            company: 'Signal Forge',
-            role: 'Staff Platform Engineer',
-            description: 'Build a reliable platform for a small team.',
-            accent: '#5847e8',
-            stage: 'draft',
-            revision: 1,
-            createdAt: now,
-            updatedAt: now,
-          },
-        ],
-      }),
+      body: JSON.stringify({ applications: [application] }),
+    }),
+  );
+  await page.route(`**/api/applications/${applicationId}`, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(application),
     }),
   );
   await page.route('**/api/profile', (route) =>
@@ -125,13 +130,66 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
   await page.route('**/api/publications', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ publications: [] }),
+      body: JSON.stringify({
+        publications: [
+          {
+            publicationId: '988c0a00-0000-4000-8000-000000000047',
+            applicationId,
+            company: application.company,
+            role: application.role,
+            publishedAt: now,
+            revokedAt: null,
+            expiresAt: '2026-09-11T12:00:00.000Z',
+            status: 'active',
+            version: 1,
+            isCurrent: true,
+            firstOpenedAt: null,
+            lastOpenedAt: null,
+            opens: 0,
+            sections: 0,
+            actions: 0,
+            downloads: 0,
+          },
+        ],
+      }),
     }),
   );
   await page.route('**/api/opportunities/decisions', (route) =>
     route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ decisions: [], feedback: [] }),
+      body: JSON.stringify({
+        decisions: [
+          {
+            decisionId: '988c0a00-0000-4000-8000-000000000048',
+            opportunityId,
+            searchProfileId: null,
+            disposition: 'saved',
+            qualification: 'priority',
+            reason: 'strong_fit',
+            note: 'Strong platform ownership match.',
+            revision: 1,
+            actor: 'human',
+            actorId: '988c0a00-0000-4000-8000-000000000049',
+            createdAt: now,
+            updatedAt: now,
+            history: [
+              {
+                eventId: '988c0a00-0000-4000-8000-000000000050',
+                searchProfileId: null,
+                disposition: 'saved',
+                qualification: 'priority',
+                reason: 'strong_fit',
+                note: 'Strong platform ownership match.',
+                revision: 1,
+                actor: 'human',
+                actorId: '988c0a00-0000-4000-8000-000000000049',
+                createdAt: now,
+              },
+            ],
+          },
+        ],
+        feedback: [],
+      }),
     }),
   );
   await page.route('**/api/opportunities', (route) =>
@@ -140,7 +198,7 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
       body: JSON.stringify({
         opportunities: [
           {
-            opportunityId: '988c0a00-0000-4000-8000-000000000043',
+            opportunityId,
             company: 'Northstar Labs',
             role: 'Platform Engineer',
             description: 'Operate reliable developer infrastructure.',

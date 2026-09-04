@@ -182,7 +182,7 @@ export const dossierMessages = {
     'The research worker is unavailable. Check your instance.',
   'Le workflow est momentanément indisponible.':
     'The workflow is temporarily unavailable.',
-  'Historique de la page privée': 'Private page history',
+  'Historique des versions et décisions': 'Version and decision history',
   'Dossier de candidature': 'Application workspace',
   'À valider': 'Needs review',
   'Relancer les agents': 'Rerun agents',
