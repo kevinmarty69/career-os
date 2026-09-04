@@ -17,9 +17,9 @@ const screens = [
   ['/insights', 'Insights'],
   [
     '/memory/interview',
-    'À quel moment as-tu compris que l’outillage pouvait quitter tes mains ?',
+    'Sur la migration du monorepo, qu’est-ce qui n’a pas marché comme prévu ?',
   ],
-  ['/interviews/demo', 'Préparer l’entretien technique'],
+  ['/interviews/demo', 'Entretien technique · Vantage Labs'],
   ['/assets', 'Assets'],
   ['/settings/models', 'Modèles & agents'],
   ['/applications/nimbus?state=running', 'Platform Engineer'],
@@ -75,6 +75,12 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
     '/applications/nimbus/review',
     '/applications/nimbus/page',
     '/links',
+    '/memory/interview',
+    '/interviews/demo',
+    '/assets',
+    '/settings/billing',
+    '/settings/integrations',
+    '/settings/data',
   ]) {
     await test.step(route, async () => {
       await page.goto(route);

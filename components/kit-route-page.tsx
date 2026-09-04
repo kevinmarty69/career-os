@@ -48,9 +48,8 @@ const nav = [
   ['/inbox', 'inbox', 'À trancher'],
   ['/applications', 'work_history', 'Candidatures'],
   ['/memory', 'database', 'Mémoire pro'],
-  ['/assets', 'description', 'Assets'],
-  ['/runs', 'bolt', "Runs d'agents"],
   ['/interviews/demo', 'record_voice_over', 'Entretiens'],
+  ['/links', 'link', 'Liens privés'],
   ['/insights', 'monitoring', 'Insights'],
   ['/settings/models', 'settings', 'Réglages'],
 ] as const;
@@ -69,6 +68,20 @@ function AppShell({
   sidebarFooter?: ReactNode;
 }) {
   const [palette, setPalette] = useState(false);
+  const screenNav =
+    path === '/assets'
+      ? [
+          ...nav.slice(0, 4),
+          ['/assets', 'description', 'Assets'] as const,
+          ...nav.slice(4),
+        ]
+      : path === '/runs'
+        ? [
+            ...nav.slice(0, 4),
+            ['/runs', 'bolt', "Runs d'agents"] as const,
+            ...nav.slice(4),
+          ]
+        : nav;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -91,7 +104,7 @@ function AppShell({
           <Icon>unfold_more</Icon>
         </Link>
         <nav>
-          {nav.map(([href, icon, label]) => (
+          {screenNav.map(([href, icon, label]) => (
             <Link
               className={
                 path === href || (href !== '/' && path.startsWith(href))
@@ -1525,78 +1538,170 @@ function InsightsScreen() {
 
 function InterviewMemoryScreen() {
   return (
-    <main className="co-focus-shell">
-      <header>
-        <Link href="/memory">
-          <Icon>close</Icon>
-        </Link>
-        <span>
-          <strong>Entretien guidé</strong>
-          <small>Corvid · 2021-2024</small>
-        </span>
-        <div>
-          <b>4 / 7</b>
-          <span>≈ 4 min restantes</span>
+    <main className="co-guided-shell">
+      <aside className="co-guided-nav">
+        <header>
+          <Link href="/memory">
+            <Icon>close</Icon>
+          </Link>
+          <span>
+            <strong>Entretien guidé</strong>
+            <small>Corvid · 2021-2024</small>
+          </span>
+        </header>
+        <section className="co-guided-progress">
+          <span>
+            <strong>Progression</strong>
+            <code>4 / 7</code>
+          </span>
+          <i>
+            <b />
+          </i>
+          <small>≈ 4 min restantes · vous pouvez sortir à tout moment</small>
+        </section>
+        <nav aria-label="Progression de l'entretien">
+          {[
+            ['check_circle', 'Périmètre du rôle', 'done'],
+            ['check_circle', 'Ce que vous avez décidé', 'done'],
+            ['check_circle', 'Résultats mesurés', 'done'],
+            ['radio_button_checked', 'Ce qui a échoué', 'active'],
+            ['radio_button_unchecked', "Travail d'équipe", ''],
+            ['radio_button_unchecked', 'Choix techniques', ''],
+            ['radio_button_unchecked', 'Preuves à retrouver', ''],
+          ].map(([icon, label, state]) => (
+            <span className={state} key={label}>
+              <Icon>{icon}</Icon>
+              {label}
+            </span>
+          ))}
+        </nav>
+        <div className="co-guided-principle">
+          <strong>
+            <Icon>edit_note</Icon>Vos mots, pas les siens
+          </strong>
+          <p>
+            L’agent reformule pour la clarté, jamais pour embellir. Vous validez
+            chaque phrase avant qu’elle n’entre dans la mémoire.
+          </p>
         </div>
-      </header>
-      <div className="co-progress">
-        <i style={{ width: '57%' }} />
-      </div>
-      <section className="co-interview">
-        <p>Question 4</p>
-        <h1>
-          À quel moment as-tu compris que l’outillage pouvait quitter tes mains
-          ?
-        </h1>
-        <span>
-          Je cherche une preuve de transmission, pas seulement de construction.
-        </span>
-        <div className="co-chat">
-          <article>
-            <i>CO</i>
-            <p>
-              Qui utilisait le système au quotidien après ton départ du projet ?
-            </p>
-          </article>
-          <article className="answer">
-            <i>MA</i>
-            <p>
-              L’équipe SRE. J’avais écrit le runbook, fait deux sessions de
-              formation et supprimé mes propres accès d’administration après un
-              mois de transition.
-            </p>
-          </article>
+      </aside>
+
+      <section className="co-guided-stage">
+        <div className="co-guided-content">
+          <div className="co-guided-question">
+            <span>
+              <Icon>record_voice_over</Icon>
+            </span>
+            <div>
+              <small>Question 4 sur 7</small>
+              <h1>
+                Sur la migration du monorepo, qu’est-ce qui n’a pas marché comme
+                prévu ?
+              </h1>
+              <p>
+                Les recruteurs techniques lisent les échecs comme un signe de
+                maturité. Un exemple concret suffit, sans conclusion morale.
+              </p>
+            </div>
+          </div>
+          <blockquote>
+            Le premier découpage était trop fin : on a créé 40 services qu’il a
+            fallu refusionner six mois plus tard. J’avais suivi la structure de
+            l’organisation plutôt que les frontières de données. On a perdu à
+            peu près un trimestre.
+          </blockquote>
+          <div className="co-guided-extracts">
+            <span>
+              <Icon>auto_awesome</Icon>
+            </span>
+            <div>
+              <p>
+                Deux affirmations extraites. Relisez-les avant qu’elles
+                rejoignent la mémoire :
+              </p>
+              <article>
+                <header>
+                  <Badge tone="warn">Déclaré</Badge>
+                  <small>aucune preuve rattachée</small>
+                </header>
+                <strong>
+                  Premier découpage trop fin : 40 services refusionnés après six
+                  mois, faute d’avoir suivi les frontières de données.
+                </strong>
+                <footer>
+                  <Button>Garder</Button>
+                  <Button quiet>Reformuler</Button>
+                  <button type="button">Jeter</button>
+                </footer>
+              </article>
+              <article>
+                <header>
+                  <Badge tone="accent">À sourcer</Badge>
+                  <small>un chiffre à confirmer</small>
+                </header>
+                <strong>
+                  Retard estimé à un trimestre sur le programme de migration.
+                </strong>
+                <button className="co-evidence-search" type="button">
+                  <Icon>search</Icon>
+                  <span>Un document daté mentionne-t-il ce retard ?</span>
+                  <b>Chercher</b>
+                </button>
+              </article>
+            </div>
+          </div>
         </div>
-        <label>
-          <span>Votre réponse</span>
-          <textarea
-            rows={4}
-            placeholder="Décrivez le contexte, votre action et ce qui a changé…"
-          />
-        </label>
-        <footer>
+        <footer className="co-guided-composer">
+          <label>
+            <span>Répondre en quelques phrases…</span>
+            <Icon>mic</Icon>
+            <Icon>attach_file</Icon>
+          </label>
           <Button quiet>Passer</Button>
           <Button>
-            Continuer <Icon>arrow_forward</Icon>
+            Question suivante <Icon>arrow_forward</Icon>
           </Button>
         </footer>
       </section>
-      <aside className="co-focus-aside">
-        <h2>Ce que l’entretien a déjà trouvé</h2>
-        <ClaimRow
-          tone="warn"
-          label="Déclaré"
-          text="Deux sessions de formation avec l’équipe SRE."
-        />
-        <ClaimRow
-          tone="warn"
-          label="À sourcer"
-          text="Suppression des accès admin après un mois de transition."
-        />
-        <div className="co-note">
-          <Icon>lock</Icon>Vos réponses restent privées. Elles entrent en
-          mémoire comme « déclaré » tant qu’aucun document ne les couvre.
+
+      <aside className="co-guided-session">
+        <header>
+          <h2>Récolté dans cette session</h2>
+          <Badge tone="accent">9</Badge>
+        </header>
+        <div className="co-guided-claims">
+          {[
+            [
+              'ok',
+              'Vérifié',
+              'Équipe de 3 sur la plateforme, 9 utilisateurs internes.',
+            ],
+            [
+              'ok',
+              'Vérifié',
+              'Décision de garder Bazel malgré la pression pour Nx.',
+            ],
+            ['warn', 'Déclaré', '40 services refusionnés après six mois.'],
+            ['warn', 'Déclaré', 'Retard d’un trimestre sur la migration.'],
+          ].map(([tone, label, text]) => (
+            <article key={text}>
+              <Badge tone={tone as Tone}>{label}</Badge>
+              <p>{text}</p>
+            </article>
+          ))}
         </div>
+        <div className="co-note">
+          <Icon>lightbulb</Icon>
+          <span>
+            <strong>Preuves à retrouver</strong>Trois affirmations attendent un
+            document. L’agent proposera une liste de fichiers à chercher à la
+            fin.
+          </span>
+        </div>
+        <footer>
+          <Button>Enregistrer et sortir</Button>
+          <small>Rien n’est ajouté à la mémoire sans votre « Garder ».</small>
+        </footer>
       </aside>
     </main>
   );
@@ -1605,88 +1710,190 @@ function InterviewMemoryScreen() {
 function InterviewPrepScreen({ debrief = false }: { debrief?: boolean }) {
   if (debrief) return <DebriefScreen />;
   return (
-    <AppShell path="/interviews/demo">
-      <PageHeader
-        eyebrow="Vantage Labs · 8 sept. 14:00"
-        title="Préparer l’entretien technique"
-        copy="60 minutes · visio · Research Engineer"
-        actions={<Button>Commencer le mode entretien</Button>}
-      />
-      <div className="co-two-col">
-        <section className="co-stack">
-          <section className="co-panel co-brief-card">
-            <p>Angle de l’entretien</p>
-            <h2>
-              Montrer que la rigueur expérimentale reste utile quand le système
-              doit servir de vrais utilisateurs.
-            </h2>
+    <AppShell
+      path="/interviews/demo"
+      sidebarContext={<InterviewSchedule />}
+      sidebarFooter={null}
+    >
+      <section className="co-prep">
+        <header className="co-prep-header">
+          <i>VL</i>
+          <div>
             <span>
-              Ne pas surjouer la recherche pure. Revenir aux choix vérifiables,
-              aux limites connues et aux boucles de feedback.
+              <h1>Entretien technique · Vantage Labs</h1>
+              <Badge tone="accent">dans 5 jours</Badge>
             </span>
+            <p>8 sept. · 14:00 - 15:00 · Visio · Research Engineer</p>
+          </div>
+          <nav>
+            <Button quiet>
+              <Icon>calendar_add_on</Icon>
+            </Button>
+            <Button quiet>Ouvrir le dossier</Button>
+            <Button>
+              <Icon>print</Icon>Fiche d’entretien
+            </Button>
+          </nav>
+        </header>
+        <nav className="co-prep-tabs" aria-label="Sections de l'entretien">
+          <button className="active" type="button">
+            Préparation
+          </button>
+          <button type="button">Interlocuteurs</button>
+          <button type="button">Ma page privée</button>
+          <button type="button">Débrief</button>
+        </nav>
+        <div className="co-prep-layout">
+          <section className="co-prep-main">
+            <header>
+              <h2>Questions probables</h2>
+              <span>déduites de l’offre et du profil des interlocuteurs</span>
+            </header>
+            <article className="co-prep-question">
+              <header>
+                <Badge tone="accent">Très probable</Badge>
+                <small>3 preuves disponibles</small>
+              </header>
+              <h3>
+                « Comment décidez-vous du découpage d’un système en services ? »
+              </h3>
+              <div>
+                <small>Appuis dans votre mémoire</small>
+                <p>
+                  <Icon>verified</Icon>Frontières de données &gt; structure de
+                  l’organisation, appris à la dure sur Corvid
+                </p>
+                <p>
+                  <Icon>verified</Icon>40 services refusionnés après six mois
+                </p>
+              </div>
+            </article>
+            <article className="co-prep-question">
+              <header>
+                <Badge tone="accent">Très probable</Badge>
+                <small>chiffre à citer exactement</small>
+              </header>
+              <h3>
+                « Parlez-moi d’un gain de performance que vous avez mesuré. »
+              </h3>
+              <div className="single">
+                <p>
+                  <Icon>description</Icon>Build p50 : 11 → 7 min. Dites les
+                  minutes, pas le pourcentage.
+                </p>
+                <Link href="/memory">Voir</Link>
+              </div>
+            </article>
+            <article className="co-prep-question weak">
+              <header>
+                <Badge tone="crit">Point faible</Badge>
+                <small>aucune preuve à opposer</small>
+              </header>
+              <h3>« Combien de personnes avez-vous managées ? »</h3>
+              <p>
+                Réponse préparée : tech lead de 3 personnes sans lien
+                hiérarchique, revue de code et astreinte partagées. Ne pas
+                gonfler, c’est vérifiable auprès de vos anciens collègues.
+              </p>
+            </article>
+            <header>
+              <h2>Vos questions à eux</h2>
+              <button type="button">Ajouter</button>
+            </header>
+            <div className="co-prep-own-questions">
+              <p>
+                <Icon>help</Icon>Qui décide aujourd’hui d’un rollback en
+                production, et en combien de temps ?<Icon>drag_indicator</Icon>
+              </p>
+              <p>
+                <Icon>help</Icon>L’équipe Research publie-t-elle, ou tout
+                reste-t-il interne ?<Icon>drag_indicator</Icon>
+              </p>
+            </div>
           </section>
-          <section className="co-panel">
-            <h2>Questions probables</h2>
-            {[
-              [
-                '01',
-                'Comment évalues-tu un système non déterministe ?',
-                '839 générations · 13 modèles · 5 providers',
-              ],
-              [
-                '02',
-                'Raconte un désaccord technique important.',
-                'Architecture du MCP · contraintes de production',
-              ],
-              [
-                '03',
-                'Comment choisis-tu ce qui ne doit pas être automatisé ?',
-                'Gates humains · permissions par preuve',
-              ],
-            ].map(([n, q, p]) => (
-              <article className="co-question" key={n}>
-                <i>{n}</i>
-                <span>
-                  <strong>{q}</strong>
-                  <small>{p}</small>
-                </span>
-                <Button quiet>Préparer</Button>
-              </article>
-            ))}
-          </section>
-        </section>
-        <aside className="co-stack">
-          <section className="co-panel">
+          <aside className="co-prep-aside">
             <h2>Interlocuteurs</h2>
-            <Company
-              initials="SC"
-              name="Sarah Chen"
-              sub="Hiring manager · Research"
-            />
-            <Company
-              initials="JP"
-              name="Jonas Petit"
-              sub="Staff Research Engineer"
-            />
-          </section>
-          <section className="co-panel">
-            <h2>Preuves à garder ouvertes</h2>
-            <ul className="co-checklist">
-              <li>Évaluation LLM · 839 générations</li>
-              <li>MCP · 36,7 k appels</li>
-              <li>Post-mortem Corvid</li>
-            </ul>
-          </section>
-          <section className="co-panel">
-            <h2>Questions à leur poser</h2>
-            <p>
-              Comment les résultats de recherche passent-ils en production ?
-            </p>
-            <p>Qui décide qu’une évaluation est assez bonne ?</p>
-          </section>
-        </aside>
-      </div>
+            <article>
+              <Company
+                initials="SM"
+                name="Sarah Meunier"
+                sub="Research Lead · 4 ans"
+              />
+              <p>
+                A publié sur l’apprentissage par renforcement appliqué à la
+                logistique. Aime les questions de méthode.
+              </p>
+            </article>
+            <article>
+              <Company
+                initials="JP"
+                name="Julien Pastor"
+                sub="Staff Engineer"
+              />
+              <p>
+                Mainteneur d’un projet OSS proche du vôtre. Terrain commun sur
+                ROS2.
+              </p>
+            </article>
+            <div className="co-prep-simulation">
+              <strong>
+                <Icon>psychology</Icon>Simulation
+              </strong>
+              <p>
+                Vingt minutes de questions posées par un agent, avec vos preuves
+                en arbitre. Le compte-rendu reste privé.
+              </p>
+              <Button>Lancer une simulation</Button>
+            </div>
+            <section>
+              <h2>Après l’entretien</h2>
+              <p>
+                Le débrief alimente votre mémoire : ce qu’on vous a demandé, ce
+                que vous n’avez pas su prouver.
+              </p>
+              <Button quiet>Préparer le débrief</Button>
+            </section>
+          </aside>
+        </div>
+      </section>
     </AppShell>
+  );
+}
+
+function InterviewSchedule() {
+  return (
+    <div className="co-interview-schedule">
+      <p className="co-nav-label">À venir</p>
+      <Link className="active" href="/interviews/demo">
+        <time>
+          <b>08</b>
+          <small>sept</small>
+        </time>
+        <span>
+          <strong>Vantage Labs</strong>
+          <small>technique · 14:00</small>
+        </span>
+      </Link>
+      <Link href="/interviews/demo">
+        <time>
+          <b>15</b>
+          <small>sept</small>
+        </time>
+        <span>
+          <strong>Atlas Health</strong>
+          <small>manager · à confirmer</small>
+        </span>
+      </Link>
+      <p className="co-nav-label">Passés</p>
+      <Link href="/interviews/demo/debrief">
+        <Icon>edit_note</Icon>
+        <span>Helix · débrief à écrire</span>
+      </Link>
+      <Link href="/interviews/demo/debrief">
+        <Icon>check_circle</Icon>
+        <span>Orbital · débriefé</span>
+      </Link>
+    </div>
   );
 }
 
@@ -2953,15 +3160,46 @@ function BillingScreen() {
     <SettingsShell
       active="Abonnement"
       side={
-        <section className="co-stack">
-          <div className="co-panel">
-            <h2>Migrer vers l’auto-hébergé</h2>
-            <p>Export complet, puis résiliation. Aucune donnée retenue.</p>
-            <Button quiet>Guide de migration</Button>
+        <section className="co-billing-side">
+          <h2>Moyen de paiement</h2>
+          <div className="co-panel co-payment-method">
+            <i />
+            <span>
+              <strong>•••• 4242</strong>
+              <small>expire 04/29</small>
+            </span>
+            <button type="button">Changer</button>
           </div>
-          <div className="co-note">
-            <Icon>code</Icon>Toujours gratuit en self-host. L’abonnement paie
-            l’hébergement et les modèles, pas les fonctionnalités.
+          <div className="co-panel">
+            <h3>Plafond d’usage</h3>
+            <p>
+              Au-delà de 15 €, les runs basculent automatiquement sur les
+              modèles locaux au lieu d’être facturés.
+            </p>
+            <label className="co-toggle">
+              <input defaultChecked type="checkbox" />
+              Ne jamais dépasser
+            </label>
+          </div>
+          <div className="co-panel">
+            <h3>Facturation</h3>
+            <p>
+              <Icon>apartment</Icon>Nom et adresse{' '}
+              <button type="button">Éditer</button>
+            </p>
+            <p>
+              <Icon>receipt_long</Icon>TVA intracommunautaire{' '}
+              <button type="button">Ajouter</button>
+            </p>
+          </div>
+          <div className="co-billing-selfhost">
+            <strong>
+              <Icon>code</Icon>Toujours gratuit en self-host
+            </strong>
+            <p>
+              L’abonnement paie l’hébergement et l’accès aux modèles, pas les
+              fonctionnalités : aucune n’est réservée au SaaS.
+            </p>
           </div>
         </section>
       }
@@ -3026,56 +3264,114 @@ function BillingScreen() {
           ]}
         />
       </section>
-      <section className="co-panel">
-        <h2>Plafond d’usage</h2>
-        <p>
-          Au-delà de 15 €, les runs basculent automatiquement sur les modèles
-          locaux.
-        </p>
-        <label className="co-toggle">
-          <input defaultChecked type="checkbox" />
-          Ne jamais dépasser
-        </label>
-      </section>
     </SettingsShell>
   );
 }
 
 function IntegrationsScreen() {
   return (
-    <SettingsShell active="Intégrations">
+    <SettingsShell
+      active="Intégrations"
+      side={
+        <section className="co-integrations-side">
+          <h2>Webhooks</h2>
+          <section className="co-panel">
+            <code>
+              <Icon>webhook</Icon>hooks.slack.com/…/T04
+            </code>
+            <ul>
+              <li>run.awaiting_review</li>
+              <li>run.failed</li>
+              <li>link.viewed</li>
+              <li className="off">memory.claim_added</li>
+            </ul>
+            <p>
+              Le corps ne contient que des identifiants, jamais le texte d’une
+              preuve.
+            </p>
+          </section>
+          <section className="co-panel">
+            <h3>Portées disponibles</h3>
+            <dl>
+              <div>
+                <dt>memory:read</dt>
+                <dd>lecture des preuves</dd>
+              </div>
+              <div>
+                <dt>memory:write</dt>
+                <dd>import de documents</dd>
+              </div>
+              <div>
+                <dt>applications:*</dt>
+                <dd>créer, lire, lister</dd>
+              </div>
+              <div>
+                <dt>runs:read</dt>
+                <dd>état et journaux</dd>
+              </div>
+            </dl>
+            <div className="co-note crit">
+              <Icon>block</Icon>Aucune portée ne permet de publier un lien privé
+              : la publication reste une action humaine.
+            </div>
+          </section>
+          <section className="co-integrations-log">
+            <strong>
+              <Icon>visibility</Icon>Journal d’accès API
+            </strong>
+            <p>
+              248 appels ce mois · dernier il y a 3 min. Chaque appel enregistre
+              le jeton, la portée et l’IP.
+            </p>
+            <Button quiet>Ouvrir le journal</Button>
+          </section>
+        </section>
+      }
+    >
       <PageHeader
         title="Intégrations & API"
         copy="Connecteurs de sources, jetons d’accès et webhooks. Tout ce qui sort est journalisé."
-        actions={<Button quiet>Documentation API</Button>}
       />
-      <section className="co-panel">
-        <h2>Sources connectées</h2>
-        {[
-          ['badge', 'LinkedIn', 'sync quotidien · 18 preuves', 'Actif'],
-          ['code', 'GitHub', '2 dépôts · 8 preuves', 'Actif'],
-          [
-            'cloud_off',
-            'Google Drive',
-            'jeton expiré · 4 preuves figées',
-            'Reconnecter',
-          ],
-        ].map(([icon, title, meta, state]) => (
-          <div className="co-model-row" key={title}>
-            <Icon>{icon}</Icon>
-            <span>
-              <strong>{title}</strong>
-              <small>{meta}</small>
-            </span>
-            <Badge tone={state === 'Actif' ? 'ok' : 'warn'}>{state}</Badge>
-          </div>
-        ))}
-        <Button quiet>
-          <Icon>add</Icon>Notion, Drive, flux RSS…
-        </Button>
+      <section className="co-integration-sources">
+        <header>
+          <h2>Sources connectées</h2>
+          <button type="button">Ajouter une source</button>
+        </header>
+        <div>
+          {[
+            ['badge', 'LinkedIn', 'sync quotidien · 18 preuves', 'Actif'],
+            ['code', 'GitHub', '2 dépôts · 8 preuves', 'Actif'],
+            [
+              'cloud_off',
+              'Google Drive',
+              'jeton expiré · 4 preuves figées',
+              'Reconnecter',
+            ],
+            ['add', 'Notion, Drive, flux RSS…', 'lecture seule uniquement', ''],
+          ].map(([icon, title, meta, state]) => (
+            <article
+              className={
+                state === 'Reconnecter' ? 'warning' : state ? '' : 'empty'
+              }
+              key={title}
+            >
+              <Icon>{icon}</Icon>
+              <span>
+                <strong>{title}</strong>
+                <small>{meta}</small>
+              </span>
+              {state ? (
+                <Badge tone={state === 'Actif' ? 'ok' : 'warn'}>{state}</Badge>
+              ) : null}
+            </article>
+          ))}
+        </div>
       </section>
       <section className="co-panel">
-        <h2>Jetons d’API</h2>
+        <div className="co-section-title">
+          <h2>Jetons d’API</h2>
+          <Button>Créer un jeton</Button>
+        </div>
         <DataTable
           headers={['Nom', 'Portée', 'Dernier usage', 'Expire', '']}
           rows={[
@@ -3099,7 +3395,6 @@ function IntegrationsScreen() {
             ],
           ]}
         />
-        <Button>Créer un jeton</Button>
       </section>
       <section className="co-code-example">
         <header>
@@ -3108,10 +3403,6 @@ function IntegrationsScreen() {
         </header>
         <pre>{`curl -X POST https://api.careeros.app/v1/applications \\\n  -H "Authorization: Bearer $COS_TOKEN" \\\n  -d '{"job_url":"https://nimbus.ai/careers/staff-pe"}'`}</pre>
       </section>
-      <div className="co-note">
-        <Icon>block</Icon>Aucune portée ne permet de publier un lien privé : la
-        publication reste une action humaine dans l’interface.
-      </div>
     </SettingsShell>
   );
 }
@@ -3123,56 +3414,100 @@ function DataScreen() {
         title="Export & suppression"
         copy="Vos données vous appartiennent, dans un format lisible sans Career OS."
       />
-      <section className="co-export-card">
-        <div>
-          <Icon>download</Icon>
-          <span>
-            <h2>Exporter tout</h2>
-            <p>≈ 18 Mo · Markdown + JSON</p>
-          </span>
-        </div>
-        <div className="co-export-checks">
-          {[
-            'Mémoire · 128 affirmations',
-            'Documents sources · 24',
-            'Candidatures · 14',
-            'Runs et journaux d’agents',
-          ].map((x) => (
-            <label key={x}>
-              <input defaultChecked type="checkbox" />
-              {x}
-            </label>
-          ))}
-        </div>
-        <pre>{`careeros-export-2026-09-03/\n├── memory/claims.json\n├── memory/claims.md\n├── sources/corvid_postmortem.md\n├── applications/nimbus-robotics/\n│   ├── page.md\n│   └── runs/8f2c.json\n└── README.md`}</pre>
-        <Button>Générer l’archive</Button>
-      </section>
-      <section className="co-delete-card">
-        <header>
-          <Icon>delete_forever</Icon>
-          <div>
-            <h2>Supprimer mon compte</h2>
+      <div className="co-data-layout">
+        <section className="co-data-main">
+          <section className="co-export-card">
+            <div>
+              <Icon>download</Icon>
+              <h2>Exporter tout</h2>
+              <code>≈ 18 Mo</code>
+            </div>
+            <div className="co-export-checks">
+              {[
+                'Mémoire · 128 affirmations',
+                'Documents sources · 24',
+                'Candidatures · 14',
+                'Runs et journaux d’agents',
+              ].map((x) => (
+                <label key={x}>
+                  <input defaultChecked type="checkbox" />
+                  {x}
+                </label>
+              ))}
+            </div>
+            <footer>
+              <div className="co-segment">
+                <button className="active" type="button">
+                  Markdown + JSON
+                </button>
+                <button type="button">JSON seul</button>
+                <button type="button">PDF</button>
+              </div>
+              <Button>Générer l’archive</Button>
+            </footer>
+          </section>
+          <pre>{`structure de l'archive\n\ncareeros-export-2026-09-03/\n├── memory/claims.json\n├── memory/claims.md\n├── sources/corvid_postmortem.md\n├── sources/cv_2024.pdf\n├── applications/nimbus-robotics/\n│   ├── page.md\n│   ├── requirements.json\n│   └── runs/8f2c.json\n└── README.md`}</pre>
+          <div className="co-note">
+            <Icon>verified</Icon>Chaque affirmation exportée conserve ses liens
+            vers ses preuves et sa date d’origine. L’archive se réimporte telle
+            quelle dans une autre instance.
+          </div>
+        </section>
+        <aside className="co-data-side">
+          <section className="co-delete-card">
+            <header>
+              <Icon>delete_forever</Icon>
+              <h2>Supprimer mon compte</h2>
+            </header>
             <p>
               Efface la mémoire, les candidatures, les runs et les liens privés.
+              Les liens deviennent inaccessibles immédiatement, y compris pour
+              un onglet déjà ouvert.
             </p>
-          </div>
-        </header>
-        <ul>
-          <li>128 affirmations, 24 documents</li>
-          <li>14 candidatures et leurs versions</li>
-          <li>4 liens privés actifs</li>
-          <li>2 jetons d’API</li>
-        </ul>
-        <label>
-          Tapez SUPPRIMER pour confirmer
-          <input placeholder="SUPPRIMER" />
-        </label>
-        <Button danger>Supprimer définitivement</Button>
-        <p>
-          Aucun délai de grâce, aucune corbeille. Exportez d’abord si vous
-          voulez garder une copie.
-        </p>
-      </section>
+            <div>
+              <strong>Ce qui sera supprimé</strong>
+              <ul>
+                <li>128 affirmations, 24 documents</li>
+                <li>14 candidatures et leurs versions</li>
+                <li>4 liens privés actifs</li>
+                <li>2 jetons d’API</li>
+              </ul>
+            </div>
+            <input
+              aria-label="Tapez SUPPRIMER pour confirmer"
+              placeholder="tapez SUPPRIMER pour confirmer"
+            />
+            <Button danger>Supprimer définitivement</Button>
+            <p>
+              Aucun délai de grâce, aucune corbeille : la suppression est
+              immédiate. Exportez d’abord si vous voulez garder une copie.
+            </p>
+          </section>
+          <section className="co-retention-card">
+            <h2>
+              <Icon>shield</Icon>Rétention
+            </h2>
+            <dl>
+              <div>
+                <dt>Documents et preuves</dt>
+                <dd>jusqu’à suppression</dd>
+              </div>
+              <div>
+                <dt>Journaux d’accès aux liens</dt>
+                <dd>90 jours</dd>
+              </div>
+              <div>
+                <dt>Sauvegardes chiffrées</dt>
+                <dd>7 jours</dd>
+              </div>
+              <div>
+                <dt>Factures (obligation légale)</dt>
+                <dd>10 ans</dd>
+              </div>
+            </dl>
+          </section>
+        </aside>
+      </div>
     </SettingsShell>
   );
 }
