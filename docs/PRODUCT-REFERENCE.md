@@ -682,7 +682,7 @@ Critères d'acceptation :
 
 ### Lot 9 - Distribution open source
 
-- [ ] Installation documentée sur une machine propre.
+- [x] Installation documentée sur une machine propre.
 - [x] Configuration PostgreSQL et stockage.
 - [x] Support d'un endpoint OpenAI-compatible local ou distant.
 - [x] BYOK sans exposition des clés au navigateur.
