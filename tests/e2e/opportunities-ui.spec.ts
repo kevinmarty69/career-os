@@ -27,11 +27,22 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
 
   await expect(page.getByText('Product Engineer')).toBeVisible();
   await expect(page.getByText('Example Labs')).toBeVisible();
+  await expect(page.getByText('Paris, France')).toBeVisible();
+  await expect(page.getByText('Hybride')).toBeVisible();
+  await expect(page.getByText('Temps plein')).toBeVisible();
+  await expect(
+    page.getByText(/80[\s\u202f]000.*100[\s\u202f]000/),
+  ).toBeVisible();
+  await expect(page.getByText('Greenhouse').first()).toBeVisible();
+  await expect(page.getByText('Republiée', { exact: true })).toBeVisible();
   const start = page.getByRole('button', { name: 'Démarrer la candidature' });
   await expect(start).toBeDisabled();
   await expect(page.getByText('Disponible prochainement')).toBeVisible();
-  await page.getByText('Provenance · 1 source').click();
+  await page.getByText('Provenance et historique · 4 observations').click();
   await expect(page.getByText('jobs.example.test').first()).toBeVisible();
+  await expect(page.getByText('Contenu de l’offre modifié')).toBeVisible();
+  await expect(page.getByText('Offre signalée comme fermée')).toBeVisible();
+  await expect(page.getByText('Offre republiée')).toBeVisible();
   expect(importedUrls).toEqual(['https://jobs.example.test/product-engineer']);
 
   await page.reload();
@@ -42,11 +53,12 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
 test('keeps the real opportunity workspace inside a mobile viewport', async ({
   page,
 }) => {
-  const opportunities = [opportunity()];
+  const opportunities = [unknownOpportunity()];
   await mockWorkspace(page, opportunities, []);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/applications');
   await expect(page.getByText('Product Engineer')).toBeVisible();
+  await expect(page.getByText('À vérifier').first()).toBeVisible();
   await page.getByRole('button', { name: 'Coller une offre' }).first().click();
   await expect(
     page.getByRole('dialog', { name: 'Coller une offre' }),
@@ -106,22 +118,34 @@ async function mockWorkspace(
 
 function opportunity(sourceUrl = 'https://jobs.example.test/product-engineer') {
   const sourceRecordId = 'c33c0a00-0000-4000-8000-000000000003';
+  const normalized = {
+    location: 'Paris, France',
+    remoteMode: 'hybrid',
+    contractType: 'full_time',
+    salaryMin: 80000,
+    salaryMax: 100000,
+    salaryCurrency: 'EUR',
+    publishedAt: '2026-09-01T08:00:00.000Z',
+    externalId: 'job-123',
+    sourceKind: 'greenhouse',
+    lifecycleSignal: 'open',
+  };
   return {
     opportunityId: 'b22c0a00-0000-4000-8000-000000000002',
     company: 'Example Labs',
     role: 'Product Engineer',
     description: 'Build reliable products.',
     sourceUrl,
-    location: null,
-    remoteMode: 'unknown',
-    contractType: 'unknown',
-    salaryMin: null,
-    salaryMax: null,
-    salaryCurrency: null,
-    publishedAt: null,
-    externalId: null,
-    sourceKind: 'generic_html',
-    lifecycle: 'open',
+    location: normalized.location,
+    remoteMode: normalized.remoteMode,
+    contractType: normalized.contractType,
+    salaryMin: normalized.salaryMin,
+    salaryMax: normalized.salaryMax,
+    salaryCurrency: normalized.salaryCurrency,
+    publishedAt: normalized.publishedAt,
+    externalId: normalized.externalId,
+    sourceKind: normalized.sourceKind,
+    lifecycle: 'reposted',
     fingerprint: null,
     revision: 1,
     sources: [
@@ -130,9 +154,9 @@ function opportunity(sourceUrl = 'https://jobs.example.test/product-engineer') {
         requestedUrl: sourceUrl,
         finalUrl: sourceUrl,
         fetchedUrl: sourceUrl,
-        sourceKind: 'generic_html',
-        externalId: null,
-        matchedBy: 'new',
+        sourceKind: 'greenhouse',
+        externalId: 'job-123',
+        matchedBy: 'exact_source',
         fetchedAt: now,
         contentType: 'text/html',
         bytes: 2048,
@@ -142,28 +166,88 @@ function opportunity(sourceUrl = 'https://jobs.example.test/product-engineer') {
     ],
     observations: [
       {
+        observationId: 'd44c0a00-0000-4000-8000-000000000007',
+        sourceRecordId,
+        observedAt: '2026-09-04T12:00:00.000Z',
+        sha256: 'd'.repeat(64),
+        change: 'reposted',
+        lifecycleSignal: 'open',
+        matchedBy: 'exact_source',
+        normalized,
+      },
+      {
+        observationId: 'd44c0a00-0000-4000-8000-000000000006',
+        sourceRecordId,
+        observedAt: '2026-09-03T12:00:00.000Z',
+        sha256: 'c'.repeat(64),
+        change: 'closed',
+        lifecycleSignal: 'closed',
+        matchedBy: 'exact_source',
+        normalized: { ...normalized, lifecycleSignal: 'closed' },
+      },
+      {
+        observationId: 'd44c0a00-0000-4000-8000-000000000005',
+        sourceRecordId,
+        observedAt: '2026-09-02T12:00:00.000Z',
+        sha256: 'b'.repeat(64),
+        change: 'changed',
+        lifecycleSignal: 'open',
+        matchedBy: 'canonical_url',
+        normalized,
+      },
+      {
         observationId: 'd44c0a00-0000-4000-8000-000000000004',
         sourceRecordId,
         observedAt: now,
         sha256: 'a'.repeat(64),
         change: 'first_seen',
-        lifecycleSignal: 'unknown',
+        lifecycleSignal: 'open',
         matchedBy: 'new',
-        normalized: {
-          location: null,
-          remoteMode: 'unknown',
-          contractType: 'unknown',
-          salaryMin: null,
-          salaryMax: null,
-          salaryCurrency: null,
-          publishedAt: null,
-          externalId: null,
-          sourceKind: 'generic_html',
-          lifecycleSignal: 'unknown',
-        },
+        normalized,
       },
     ],
     firstSeenAt: now,
     lastSeenAt: now,
+  };
+}
+
+function unknownOpportunity() {
+  const base = opportunity();
+  const unknown = {
+    location: null,
+    remoteMode: 'unknown',
+    contractType: 'unknown',
+    salaryMin: null,
+    salaryMax: null,
+    salaryCurrency: null,
+    publishedAt: null,
+    externalId: null,
+    sourceKind: 'generic_html',
+    lifecycleSignal: 'unknown',
+  } as const;
+  return {
+    ...base,
+    location: unknown.location,
+    remoteMode: unknown.remoteMode,
+    contractType: unknown.contractType,
+    salaryMin: unknown.salaryMin,
+    salaryMax: unknown.salaryMax,
+    salaryCurrency: unknown.salaryCurrency,
+    publishedAt: unknown.publishedAt,
+    externalId: unknown.externalId,
+    sourceKind: unknown.sourceKind,
+    lifecycle: 'open',
+    sources: base.sources.map((source) => ({
+      ...source,
+      sourceKind: 'generic_html',
+      externalId: null,
+    })),
+    observations: [
+      {
+        ...base.observations.at(-1),
+        normalized: unknown,
+        lifecycleSignal: 'unknown',
+      },
+    ],
   };
 }

@@ -253,50 +253,136 @@ function OpportunityCard({
   opportunity: DiscoveredJob;
 }) {
   const source = opportunity.sources[0];
+  const lifecycle = lifecycleCopy(opportunity.lifecycle);
   return (
-    <article className={styles.opportunityCard}>
+    <article
+      className={`${styles.opportunityCard} ${styles[`lifecycle-${opportunity.lifecycle}`]}`}
+    >
       <div className={styles.companyMark} aria-hidden="true">
         {initials(opportunity.company ?? opportunity.role ?? 'Offre')}
       </div>
       <div className={styles.opportunityBody}>
-        <small>{opportunity.company ?? 'Entreprise non identifiée'}</small>
-        <h3>{opportunity.role ?? 'Rôle à confirmer'}</h3>
+        <div className={styles.opportunityTitle}>
+          <div>
+            <small>{opportunity.company ?? 'À vérifier'}</small>
+            <h3>{opportunity.role ?? 'À vérifier'}</h3>
+          </div>
+          <span className={styles.lifecycle}>
+            <i />
+            {lifecycle}
+          </span>
+        </div>
+        <dl className={styles.jobFacts}>
+          <Fact
+            Icon={Icon}
+            icon="location_on"
+            label="Lieu"
+            value={opportunity.location ?? 'À vérifier'}
+          />
+          <Fact
+            Icon={Icon}
+            icon="home_work"
+            label="Mode"
+            value={remoteCopy(opportunity.remoteMode)}
+          />
+          <Fact
+            Icon={Icon}
+            icon="contract"
+            label="Contrat"
+            value={contractCopy(opportunity.contractType)}
+          />
+          <Fact
+            Icon={Icon}
+            icon="payments"
+            label="Salaire"
+            value={salaryCopy(opportunity)}
+          />
+          <Fact
+            Icon={Icon}
+            icon="dataset_linked"
+            label="Source ATS"
+            value={atsCopy(opportunity.sourceKind)}
+          />
+        </dl>
         <a href={opportunity.sourceUrl} rel="noreferrer" target="_blank">
           <Icon>open_in_new</Icon>Voir l’offre d’origine
         </a>
         <details>
           <summary>
-            <Icon>verified</Icon>Provenance · {opportunity.sources.length}{' '}
-            {opportunity.sources.length > 1 ? 'sources' : 'source'}
+            <Icon>verified</Icon>Provenance et historique ·{' '}
+            {opportunity.observations.length}{' '}
+            {opportunity.observations.length > 1
+              ? 'observations'
+              : 'observation'}
           </summary>
-          <dl>
-            <div>
-              <dt>URL demandée</dt>
-              <dd>
-                <a href={source.requestedUrl} rel="noreferrer" target="_blank">
-                  {host(source.requestedUrl)}
-                </a>
-              </dd>
-            </div>
-            <div>
-              <dt>URL finale</dt>
-              <dd>
-                <a href={source.finalUrl} rel="noreferrer" target="_blank">
-                  {host(source.finalUrl)}
-                </a>
-              </dd>
-            </div>
-            <div>
-              <dt>Consultée</dt>
-              <dd>{formatDate(source.fetchedAt)}</dd>
-            </div>
-            <div>
-              <dt>Empreinte</dt>
-              <dd>
-                <code>{source.sha256.slice(0, 12)}…</code>
-              </dd>
-            </div>
-          </dl>
+          <div className={styles.provenance}>
+            <section>
+              <h4>Source consultée</h4>
+              <dl>
+                <div>
+                  <dt>URL demandée</dt>
+                  <dd>
+                    <a
+                      href={source.requestedUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {host(source.requestedUrl)}
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt>URL finale</dt>
+                  <dd>
+                    <a href={source.finalUrl} rel="noreferrer" target="_blank">
+                      {host(source.finalUrl)}
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Collecteur</dt>
+                  <dd>{sourceKindCopy(source.sourceKind)}</dd>
+                </div>
+                <div>
+                  <dt>Identifiant source</dt>
+                  <dd>{source.externalId ?? 'À vérifier'}</dd>
+                </div>
+                <div>
+                  <dt>Consultée</dt>
+                  <dd>{formatDateTime(source.fetchedAt)}</dd>
+                </div>
+                <div>
+                  <dt>Empreinte</dt>
+                  <dd>
+                    <code>{source.sha256.slice(0, 12)}…</code>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+            <section>
+              <h4>Historique des observations</h4>
+              <ol className={styles.timeline}>
+                {opportunity.observations.map((observation) => (
+                  <li
+                    className={styles[`change-${observation.change}`]}
+                    key={observation.observationId}
+                  >
+                    <i aria-hidden="true" />
+                    <div>
+                      <strong>{observationCopy(observation.change)}</strong>
+                      <time dateTime={observation.observedAt}>
+                        {formatDateTime(observation.observedAt)}
+                      </time>
+                    </div>
+                    <small>
+                      {matchCopy(observation.matchedBy)} ·{' '}
+                      {observation.sha256.slice(0, 8)}…
+                    </small>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </div>
         </details>
       </div>
       <div className={styles.opportunityActions}>
@@ -311,6 +397,30 @@ function OpportunityCard({
         <small>Disponible prochainement</small>
       </div>
     </article>
+  );
+}
+
+function Fact({
+  Icon,
+  icon,
+  label,
+  value,
+}: {
+  Icon: IconComponent;
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <Icon>{icon}</Icon>
+      <span>
+        <dt>{label}</dt>
+        <dd className={value === 'À vérifier' ? styles.unknown : undefined}>
+          {value}
+        </dd>
+      </span>
+    </div>
   );
 }
 
@@ -532,6 +642,100 @@ function formatDate(value: string) {
     month: 'short',
     year: 'numeric',
   }).format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function lifecycleCopy(lifecycle: DiscoveredJob['lifecycle']) {
+  return {
+    open: 'Ouverte',
+    changed: 'Modifiée',
+    closed: 'Fermée',
+    reposted: 'Republiée',
+  }[lifecycle];
+}
+
+function remoteCopy(remoteMode: DiscoveredJob['remoteMode']) {
+  return {
+    unknown: 'À vérifier',
+    onsite: 'Sur site',
+    hybrid: 'Hybride',
+    remote: 'Télétravail',
+  }[remoteMode];
+}
+
+function contractCopy(contractType: DiscoveredJob['contractType']) {
+  return {
+    unknown: 'À vérifier',
+    full_time: 'Temps plein',
+    part_time: 'Temps partiel',
+    internship: 'Stage',
+    contract: 'Contrat',
+    temporary: 'Temporaire',
+  }[contractType];
+}
+
+function salaryCopy(opportunity: DiscoveredJob) {
+  const { salaryMin, salaryMax, salaryCurrency } = opportunity;
+  if (!salaryCurrency || (salaryMin === null && salaryMax === null))
+    return 'À vérifier';
+  const format = (amount: number) =>
+    new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: salaryCurrency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  if (salaryMin !== null && salaryMax !== null)
+    return salaryMin === salaryMax
+      ? format(salaryMin)
+      : `${format(salaryMin)} à ${format(salaryMax)}`;
+  if (salaryMin !== null) return `Dès ${format(salaryMin)}`;
+  return `Jusqu’à ${format(salaryMax!)}`;
+}
+
+function atsCopy(sourceKind: DiscoveredJob['sourceKind']) {
+  return sourceKind === 'generic_html'
+    ? 'À vérifier'
+    : sourceKindCopy(sourceKind);
+}
+
+function sourceKindCopy(sourceKind: DiscoveredJob['sourceKind']) {
+  return {
+    generic_html: 'Page web',
+    greenhouse: 'Greenhouse',
+    ashby: 'Ashby',
+  }[sourceKind];
+}
+
+function observationCopy(
+  change: DiscoveredJob['observations'][number]['change'],
+) {
+  return {
+    first_seen: 'Première observation',
+    unchanged: 'Aucun changement détecté',
+    changed: 'Contenu de l’offre modifié',
+    closed: 'Offre signalée comme fermée',
+    reposted: 'Offre republiée',
+  }[change];
+}
+
+function matchCopy(
+  matchedBy: DiscoveredJob['observations'][number]['matchedBy'],
+) {
+  return {
+    new: 'Nouvelle offre',
+    exact_source: 'Même source',
+    canonical_url: 'Même URL canonique',
+    fingerprint: 'Même empreinte',
+  }[matchedBy];
 }
 
 function importError(status: number) {
