@@ -28,10 +28,22 @@ pnpm db:up
 pnpm dev
 ```
 
-The Compose bootstrap applies every versioned SQL migration in filename order
-when it creates a new database volume. Existing installations must back up the
-database and apply only the newly added migration files, in order, before
-restarting the application. Never replay an already applied migration.
+`pnpm db:up` starts PostgreSQL, then `pnpm db:migrate` verifies migration
+checksums and applies pending migrations under a database lock. Fresh and
+existing installations use this same path.
+
+An installation created before the migration ledger must be baselined once.
+Stop the application and workers, back up PostgreSQL, identify the last SQL
+migration already applied, then run for example:
+
+```bash
+pnpm db:migrate -- --baseline 0022
+```
+
+The baseline verifies the database structure, records migrations through that
+version without replaying them, then applies every newer migration. The first
+ledger release accepts only an exact, complete 0022 schema. It rejects later or
+partially applied untracked states instead of guessing their history.
 
 Publication and saved Career Memory fail closed when `DATABASE_URL` or `BETTER_AUTH_SECRET` is missing.
 

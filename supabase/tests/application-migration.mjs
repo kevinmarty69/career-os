@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import { Client } from 'pg';
 
@@ -49,36 +50,14 @@ try {
       `https://example.com/${'u'.repeat(2_050)}`,
     ],
   );
-  await target.query(
-    await readFile('supabase/migrations/0009_applications.sql', 'utf8'),
-  );
-  await target.query(
-    await readFile('supabase/migrations/0010_url_import_quota.sql', 'utf8'),
-  );
-  await target.query(
-    await readFile(
-      'supabase/migrations/0011_durable_company_researcher.sql',
-      'utf8',
-    ),
-  );
-  await target.query(
-    await readFile(
-      'supabase/migrations/0012_global_company_researcher_worker.sql',
-      'utf8',
-    ),
-  );
-  await target.query(
-    await readFile(
-      'supabase/migrations/0013_durable_evidence_archivist.sql',
-      'utf8',
-    ),
-  );
-  await target.query(
-    await readFile(
-      'supabase/migrations/0014_durable_recruiter_strategist.sql',
-      'utf8',
-    ),
-  );
+  for (let index = 9; index <= 22; index += 1) {
+    const prefix = String(index).padStart(4, '0');
+    const file = (await readdir('supabase/migrations')).find((name) =>
+      name.startsWith(`${prefix}_`),
+    );
+    assert.ok(file, `migration ${prefix} is missing`);
+    await target.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
+  }
 
   const { rows } = await target.query(
     `select id, company, role, raw_text, url
@@ -102,6 +81,74 @@ try {
     role: 'Role',
     raw_text: 'raw',
     url: 'https://example.com/jobs/1',
+  });
+
+  const refused = spawnSync('pnpm', ['exec', 'tsx', 'scripts/migrate.ts'], {
+    cwd: process.cwd(),
+    env: { ...process.env, DATABASE_URL: testUrl.toString() },
+    encoding: 'utf8',
+  });
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /Existing database is untracked/);
+  const wrongBaseline = spawnSync(
+    'pnpm',
+    ['exec', 'tsx', 'scripts/migrate.ts', '--baseline', '0024'],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, DATABASE_URL: testUrl.toString() },
+      encoding: 'utf8',
+    },
+  );
+  assert.equal(wrongBaseline.status, 1);
+  assert.match(
+    wrongBaseline.stderr,
+    /only supported untracked baseline is 0022/,
+  );
+  await target.query(
+    'revoke execute on function app.mint_publication(uuid,bytea,timestamptz) from career_publisher',
+  );
+  const partialBaseline = spawnSync(
+    'pnpm',
+    ['exec', 'tsx', 'scripts/migrate.ts', '--baseline', '0022'],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, DATABASE_URL: testUrl.toString() },
+      encoding: 'utf8',
+    },
+  );
+  assert.equal(partialBaseline.status, 1);
+  assert.match(partialBaseline.stderr, /does not match baseline 0022/);
+  await target.query(
+    'grant execute on function app.mint_publication(uuid,bytea,timestamptz) to career_publisher',
+  );
+  const migrated = spawnSync(
+    'pnpm',
+    ['exec', 'tsx', 'scripts/migrate.ts', '--baseline', '0022'],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, DATABASE_URL: testUrl.toString() },
+      encoding: 'utf8',
+    },
+  );
+  assert.equal(migrated.status, 0, migrated.stderr || migrated.stdout);
+  assert.match(migrated.stdout, /Applied 2 migrations; schema at 0024\./);
+  const rerun = spawnSync('pnpm', ['exec', 'tsx', 'scripts/migrate.ts'], {
+    cwd: process.cwd(),
+    env: { ...process.env, DATABASE_URL: testUrl.toString() },
+    encoding: 'utf8',
+  });
+  assert.equal(rerun.status, 0, rerun.stderr || rerun.stdout);
+  assert.match(rerun.stdout, /Applied 0 migrations; schema at 0024\./);
+  const migratedState = await target.query(
+    `select
+      (select count(*)::integer from public.career_os_schema_migrations) as migration_count,
+      (select bool_and(company_sources = '[]'::jsonb) from app.applications) as applications_defaulted,
+      (select bool_and(company_sources = '[]'::jsonb) from app.opportunities) as opportunities_defaulted`,
+  );
+  assert.deepEqual(migratedState.rows[0], {
+    migration_count: 24,
+    applications_defaulted: true,
+    opportunities_defaulted: true,
   });
 
   await target.query(
@@ -208,7 +255,7 @@ try {
   } finally {
     await Promise.all(concurrentClients.map(({ client }) => client.end()));
   }
-  console.log('application migration and URL import quotas ok');
+  console.log('application upgrade, migration ledger and URL import quotas ok');
 } finally {
   await target?.end();
   if (adminConnected) {
