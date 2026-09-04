@@ -526,15 +526,15 @@ Critères d'acceptation :
 
 ### Lot 1 - Onboarding et mémoire professionnelle
 
-- [ ] Import local de PDF, DOCX, TXT et texte collé.
-- [ ] Extraction structurée des expériences, projets, compétences et résultats.
-- [ ] Écran de validation avant persistance.
-- [ ] Ajout manuel d'une expérience, d'un projet, d'une preuve ou d'une préférence.
-- [ ] Gestion des statuts `verified`, `declared`, `inferred` et `unsupported`.
-- [ ] Sensibilité et usages autorisés par élément.
-- [ ] Fusion des doublons et historique des corrections.
-- [ ] Import guidé du contenu LinkedIn par copie ou export de données.
-- [ ] Indicateur de couverture de la mémoire, expliqué sans score trompeur.
+- [x] Import local de PDF, DOCX, TXT et texte collé.
+- [x] Extraction structurée des expériences, projets, compétences et résultats.
+- [x] Écran de validation avant persistance.
+- [x] Ajout manuel d'une expérience, d'un projet, d'une preuve ou d'une préférence.
+- [x] Gestion des statuts `verified`, `declared`, `inferred` et `unsupported`.
+- [x] Sensibilité et usages autorisés par élément.
+- [x] Fusion des doublons et historique des corrections.
+- [x] Import guidé du contenu LinkedIn par copie ou export de données.
+- [x] Indicateur de couverture de la mémoire, expliqué sans score trompeur.
 
 Critères d'acceptation :
 
@@ -544,13 +544,13 @@ Critères d'acceptation :
 
 ### Lot 2 - Profil de recherche
 
-- [ ] Définition des rôles et séniorités ciblés.
-- [ ] Contraintes de lieu, remote, fuseau, langue, contrat et salaire.
-- [ ] Préférences de stack, secteur, produit, taille et culture.
-- [ ] Listes d'entreprises et réseaux exclus.
-- [ ] Séparation visuelle entre contraintes dures et préférences.
-- [ ] Plusieurs recherches enregistrées pour des objectifs distincts.
-- [ ] Aperçu de l'effet de chaque critère sur les résultats.
+- [x] Définition des rôles et séniorités ciblés.
+- [x] Contraintes de lieu, remote, fuseau, langue, contrat et salaire.
+- [x] Préférences de stack, secteur, produit, taille et culture.
+- [x] Listes d'entreprises et réseaux exclus.
+- [x] Séparation visuelle entre contraintes dures et préférences.
+- [x] Plusieurs recherches enregistrées pour des objectifs distincts.
+- [x] Aperçu de l'effet de chaque critère sur les résultats.
 
 Critères d'acceptation :
 
