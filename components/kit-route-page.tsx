@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationsPage } from '@/components/applications/applications-page';
+import { LocaleSwitch, useLocalizer } from '@/components/i18n/i18n-provider';
 import { CareerMemoryContent } from '@/components/memory/career-memory-content';
+import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
+import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
+import { homeMessages } from '@/lib/i18n/dictionaries/home';
+import { inboxMessages } from '@/lib/i18n/dictionaries/inbox';
+import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
+import { searchProfilesMessages } from '@/lib/i18n/dictionaries/search-profiles';
+import { shellMessages } from '@/lib/i18n/dictionaries/shell';
 
 type Query = Record<string, string | string[] | undefined>;
 type Tone = 'ok' | 'warn' | 'crit' | 'accent' | 'muted';
@@ -57,6 +65,16 @@ const nav = [
   ['/settings/models', 'settings', 'Réglages'],
 ] as const;
 
+const activeFrontMessages = [
+  shellMessages,
+  homeMessages,
+  applicationsMessages,
+  memoryMessages,
+  searchProfilesMessages,
+  inboxMessages,
+  dossierMessages,
+] as const;
+
 export function AppShell({
   path,
   children,
@@ -70,6 +88,7 @@ export function AppShell({
   sidebarContext?: ReactNode;
   sidebarFooter?: ReactNode;
 }) {
+  const localize = useLocalizer(activeFrontMessages);
   const [palette, setPalette] = useState(false);
   const screenNav =
     path === '/assets'
@@ -96,7 +115,7 @@ export function AppShell({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-  return (
+  return localize(
     <main className={`co-shell${aside ? ' has-aside' : ''}`}>
       <aside className="co-sidebar" aria-label="Navigation principale">
         <Link className="co-brand" href="/">
@@ -106,6 +125,7 @@ export function AppShell({
           <strong>Career OS</strong>
           <Icon>unfold_more</Icon>
         </Link>
+        <LocaleSwitch />
         <nav>
           {screenNav.map(([href, icon, label]) => (
             <Link
@@ -164,12 +184,16 @@ export function AppShell({
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
       {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
-    </main>
+      <div className="co-mobile-locale">
+        <LocaleSwitch compact />
+      </div>
+    </main>,
   );
 }
 
 function CurrentApplications() {
-  return (
+  const localize = useLocalizer([shellMessages]);
+  return localize(
     <>
       <p className="co-nav-label">En cours</p>
       <div className="co-current-list">
@@ -189,12 +213,13 @@ function CurrentApplications() {
           <Icon>autorenew</Icon>
         </Link>
       </div>
-    </>
+    </>,
   );
 }
 
 function InstanceCard() {
-  return (
+  const localize = useLocalizer([shellMessages]);
+  return localize(
     <div className="co-instance">
       <Icon>cloud_done</Icon>
       <strong>Instance saine</strong>
@@ -203,12 +228,13 @@ function InstanceCard() {
         <br />
         dernière sauvegarde 03:00
       </small>
-    </div>
+    </div>,
   );
 }
 
 function CommandPalette({ onClose }: { onClose: () => void }) {
-  return (
+  const localize = useLocalizer([shellMessages]);
+  return localize(
     <div className="co-scrim" role="presentation" onMouseDown={onClose}>
       <section
         className="co-command"
@@ -284,7 +310,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
           <b>recherche dans 128 preuves</b>
         </footer>
       </section>
-    </div>
+    </div>,
   );
 }
 
@@ -361,7 +387,8 @@ function ClaimRow({
 }
 
 function HomeAside() {
-  return (
+  const localize = useLocalizer([homeMessages]);
+  return localize(
     <div className="co-home-aside">
       <section className="co-home-memory-card">
         <header>
@@ -463,7 +490,7 @@ function HomeAside() {
           <Icon>more_vert</Icon>
         </Link>
       </section>
-    </div>
+    </div>,
   );
 }
 
@@ -611,6 +638,7 @@ function ApplicationsScreen() {
 }
 
 function DossierNav({ active }: { active: string }) {
+  const localize = useLocalizer([dossierMessages]);
   const items = [
     ['assignment', 'Brief', ''],
     ['business', 'Entreprise', 'company'],
@@ -620,7 +648,7 @@ function DossierNav({ active }: { active: string }) {
     ['groups', 'Contacts', ''],
     ['history', 'Versions', 'versions'],
   ];
-  return (
+  return localize(
     <aside className="co-dossier-nav">
       <Link href="/applications">
         <Icon>arrow_back</Icon>Toutes les candidatures
@@ -636,7 +664,7 @@ function DossierNav({ active }: { active: string }) {
           {label}
         </Link>
       ))}
-    </aside>
+    </aside>,
   );
 }
 
@@ -649,7 +677,8 @@ function DossierShell({
   children: ReactNode;
   state?: ReactNode;
 }) {
-  return (
+  const localize = useLocalizer(activeFrontMessages);
+  return localize(
     <main className="co-dossier-shell">
       <DossierNav active={active} />
       <section>
@@ -665,6 +694,7 @@ function DossierShell({
               </strong>
             </span>
           </div>
+          <LocaleSwitch compact />
           {state ?? <Badge tone="warn">À valider</Badge>}
           <Button>
             <Icon>bolt</Icon>Relancer les agents
@@ -672,7 +702,7 @@ function DossierShell({
         </header>
         {children}
       </section>
-    </main>
+    </main>,
   );
 }
 

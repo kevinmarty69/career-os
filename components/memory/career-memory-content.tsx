@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
 import type { Profile } from '@/lib/schemas';
 import { useCareerMemory } from './use-career-memory';
 
@@ -29,6 +31,8 @@ const useLabels = {
 } as const;
 
 export function CareerMemoryContent() {
+  const { locale } = useI18n();
+  const localize = useLocalizer([memoryMessages]);
   const memory = useCareerMemory();
   const [expanded, setExpanded] = useState<string>();
   const [showManual, setShowManual] = useState(false);
@@ -94,13 +98,13 @@ export function CareerMemoryContent() {
   }
 
   if (memory.state === 'loading')
-    return (
+    return localize(
       <p className="co-memory-status" role="status">
         Chargement de la mémoire…
-      </p>
+      </p>,
     );
 
-  return (
+  return localize(
     <>
       {memory.message ? (
         <p className="co-memory-status" role="status">
@@ -327,7 +331,7 @@ export function CareerMemoryContent() {
                 <div key={item.revision}>
                   <dt>Révision {item.revision}</dt>
                   <dd>
-                    {new Intl.DateTimeFormat('fr-FR', {
+                    {new Intl.DateTimeFormat(locale, {
                       dateStyle: 'short',
                       timeStyle: 'short',
                     }).format(new Date(item.createdAt))}
@@ -338,7 +342,7 @@ export function CareerMemoryContent() {
           </footer>
         </aside>
       </div>
-    </>
+    </>,
   );
 }
 
@@ -353,7 +357,8 @@ function ClaimEditor({
   const evidence = memory.profile.evidence.filter(({ id }) =>
     claim.evidenceIds.includes(id),
   );
-  return (
+  const localize = useLocalizer([memoryMessages]);
+  return localize(
     <section className="co-memory-provenance">
       <div className="co-memory-edit-grid">
         <label>
@@ -531,7 +536,7 @@ function ClaimEditor({
           </button>
         </div>
       )}
-    </section>
+    </section>,
   );
 }
 

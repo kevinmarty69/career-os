@@ -132,6 +132,10 @@ La version auto-hébergée fournit le cœur du produit, sans être volontairemen
 
 ## 6. Parcours principal
 
+L'interface est en anglais par défaut. Le français est disponible depuis un
+sélecteur global et le choix persiste entre les visites. Les futures captures
+du journal build in public sont produites en anglais.
+
 ```text
 Création de la mémoire professionnelle
                  ↓

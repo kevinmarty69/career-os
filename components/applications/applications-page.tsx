@@ -22,6 +22,8 @@ import {
   opportunityListResponseSchema,
   type DiscoveredJob,
 } from '@/lib/discovered-job-contract';
+import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import styles from './applications-page.module.css';
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -252,9 +254,11 @@ function OpportunityCard({
   Icon: IconComponent;
   opportunity: DiscoveredJob;
 }) {
+  const { locale } = useI18n();
+  const localize = useLocalizer([applicationsMessages]);
   const source = opportunity.sources[0];
   const lifecycle = lifecycleCopy(opportunity.lifecycle);
-  return (
+  return localize(
     <article
       className={`${styles.opportunityCard} ${styles[`lifecycle-${opportunity.lifecycle}`]}`}
     >
@@ -295,7 +299,7 @@ function OpportunityCard({
             Icon={Icon}
             icon="payments"
             label="Salaire"
-            value={salaryCopy(opportunity)}
+            value={salaryCopy(opportunity, locale)}
           />
           <Fact
             Icon={Icon}
@@ -349,7 +353,7 @@ function OpportunityCard({
                 </div>
                 <div>
                   <dt>Consultée</dt>
-                  <dd>{formatDateTime(source.fetchedAt)}</dd>
+                  <dd>{formatDateTime(source.fetchedAt, locale)}</dd>
                 </div>
                 <div>
                   <dt>Empreinte</dt>
@@ -371,7 +375,7 @@ function OpportunityCard({
                     <div>
                       <strong>{observationCopy(observation.change)}</strong>
                       <time dateTime={observation.observedAt}>
-                        {formatDateTime(observation.observedAt)}
+                        {formatDateTime(observation.observedAt, locale)}
                       </time>
                     </div>
                     <small>
@@ -386,7 +390,7 @@ function OpportunityCard({
         </details>
       </div>
       <div className={styles.opportunityActions}>
-        <span>Découverte {formatDate(opportunity.firstSeenAt)}</span>
+        <span>Découverte {formatDate(opportunity.firstSeenAt, locale)}</span>
         <button
           disabled
           title="La promotion vers une candidature sera ajoutée dans une prochaine tranche."
@@ -396,7 +400,7 @@ function OpportunityCard({
         </button>
         <small>Disponible prochainement</small>
       </div>
-    </article>
+    </article>,
   );
 }
 
@@ -411,7 +415,8 @@ function Fact({
   label: string;
   value: string;
 }) {
-  return (
+  const localize = useLocalizer([applicationsMessages]);
+  return localize(
     <div>
       <Icon>{icon}</Icon>
       <span>
@@ -420,7 +425,7 @@ function Fact({
           {value}
         </dd>
       </span>
-    </div>
+    </div>,
   );
 }
 
@@ -431,6 +436,8 @@ function ApplicationRow({
   Icon: IconComponent;
   application: Application;
 }) {
+  const { locale } = useI18n();
+  const localize = useLocalizer([applicationsMessages]);
   const stage = {
     draft: 'Brouillon',
     applied: 'Envoyée',
@@ -438,7 +445,7 @@ function ApplicationRow({
     offer: 'Offre reçue',
     closed: 'Clôturée',
   }[application.stage];
-  return (
+  return localize(
     <Link
       className={styles.applicationRow}
       href={`/applications/${application.applicationId}`}
@@ -452,10 +459,10 @@ function ApplicationRow({
       </div>
       <span className={styles.stage}>{stage}</span>
       <time dateTime={application.updatedAt}>
-        {formatDate(application.updatedAt)}
+        {formatDate(application.updatedAt, locale)}
       </time>
       <Icon>chevron_right</Icon>
-    </Link>
+    </Link>,
   );
 }
 
@@ -468,6 +475,7 @@ function ImportDialog({
   onClose: () => void;
   onImported: (opportunity: DiscoveredJob) => void;
 }) {
+  const localize = useLocalizer([applicationsMessages]);
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
@@ -498,7 +506,7 @@ function ImportDialog({
     }
   }
 
-  return (
+  return localize(
     <div
       className={styles.scrim}
       onMouseDown={(event) => {
@@ -570,7 +578,7 @@ function ImportDialog({
           </footer>
         </form>
       </section>
-    </div>
+    </div>,
   );
 }
 
@@ -589,7 +597,8 @@ function EmptyState({
   action?: string;
   onAction?: () => void;
 }) {
-  return (
+  const localize = useLocalizer([applicationsMessages]);
+  return localize(
     <div className={styles.empty}>
       <span>
         <Icon>{icon}</Icon>
@@ -603,12 +612,13 @@ function EmptyState({
           {action}
         </button>
       ) : null}
-    </div>
+    </div>,
   );
 }
 
 function LoadingRows({ label }: { label: string }) {
-  return (
+  const localize = useLocalizer([applicationsMessages]);
+  return localize(
     <div
       aria-label={label}
       aria-live="polite"
@@ -618,7 +628,7 @@ function LoadingRows({ label }: { label: string }) {
       <span />
       <span />
       <span />
-    </div>
+    </div>,
   );
 }
 
@@ -636,16 +646,16 @@ function host(url: string) {
   return new URL(url).hostname.replace(/^www\./, '');
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('fr-FR', {
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   }).format(new Date(value));
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('fr-FR', {
+function formatDateTime(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -683,12 +693,12 @@ function contractCopy(contractType: DiscoveredJob['contractType']) {
   }[contractType];
 }
 
-function salaryCopy(opportunity: DiscoveredJob) {
+function salaryCopy(opportunity: DiscoveredJob, locale: string) {
   const { salaryMin, salaryMax, salaryCurrency } = opportunity;
   if (!salaryCurrency || (salaryMin === null && salaryMax === null))
     return 'À vérifier';
   const format = (amount: number) =>
-    new Intl.NumberFormat('fr-FR', {
+    new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: salaryCurrency,
       maximumFractionDigits: 0,
@@ -696,9 +706,10 @@ function salaryCopy(opportunity: DiscoveredJob) {
   if (salaryMin !== null && salaryMax !== null)
     return salaryMin === salaryMax
       ? format(salaryMin)
-      : `${format(salaryMin)} à ${format(salaryMax)}`;
-  if (salaryMin !== null) return `Dès ${format(salaryMin)}`;
-  return `Jusqu’à ${format(salaryMax!)}`;
+      : `${format(salaryMin)}${locale === 'fr' ? ' à ' : ' to '}${format(salaryMax)}`;
+  if (salaryMin !== null)
+    return `${locale === 'fr' ? 'Dès' : 'From'} ${format(salaryMin)}`;
+  return `${locale === 'fr' ? 'Jusqu’à' : 'Up to'} ${format(salaryMax!)}`;
 }
 
 function atsCopy(sourceKind: DiscoveredJob['sourceKind']) {

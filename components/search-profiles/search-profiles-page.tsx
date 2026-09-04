@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useLocalizer } from '@/components/i18n/i18n-provider';
 import { AppShell, Icon } from '@/components/kit-route-page';
+import { searchProfilesMessages } from '@/lib/i18n/dictionaries/search-profiles';
 import {
   createSearchProfile,
   deleteSearchProfile,
@@ -33,6 +35,7 @@ const criterionOptions: Array<[PreviewCriterion, string]> = [
 ];
 
 export function SearchProfilesPage() {
+  const localize = useLocalizer([searchProfilesMessages]);
   const [profiles, setProfiles] = useState<SearchProfile[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const [draft, setDraft] = useState<SearchProfileFields>(() => freshProfile());
@@ -178,7 +181,7 @@ export function SearchProfilesPage() {
     }
   }
 
-  return (
+  return localize(
     <AppShell
       path="/search-profiles"
       sidebarContext={
@@ -315,7 +318,7 @@ export function SearchProfilesPage() {
           </section>
         </div>
       </div>
-    </AppShell>
+    </AppShell>,
   );
 }
 
@@ -326,6 +329,7 @@ function HardConstraints({
   draft: SearchProfileFields;
   onChange: (next: SearchProfileFields) => void;
 }) {
+  const localize = useLocalizer([searchProfilesMessages]);
   const setHard = <Key extends keyof SearchProfileFields['hardConstraints']>(
     key: Key,
     value: SearchProfileFields['hardConstraints'][Key],
@@ -334,7 +338,7 @@ function HardConstraints({
       ...draft,
       hardConstraints: { ...draft.hardConstraints, [key]: value },
     });
-  return (
+  return localize(
     <section className={`${styles.criteria} ${styles.hard}`}>
       <SectionHeading
         icon="block"
@@ -448,7 +452,7 @@ function HardConstraints({
           </div>
         </div>
       </div>
-    </section>
+    </section>,
   );
 }
 
@@ -459,6 +463,7 @@ function SoftPreferences({
   draft: SearchProfileFields;
   onChange: (next: SearchProfileFields) => void;
 }) {
+  const localize = useLocalizer([searchProfilesMessages]);
   const setSoft = <Key extends keyof SearchProfileFields['softPreferences']>(
     key: Key,
     value: string[],
@@ -467,7 +472,7 @@ function SoftPreferences({
       ...draft,
       softPreferences: { ...draft.softPreferences, [key]: value },
     });
-  return (
+  return localize(
     <section className={`${styles.criteria} ${styles.soft}`}>
       <SectionHeading
         icon="sort"
@@ -507,7 +512,7 @@ function SoftPreferences({
           placeholder="Ownership, équipe produit"
         />
       </div>
-    </section>
+    </section>,
   );
 }
 
@@ -518,6 +523,7 @@ function Exclusions({
   draft: SearchProfileFields;
   onChange: (next: SearchProfileFields) => void;
 }) {
+  const localize = useLocalizer([searchProfilesMessages]);
   const setHard = (
     key: 'excludedCompanies' | 'excludedNetworks',
     value: string[],
@@ -526,7 +532,7 @@ function Exclusions({
       ...draft,
       hardConstraints: { ...draft.hardConstraints, [key]: value },
     });
-  return (
+  return localize(
     <section className={`${styles.criteria} ${styles.exclusions}`}>
       <SectionHeading
         icon="visibility_off"
@@ -548,7 +554,7 @@ function Exclusions({
           placeholder="Réseau de fondateurs, ancien employeur"
         />
       </div>
-    </section>
+    </section>,
   );
 }
 
@@ -557,6 +563,7 @@ function CriterionSimulator({
 }: {
   hard: SearchProfileFields['hardConstraints'];
 }) {
+  const localize = useLocalizer([searchProfilesMessages]);
   const [criterion, setCriterion] = useState<PreviewCriterion>('role');
   const [value, setValue] = useState('');
   const result = useMemo(
@@ -568,7 +575,7 @@ function CriterionSimulator({
     blocked: 'Bloqué',
     unknown: 'Inconnu',
   }[result.state];
-  return (
+  return localize(
     <section className={styles.simulator}>
       <SectionHeading
         icon="rule"
@@ -627,7 +634,7 @@ function CriterionSimulator({
           ) : null}
         </output>
       </div>
-    </section>
+    </section>,
   );
 }
 
@@ -667,7 +674,8 @@ function ListField({
   onChange: (next: string[]) => void;
   placeholder: string;
 }) {
-  return (
+  const localize = useLocalizer([searchProfilesMessages]);
+  return localize(
     <label className={styles.listField}>
       <span>{label}</span>
       <input
@@ -677,7 +685,7 @@ function ListField({
         value={value.join(', ')}
       />
       <small>Séparez les valeurs par une virgule.</small>
-    </label>
+    </label>,
   );
 }
 
@@ -692,7 +700,8 @@ function CheckGroup({
   value: readonly string[];
   onChange: (next: string[]) => void;
 }) {
-  return (
+  const localize = useLocalizer([searchProfilesMessages]);
+  return localize(
     <fieldset className={styles.checkGroup}>
       <legend>{label}</legend>
       <div>
@@ -713,7 +722,7 @@ function CheckGroup({
           </label>
         ))}
       </div>
-    </fieldset>
+    </fieldset>,
   );
 }
 

@@ -5,6 +5,7 @@ import { readProfile, readProfileHistory, saveProfile } from '@/lib/career-api';
 import { memoryCoverage, mergeDuplicateClaims } from '@/lib/career-memory';
 import { profileSchema, type Profile } from '@/lib/schemas';
 import type { ProfileRevisionSummary } from '@/lib/server/profile';
+import { useI18n } from '@/components/i18n/i18n-provider';
 
 const emptyProfile: Profile = {
   name: '',
@@ -15,6 +16,7 @@ const emptyProfile: Profile = {
 };
 
 export function useCareerMemory() {
+  const { locale } = useI18n();
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [revision, setRevision] = useState(0);
   const [history, setHistory] = useState<ProfileRevisionSummary[]>([]);
@@ -115,8 +117,12 @@ export function useCareerMemory() {
     setProfile(merged.profile);
     setMessage(
       merged.mergedCount
-        ? `${merged.mergedCount} doublon${merged.mergedCount > 1 ? 's' : ''} fusionné${merged.mergedCount > 1 ? 's' : ''}. Enregistrez pour confirmer.`
-        : 'Aucun doublon sûr à fusionner.',
+        ? locale === 'fr'
+          ? `${merged.mergedCount} doublon${merged.mergedCount > 1 ? 's' : ''} fusionné${merged.mergedCount > 1 ? 's' : ''}. Enregistrez pour confirmer.`
+          : `${merged.mergedCount} duplicate${merged.mergedCount > 1 ? 's' : ''} merged. Save to confirm.`
+        : locale === 'fr'
+          ? 'Aucun doublon sûr à fusionner.'
+          : 'No safe duplicate to merge.',
     );
   }
 

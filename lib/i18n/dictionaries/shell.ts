@@ -1,0 +1,41 @@
+import type { MessageDictionary } from '../messages';
+
+export const shellMessages = {
+  Accueil: 'Home',
+  'À trancher': 'Needs review',
+  Candidatures: 'Applications',
+  'Mémoire pro': 'Career memory',
+  'Profils de recherche': 'Search profiles',
+  Entretiens: 'Interviews',
+  'Liens privés': 'Private links',
+  Réglages: 'Settings',
+  'Navigation principale': 'Main navigation',
+  'Chercher une preuve, une entreprise, une affirmation…':
+    'Search evidence, a company, or a claim…',
+  Aide: 'Help',
+  Notifications: 'Notifications',
+  'Ingénieur plateforme': 'Platform engineer',
+  'En cours': 'In progress',
+  'Auto-hébergé · 3 workers': 'Self-hosted · 3 workers',
+  'dernière sauvegarde 03:00': 'last backup at 03:00',
+  'Instance saine': 'Instance healthy',
+  'Palette de commandes': 'Command palette',
+  'Chercher une preuve, une entreprise, une action…':
+    'Search evidence, a company, or an action…',
+  'Preuves · 3': 'Evidence · 3',
+  'corvid_postmortem.md · §4 · vérifiée':
+    'corvid_postmortem.md · §4 · verified',
+  'Cache de build partagé entre 340 services':
+    'Shared build cache across 340 services',
+  'Temps de build divisé par deux': 'Build time cut in half',
+  'déclaré · en conflit avec la source': 'declared · conflicts with the source',
+  'Candidatures · 2': 'Applications · 2',
+  'Nimbus Robotics — cite ce chiffre': 'Nimbus Robotics — cites this figure',
+  'Staff Product Engineer · publiée': 'Staff Product Engineer · published',
+  'Fathom — appariement en cours': 'Fathom — matching in progress',
+  'Nouvelle candidature depuis une URL': 'New application from a URL',
+  'Importer un document dans la mémoire':
+    'Import a document into career memory',
+  '↵ ouvrir': '↵ open',
+  'recherche dans 128 preuves': 'searching 128 evidence items',
+} as const satisfies MessageDictionary;

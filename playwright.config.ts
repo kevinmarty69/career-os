@@ -14,7 +14,25 @@ export default defineConfig({
       CAREER_OS_E2E: '1',
     },
   },
-  use: { baseURL: 'http://localhost:3117', trace: 'retain-on-failure' },
+  use: {
+    baseURL: 'http://localhost:3117',
+    storageState: {
+      cookies: [
+        {
+          name: 'career-os-locale',
+          value: 'fr',
+          domain: 'localhost',
+          path: '/',
+          expires: -1,
+          httpOnly: false,
+          secure: false,
+          sameSite: 'Lax',
+        },
+      ],
+      origins: [],
+    },
+    trace: 'retain-on-failure',
+  },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     {

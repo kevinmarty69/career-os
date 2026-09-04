@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRef, useState, type DragEvent } from 'react';
+import { LocaleSwitch, useLocalizer } from '@/components/i18n/i18n-provider';
+import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
 import styles from './memory-import-flow.module.css';
 import {
   allowedUseLabels,
@@ -56,7 +58,8 @@ function Brand() {
 }
 
 function AppChrome({ children }: { children: React.ReactNode }) {
-  return (
+  const localize = useLocalizer([memoryMessages]);
+  return localize(
     <main className={styles.canvas}>
       <a className={styles.skipLink} href="#memory-import-content">
         Aller à l’import
@@ -77,6 +80,7 @@ function AppChrome({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+          <LocaleSwitch compact />
           <section className={styles.setup} aria-labelledby="setup-title">
             <h2 id="setup-title">Mise en route</h2>
             <ol>
@@ -105,6 +109,7 @@ function AppChrome({ children }: { children: React.ReactNode }) {
 
         <header className={styles.mobileHeader}>
           <Brand />
+          <LocaleSwitch compact />
           <Link href="/memory" aria-label="Fermer l’import">
             <Icon>close</Icon>
           </Link>
@@ -127,7 +132,7 @@ function AppChrome({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
       </section>
-    </main>
+    </main>,
   );
 }
 
@@ -186,6 +191,7 @@ function ErrorBanner({ message }: { message: string }) {
 }
 
 function SourceStep({ controller }: { controller: Controller }) {
+  const localize = useLocalizer([memoryMessages]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const canReadPaste = controller.pasteText.trim().length > 0;
@@ -201,7 +207,7 @@ function SourceStep({ controller }: { controller: Controller }) {
     chooseFile(event.dataTransfer.files);
   }
 
-  return (
+  return localize(
     <>
       <PageHeading
         copy="Importez une source. Vous déciderez ensuite ce qui entre réellement dans votre mémoire."
@@ -328,12 +334,13 @@ function SourceStep({ controller }: { controller: Controller }) {
           </ul>
         </aside>
       </div>
-    </>
+    </>,
   );
 }
 
 function ReadingStep({ controller }: { controller: Controller }) {
-  return (
+  const localize = useLocalizer([memoryMessages]);
+  return localize(
     <>
       <PageHeading
         copy="L’extraction s’exécute localement. La durée dépend du document et de votre appareil."
@@ -366,11 +373,12 @@ function ReadingStep({ controller }: { controller: Controller }) {
           sont pas mesurables de façon fiable pendant la lecture locale.
         </p>
       </aside>
-    </>
+    </>,
   );
 }
 
 function ReviewStep({ controller }: { controller: Controller }) {
+  const localize = useLocalizer([memoryMessages]);
   const review = controller.review;
   if (!review) return null;
   const selectedCount = review.candidates.filter(
@@ -378,7 +386,7 @@ function ReviewStep({ controller }: { controller: Controller }) {
   ).length;
   const saving = controller.stage === 'saving';
 
-  return (
+  return localize(
     <>
       <PageHeading
         copy="Corrigez les formulations, la catégorie, la confidentialité et les usages avant l’enregistrement."
@@ -547,7 +555,7 @@ function ReviewStep({ controller }: { controller: Controller }) {
           </section>
         </aside>
       </div>
-    </>
+    </>,
   );
 }
 
@@ -573,6 +581,7 @@ function CandidateEditor({
   ) => void;
 }) {
   const [open, setOpen] = useState(index === 0);
+  const localize = useLocalizer([memoryMessages]);
   const statementId = `statement-${candidate.id}`;
 
   function toggleUse(use: AllowedUse) {
@@ -582,7 +591,7 @@ function CandidateEditor({
     onChange({ allowedUses: uses });
   }
 
-  return (
+  return localize(
     <article
       className={`${styles.candidate} ${candidate.selected ? '' : styles.unselected}`}
     >
@@ -703,12 +712,13 @@ function CandidateEditor({
           </details>
         </div>
       ) : null}
-    </article>
+    </article>,
   );
 }
 
 function SavedStep() {
-  return (
+  const localize = useLocalizer([memoryMessages]);
+  return localize(
     <section className={styles.savedPanel}>
       <span className={styles.savedIcon}>
         <Icon>check</Icon>
@@ -727,6 +737,6 @@ function SavedStep() {
           Ajouter une autre source
         </Link>
       </div>
-    </section>
+    </section>,
   );
 }

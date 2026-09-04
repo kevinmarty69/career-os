@@ -15,6 +15,66 @@
   --shadow-sm: 0 1px 2px rgb(24 24 27 / 5%);
 }
 
+.co-locale-switch {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border: 1px solid var(--co-border, #dedee5);
+  border-radius: 999px;
+  background: var(--co-surface, #fff);
+  gap: 2px;
+}
+
+.co-locale-switch button {
+  min-width: 34px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--co-text-3, #72727d);
+  background: transparent;
+  font: 700 0.7rem/1 var(--font-mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.co-locale-switch button.active {
+  color: #fff;
+  background: var(--co-text, #17171d);
+}
+
+.co-locale-switch button:focus-visible {
+  outline: 3px solid
+    color-mix(in srgb, var(--co-accent, #5847e8) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.co-locale-switch.compact button {
+  min-width: 30px;
+  min-height: 28px;
+}
+
+.co-sidebar > .co-locale-switch {
+  margin: -4px 8px 8px;
+}
+
+.co-mobile-locale {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .co-mobile-locale {
+    position: fixed;
+    z-index: 80;
+    right: 14px;
+    bottom: 14px;
+    display: block;
+    padding: 2px;
+    border-radius: 999px;
+    box-shadow: 0 8px 30px rgb(21 22 28 / 16%);
+  }
+}
+
 /* Career OS handoff kit v1.0 — shared chrome for A2-A33. */
 .co-shell,
 .co-dossier-shell,

@@ -80,17 +80,24 @@
 }
 
 .sidebar {
+  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;
   padding: 24px 16px;
 }
 
+.sidebar > :global(.co-locale-switch) {
+  position: absolute;
+  top: 25px;
+  right: 16px;
+}
+
 .brand {
   display: flex;
   gap: 11px;
   align-items: center;
-  padding: 0 10px 30px;
+  padding: 0 88px 30px 10px;
   color: var(--ink);
   font-size: 17px;
   font-weight: 750;
