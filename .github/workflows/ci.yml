@@ -31,6 +31,7 @@ jobs:
       - run: pnpm build
       - run: pnpm db:up
       - run: pnpm db:test
+      - run: pnpm test:integration:http
       - run: pnpm test:integration:correction
       - run: docker build -f Dockerfile.page-composer -t career-os-page-composer:test .
       - run: pnpm audit --prod --audit-level high

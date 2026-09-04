@@ -117,12 +117,14 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         (${otherTenantId}, ${otherOwnerId}, ${secret})`;
       await transaction`insert into app.applications (
         id, tenant_id, company, role, raw_text, accent, create_idempotency_key,
-        create_input_hash, deleted_at
+        create_input_hash, created_at, deleted_at
       ) values
         (${applicationId}, ${tenantId}, 'Visible Co', 'Engineer', 'visible application',
-          '#21504b', ${randomUUID()}, ${'a'.repeat(64)}, now()),
+          '#21504b', ${randomUUID()}, ${'a'.repeat(64)},
+          '2026-01-02 03:04:05.123456+00'::timestamptz, now()),
         (${otherApplicationId}, ${otherTenantId}, ${secret}, 'Engineer', ${secret},
-          '#21504b', ${randomUUID()}, ${'b'.repeat(64)}, null)`;
+          '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
+          '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
       await transaction`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role, raw_text,
         extraction_status

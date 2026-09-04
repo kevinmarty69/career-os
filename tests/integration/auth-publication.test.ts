@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { createServer } from 'node:http';
 import { Pool } from 'pg';
-import { latestPageSpec, runAgentTeam } from '../../lib/agent-runtime';
 import { syntheticProfile } from '../../lib/fixture';
+import { LocalOpenAIReviewClient } from '../../lib/server/local-openai-review-client';
+import { processReviewerStep } from '../../lib/server/reviewer-worker';
 import type { PersistedRun } from '../../lib/run-contract';
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
@@ -108,67 +110,254 @@ async function expectStatus(
 }
 
 async function makeRunPublishable(run: PersistedRun, tenantId: string) {
-  const demo = await runAgentTeam({
-    tenantId,
-    runId: run.runId,
-    profile: run.profile,
-    opportunity,
-    costBudgetMicros: 0,
-  });
-  const spec = latestPageSpec(demo);
-  assert.ok(spec);
-  const claimIds = [
-    ...new Set(
-      spec.blocks.flatMap((block) =>
-        'claimIds' in block ? block.claimIds : [],
-      ),
-    ),
-  ];
-  assert.ok(claimIds.length > 0);
+  const claim = run.profile.claims.find(
+    ({ evidenceIds }) => evidenceIds.length,
+  );
+  assert.ok(claim);
+  const claimIds = [claim.id];
+  const spec = {
+    version: 1 as const,
+    company: {
+      name: opportunity.company,
+      role: opportunity.role,
+      accent: opportunity.accent,
+    },
+    hero: {
+      eyebrow: 'Private application',
+      title: `${run.profile.name} × ${opportunity.company}`,
+      thesis: claim.statement,
+    },
+    blocks: [
+      {
+        type: 'fit' as const,
+        title: 'Relevant experience',
+        claimIds,
+      },
+    ],
+  };
 
+  const suffix =
+    process.env.CAREER_OS_HTTP_TEST_SUFFIX ??
+    randomUUID().replaceAll('-', '').slice(0, 12);
   const database = new Pool({ connectionString: databaseUrl });
   const client = await database.connect();
+  const credentials = {
+    recruiter: workerCredential(`publication_recruiter_${suffix}`),
+    hiringManager: workerCredential(`publication_hiring_${suffix}`),
+    factuality: workerCredential(`publication_factuality_${suffix}`),
+  };
+  const fake = createServer((request, response) => {
+    request.resume();
+    request.on('end', () => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          id: randomUUID(),
+          choices: [
+            {
+              message: { content: JSON.stringify({ issues: [] }) },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: {
+            prompt_tokens: 30,
+            completion_tokens: 10,
+            total_tokens: 40,
+          },
+        }),
+      );
+    });
+  });
   try {
+    for (const [credential, role] of [
+      [credentials.recruiter, 'career_recruiter_reviewer'],
+      [credentials.hiringManager, 'career_hiring_manager_reviewer'],
+      [credentials.factuality, 'career_factuality_reviewer'],
+    ] as const)
+      await client.query(
+        `create role ${credential.login} login noinherit password '${credential.password}' in role ${role}`,
+      );
     await client.query('begin');
-    const pageSpec = await client.query<{ id: string; spec_hash: string }>(
+    const strategyArtifactId = randomUUID();
+    const strategyApprovalId = randomUUID();
+    const strategy = await client.query<{ artifact_hash: string }>(
+      `insert into app.artifacts (
+         id, tenant_id, workflow_run_id, kind, version, body, created_by
+       ) values ($1, $2, $3, 'strategy', 1, '{}'::jsonb, 'recruiter')
+       returning encode(digest(body::text, 'sha256'), 'hex') artifact_hash`,
+      [strategyArtifactId, tenantId, run.runId],
+    );
+    await client.query(
+      `insert into app.strategy_approvals (
+         id, tenant_id, workflow_run_id, strategy_artifact_id,
+         strategy_artifact_hash, idempotency_key, approved_by
+       ) select $1, $2, $3, $4, $5, $6, owner_id
+         from app.tenants where id = $2`,
+      [
+        strategyApprovalId,
+        tenantId,
+        run.runId,
+        strategyArtifactId,
+        strategy.rows[0].artifact_hash,
+        randomUUID(),
+      ],
+    );
+    const pageArtifactId = randomUUID();
+    const pageSpecId = randomUUID();
+    await client.query(
+      `insert into app.artifacts (
+         id, tenant_id, workflow_run_id, kind, version, body, created_by
+       ) values ($1, $2, $3, 'page_spec', 1, $4, 'page_composer')`,
+      [pageArtifactId, tenantId, run.runId, spec],
+    );
+    await client.query(
       `insert into app.page_specs (
-         tenant_id, workflow_run_id, version, spec, input_hash
-       ) values ($1, $2, 1, $3, $4)
-       returning id, spec_hash`,
-      [tenantId, run.runId, spec, 'test-fixture'],
+         id, tenant_id, workflow_run_id, version, spec, input_hash,
+         source_artifact_id
+       ) values ($1, $2, $3, 1, $4, repeat('a', 64), $5)`,
+      [pageSpecId, tenantId, run.runId, spec, pageArtifactId],
     );
     for (const claimId of claimIds)
       await client.query(
         `insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id)
          values ($1, $2, $3)`,
-        [tenantId, pageSpec.rows[0].id, claimId],
+        [tenantId, pageSpecId, claimId],
       );
-    for (const reviewer of ['recruiter', 'hiring_manager', 'factuality'])
-      await client.query(
-        `insert into app.reviews (
-           tenant_id, page_spec_id, reviewer, verdict, issues, page_spec_hash
-         ) values ($1, $2, $3, 'pass', '[]', $4)`,
-        [tenantId, pageSpec.rows[0].id, reviewer, pageSpec.rows[0].spec_hash],
-      );
+    await client.query(
+      `insert into app.page_spec_evidence (
+         tenant_id, page_spec_id, claim_id, evidence_id, position
+       ) select link.tenant_id, $2, link.claim_id, link.evidence_id, link.position
+         from app.claim_evidence link
+         where link.tenant_id = $1 and link.claim_id = any($3::uuid[])`,
+      [tenantId, pageSpecId, claimIds],
+    );
     await client.query(
       `update app.workflow_steps set status = 'cancelled'
        where tenant_id = $1 and workflow_run_id = $2 and status = 'pending'`,
       [tenantId, run.runId],
     );
     await client.query(
-      `update app.workflow_runs set status = 'awaiting_approval',
-         state = 'human_approval'
+      `insert into app.workflow_steps (
+         tenant_id, workflow_run_id, stage, status, idempotency_key,
+         input, input_hash, output_artifact_id, page_spec_id, completed_at
+       ) values ($1, $2, 'page-composer', 'completed', 'publication-fixture',
+         $3, encode(digest($3::jsonb::text, 'sha256'), 'hex'), $4, $5, now())`,
+      [
+        tenantId,
+        run.runId,
+        {
+          schemaVersion: 1,
+          strategyArtifactId,
+          strategyArtifactHash: strategy.rows[0].artifact_hash,
+          strategyApprovalId,
+        },
+        pageArtifactId,
+        pageSpecId,
+      ],
+    );
+    await client.query(
+      `update app.workflow_runs set status = 'paused', state = 'page_spec_review'
        where tenant_id = $1 and id = $2`,
       [tenantId, run.runId],
     );
+    const owner = await client.query<{ owner_id: string }>(
+      'select owner_id from app.tenants where id = $1',
+      [tenantId],
+    );
+    await client.query(
+      `select set_config('request.jwt.claim.sub', $1, true),
+        set_config('request.jwt.claim.tenant_id', $2, true)`,
+      [owner.rows[0].owner_id, tenantId],
+    );
+    await client.query('set local role career_app');
+    await client.query('select app.start_page_spec_reviews($1,$2,$3)', [
+      tenantId,
+      run.runId,
+      randomUUID(),
+    ]);
     await client.query('commit');
+
+    await new Promise<void>((resolve) => fake.listen(0, '127.0.0.1', resolve));
+    const address = fake.address();
+    assert(address && typeof address !== 'string');
+    const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+    assert.equal(
+      (
+        await processReviewerStep({
+          reviewer: 'recruiter',
+          databaseUrl: credentials.recruiter.url,
+          client: new LocalOpenAIReviewClient({
+            reviewer: 'recruiter',
+            baseUrl,
+            apiKey: 'local-test',
+            model: 'fake-reviewer',
+          }),
+        })
+      ).status,
+      'completed',
+    );
+    assert.equal(
+      (
+        await processReviewerStep({
+          reviewer: 'hiring-manager',
+          databaseUrl: credentials.hiringManager.url,
+          client: new LocalOpenAIReviewClient({
+            reviewer: 'hiring-manager',
+            baseUrl,
+            apiKey: 'local-test',
+            model: 'fake-reviewer',
+          }),
+        })
+      ).status,
+      'completed',
+    );
+    assert.equal(
+      (
+        await processReviewerStep({
+          reviewer: 'factuality',
+          databaseUrl: credentials.factuality.url,
+        })
+      ).status,
+      'completed',
+    );
+    const reviewState = await client.query<{
+      status: string;
+      state: string;
+      review_count: number;
+    }>(
+      `select run.status, run.state,
+        (select count(*)::integer from app.reviews review
+          where review.workflow_run_id = run.id) review_count
+       from app.workflow_runs run where run.id = $1`,
+      [run.runId],
+    );
+    assert.deepEqual(reviewState.rows[0], {
+      status: 'awaiting_approval',
+      state: 'human_approval',
+      review_count: 3,
+    });
   } catch (error) {
-    await client.query('rollback');
+    await client.query('rollback').catch(() => undefined);
     throw error;
   } finally {
+    await new Promise<void>((resolve) => fake.close(() => resolve())).catch(
+      () => undefined,
+    );
     client.release();
+    for (const credential of Object.values(credentials))
+      await database
+        .query(`drop role if exists ${credential.login}`)
+        .catch(() => undefined);
     await database.end();
   }
+}
+
+function workerCredential(login: string) {
+  const password = `worker-${randomUUID()}`;
+  const url = new URL(databaseUrl!);
+  url.username = login;
+  url.password = password;
+  return { login, password, url: url.toString() };
 }
 
 async function main() {
@@ -294,6 +483,17 @@ async function main() {
     applicationId: string;
     revision: number;
   };
+  const heartbeat = new Pool({ connectionString: databaseUrl });
+  try {
+    await heartbeat.query('begin');
+    await heartbeat.query('set local role career_company_researcher');
+    await heartbeat.query(
+      "select app.record_worker_heartbeat('company-researcher')",
+    );
+    await heartbeat.query('commit');
+  } finally {
+    await heartbeat.end();
+  }
   const runResponse = await owner.post(
     '/api/runs',
     {

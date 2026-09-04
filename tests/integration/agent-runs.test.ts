@@ -13,6 +13,8 @@ const requestOrigin = process.env.TEST_REQUEST_ORIGIN ?? baseUrl;
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required.');
 const suffix = randomUUID();
+const livingProfile = structuredClone(syntheticProfile);
+for (const claim of livingProfile.claims) claim.level = 'declared';
 
 class BrowserSession {
   private readonly cookies = new Map<string, string>();
@@ -141,7 +143,7 @@ async function main() {
   }
 
   const saved = await owner.request('/api/profile', 'PUT', {
-    profile: syntheticProfile,
+    profile: livingProfile,
     expectedRevision: 0,
   });
   await expectStatus(saved, 200, 'saved Career Memory');
@@ -382,10 +384,11 @@ async function main() {
       review_count: '0',
       usage_count: '0',
       step_input: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         company: 'Northstar Labs',
         role: 'Senior Product Engineer',
         description: 'Ship dependable product workflows.',
+        companySources: [],
         source: {
           kind: 'job-posting',
           url: 'https://jobs.example.test/product-engineer',

@@ -15,6 +15,7 @@
     "test:integration:worker": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/*worker.test.ts",
     "test:integration:correction": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/page-correction-worker.test.ts",
     "test:integration:export": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/workspace-export.test.ts",
+    "test:integration:http": "node scripts/run-http-integration-tests.mjs",
     "worker": "tsx scripts/run-agent-worker.ts",
     "worker:company-researcher": "tsx scripts/run-agent-worker.ts",
     "worker:evidence": "tsx scripts/run-evidence-worker.ts",

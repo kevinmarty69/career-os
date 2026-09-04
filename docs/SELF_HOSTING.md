@@ -135,12 +135,15 @@ For a durable host, use the units in [`deploy/systemd`](../deploy/systemd). They
 pnpm check
 pnpm build
 pnpm db:test
+pnpm test:integration:http
 pnpm test:integration:worker
 pnpm exec playwright install chromium
 pnpm test:e2e
 ```
 
 `pnpm db:test` exercises migrations, RLS, capability security, tenant isolation, budgets, durable concurrency, reviews, and worker heartbeats. Run it against the disposable Compose database, never a production database.
+
+`pnpm test:integration:http` starts the production build on port 3019 and runs the application, workflow and private-publication HTTP contracts against it.
 
 ## Security notes
 
