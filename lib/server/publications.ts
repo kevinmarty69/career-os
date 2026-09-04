@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
 import {
+  decodePublicationCursor,
+  encodePublicationCursor,
   publicationInputSchema,
+  publicationSummarySchema,
   publishedPayloadSchema,
 } from './publication-input';
 
@@ -14,6 +17,19 @@ export type PublicationSession = {
 };
 
 export class PublicationRejectedError extends Error {}
+
+type PublicationSummaryRow = {
+  publication_id: string;
+  application_id: string;
+  company: string;
+  role: string;
+  published_at: string;
+  revoked_at: Date | null;
+  expires_at: Date | null;
+  status: 'active' | 'expired' | 'revoked';
+};
+
+const PUBLICATION_PAGE_SIZE = 50;
 
 function database() {
   const url = process.env.DATABASE_URL;
@@ -93,6 +109,48 @@ export async function mintPublication(
       return publication.id;
     });
     return { publicationId, rawToken, expiresAt: expiresAt.toISOString() };
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function listPublications(
+  session: PublicationSession,
+  rawCursor: string | null,
+) {
+  const cursor = decodePublicationCursor(rawCursor);
+  if (cursor === null)
+    throw new PublicationRejectedError('Invalid publication cursor.');
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session);
+      const rows = await tx<PublicationSummaryRow[]>`
+        select * from app.list_publications(
+          ${cursor?.publishedAt ?? null}::timestamptz,
+          ${cursor?.publicationId ?? null}::uuid,
+          ${PUBLICATION_PAGE_SIZE + 1}
+        )`;
+      const page = rows.slice(0, PUBLICATION_PAGE_SIZE).map((row) =>
+        publicationSummarySchema.parse({
+          publicationId: row.publication_id,
+          applicationId: row.application_id,
+          company: row.company,
+          role: row.role,
+          publishedAt: row.published_at,
+          revokedAt: row.revoked_at?.toISOString() ?? null,
+          expiresAt: row.expires_at?.toISOString() ?? null,
+          status: row.status,
+        }),
+      );
+      return {
+        publications: page,
+        nextCursor:
+          rows.length > PUBLICATION_PAGE_SIZE && page.length
+            ? encodePublicationCursor(page.at(-1)!)
+            : null,
+      };
+    });
   } finally {
     await sql.end();
   }

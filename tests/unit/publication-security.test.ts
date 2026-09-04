@@ -12,7 +12,10 @@ import {
   readBoundedJson,
 } from '../../lib/server/http';
 import {
+  decodePublicationCursor,
+  encodePublicationCursor,
   publicationInputSchema,
+  publicationSummarySchema,
   publishedPayloadSchema,
 } from '../../lib/server/publication-input';
 import {
@@ -157,6 +160,32 @@ test('published payload remains independently readable', () => {
     publishedPayloadSchema.parse({ profile: syntheticProfile, spec }),
     { profile: syntheticProfile, spec },
   );
+});
+
+test('publication inventory exposes metadata without capabilities', () => {
+  const summary = {
+    publicationId: randomUUID(),
+    applicationId: randomUUID(),
+    company: 'Northstar Labs',
+    role: 'Senior Product Engineer',
+    publishedAt: new Date().toISOString(),
+    revokedAt: null,
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    status: 'active' as const,
+  };
+  assert.deepEqual(publicationSummarySchema.parse(summary), summary);
+  assert.equal(
+    publicationSummarySchema.safeParse({ ...summary, rawToken: 'secret' })
+      .success,
+    false,
+  );
+  const cursor = encodePublicationCursor(summary);
+  assert.deepEqual(decodePublicationCursor(cursor), {
+    publicationId: summary.publicationId,
+    publishedAt: summary.publishedAt,
+  });
+  assert.equal(decodePublicationCursor('not-json'), null);
+  assert.equal(decodePublicationCursor('x'.repeat(513)), null);
 });
 
 test('JSON reader stops an oversized streamed body', async () => {
