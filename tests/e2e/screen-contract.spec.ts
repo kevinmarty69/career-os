@@ -8,7 +8,7 @@ const screens = [
     'L’opérabilité par une petite équipe, pas la performance brute.',
   ],
   ['/applications/nimbus/review', '3 modifications proposées'],
-  ['/memory/import', 'Constituer votre mémoire'],
+  ['/memory/import', 'Lecture de votre CV'],
   [
     '/applications/nimbus/page',
     'Faire tenir une flotte de 12 000 robots sur une plateforme opérable par trois personnes.',
@@ -79,6 +79,7 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
     '/memory/interview',
     '/interviews/demo',
     '/assets',
+    '/memory/import',
     '/settings/billing',
     '/settings/integrations',
     '/settings/data',
@@ -93,6 +94,25 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
       expect(overflows).toBe(false);
     });
   }
+});
+
+test('shows a traceable CV import state before human validation', async ({
+  page,
+}) => {
+  await page.goto('/memory/import');
+  await expect(
+    page.getByRole('progressbar', { name: 'Progression de l’import' }),
+  ).toHaveAttribute('value', '64');
+  await expect(
+    page.getByText('Vous relirez tout avant validation'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Extraction en direct' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('citation directe', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('à confirmer', { exact: true })).toBeVisible();
 });
 
 test('shows the privacy-safe expired-link screen', async ({ page }) => {
