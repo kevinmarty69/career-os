@@ -1,5 +1,5 @@
-import { CareerWorkspace } from '@/components/career-workspace';
+import { KitRoutePage } from '@/components/kit-route-page';
 
 export default function Home() {
-  return <CareerWorkspace />;
+  return <KitRoutePage path="/" query={{}} />;
 }

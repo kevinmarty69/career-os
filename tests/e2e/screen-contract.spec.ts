@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const screens = [
+  ['/', 'Trois affirmations à trancher avant d’envoyer votre page privée.'],
   ['/memory', 'Mémoire professionnelle'],
   ['/applications', 'Candidatures'],
   [
@@ -71,6 +72,7 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   for (const route of [
+    '/',
     '/applications/nimbus',
     '/applications/nimbus/review',
     '/applications/nimbus/page',
@@ -94,6 +96,22 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
       expect(overflows).toBe(false);
     });
   }
+});
+
+test('navigates from memory to the kit home without reviving the legacy shell', async ({
+  page,
+}) => {
+  await page.goto('/memory');
+  await page.getByRole('link', { name: 'Accueil', exact: true }).click();
+
+  await expect(page).toHaveURL('/');
+  await expect(
+    page.getByRole('heading', {
+      name: 'Trois affirmations à trancher avant d’envoyer votre page privée.',
+    }),
+  ).toBeVisible();
+  await expect(page.locator('main.co-shell')).toBeVisible();
+  await expect(page.locator('.app-shell')).toHaveCount(0);
 });
 
 test('shows a traceable CV import state before human validation', async ({

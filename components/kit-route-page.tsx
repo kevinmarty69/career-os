@@ -124,6 +124,40 @@ function AppShell({
         {sidebarFooter === undefined ? <InstanceCard /> : sidebarFooter}
       </aside>
       <section className="co-surface">
+        {path === '/' ? (
+          <header className="co-home-topbar">
+            <button
+              className="co-home-search"
+              onClick={() => setPalette(true)}
+              type="button"
+            >
+              <Icon>search</Icon>
+              <span>Chercher une preuve, une entreprise, une affirmation…</span>
+              <kbd>⌘K</kbd>
+            </button>
+            <div>
+              <button className="co-round" aria-label="Aide" type="button">
+                <Icon>help</Icon>
+              </button>
+              <button
+                className="co-round"
+                aria-label="Notifications"
+                type="button"
+              >
+                <Icon>notifications</Icon>
+                <i />
+              </button>
+              <span className="co-home-user">
+                <i>MA</i>
+                <span>
+                  <strong>Marc Aubry</strong>
+                  <small>Ingénieur plateforme</small>
+                </span>
+                <Icon>expand_more</Icon>
+              </span>
+            </div>
+          </header>
+        ) : null}
         <div className="co-content">{children}</div>
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
@@ -321,6 +355,212 @@ function ClaimRow({
       <strong>{text}</strong>
       {action ? <Button quiet>{action}</Button> : null}
     </article>
+  );
+}
+
+function HomeAside() {
+  return (
+    <div className="co-home-aside">
+      <section className="co-home-memory-card">
+        <header>
+          <h2>Mémoire pro</h2>
+          <button aria-label="Options de la mémoire" type="button">
+            <Icon>more_horiz</Icon>
+          </button>
+        </header>
+        <div className="co-home-donut">
+          <svg
+            aria-label="92 pour cent de la mémoire est sourcée"
+            role="img"
+            viewBox="0 0 120 120"
+          >
+            <circle cx="60" cy="60" fill="none" r="45" strokeWidth="14" />
+            <circle
+              className="accent"
+              cx="60"
+              cy="60"
+              fill="none"
+              pathLength="100"
+              r="45"
+              strokeDasharray="72 28"
+              strokeWidth="14"
+            />
+            <circle
+              className="ok"
+              cx="60"
+              cy="60"
+              fill="none"
+              pathLength="100"
+              r="45"
+              strokeDasharray="20 80"
+              strokeDashoffset="-72"
+              strokeWidth="14"
+            />
+          </svg>
+          <span>
+            <strong>92 %</strong>
+            <small>sourcé</small>
+          </span>
+        </div>
+        <dl>
+          <div>
+            <dt>
+              <i className="accent" /> Documents importés
+            </dt>
+            <dd>92</dd>
+          </div>
+          <div>
+            <dt>
+              <i className="ok" /> Vérifiées par agent
+            </dt>
+            <dd>26</dd>
+          </div>
+          <div>
+            <dt>
+              <i /> Sans source
+            </dt>
+            <dd>10</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="co-home-responses">
+        <header>
+          <h2>Réponses reçues</h2>
+          <span>6 dernières sem.</span>
+        </header>
+        <div aria-label="Réponses reçues sur six semaines" role="img">
+          {[32, 49, 41, 61, 52, 74].map((height, index) => (
+            <span key={height}>
+              <i style={{ height: `${height}%` }} />
+              <small>S{30 + index}</small>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="co-home-links">
+        <header>
+          <h2>Liens privés actifs</h2>
+          <Link href="/links">Tout voir</Link>
+        </header>
+        <Link href="/applications/nimbus">
+          <Icon>visibility</Icon>
+          <span>
+            <strong>/p/8f2c-nimbus</strong>
+            <small>4 vues · expire le 12 oct.</small>
+          </span>
+          <Icon>more_vert</Icon>
+        </Link>
+        <Link href="/applications/atlas">
+          <Icon>visibility_off</Icon>
+          <span>
+            <strong>/p/1a77-atlas</strong>
+            <small>Jamais ouvert</small>
+          </span>
+          <Icon>more_vert</Icon>
+        </Link>
+      </section>
+    </div>
+  );
+}
+
+function HomeScreen() {
+  return (
+    <AppShell
+      aside={<HomeAside />}
+      path="/"
+      sidebarFooter={
+        <div className="co-home-hosting">
+          <strong>Auto-hébergé</strong>
+          <span>Vos preuves ne quittent pas votre instance.</span>
+          <Link href="/settings/models">Voir la config</Link>
+        </div>
+      }
+    >
+      <section className="co-home-hero">
+        <p>Revue humaine · Nimbus Robotics</p>
+        <h1>
+          Trois affirmations à trancher avant d’envoyer votre page privée.
+        </h1>
+        <span>
+          Les agents ont terminé leur passe à 14:03. Un chiffre dépasse ce que
+          votre preuve démontre.
+        </span>
+        <div>
+          <Link className="co-button dark" href="/applications/nimbus/review">
+            Ouvrir la revue <Icon>arrow_forward</Icon>
+          </Link>
+          <Link className="co-button transparent" href="/runs">
+            Voir le journal
+          </Link>
+        </div>
+      </section>
+
+      <section className="co-home-stats" aria-label="Indicateurs principaux">
+        <Stat icon="work_history" value="14 actives" label="Candidatures" />
+        <Stat
+          icon="verified"
+          tone="ok"
+          value="118 / 128 sourcées"
+          label="Affirmations"
+        />
+        <Stat
+          icon="trending_up"
+          tone="warn"
+          value="38 % de réponses"
+          label="Performance"
+        />
+      </section>
+
+      <section className="co-home-review-queue">
+        <header>
+          <h2>À trancher</h2>
+          <div>
+            <button aria-label="Décision précédente" disabled type="button">
+              <Icon>chevron_left</Icon>
+            </button>
+            <button aria-label="Décision suivante" type="button">
+              <Icon>chevron_right</Icon>
+            </button>
+          </div>
+        </header>
+        <article className="co-home-review-card">
+          <Icon>shield</Icon>
+          <div>
+            <header>
+              <h3>Le chiffre dépasse la preuve</h3>
+              <Badge tone="warn">Ouverture</Badge>
+            </header>
+            <p>
+              L’agent a écrit « réduit de <strong>42 %</strong> le temps de
+              build ». Votre post-mortem mesure 11 → 7 minutes, soit environ{' '}
+              <strong>35 %</strong>.
+            </p>
+            <Link href="/memory">
+              <Icon>description</Icon>
+              <code>corvid_postmortem.md · §4</code>
+              <span>Ouvrir</span>
+            </Link>
+            <footer>
+              <button type="button">Utiliser 11 → 7 min</button>
+              <button type="button">Garder ma version</button>
+            </footer>
+          </div>
+        </article>
+        <article className="co-home-review-card compact">
+          <Icon>link_off</Icon>
+          <div>
+            <h3>Affirmation sans preuve rattachée</h3>
+            <p>
+              « Divisé les coûts d’infrastructure par deux » · section Preuves
+              détaillées.
+            </p>
+          </div>
+          <Link href="/memory">Rattacher</Link>
+        </article>
+      </section>
+    </AppShell>
   );
 }
 
@@ -3590,6 +3830,7 @@ function KitNotFound() {
 }
 
 export function KitRoutePage({ path, query }: { path: string; query: Query }) {
+  if (path === '/') return <HomeScreen />;
   if (path === '/memory') return <MemoryScreen />;
   if (path === '/applications') return <ApplicationsScreen />;
   if (/^\/applications\/[^/]+$/.test(path))
