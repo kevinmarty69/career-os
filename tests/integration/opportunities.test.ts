@@ -401,6 +401,13 @@ async function main() {
   );
   const searchProfileInput = {
     name: 'Senior engineering search',
+    discoverySources: [
+      {
+        company: 'Nimbus',
+        url: 'https://jobs.ashbyhq.com/nimbus',
+      },
+    ],
+    discoveryIntervalHours: 12,
     alertThreshold: 80,
     active: true,
     hardConstraints: {
@@ -431,10 +438,12 @@ async function main() {
   await expectStatus(createSearchProfile, 201, 'search profile create');
   const searchProfile = (await createSearchProfile.json()) as {
     searchProfileId: string;
+    discoveryIntervalHours: number;
     alertThreshold: number | null;
     revision: number;
   };
   assert.equal(searchProfile.alertThreshold, 80);
+  assert.equal(searchProfile.discoveryIntervalHours, 12);
   const matchPath = `/api/opportunities/${connected.opportunity.opportunityId}/match`;
   await expectStatus(
     await owner.browser.request(

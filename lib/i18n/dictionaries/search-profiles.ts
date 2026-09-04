@@ -43,6 +43,20 @@ export const searchProfilesMessages = {
   'Seuil d’alerte': 'Alert threshold',
   Désactivé: 'Disabled',
   'Signal humain, en %': 'Human feedback signal, %',
+  'Découverte planifiée': 'Scheduled discovery',
+  'Surveillez des tableaux publics Greenhouse ou Ashby. Aucun service payant n’est requis.':
+    'Monitor public Greenhouse or Ashby boards. No paid service is required.',
+  Automatique: 'Automatic',
+  Fréquence: 'Frequency',
+  'Fréquence de découverte': 'Discovery frequency',
+  'Toutes les 6 heures': 'Every 6 hours',
+  'Toutes les 12 heures': 'Every 12 hours',
+  'Chaque jour': 'Daily',
+  'Tous les 3 jours': 'Every 3 days',
+  'Ajouter un tableau': 'Add board',
+  'URL du tableau public': 'Public board URL',
+  'Aucun tableau surveillé. Ajoutez l’URL racine d’un tableau public.':
+    'No board is monitored. Add the root URL of a public board.',
   'Profil actif': 'Active profile',
   'Profil enregistré.': 'Profile saved.',
   'Les changements ne sont pas automatiques.':

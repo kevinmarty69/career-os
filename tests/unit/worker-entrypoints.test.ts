@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import packageJson from '../../package.json';
 
-test('exposes seven isolated production worker entrypoints', () => {
+test('exposes isolated production worker entrypoints', () => {
   const expected = {
     'worker:company-researcher': 'tsx scripts/run-agent-worker.ts',
     'worker:evidence-archivist': 'tsx scripts/run-evidence-worker.ts',
     'worker:recruiter-strategist': 'tsx scripts/run-strategy-worker.ts',
     'worker:page-composer': 'tsx scripts/run-page-composer-worker.ts',
+    'worker:job-discovery':
+      'NODE_OPTIONS=--conditions=react-server tsx scripts/run-discovery-worker.ts',
     'worker:recruiter-reviewer':
       'CAREER_OS_REVIEWER=recruiter tsx scripts/run-reviewer-worker.ts',
     'worker:hiring-manager-reviewer':

@@ -81,7 +81,11 @@ export function ApplicationPublicationCheckpoint({
               )}
             </span>
             <div>
-              <button disabled={Boolean(pending)} onClick={onNewVersion} type="button">
+              <button
+                disabled={Boolean(pending)}
+                onClick={onNewVersion}
+                type="button"
+              >
                 Préparer une nouvelle version
               </button>
               <button

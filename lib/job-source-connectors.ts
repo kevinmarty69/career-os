@@ -20,6 +20,15 @@ export type JobConnectorTarget = {
   posting: string;
 };
 
+export type JobBoardTarget = Pick<
+  JobConnectorTarget,
+  'sourceKind' | 'board' | 'fetchUrl'
+> & { pageUrl: string };
+
+export type ConnectedBoardJob = ConnectedJob & {
+  pageUrl: string;
+};
+
 export type ConnectedJob = {
   extraction: JobPostingExtraction;
   normalized: NormalizedJobFields;
@@ -57,6 +66,9 @@ const greenhouseJobSchema = z
       .max(20)
       .optional(),
   })
+  .passthrough();
+const greenhouseBoardSchema = z
+  .object({ jobs: z.array(greenhouseJobSchema).max(5_000) })
   .passthrough();
 
 const ashbySalarySchema = z
@@ -140,6 +152,80 @@ export function resolveJobConnector(rawUrl: string): JobConnectorTarget | null {
   return null;
 }
 
+export function resolveJobBoard(rawUrl: string): JobBoardTarget | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) return null;
+  url.hash = '';
+  const parts = url.pathname.split('/').filter(Boolean);
+  const host = url.hostname.toLowerCase();
+  if (
+    ['boards.greenhouse.io', 'job-boards.greenhouse.io'].includes(host) &&
+    parts.length === 1
+  ) {
+    const [board] = parts;
+    return {
+      sourceKind: 'greenhouse',
+      board,
+      pageUrl: url.href,
+      fetchUrl: `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(board)}/jobs?content=true&pay_transparency=true`,
+    };
+  }
+  if (host === 'jobs.ashbyhq.com' && parts.length === 1) {
+    const [board] = parts;
+    return {
+      sourceKind: 'ashby',
+      board,
+      pageUrl: url.href,
+      fetchUrl: `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(board)}?includeCompensation=true`,
+    };
+  }
+  return null;
+}
+
+export function parseJobBoard(
+  target: JobBoardTarget,
+  payload: string,
+): ConnectedBoardJob[] {
+  let json: unknown;
+  try {
+    json = JSON.parse(payload);
+  } catch {
+    throw new JobConnectorError();
+  }
+  if (target.sourceKind === 'greenhouse') {
+    const parsed = greenhouseBoardSchema.safeParse(json);
+    if (!parsed.success) throw new JobConnectorError();
+    return parsed.data.jobs.map((job) => {
+      const pageUrl =
+        job.absolute_url ??
+        `https://job-boards.greenhouse.io/${encodeURIComponent(target.board)}/jobs/${job.id}`;
+      return {
+        ...parseGreenhouse(
+          {
+            ...target,
+            pageUrl,
+            externalId: `${target.board}:${job.id}`,
+            posting: String(job.id),
+          },
+          job,
+        ),
+        pageUrl,
+      };
+    });
+  }
+  const parsed = ashbyBoardSchema.safeParse(json);
+  if (!parsed.success) throw new JobConnectorError();
+  return parsed.data.jobs.map((job) => ({
+    ...parseAshbyJob(target.board, job),
+    pageUrl: job.jobUrl,
+  }));
+}
+
 export function parseJobConnector(
   target: JobConnectorTarget,
   payload: string,
@@ -219,7 +305,13 @@ function parseAshby(target: JobConnectorTarget, value: unknown): ConnectedJob {
     );
   });
   if (candidates.length !== 1) throw new JobConnectorError();
-  const job = candidates[0];
+  return parseAshbyJob(target.board, candidates[0]);
+}
+
+function parseAshbyJob(
+  board: string,
+  job: z.infer<typeof ashbyJobSchema>,
+): ConnectedJob {
   const description =
     job.descriptionPlain?.trim() ||
     (job.descriptionHtml
@@ -241,7 +333,7 @@ function parseAshby(target: JobConnectorTarget, value: unknown): ConnectedJob {
       salaryCurrency: salary?.currency ?? null,
       salaryPeriod: salary ? 'year' : 'unknown',
       publishedAt: job.publishedAt ?? null,
-      externalId: target.externalId,
+      externalId: `${board}:${new URL(job.jobUrl).pathname.split('/').filter(Boolean).at(-1)}`,
       sourceKind: 'ashby',
       lifecycleSignal: job.isListed === false ? 'closed' : 'open',
     }),

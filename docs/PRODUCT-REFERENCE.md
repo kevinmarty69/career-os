@@ -566,7 +566,7 @@ Critères d'acceptation :
 
 - [x] Import direct d'une URL d'annonce.
 - [x] Connecteurs initiaux pour plusieurs ATS publics et sites carrière.
-- [ ] Recherche planifiée selon les profils enregistrés.
+- [x] Recherche planifiée selon les profils enregistrés.
 - [x] Normalisation des postes, lieux, contrats, salaires et dates.
 - [x] Déduplication multi-source.
 - [x] Détection des modifications et fermetures.

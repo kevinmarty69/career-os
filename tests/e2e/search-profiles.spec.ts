@@ -3,6 +3,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 type StoredProfile = {
   searchProfileId: string;
   name: string;
+  discoverySources: Array<{ company: string; url: string }>;
+  discoveryIntervalHours: 6 | 12 | 24 | 72;
   alertThreshold: number | null;
   active: boolean;
   hardConstraints: Record<string, unknown>;
@@ -27,6 +29,12 @@ test('creates multiple profiles and explains deterministic hard-criterion effect
   ).toBeVisible();
 
   await page.getByLabel('Nom du profil').fill('Product Europe');
+  await page.getByRole('button', { name: 'Ajouter un tableau' }).click();
+  await page.getByLabel('Entreprise source 1').fill('Nimbus');
+  await page
+    .getByLabel('URL du tableau source 1')
+    .fill('https://jobs.ashbyhq.com/nimbus');
+  await page.getByLabel('Fréquence de découverte').selectOption('12');
   await page.getByLabel('Seuil d’alerte').fill('75');
   await page.getByLabel('Rôles').fill('Product Engineer, Software Engineer');
   await page.getByRole('button', { name: 'Enregistrer le profil' }).click();
@@ -54,6 +62,9 @@ test('creates multiple profiles and explains deterministic hard-criterion effect
   expect(
     stored.find(({ name }) => name === 'Product Europe')?.alertThreshold,
   ).toBe(75);
+  expect(
+    stored.find(({ name }) => name === 'Product Europe')?.discoverySources,
+  ).toEqual([{ company: 'Nimbus', url: 'https://jobs.ashbyhq.com/nimbus' }]);
 });
 
 test('keeps the search profile editor inside a mobile viewport', async ({

@@ -40,6 +40,8 @@ const profile: SearchProfile = {
     companySizes: [],
     cultures: [],
   },
+  discoverySources: [],
+  discoveryIntervalHours: 24,
   alertThreshold: null,
   active: true,
   revision: 2,

@@ -20,6 +20,8 @@ type SearchProfileRow = {
   name: string;
   hard_constraints: unknown;
   soft_preferences: unknown;
+  discovery_sources: unknown;
+  discovery_interval_hours: number;
   alert_threshold: number | null;
   active: boolean;
   revision: string;
@@ -39,8 +41,9 @@ export async function listSearchProfiles(session: PublicationSession) {
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const rows = await tx<SearchProfileRow[]>`
-        select id, name, hard_constraints, soft_preferences, alert_threshold,
-          active, revision, created_at, updated_at
+        select id, name, hard_constraints, soft_preferences, discovery_sources,
+          discovery_interval_hours, alert_threshold, active, revision,
+          created_at, updated_at
         from app.search_profiles
         where tenant_id = ${session.tenantId}
         order by active desc, updated_at desc, id desc
@@ -74,13 +77,17 @@ export async function createSearchProfile(
         const [created] = await tx<SearchProfileRow[]>`
           insert into app.search_profiles (
             tenant_id, name, hard_constraints, soft_preferences,
-            alert_threshold, active
+            discovery_sources, discovery_interval_hours, alert_threshold,
+            active, next_discovery_at
           ) values (
             ${session.tenantId}, ${input.name}, ${tx.json(input.hardConstraints)},
-            ${tx.json(input.softPreferences)}, ${input.alertThreshold},
-            ${input.active}
+            ${tx.json(input.softPreferences)}, ${tx.json(input.discoverySources)},
+            ${input.discoveryIntervalHours}, ${input.alertThreshold}, ${input.active},
+            case when ${input.active && input.discoverySources.length > 0}
+              then clock_timestamp() else null end
           ) returning id, name, hard_constraints, soft_preferences,
-            alert_threshold, active, revision, created_at, updated_at`;
+            discovery_sources, discovery_interval_hours, alert_threshold,
+            active, revision, created_at, updated_at`;
         return projection(created);
       } catch (error) {
         if (postgresErrorCode(error) === '23505')
@@ -105,8 +112,9 @@ export async function readSearchProfile(
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [row] = await tx<SearchProfileRow[]>`
-        select id, name, hard_constraints, soft_preferences, alert_threshold,
-          active, revision, created_at, updated_at
+        select id, name, hard_constraints, soft_preferences, discovery_sources,
+          discovery_interval_hours, alert_threshold, active, revision,
+          created_at, updated_at
         from app.search_profiles
         where tenant_id = ${session.tenantId} and id = ${searchProfileId}`;
       return row ? projection(row) : undefined;
@@ -128,8 +136,9 @@ export async function updateSearchProfile(
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [existing] = await tx<SearchProfileRow[]>`
-        select id, name, hard_constraints, soft_preferences, alert_threshold,
-          active, revision, created_at, updated_at
+        select id, name, hard_constraints, soft_preferences, discovery_sources,
+          discovery_interval_hours, alert_threshold, active, revision,
+          created_at, updated_at
         from app.search_profiles
         where tenant_id = ${session.tenantId} and id = ${searchProfileId}
         for update`;
@@ -145,12 +154,20 @@ export async function updateSearchProfile(
             name = ${input.name},
             hard_constraints = ${tx.json(input.hardConstraints)},
             soft_preferences = ${tx.json(input.softPreferences)},
+            discovery_sources = ${tx.json(input.discoverySources)},
+            discovery_interval_hours = ${input.discoveryIntervalHours},
             alert_threshold = ${input.alertThreshold},
             active = ${input.active},
+            next_discovery_at = case
+              when ${input.active} and ${input.discoverySources.length > 0}
+                then least(coalesce(next_discovery_at, clock_timestamp()), clock_timestamp())
+              else null
+            end,
             revision = revision + 1
           where tenant_id = ${session.tenantId} and id = ${searchProfileId}
           returning id, name, hard_constraints, soft_preferences,
-            alert_threshold, active, revision, created_at, updated_at`;
+            discovery_sources, discovery_interval_hours, alert_threshold,
+            active, revision, created_at, updated_at`;
         return projection(updated);
       } catch (error) {
         if (postgresErrorCode(error) === '23505')
@@ -199,6 +216,8 @@ function projection(row: SearchProfileRow): SearchProfile {
     name: row.name,
     hardConstraints: searchHardConstraintsSchema.parse(row.hard_constraints),
     softPreferences: searchSoftPreferencesSchema.parse(row.soft_preferences),
+    discoverySources: row.discovery_sources,
+    discoveryIntervalHours: row.discovery_interval_hours,
     alertThreshold: row.alert_threshold,
     active: row.active,
     revision: Number(row.revision),
@@ -214,6 +233,9 @@ function sameFields(
   return (
     row.name === input.name &&
     row.active === input.active &&
+    JSON.stringify(row.discovery_sources) ===
+      JSON.stringify(input.discoverySources) &&
+    row.discovery_interval_hours === input.discoveryIntervalHours &&
     row.alert_threshold === input.alertThreshold &&
     JSON.stringify(searchHardConstraintsSchema.parse(row.hard_constraints)) ===
       JSON.stringify(input.hardConstraints) &&

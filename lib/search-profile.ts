@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { resolveJobBoard } from './job-source-connectors';
 
 const boundedLabel = z.string().trim().min(1).max(120);
 const boundedLabels = z.array(boundedLabel).max(30);
@@ -11,6 +12,24 @@ export const contractTypeSchema = z.enum([
   'internship',
 ]);
 export const salaryCurrencySchema = z.enum(['EUR', 'USD', 'GBP']);
+export const discoverySourceSchema = z
+  .object({
+    company: boundedLabel,
+    url: z
+      .string()
+      .url()
+      .max(2_048)
+      .refine((value) => resolveJobBoard(value) !== null, {
+        message: 'Only public Greenhouse and Ashby board URLs are supported.',
+      }),
+  })
+  .strict();
+export const discoveryIntervalHoursSchema = z.union([
+  z.literal(6),
+  z.literal(12),
+  z.literal(24),
+  z.literal(72),
+]);
 
 export const searchHardConstraintsSchema = z
   .object({
@@ -48,6 +67,8 @@ export const searchProfileFieldsSchema = z
     name: z.string().trim().min(1).max(120),
     hardConstraints: searchHardConstraintsSchema,
     softPreferences: searchSoftPreferencesSchema,
+    discoverySources: z.array(discoverySourceSchema).max(10).default([]),
+    discoveryIntervalHours: discoveryIntervalHoursSchema.default(24),
     alertThreshold: z.number().int().min(0).max(100).nullable().default(null),
     active: z.boolean(),
   })
@@ -75,6 +96,8 @@ export type SearchProfile = z.infer<typeof searchProfileSchema>;
 
 export const emptySearchProfile: SearchProfileFields = {
   name: '',
+  discoverySources: [],
+  discoveryIntervalHours: 24,
   alertThreshold: null,
   active: true,
   hardConstraints: {

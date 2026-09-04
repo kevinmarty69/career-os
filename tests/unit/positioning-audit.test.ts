@@ -99,6 +99,8 @@ test('audits imported channels, targets and missing proof without inventing fit'
       companySizes: [],
       cultures: [],
     },
+    discoverySources: [],
+    discoveryIntervalHours: 24,
     alertThreshold: null,
   } satisfies SearchProfile;
 

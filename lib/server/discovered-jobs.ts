@@ -64,8 +64,8 @@ type ObservationRow = {
   normalized: unknown;
 };
 
-function database() {
-  const url = process.env.DATABASE_URL;
+function database(databaseUrl?: string) {
+  const url = databaseUrl ?? process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required.');
   return postgres(url, { max: 5, idle_timeout: 5 });
 }
@@ -85,28 +85,33 @@ export function discoveredJobFingerprint(
 export async function storeDiscoveredJob(
   session: PublicationSession,
   rawInput: unknown,
+  options?: { databaseUrl?: string; discoveryLeaseToken?: string },
 ): Promise<{ created: boolean; opportunity: DiscoveredJob }> {
   const input = discoveredJobPersistenceInputSchema.parse(rawInput);
   const fingerprint = discoveredJobFingerprint(input);
   const sourceIdentity = input.normalized.externalId
     ? `${input.normalized.sourceKind}:${input.normalized.externalId}`
     : input.provenance.requestedUrl;
-  const sql = database();
+  const sql = database(options?.databaseUrl);
   try {
     return await sql.begin(async (tx) => {
       await tx`select pg_advisory_xact_lock(hashtextextended(
         ${`${session.tenantId}:discovered-job:${fingerprint ?? sourceIdentity}`}, 0
       ))`;
-      const [owner] = await tx<{ user_id: string }[]>`
-        select "userId" as user_id from auth."member"
-        where "organizationId" = ${session.tenantId} and role = 'owner'
-        order by "createdAt" limit 1`;
-      await authorize(tx, session);
-      await tx`insert into app.tenants (id, owner_id, name)
-        values (
-          ${session.tenantId}, ${owner?.user_id ?? session.userId},
-          ${session.tenantName ?? 'Workspace'}
-        ) on conflict (id) do update set name = excluded.name`;
+      if (options?.discoveryLeaseToken) {
+        await authorizeDiscovery(tx, session, options.discoveryLeaseToken);
+      } else {
+        const [owner] = await tx<{ user_id: string }[]>`
+          select "userId" as user_id from auth."member"
+          where "organizationId" = ${session.tenantId} and role = 'owner'
+          order by "createdAt" limit 1`;
+        await authorize(tx, session);
+        await tx`insert into app.tenants (id, owner_id, name)
+          values (
+            ${session.tenantId}, ${owner?.user_id ?? session.userId},
+            ${session.tenantName ?? 'Workspace'}
+          ) on conflict (id) do update set name = excluded.name`;
+      }
 
       const knownSource = await findExactSource(tx, session.tenantId, input);
       let job: JobRow | undefined;
@@ -483,4 +488,14 @@ async function authorize(
   await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
     set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
   await tx.unsafe('set local role career_app');
+}
+
+async function authorizeDiscovery(
+  tx: postgres.TransactionSql,
+  session: PublicationSession,
+  leaseToken: string,
+) {
+  await tx`select set_config('app.discovery_lease_token', ${leaseToken}, true),
+    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
+  await tx.unsafe('set local role career_job_discovery');
 }

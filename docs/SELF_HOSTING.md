@@ -81,9 +81,13 @@ grant career_hiring_manager_reviewer to career_hiring_manager_reviewer_login;
 create role career_factuality_reviewer_login login noinherit
   password '<generate another strong password>';
 grant career_factuality_reviewer to career_factuality_reviewer_login;
+
+create role career_job_discovery_login login noinherit
+  password '<generate another strong password>';
+grant career_job_discovery to career_job_discovery_login;
 ```
 
-Each login must be a non-owner without `SUPERUSER`, `BYPASSRLS`, `CREATEDB`, `CREATEROLE`, inherited roles, or direct table privileges. Workers inspect their own grants before claiming work and fail closed on excess authority.
+Each login must be a non-owner without `SUPERUSER`, `BYPASSRLS`, `CREATEDB`, `CREATEROLE` or inherited roles. Workers inspect their own grants before claiming work and fail closed on excess authority. Job discovery alone receives write access to the three opportunity tables, protected by a tenant-scoped, expiring lease policy; all other workers have no direct table privileges.
 
 ## 3. Configure the workers
 
@@ -98,6 +102,7 @@ Map each login to its matching environment variable:
 | Recruiter reviewer      | `CAREER_OS_RECRUITER_REVIEWER_DATABASE_URL`      | `pnpm worker:recruiter-reviewer`      | required |
 | Hiring-manager reviewer | `CAREER_OS_HIRING_MANAGER_REVIEWER_DATABASE_URL` | `pnpm worker:hiring-manager-reviewer` | required |
 | Factuality reviewer     | `CAREER_OS_FACTUALITY_REVIEWER_DATABASE_URL`     | `pnpm worker:factuality-reviewer`     | no       |
+| Job discovery           | `CAREER_OS_DISCOVERY_DATABASE_URL`               | `pnpm worker:job-discovery`           | no       |
 
 Build the disposable Page Composer image before starting that worker:
 
@@ -127,7 +132,7 @@ Worker commands intentionally do not load the application's `.env.local`: a shar
 
 Start each command from the table in a separate process. PostgreSQL assigns the next tenant-scoped job globally and returns an opaque lease token; workers never receive a tenant selector.
 
-For a durable host, use the units in [`deploy/systemd`](../deploy/systemd). They run the seven roles separately, restart failures, send `SIGTERM`, and allow an active iteration to drain before timeout.
+For a durable host, run each role separately under your process supervisor. The supplied [`deploy/systemd`](../deploy/systemd) units cover the seven application agents; add the job-discovery command with its isolated database variable when scheduled search is enabled.
 
 ## 5. Verify the installation
 

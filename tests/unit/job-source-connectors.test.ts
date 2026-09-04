@@ -4,7 +4,9 @@ import test from 'node:test';
 import {
   genericNormalizedFields,
   JobConnectorError,
+  parseJobBoard,
   parseJobConnector,
+  resolveJobBoard,
   resolveJobConnector,
 } from '../../lib/job-source-connectors';
 
@@ -34,6 +36,32 @@ test('recognizes only supported public Greenhouse and Ashby job URLs', () => {
     'https://api.ashbyhq.com/posting-api/job-board/nimbus?includeCompensation=true',
   );
   assert.equal(resolveJobConnector('https://example.com/jobs/44444'), null);
+});
+
+test('enumerates supported public ATS boards without inventing company data', () => {
+  const greenhouse = resolveJobBoard(
+    'https://job-boards.greenhouse.io/greenhouselabs',
+  );
+  assert.ok(greenhouse);
+  assert.equal(
+    greenhouse.fetchUrl,
+    'https://boards-api.greenhouse.io/v1/boards/greenhouselabs/jobs?content=true&pay_transparency=true',
+  );
+  const greenhouseJobs = parseJobBoard(
+    greenhouse,
+    JSON.stringify({ jobs: [JSON.parse(fixture('greenhouse-job.json'))] }),
+  );
+  assert.equal(greenhouseJobs[0].extraction.role, 'Product Engineer');
+
+  const ashby = resolveJobBoard('https://jobs.ashbyhq.com/nimbus');
+  assert.ok(ashby);
+  const ashbyJobs = parseJobBoard(ashby, fixture('ashby-job-board.json'));
+  assert.equal(ashbyJobs.length, 2);
+  assert.equal(
+    ashbyJobs[0].normalized.externalId,
+    'nimbus:123e4567-e89b-12d3-a456-426614174000',
+  );
+  assert.equal(resolveJobBoard('https://example.com/jobs'), null);
 });
 
 test('normalizes the official Greenhouse job fixture without guessing absent fields', () => {

@@ -24,6 +24,7 @@
     "worker:recruiter-strategist": "tsx scripts/run-strategy-worker.ts",
     "worker:page": "tsx scripts/run-page-composer-worker.ts",
     "worker:page-composer": "tsx scripts/run-page-composer-worker.ts",
+    "worker:job-discovery": "NODE_OPTIONS=--conditions=react-server tsx scripts/run-discovery-worker.ts",
     "worker:review:recruiter": "CAREER_OS_REVIEWER=recruiter tsx scripts/run-reviewer-worker.ts",
     "worker:recruiter-reviewer": "CAREER_OS_REVIEWER=recruiter tsx scripts/run-reviewer-worker.ts",
     "worker:review:hiring-manager": "CAREER_OS_REVIEWER=hiring-manager tsx scripts/run-reviewer-worker.ts",

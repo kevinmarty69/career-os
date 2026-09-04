@@ -307,6 +307,7 @@ export function SearchProfilesPage() {
               </label>
             </div>
 
+            <ScheduledDiscovery draft={draft} onChange={setDraft} Icon={Icon} />
             <HardConstraints draft={draft} onChange={setDraft} />
             <SoftPreferences draft={draft} onChange={setDraft} />
             <Exclusions draft={draft} onChange={setDraft} />
@@ -341,6 +342,126 @@ export function SearchProfilesPage() {
         </div>
       </div>
     </AppShell>,
+  );
+}
+
+function ScheduledDiscovery({
+  draft,
+  onChange,
+  Icon,
+}: {
+  draft: SearchProfileFields;
+  onChange: (next: SearchProfileFields) => void;
+  Icon: typeof import('@/components/kit-route-page').Icon;
+}) {
+  const localize = useLocalizer([searchProfilesMessages]);
+  const sources = draft.discoverySources;
+  return localize(
+    <section className={`${styles.criteria} ${styles.discovery}`}>
+      <SectionHeading
+        icon="schedule"
+        label="Découverte planifiée"
+        copy="Surveillez des tableaux publics Greenhouse ou Ashby. Aucun service payant n’est requis."
+        badge="Automatique"
+      />
+      <div className={styles.discoveryControls}>
+        <label>
+          <span>Fréquence</span>
+          <select
+            aria-label="Fréquence de découverte"
+            onChange={(event) =>
+              onChange({
+                ...draft,
+                discoveryIntervalHours: Number(
+                  event.target.value,
+                ) as SearchProfileFields['discoveryIntervalHours'],
+              })
+            }
+            value={draft.discoveryIntervalHours}
+          >
+            <option value={6}>Toutes les 6 heures</option>
+            <option value={12}>Toutes les 12 heures</option>
+            <option value={24}>Chaque jour</option>
+            <option value={72}>Tous les 3 jours</option>
+          </select>
+        </label>
+        <button
+          className="co-button quiet"
+          onClick={() =>
+            onChange({
+              ...draft,
+              discoverySources: [...sources, { company: '', url: '' }],
+            })
+          }
+          type="button"
+        >
+          <Icon>add</Icon>Ajouter un tableau
+        </button>
+      </div>
+      {sources.length ? (
+        <div className={styles.sourceList}>
+          {sources.map((source, index) => (
+            <div key={index}>
+              <label>
+                <span>Entreprise</span>
+                <input
+                  aria-label={`Entreprise source ${index + 1}`}
+                  onChange={(event) =>
+                    onChange({
+                      ...draft,
+                      discoverySources: sources.map((item, sourceIndex) =>
+                        sourceIndex === index
+                          ? { ...item, company: event.target.value }
+                          : item,
+                      ),
+                    })
+                  }
+                  placeholder="Acme"
+                  value={source.company}
+                />
+              </label>
+              <label>
+                <span>URL du tableau public</span>
+                <input
+                  aria-label={`URL du tableau source ${index + 1}`}
+                  onChange={(event) =>
+                    onChange({
+                      ...draft,
+                      discoverySources: sources.map((item, sourceIndex) =>
+                        sourceIndex === index
+                          ? { ...item, url: event.target.value }
+                          : item,
+                      ),
+                    })
+                  }
+                  placeholder="https://jobs.ashbyhq.com/acme"
+                  type="url"
+                  value={source.url}
+                />
+              </label>
+              <button
+                aria-label={`Supprimer la source ${index + 1}`}
+                onClick={() =>
+                  onChange({
+                    ...draft,
+                    discoverySources: sources.filter(
+                      (_, sourceIndex) => sourceIndex !== index,
+                    ),
+                  })
+                }
+                type="button"
+              >
+                <Icon>delete</Icon>
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={styles.noSources}>
+          Aucun tableau surveillé. Ajoutez l’URL racine d’un tableau public.
+        </p>
+      )}
+    </section>,
   );
 }
 
@@ -768,6 +889,8 @@ function freshProfile(): SearchProfileFields {
 function fieldsFrom(profile: SearchProfile): SearchProfileFields {
   return {
     name: profile.name,
+    discoverySources: structuredClone(profile.discoverySources),
+    discoveryIntervalHours: profile.discoveryIntervalHours,
     alertThreshold: profile.alertThreshold,
     active: profile.active,
     hardConstraints: structuredClone(profile.hardConstraints),
