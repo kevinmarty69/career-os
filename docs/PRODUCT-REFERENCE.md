@@ -683,15 +683,15 @@ Critères d'acceptation :
 ### Lot 9 - Distribution open source
 
 - [ ] Installation documentée sur une machine propre.
-- [ ] Configuration PostgreSQL et stockage.
-- [ ] Support d'un endpoint OpenAI-compatible local ou distant.
-- [ ] BYOK sans exposition des clés au navigateur.
-- [ ] Workers supervisables et health checks.
-- [ ] Sauvegarde et restauration documentées.
-- [ ] Configuration des sources de recherche.
-- [ ] Jeu de données fictives pour découvrir le produit.
-- [ ] Migrations reproductibles et procédure de mise à jour.
-- [ ] Documentation claire des limites et responsabilités de l'opérateur.
+- [x] Configuration PostgreSQL et stockage.
+- [x] Support d'un endpoint OpenAI-compatible local ou distant.
+- [x] BYOK sans exposition des clés au navigateur.
+- [x] Workers supervisables et health checks.
+- [x] Sauvegarde et restauration documentées.
+- [x] Configuration des sources de recherche.
+- [x] Jeu de données fictives pour découvrir le produit.
+- [x] Migrations reproductibles et procédure de mise à jour.
+- [x] Documentation claire des limites et responsabilités de l'opérateur.
 
 Critères d'acceptation :
 

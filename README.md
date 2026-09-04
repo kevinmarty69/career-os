@@ -14,11 +14,11 @@ It is deliberately not a generic AI resume generator. Models may research and su
 The built-in demo uses synthetic data and a deterministic in-browser workflow. It needs no account, database, or model:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open [localhost:3000](http://localhost:3000), choose **Explorer avec des données fictives**, edit the sample job brief, then generate the application. The demo exercises the evidence, drafting, review, and provenance UI; persistence and private sharing are intentionally disabled until the server is configured.
+Open [localhost:3000](http://localhost:3000), choose **Explore with sample data**, edit the sample job brief, then generate the application. The demo exercises the evidence, drafting, review, and provenance UI; persistence and private sharing are intentionally disabled until the server is configured.
 
 ![Career OS evidence-backed application workspace](docs/career-os-workspace.jpg)
 

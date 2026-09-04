@@ -5,7 +5,7 @@ This guide runs the complete persisted workflow. For the zero-infrastructure syn
 ## Requirements
 
 - Node.js 22+
-- pnpm 10+
+- pnpm 11+
 - Docker with Compose
 - a loopback OpenAI-compatible model endpoint
 
@@ -14,7 +14,7 @@ The current canary accepts loopback model endpoints only. It cannot call a remot
 ## 1. Configure the application
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 cp .env.example .env.local
 openssl rand -base64 32
 ```
@@ -46,6 +46,12 @@ ledger release accepts only an exact, complete 0022 schema. It rejects later or
 partially applied untracked states instead of guessing their history.
 
 Publication and saved Career Memory fail closed when `DATABASE_URL` or `BETTER_AUTH_SECRET` is missing.
+
+### PostgreSQL and stored data
+
+`DATABASE_URL` may point to the supplied PostgreSQL 17 container or to an operator-managed PostgreSQL 17 database. The Compose setup binds PostgreSQL to loopback on port `54329` and keeps data in the named `career_os_db` volume. Do not expose that port publicly.
+
+Career Memory accepted by the user, applications, runs, decisions, search profiles, discovered jobs and private publications live in PostgreSQL. Raw CV, DOCX and TXT bytes are parsed in the browser and are not stored. This release does not require object storage.
 
 ## 2. Create isolated worker logins
 
@@ -126,6 +132,8 @@ export CAREER_OS_LOCAL_MODEL_API_KEY=local-only
 export CAREER_OS_LOCAL_MODEL='<your local model name>'
 ```
 
+This is the self-hosted BYOK boundary: the endpoint, model and key exist only in the four model-worker environments. They are never exposed through a `NEXT_PUBLIC_*` variable or sent to the browser. The current canary deliberately accepts only loopback HTTP endpoints, so run an OpenAI-compatible local server or a local gateway under your control.
+
 Worker commands intentionally do not load the application's `.env.local`: a shared file would give every process every database credential. Export only the matching variables in each worker process.
 
 ## 4. Run and supervise
@@ -133,6 +141,15 @@ Worker commands intentionally do not load the application's `.env.local`: a shar
 Start each command from the table in a separate process. PostgreSQL assigns the next tenant-scoped job globally and returns an opaque lease token; workers never receive a tenant selector.
 
 For a durable host, use the units in [`deploy/systemd`](../deploy/systemd). They run the eight roles separately, restart failures, send `SIGTERM`, and allow an active iteration to drain before timeout.
+
+### Configure job sources
+
+Sign in, open `/search-profiles`, create a profile and add one or more public ATS board roots:
+
+- `https://boards.greenhouse.io/<board>`
+- `https://jobs.ashbyhq.com/<board>`
+
+Choose a 6, 12, 24 or 72-hour interval. The discovery worker enumerates the public board, rejects jobs outside the profile's hard constraints and deduplicates observations in PostgreSQL. Individual job URLs, authenticated boards and arbitrary crawlers are not supported. No paid search provider is required.
 
 ## 5. Verify the installation
 
@@ -149,6 +166,60 @@ pnpm test:e2e
 `pnpm db:test` exercises migrations, RLS, capability security, tenant isolation, budgets, durable concurrency, reviews, and worker heartbeats. Run it against the disposable Compose database, never a production database.
 
 `pnpm test:integration:http` starts the production build on port 3019 and runs the application, workflow and private-publication HTTP contracts against it.
+
+For a running instance, open **Settings → Worker availability**. The authenticated status endpoint reports each of the eight heartbeats as `fresh`, `stale` or `missing` without exposing timestamps. On a systemd host, also check:
+
+```bash
+systemctl is-active career-os-workers.target
+systemctl --failed 'career-os-worker@*.service'
+```
+
+## 6. Back up and restore
+
+Back up before every upgrade and at the interval required by your recovery objective:
+
+```bash
+docker compose exec -T db pg_dump -U career_os -d career_os --format=custom > career-os.backup
+pg_restore --list career-os.backup > /dev/null
+```
+
+Copy the backup off the application host and test restoration regularly. A restore replaces database state; stop the application and all workers first, verify the target database, then run:
+
+```bash
+docker compose exec -T db pg_restore -U career_os -d career_os --clean --if-exists --no-owner < career-os.backup
+pnpm db:migrate
+pnpm test:integration:http
+```
+
+The database is the complete server-side backup boundary in this release. The repository and root-owned worker environment files must be backed up separately; never place those environment files in a database dump or a public archive.
+
+## 7. Update an installation
+
+Use a clean working tree and never edit an applied migration:
+
+```bash
+sudo systemctl stop career-os-workers.target
+git pull --ff-only
+pnpm install --frozen-lockfile
+pnpm db:migrate
+pnpm check
+pnpm build
+sudo systemctl start career-os-workers.target
+```
+
+Restart the supervised Next.js process after the build, then verify worker availability and one private publication. Migration checksums and the database advisory lock prevent silent replay or two concurrent migrators.
+
+## 8. Operator responsibilities and current limits
+
+- terminate TLS at a trusted reverse proxy and configure the exact public origin;
+- keep application, database, worker and model credentials separate and rotate them after suspected exposure;
+- own PostgreSQL backups, restore tests, host monitoring, capacity and updates;
+- restrict outbound URL-import traffic and comply with the terms of public ATS sources;
+- choose and operate the local OpenAI-compatible model; Career OS reports usage but does not manage model availability;
+- treat imported documents, job pages and model output as untrusted data;
+- use this permanent worker pool for a self-hosted instance, not as the isolation boundary of a public multi-tenant SaaS.
+
+The open-source release does not provide managed backups, email delivery, billing, remote paid-model routing or cloud sandbox isolation. Its synthetic demo remains available without infrastructure through **Explore with sample data**.
 
 ## Security notes
 
