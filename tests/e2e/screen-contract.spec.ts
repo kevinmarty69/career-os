@@ -115,6 +115,67 @@ test('shows a traceable CV import state before human validation', async ({
   await expect(page.getByText('à confirmer', { exact: true })).toBeVisible();
 });
 
+test('keeps the CV import readable at tablet width', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto('/memory/import');
+
+  await expect(
+    page.getByRole('navigation', { name: 'Navigation principale' }),
+  ).toBeHidden();
+  const mobileNavigation = page.getByRole('navigation', {
+    name: 'Navigation mobile',
+  });
+  await expect(mobileNavigation).toBeVisible();
+  await expect(mobileNavigation.getByRole('link')).toHaveCount(4);
+  await expect(
+    page.getByRole('heading', { name: 'Extraction en direct' }),
+  ).toBeVisible();
+
+  const overflows = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth >
+      document.documentElement.clientWidth,
+  );
+  expect(overflows).toBe(false);
+});
+
+test('exposes keyboard navigation and readable informational copy', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/memory/import');
+
+  const desktopNavigation = page.getByRole('navigation', {
+    name: 'Navigation principale',
+  });
+  const links = desktopNavigation.getByRole('link');
+  await expect(links).toHaveCount(5);
+  await expect(links.nth(0)).toHaveAttribute('href', '/');
+  await expect(links.nth(1)).toHaveAttribute('href', '/applications');
+  await expect(links.nth(2)).toHaveAttribute('href', '/memory');
+  await expect(links.nth(3)).toHaveAttribute('href', '/links');
+  await expect(links.nth(4)).toHaveAttribute('href', '/settings/models');
+
+  const shell = await page
+    .getByRole('region', { name: 'Import du CV en cours' })
+    .boundingBox();
+  expect(shell).toMatchObject({ x: 0, y: 0, width: 1440, height: 900 });
+
+  await page.keyboard.press('Tab');
+  await expect(page.getByText('Aller à la progression')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(links.first()).toBeFocused();
+  await expect(links.first()).toHaveCSS('outline-style', 'solid');
+
+  for (const copy of [
+    page.getByText('Étape 1 sur 3'),
+    page.getByText('≈ 15 s restantes'),
+    page.getByText('citation directe', { exact: true }),
+  ]) {
+    await expect(copy).toHaveCSS('color', 'rgb(92, 94, 104)');
+  }
+});
+
 test('shows the privacy-safe expired-link screen', async ({ page }) => {
   await page.goto('/p/unknown-capability');
   await expect(

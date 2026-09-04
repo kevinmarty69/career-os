@@ -30,11 +30,18 @@ export const metadata: Metadata = {
 };
 
 const navigation = [
-  ['grid_view', 'Accueil', 'active'],
-  ['account_tree', 'Candidatures', 'disabled'],
-  ['database', 'Mémoire', 'running'],
-  ['send', 'Liens privés', 'disabled'],
-  ['settings', 'Réglages', 'idle'],
+  ['grid_view', 'Accueil', '/', 'active'],
+  ['account_tree', 'Candidatures', '/applications', 'idle'],
+  ['database', 'Mémoire', '/memory', 'running'],
+  ['send', 'Liens privés', '/links', 'idle'],
+  ['settings', 'Réglages', '/settings/models', 'idle'],
+] as const;
+
+const mobileNavigation = [
+  ['grid_view', 'Accueil', '/', true],
+  ['database', 'Mémoire', '/memory', false],
+  ['account_tree', 'Candidatures', '/applications', false],
+  ['settings', 'Réglages', '/settings/models', false],
 ] as const;
 
 const importSteps = [
@@ -90,16 +97,16 @@ export default function ImportCvPage() {
           <Brand />
 
           <nav className={styles.navigation} aria-label="Navigation principale">
-            {navigation.map(([icon, label, state]) => (
-              <div
+            {navigation.map(([icon, label, href, state]) => (
+              <Link
                 aria-current={state === 'active' ? 'page' : undefined}
-                aria-disabled={state === 'disabled' ? 'true' : undefined}
                 className={`${styles.navigationItem} ${styles[state] ?? ''}`}
+                href={href}
                 key={label}
               >
                 <Icon>{state === 'running' ? 'autorenew' : icon}</Icon>
                 <span>{label}</span>
-              </div>
+              </Link>
             ))}
           </nav>
 
@@ -247,18 +254,15 @@ export default function ImportCvPage() {
         </section>
 
         <nav className={styles.mobileNavigation} aria-label="Navigation mobile">
-          {(
-            [
-              ['grid_view', 'Accueil', true],
-              ['database', 'Mémoire', false],
-              ['account_tree', 'Candidatures', false],
-              ['settings', 'Réglages', false],
-            ] as const
-          ).map(([icon, label, active]) => (
-            <span aria-current={active ? 'page' : undefined} key={label}>
+          {mobileNavigation.map(([icon, label, href, active]) => (
+            <Link
+              aria-current={active ? 'page' : undefined}
+              href={href}
+              key={label}
+            >
               <Icon>{icon}</Icon>
               <small>{label}</small>
-            </span>
+            </Link>
           ))}
         </nav>
       </section>

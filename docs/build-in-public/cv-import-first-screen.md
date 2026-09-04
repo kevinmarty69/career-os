@@ -33,5 +33,5 @@ on the viewer's local font availability.
 The new artifact defines this screen's desktop visual language but does not
 include an updated global design-system document or a dedicated mobile V1.
 Desktop values therefore follow the artifact. Mobile follows the existing
-handoff rule of a single content column below 900 px with bottom navigation;
+handoff rule of a single content column below 1120 px with bottom navigation;
 it remains a functional adaptation to validate with the designer.
