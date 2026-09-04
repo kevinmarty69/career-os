@@ -74,3 +74,43 @@ test('legacy URLs can be omitted without weakening the HTTP boundary', () => {
     true,
   );
 });
+
+test('company research sources are explicit, canonical and unique', () => {
+  assert.equal(
+    applicationFieldsSchema.safeParse({
+      ...application,
+      companySources: [
+        { url: 'https://example.test/about', origin: 'job-jsonld' },
+        { url: 'https://example.test/careers', origin: 'api' },
+      ],
+    }).success,
+    true,
+  );
+  assert.deepEqual(
+    applicationFieldsSchema.parse({
+      ...application,
+      companySources: [
+        { url: 'http://EXAMPLE.test/about', origin: 'job-jsonld' },
+      ],
+    }).companySources,
+    [{ url: 'http://example.test/about', origin: 'job-jsonld' }],
+  );
+  for (const companySources of [
+    [{ url: 'https://user:password@example.test/about', origin: 'api' }],
+    [
+      { url: 'https://example.test/about', origin: 'api' },
+      { url: 'https://EXAMPLE.test/about', origin: 'job-jsonld' },
+    ],
+    Array.from({ length: 4 }, (_, index) => ({
+      url: `https://example.test/${index}`,
+      origin: 'api',
+    })),
+  ])
+    assert.equal(
+      applicationFieldsSchema.safeParse({
+        ...application,
+        companySources,
+      }).success,
+      false,
+    );
+});

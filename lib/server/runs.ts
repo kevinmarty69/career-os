@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import postgres from 'postgres';
+import { applicationCompanySourcesSchema } from '../application-contract';
 import {
   createRunInputSchema,
   deploymentModeSchema,
@@ -145,9 +146,10 @@ export async function createPersistedRun(
           raw_text: string;
           url: string | null;
           accent: string;
+          company_sources: unknown;
           revision: string;
         }>
-      >`select company, role, raw_text, url, accent, revision
+      >`select company, role, raw_text, url, accent, company_sources, revision
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${input.applicationId}
           and deleted_at is null
@@ -158,6 +160,9 @@ export async function createPersistedRun(
         throw new RunConflictError(
           'Run requires the current application revision.',
         );
+      const companySources = applicationCompanySourcesSchema.parse(
+        application.company_sources,
+      );
 
       const living = await readLivingProfile(tx, session);
       if (!living || living.revision !== input.profileRevision)
@@ -175,11 +180,12 @@ export async function createPersistedRun(
       const runId = randomUUID();
       await tx`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role,
-        raw_text, url, accent, extraction_status
+        raw_text, url, accent, company_sources, extraction_status
       ) values (
         ${opportunityId}, ${session.tenantId}, ${input.applicationId},
         ${input.applicationRevision}, ${application.company}, ${application.role},
-        ${application.raw_text}, ${application.url}, ${application.accent}, 'ready'
+        ${application.raw_text}, ${application.url}, ${application.accent},
+        ${tx.json(companySources)}, 'ready'
       )`;
       await tx`insert into app.workflow_runs (
         id, tenant_id, opportunity_id, profile_id, source_profile_id,
@@ -192,10 +198,11 @@ export async function createPersistedRun(
         0, now() + interval '1 hour', ${inputHash}
       )`;
       const researchInput = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         company: application.company,
         role: application.role,
         description: application.raw_text,
+        companySources,
         source: {
           kind: 'job-posting',
           ...(application.url ? { url: application.url } : {}),

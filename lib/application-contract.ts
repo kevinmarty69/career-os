@@ -1,6 +1,26 @@
 import { z } from 'zod';
 import { httpUrlSchema } from './http-url';
 
+export const applicationCompanySourceSchema = z
+  .object({
+    url: httpUrlSchema
+      .refine((value) => {
+        const url = new URL(value);
+        return !url.username && !url.password;
+      })
+      .transform((value) => new URL(value).href),
+    origin: z.enum(['job-jsonld', 'api']),
+  })
+  .strict();
+
+export const applicationCompanySourcesSchema = z
+  .array(applicationCompanySourceSchema)
+  .max(3)
+  .refine(
+    (sources) => new Set(sources.map(({ url }) => url)).size === sources.length,
+    'Company source URLs must be unique.',
+  );
+
 export const applicationStageSchema = z.enum([
   'draft',
   'applied',
@@ -17,6 +37,7 @@ export const applicationFieldsSchema = z
     url: httpUrlSchema.optional(),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     stage: applicationStageSchema.default('draft'),
+    companySources: applicationCompanySourcesSchema.optional(),
   })
   .strict();
 

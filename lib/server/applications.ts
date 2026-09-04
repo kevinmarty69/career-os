@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { z } from 'zod';
 import {
   applicationFieldsSchema,
+  applicationCompanySourcesSchema,
   applicationSchema,
   deleteApplicationInputSchema,
   updateApplicationInputSchema,
@@ -24,6 +25,7 @@ type ApplicationRow = {
   url: string | null;
   accent: string;
   stage: Application['stage'];
+  company_sources: unknown;
   revision: string;
   create_input_hash: string;
   created_at: Date;
@@ -63,7 +65,7 @@ export async function createApplication(
         )
         on conflict (id) do update set name = excluded.name`;
       const [existing] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId}
@@ -80,13 +82,13 @@ export async function createApplication(
       const id = randomUUID();
       const [created] = await tx<ApplicationRow[]>`
         insert into app.applications (
-          id, tenant_id, company, role, raw_text, url, accent, stage,
+          id, tenant_id, company, role, raw_text, url, accent, stage, company_sources,
           create_idempotency_key, create_input_hash
         ) values (
           ${id}, ${session.tenantId}, ${input.company}, ${input.role},
           ${input.description}, ${input.url ?? null}, ${input.accent},
-          ${input.stage}, ${idempotencyKey}, ${inputHash}
-        ) returning id, company, role, raw_text, url, accent, stage, revision,
+          ${input.stage}, ${tx.json(input.companySources ?? [])}, ${idempotencyKey}, ${inputHash}
+        ) returning id, company, role, raw_text, url, accent, stage, company_sources, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
       return { created: true, application: projection(created) };
     });
@@ -101,7 +103,7 @@ export async function listApplications(session: PublicationSession) {
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const rows = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and deleted_at is null
@@ -123,7 +125,7 @@ export async function readApplication(
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [row] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${applicationId}
@@ -147,7 +149,7 @@ export async function updateApplication(
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [existing] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, accent, stage, revision,
+        select id, company, role, raw_text, url, accent, stage, company_sources, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${applicationId}
@@ -167,9 +169,10 @@ export async function updateApplication(
         update app.applications set company = ${input.company}, role = ${input.role},
           raw_text = ${input.description}, url = ${input.url ?? null},
           accent = ${input.accent}, stage = ${input.stage},
+          company_sources = ${tx.json(input.companySources ?? companySources(existing.company_sources))},
           revision = revision + 1
         where tenant_id = ${session.tenantId} and id = ${applicationId}
-        returning id, company, role, raw_text, url, accent, stage, revision,
+        returning id, company, role, raw_text, url, accent, stage, company_sources, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
       return projection(updated);
     });
@@ -210,6 +213,7 @@ export async function deleteApplication(
 
 function projection(row: ApplicationRow): Application {
   const url = optionalHttpUrl(row.url);
+  const sources = companySources(row.company_sources);
   return applicationSchema.parse({
     applicationId: row.id,
     company: row.company,
@@ -218,6 +222,7 @@ function projection(row: ApplicationRow): Application {
     ...(url ? { url } : {}),
     accent: row.accent,
     stage: row.stage,
+    ...(sources.length ? { companySources: sources } : {}),
     revision: Number(row.revision),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -254,6 +259,18 @@ function sameFields(
     row.raw_text === input.description &&
     row.url === (input.url ?? null) &&
     row.accent === input.accent &&
-    row.stage === input.stage
+    row.stage === input.stage &&
+    (input.companySources === undefined ||
+      JSON.stringify(companySources(row.company_sources)) ===
+        JSON.stringify(input.companySources))
   );
+}
+
+function companySources(value: unknown) {
+  const parsed = applicationCompanySourcesSchema.safeParse(value);
+  if (!parsed.success)
+    throw new ApplicationRejectedError(
+      'Application company sources are invalid.',
+    );
+  return parsed.data;
 }
