@@ -1140,11 +1140,9 @@ function researchProjection(
   if (!Array.isArray(body.signals))
     throw new RunRejectedError('Run research artifact is invalid.');
   return persistedResearchSchema.parse({
+    ...body,
     artifactId,
     artifactHash,
-    company: body.company,
-    role: body.role,
-    source: body.source,
     signals: body.signals.map((signal, index) => ({
       ...(signal && typeof signal === 'object' ? signal : {}),
       signalId: `signal-${index + 1}`,
