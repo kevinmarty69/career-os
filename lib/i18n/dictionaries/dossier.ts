@@ -9,6 +9,22 @@ export const dossierMessages = {
   Contacts: 'Contacts',
   Versions: 'Versions',
   'Toutes les candidatures': 'All applications',
+  Candidature: 'Application',
+  'Chargement…': 'Loading…',
+  'Chargement de la candidature…': 'Loading application…',
+  'Connectez-vous pour ouvrir ce dossier.': 'Sign in to open this application.',
+  'Cette candidature est introuvable.': 'This application could not be found.',
+  'Impossible de charger cette candidature.':
+    'Unable to load this application.',
+  'Candidature réelle · données persistées':
+    'Real application · persisted data',
+  Étape: 'Stage',
+  Révision: 'Revision',
+  'Dernière mise à jour': 'Last updated',
+  'Ouvrir la source': 'Open source',
+  'Aucune URL source enregistrée.': 'No source URL saved.',
+  'Le dossier est prêt pour la recherche entreprise et le workflow agentique.':
+    'This application is ready for company research and the agent workflow.',
   'Historique de la page privée': 'Private page history',
   'Dossier de candidature': 'Application workspace',
   'À valider': 'Needs review',

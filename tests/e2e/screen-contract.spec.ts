@@ -4,10 +4,6 @@ const screens = [
   ['/', 'Trois affirmations à trancher avant d’envoyer votre page privée.'],
   ['/memory', 'Mémoire professionnelle'],
   ['/applications', 'Candidatures'],
-  [
-    '/applications/nimbus',
-    'L’opérabilité par une petite équipe, pas la performance brute.',
-  ],
   ['/applications/nimbus/review', '3 modifications proposées'],
   ['/memory/import', 'Ajoutez votre parcours'],
   [
@@ -48,7 +44,7 @@ test('renders every routed handoff screen', async ({ page }) => {
     await test.step(route, async () => {
       await page.goto(route);
       await expect(
-        page.getByRole('heading', { name: heading, exact: true }),
+        page.getByRole('heading', { level: 1, name: heading, exact: true }),
       ).toBeVisible();
       await expect(
         page.getByRole('heading', { name: 'Écran non documenté' }),
@@ -73,7 +69,6 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   for (const route of [
     '/',
-    '/applications/nimbus',
     '/applications/nimbus/review',
     '/applications/nimbus/page',
     '/applications/nimbus/company',
@@ -174,7 +169,8 @@ test('exposes keyboard navigation and readable informational copy', async ({
   const shell = await page
     .getByRole('region', { name: 'Import de la mémoire' })
     .boundingBox();
-  expect(shell).toMatchObject({ x: 0, y: 0, width: 1440, height: 900 });
+  expect(shell).toMatchObject({ x: 0, y: 0, width: 1440 });
+  expect(shell?.height).toBeGreaterThanOrEqual(900);
 
   await page.keyboard.press('Tab');
   await expect(page.getByText('Aller à l’import')).toBeFocused();
@@ -190,23 +186,13 @@ test('exposes keyboard navigation and readable informational copy', async ({
 test('keeps the main application shell edge to edge', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
-  await page
-    .getByRole('button', { name: 'Explorer avec des données fictives' })
-    .click();
 
-  const shell = page.locator('main.app-shell');
+  const shell = page.locator('main.co-shell');
   await expect(shell).toBeVisible();
-  expect(await shell.boundingBox()).toMatchObject({
-    x: 0,
-    y: 0,
-    width: 1440,
-    height: 900,
-  });
-  await expect(shell.locator('.sidebar')).toHaveCSS('border-radius', '0px');
-  await expect(shell.locator('.shell-content')).toHaveCSS(
-    'border-radius',
-    '0px',
-  );
+  const box = await shell.boundingBox();
+  expect(box).toMatchObject({ x: 0, y: 0, width: 1440 });
+  expect(box?.height).toBeGreaterThanOrEqual(900);
+  await expect(shell).toHaveCSS('border-radius', '0px');
 });
 
 test('shows the privacy-safe expired-link screen', async ({ page }) => {

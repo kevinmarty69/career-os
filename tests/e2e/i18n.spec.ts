@@ -4,10 +4,6 @@ const englishScreens = [
   ['/', 'Three claims need your decision before you send your private page.'],
   ['/memory', 'Career memory'],
   ['/applications', 'Applications'],
-  [
-    '/applications/nimbus',
-    'Operability for a small team, not raw performance.',
-  ],
   ['/applications/nimbus/review', '3 suggested changes'],
   ['/memory/import', 'Add your background'],
   [

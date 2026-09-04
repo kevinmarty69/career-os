@@ -3,8 +3,17 @@
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationsPage } from '@/components/applications/applications-page';
-import { LocaleSwitch, useLocalizer } from '@/components/i18n/i18n-provider';
+import {
+  LocaleSwitch,
+  useI18n,
+  useLocalizer,
+} from '@/components/i18n/i18n-provider';
 import { CareerMemoryContent } from '@/components/memory/career-memory-content';
+import {
+  applicationSchema,
+  type Application,
+} from '@/lib/application-contract';
+import { readApplication } from '@/lib/career-api';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
@@ -639,7 +648,15 @@ function ApplicationsScreen() {
   return <ApplicationsPage AppShell={AppShell} Icon={Icon} />;
 }
 
-function DossierNav({ active }: { active: string }) {
+function DossierNav({
+  active,
+  applicationId,
+  company,
+}: {
+  active: string;
+  applicationId: string;
+  company: string;
+}) {
   const localize = useLocalizer([dossierMessages]);
   const items = [
     ['assignment', 'Brief', ''],
@@ -655,11 +672,15 @@ function DossierNav({ active }: { active: string }) {
       <Link href="/applications">
         <Icon>arrow_back</Icon>Toutes les candidatures
       </Link>
-      <p>Nimbus Robotics</p>
+      <p>{company}</p>
       {items.map(([icon, label, path]) => (
         <Link
           className={active === label ? 'active' : ''}
-          href={path ? `/applications/nimbus/${path}` : '/applications/nimbus'}
+          href={
+            path
+              ? `/applications/${applicationId}/${path}`
+              : `/applications/${applicationId}`
+          }
           key={label}
         >
           <Icon>{icon}</Icon>
@@ -674,21 +695,35 @@ function DossierShell({
   active,
   children,
   state,
+  actions,
+  identity = {
+    applicationId: 'nimbus',
+    company: 'Nimbus Robotics',
+    role: 'Staff Product Engineer',
+  },
 }: {
   active: string;
   children: ReactNode;
   state?: ReactNode;
+  actions?: ReactNode;
+  identity?: { applicationId: string; company: string; role: string };
 }) {
   const localize = useLocalizer(activeFrontMessages);
   return localize(
     <main className="co-dossier-shell">
-      <DossierNav active={active} />
+      <DossierNav
+        active={active}
+        applicationId={identity.applicationId}
+        company={identity.company}
+      />
       <section>
         <header className="co-dossier-top">
           <div>
-            <i>NR</i>
+            <i>{initials(identity.company)}</i>
             <span>
-              <small>Nimbus Robotics · Staff Product Engineer</small>
+              <small>
+                {identity.company} · {identity.role}
+              </small>
               <strong>
                 {active === 'Versions'
                   ? 'Historique de la page privée'
@@ -698,13 +733,143 @@ function DossierShell({
           </div>
           <LocaleSwitch compact />
           {state ?? <Badge tone="warn">À valider</Badge>}
-          <Button>
-            <Icon>bolt</Icon>Relancer les agents
-          </Button>
+          {actions === undefined ? (
+            <Button>
+              <Icon>bolt</Icon>Relancer les agents
+            </Button>
+          ) : (
+            actions
+          )}
         </header>
         {children}
       </section>
     </main>,
+  );
+}
+
+function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
+  const { locale } = useI18n();
+  const localize = useLocalizer([dossierMessages]);
+  const [result, setResult] = useState<{
+    applicationId: string;
+    application?: Application;
+    error?: 'auth' | 'missing' | 'unavailable';
+  }>();
+  const current = result?.applicationId === applicationId ? result : undefined;
+  const application = current?.application;
+  const error = current?.error;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void readApplication(applicationId, controller.signal)
+      .then(async (response) => {
+        if (response.status === 401)
+          return setResult({ applicationId, error: 'auth' });
+        if (response.status === 404)
+          return setResult({ applicationId, error: 'missing' });
+        if (!response.ok)
+          return setResult({ applicationId, error: 'unavailable' });
+        const parsed = applicationSchema.safeParse(await response.json());
+        if (!parsed.success)
+          return setResult({ applicationId, error: 'unavailable' });
+        setResult({ applicationId, application: parsed.data });
+      })
+      .catch((requestError: unknown) => {
+        if (
+          !(requestError instanceof DOMException) ||
+          requestError.name !== 'AbortError'
+        )
+          setResult({ applicationId, error: 'unavailable' });
+      });
+    return () => controller.abort();
+  }, [applicationId]);
+
+  const identity = application
+    ? {
+        applicationId,
+        company: application.company,
+        role: application.role,
+      }
+    : {
+        applicationId,
+        company: 'Candidature',
+        role: 'Chargement…',
+      };
+
+  return localize(
+    <DossierShell
+      actions={null}
+      active="Brief"
+      identity={identity}
+      state={
+        application ? (
+          <Badge tone="muted">Candidature réelle · données persistées</Badge>
+        ) : undefined
+      }
+    >
+      <div className="co-dossier-content co-live-dossier">
+        {!application ? (
+          <section className="co-panel co-live-dossier-state">
+            <h1>
+              {error === 'auth'
+                ? 'Connectez-vous pour ouvrir ce dossier.'
+                : error === 'missing'
+                  ? 'Cette candidature est introuvable.'
+                  : error === 'unavailable'
+                    ? 'Impossible de charger cette candidature.'
+                    : 'Chargement de la candidature…'}
+            </h1>
+            {error ? (
+              <Link className="co-button" href="/applications">
+                Retour aux candidatures
+              </Link>
+            ) : null}
+          </section>
+        ) : (
+          <section className="co-panel co-live-dossier-card">
+            <p>Candidature réelle · données persistées</p>
+            <h1>{application.role}</h1>
+            <h2>{application.company}</h2>
+            <dl>
+              <div>
+                <dt>Étape</dt>
+                <dd>{stageLabel(application.stage, locale)}</dd>
+              </div>
+              <div>
+                <dt>Révision</dt>
+                <dd>{application.revision}</dd>
+              </div>
+              <div>
+                <dt>Dernière mise à jour</dt>
+                <dd>
+                  {new Intl.DateTimeFormat(locale, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  }).format(new Date(application.updatedAt))}
+                </dd>
+              </div>
+            </dl>
+            <p>{application.description}</p>
+            {application.url ? (
+              <a
+                className="co-button"
+                href={application.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Ouvrir la source
+              </a>
+            ) : (
+              <span>Aucune URL source enregistrée.</span>
+            )}
+            <footer>
+              Le dossier est prêt pour la recherche entreprise et le workflow
+              agentique.
+            </footer>
+          </section>
+        )}
+      </div>
+    </DossierShell>,
   );
 }
 
@@ -3584,12 +3749,49 @@ function KitNotFound() {
   );
 }
 
+function initials(value: string) {
+  return (
+    value
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'CO'
+  );
+}
+
+function stageLabel(stage: Application['stage'], locale: 'en' | 'fr') {
+  const labels = {
+    en: {
+      draft: 'Draft',
+      applied: 'Applied',
+      interview: 'Interview',
+      offer: 'Offer',
+      closed: 'Closed',
+    },
+    fr: {
+      draft: 'Brouillon',
+      applied: 'Envoyée',
+      interview: 'Entretien',
+      offer: 'Offre',
+      closed: 'Clôturée',
+    },
+  } as const;
+  return labels[locale][stage];
+}
+
 export function KitRoutePage({ path, query }: { path: string; query: Query }) {
   if (path === '/') return <HomeScreen />;
   if (path === '/memory') return <MemoryScreen />;
   if (path === '/applications') return <ApplicationsScreen />;
-  if (/^\/applications\/[^/]+$/.test(path))
-    return <DossierScreen running={query.state === 'running'} />;
+  const applicationMatch = path.match(/^\/applications\/([^/]+)$/);
+  if (applicationMatch)
+    return query.state === 'running' ? (
+      <DossierScreen running />
+    ) : (
+      <DynamicDossierScreen applicationId={applicationMatch[1]} />
+    );
   if (/^\/applications\/[^/]+\/review$/.test(path)) return <ReviewScreen />;
   if (path === '/memory/import') return <ImportScreen />;
   if (/^\/applications\/[^/]+\/page$/.test(path)) return <PageEditorScreen />;
