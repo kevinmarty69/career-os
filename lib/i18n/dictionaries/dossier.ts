@@ -92,6 +92,33 @@ export const dossierMessages = {
     'All checks are resolved. Ready for your final approval.',
   'La publication reste bloquée tant qu’une décision manque.':
     'Publishing remains blocked while a decision is missing.',
+  'Validation humaine finale': 'Final human approval',
+  'Le lien privé est prêt': 'The private link is ready',
+  'Le lien privé a été révoqué': 'The private link has been revoked',
+  'Publiez uniquement ce que vous avez validé':
+    'Publish only what you approved',
+  Publié: 'Published',
+  Révoqué: 'Revoked',
+  'Non publié': 'Unpublished',
+  'Le snapshot est immuable, non indexable et accessible pendant sept jours. Vous pouvez couper l’accès immédiatement.':
+    'The snapshot is immutable, non-indexable, and available for seven days. You can revoke access immediately.',
+  Ouvrir: 'Open',
+  'Révoquer le lien': 'Revoke link',
+  'Révocation…': 'Revoking…',
+  'L’accès est coupé immédiatement, y compris pour un onglet déjà ouvert.':
+    'Access is revoked immediately, including in a tab that is already open.',
+  'Les trois reviews sont résolues. Cette action fige la page actuelle dans un snapshot privé ; aucune modification ultérieure de votre mémoire ne changera ce qui est partagé.':
+    'All three reviews are resolved. This action freezes the current page in a private snapshot; later changes to your Career Memory will not alter what is shared.',
+  'Snapshot immuable': 'Immutable snapshot',
+  'Expiration automatique sous sept jours':
+    'Automatic expiration after seven days',
+  'Révocation immédiate': 'Immediate revocation',
+  'Aucun lien n’est créé sans cette action.':
+    'No link is created without this action.',
+  'Création du lien…': 'Creating link…',
+  'Valider et créer le lien privé': 'Approve and create private link',
+  'L’action n’a pas abouti. Vérifiez votre session puis réessayez.':
+    'The action failed. Check your session and try again.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',

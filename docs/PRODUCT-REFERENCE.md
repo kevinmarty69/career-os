@@ -625,16 +625,16 @@ Critères d'acceptation :
 
 ### Lot 6 - Page privée personnalisée
 
-- [ ] Composition à partir de blocs approuvés et de données structurées.
-- [ ] Hero spécifique au rôle et à l'entreprise.
-- [ ] Lecture rapide suivie de preuves en divulgation progressive.
+- [x] Composition à partir de blocs approuvés et de données structurées.
+- [x] Hero spécifique au rôle et à l'entreprise.
+- [x] Lecture rapide suivie de preuves en divulgation progressive.
 - [ ] Personnalisation accessible avec logo, couleurs et tonalité.
 - [ ] Indication claire de candidature indépendante.
 - [ ] CV, LinkedIn, GitHub, portfolio et contact configurables.
 - [ ] Aperçu desktop et mobile.
 - [ ] Contrôle de contraste, responsive et navigation clavier.
-- [ ] Lien privé non indexable, expirant et révocable.
-- [ ] Session privée sans secret persistant dans l'URL.
+- [x] Lien privé non indexable, expirant et révocable.
+- [x] Session privée sans secret persistant dans l'URL.
 - [ ] Versionnement et remplacement d'une publication.
 - [ ] Analytics sobres : ouvertures, sections, actions et téléchargement.
 

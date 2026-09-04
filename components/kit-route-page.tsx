@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationEvidenceCheckpoint } from '@/components/applications/application-evidence-checkpoint';
 import { ApplicationPageDraftCheckpoint } from '@/components/applications/application-page-draft-checkpoint';
+import { ApplicationPublicationCheckpoint } from '@/components/applications/application-publication-checkpoint';
 import { ApplicationResearchCheckpoint } from '@/components/applications/application-research-checkpoint';
 import { ApplicationReviewCheckpoint } from '@/components/applications/application-review-checkpoint';
 import { ApplicationStrategyCheckpoint } from '@/components/applications/application-strategy-checkpoint';
@@ -1007,6 +1008,17 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
                 }
                 pending={workflow.reviewPending}
                 run={workflow.run}
+              />
+            ) : null}
+            {workflow.run?.publicationEligible ? (
+              <ApplicationPublicationCheckpoint
+                error={workflow.publicationError}
+                onCopy={() => void workflow.copyPublicationLink()}
+                onPublish={() => void workflow.publish()}
+                onRevoke={() => void workflow.revoke()}
+                pending={workflow.publicationPending}
+                publication={workflow.publication}
+                revoked={workflow.publicationRevoked}
               />
             ) : null}
             {application.url ? (
@@ -4004,6 +4016,7 @@ function runStageLabel(stage: string, locale: 'en' | 'fr') {
     review_factuality: ['Factual review', 'Revue factuelle'],
     review_decision: ['Human decisions', 'Décisions humaines'],
     human_approval: ['Final approval', 'Validation finale'],
+    publication_ready: ['Published', 'Publiée'],
     'company-researcher': ['Company research', 'Recherche entreprise'],
     'evidence-archivist': ['Evidence matching', 'Appariement des preuves'],
     'recruiter-strategist': [

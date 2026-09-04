@@ -291,6 +291,22 @@ function reviewedRun() {
   } as const;
 }
 
+function publishableRun() {
+  const reviewed = reviewedRun();
+  return {
+    ...reviewed,
+    stage: 'human_approval',
+    reviewDecisions: [
+      {
+        reviewId: reviewed.reviews[0].reviewId,
+        issueIndex: 0,
+        decision: 'keep',
+      },
+    ],
+    publicationEligible: true,
+  } as const;
+}
+
 test('renders the persisted application instead of the Nimbus fixture', async ({
   context,
   page,
@@ -302,7 +318,9 @@ test('renders the persisted application instead of the Nimbus fixture', async ({
   await expect(
     page.getByRole('heading', { name: 'Staff Platform Engineer' }),
   ).toBeVisible();
-  await expect(page.getByText('Signal Forge').first()).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Signal Forge', exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('Revision')).toBeVisible();
   await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
   await expect(
@@ -637,6 +655,56 @@ test('keeps review objections visible until the human decides', async ({
     decision: 'keep',
   });
   expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('publishes the approved snapshot and can revoke its private link', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const run = publishableRun();
+  const publicationId = '988c0a00-0000-4000-8000-000000000023';
+  let publishedBody: { runId?: string; rawToken?: string } | undefined;
+  let revoked = false;
+  await mockApplication(page, run);
+  await page.route('**/api/publications', async (route) => {
+    publishedBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        publicationId,
+        rawToken: 'f'.repeat(72),
+        expiresAt: '2026-09-11T14:00:00.000Z',
+      }),
+    });
+  });
+  await page.route(`**/api/publications/${publicationId}`, async (route) => {
+    revoked = true;
+    await route.fulfill({ status: 204 });
+  });
+
+  await page.goto(`/applications/${applicationId}`);
+  await expect(
+    page.getByRole('heading', { name: 'Publish only what you approved' }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Approve and create private link' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'The private link is ready' }),
+  ).toBeVisible();
+  expect(publishedBody?.runId).toBe(run.runId);
+  expect(publishedBody?.rawToken).toHaveLength(72);
+  await expect(
+    page.getByRole('link', { name: 'Open', exact: true }),
+  ).toHaveAttribute('href', `/p/${publicationId}#${'f'.repeat(72)}`);
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Revoke link' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'The private link has been revoked' }),
+  ).toBeVisible();
+  expect(revoked).toBe(true);
 });
 
 test('keeps the persisted dossier readable on mobile', async ({ page }) => {

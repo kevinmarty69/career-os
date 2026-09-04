@@ -179,6 +179,16 @@ export const pageSpecSchema = z
 export type Profile = z.infer<typeof profileSchema>;
 export type PageSpec = z.infer<typeof pageSpecSchema>;
 
+export const createdPublicationSchema = z
+  .object({
+    publicationId: z.string().uuid(),
+    rawToken: z.string().min(64).max(128),
+    expiresAt: z.string().datetime(),
+  })
+  .strict();
+
+export type CreatedPublication = z.infer<typeof createdPublicationSchema>;
+
 export type Review = {
   reviewer: 'recruiter' | 'hiring-manager' | 'factuality';
   passed: boolean;

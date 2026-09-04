@@ -5,10 +5,12 @@ import type { Application } from '@/lib/application-contract';
 import {
   approveRunStrategy,
   confirmRunResearch,
+  createPublication,
   createRun,
   decideRunReviewIssue,
   readApplicationRun,
   readProfile,
+  revokePublication,
   startRunReviews,
   startRunStrategy,
 } from '@/lib/career-api';
@@ -18,6 +20,10 @@ import {
   type PersistedRun,
 } from '@/lib/run-contract';
 import { persistedRunOperation } from '@/lib/run-operation';
+import {
+  createdPublicationSchema,
+  type CreatedPublication,
+} from '@/lib/schemas';
 
 type WorkflowError =
   | 'auth'
@@ -39,6 +45,12 @@ export function useApplicationWorkflow(applicationId: string) {
   const [decisionError, setDecisionError] = useState(false);
   const [reviewPending, setReviewPending] = useState<string>();
   const [reviewError, setReviewError] = useState(false);
+  const [publication, setPublication] = useState<CreatedPublication>();
+  const [publicationPending, setPublicationPending] = useState<
+    'publish' | 'revoke'
+  >();
+  const [publicationError, setPublicationError] = useState(false);
+  const [publicationRevoked, setPublicationRevoked] = useState(false);
   const current = result?.applicationId === applicationId ? result : undefined;
 
   useEffect(() => {
@@ -371,6 +383,60 @@ export function useApplicationWorkflow(applicationId: string) {
     }
   }
 
+  async function publish() {
+    if (!current?.run?.publicationEligible || publicationPending) return;
+    setPublicationPending('publish');
+    setPublicationError(false);
+    try {
+      const response = await createPublication(current.run.runId);
+      if (!response.ok) {
+        setPublicationError(true);
+        return;
+      }
+      const created = createdPublicationSchema.parse(await response.json());
+      setPublication(created);
+      setPublicationRevoked(false);
+      setResult({
+        ...current,
+        run: {
+          ...current.run,
+          status: 'completed',
+          stage: 'publication_ready',
+        },
+      });
+    } catch {
+      setPublicationError(true);
+    } finally {
+      setPublicationPending(undefined);
+    }
+  }
+
+  async function copyPublicationLink() {
+    if (!publication) return;
+    await navigator.clipboard.writeText(
+      `${location.origin}/p/${publication.publicationId}#${publication.rawToken}`,
+    );
+  }
+
+  async function revoke() {
+    if (!publication || publicationPending) return;
+    setPublicationPending('revoke');
+    setPublicationError(false);
+    try {
+      const response = await revokePublication(publication.publicationId);
+      if (!response.ok) {
+        setPublicationError(true);
+        return;
+      }
+      setPublication(undefined);
+      setPublicationRevoked(true);
+    } catch {
+      setPublicationError(true);
+    } finally {
+      setPublicationPending(undefined);
+    }
+  }
+
   return {
     ...current,
     approveStrategy,
@@ -379,11 +445,18 @@ export function useApplicationWorkflow(applicationId: string) {
     decisionError,
     decisionPending,
     loading: !current,
+    copyPublicationLink,
+    publish,
+    publication,
+    publicationError,
+    publicationPending,
+    publicationRevoked,
     reviewError,
     reviewPending,
     start,
     startReviews,
     startStrategy,
     starting,
+    revoke,
   };
 }
