@@ -176,6 +176,28 @@ test('exposes keyboard navigation and readable informational copy', async ({
   }
 });
 
+test('keeps the main application shell edge to edge', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Explorer avec des données fictives' })
+    .click();
+
+  const shell = page.locator('main.app-shell');
+  await expect(shell).toBeVisible();
+  expect(await shell.boundingBox()).toMatchObject({
+    x: 0,
+    y: 0,
+    width: 1440,
+    height: 900,
+  });
+  await expect(shell.locator('.sidebar')).toHaveCSS('border-radius', '0px');
+  await expect(shell.locator('.shell-content')).toHaveCSS(
+    'border-radius',
+    '0px',
+  );
+});
+
 test('shows the privacy-safe expired-link screen', async ({ page }) => {
   await page.goto('/p/unknown-capability');
   await expect(

@@ -11043,19 +11043,19 @@ button,
 @media (min-width: 761px) {
   .app-shell:not(.dossier-mode) {
     grid-template-columns: 250px minmax(0, 1fr);
-    gap: 10px;
-    padding: 10px;
-    background: #d8d9de;
+    gap: 0;
+    padding: 0;
+    background: #efeff3;
   }
 
   .app-shell:not(.dossier-mode) .sidebar {
-    min-height: calc(100vh - 20px);
-    border-radius: 26px 0 0 26px;
+    min-height: 100vh;
+    border-radius: 0;
     background: #efeff3;
   }
 
   .app-shell:not(.dossier-mode) .sidebar-panel {
-    min-height: calc(100vh - 20px);
+    min-height: 100vh;
     padding: 20px 10px 16px;
   }
 
@@ -11065,12 +11065,12 @@ button,
   }
 
   .app-shell:not(.dossier-mode) .shell-content {
-    min-height: calc(100vh - 20px);
-    border-radius: 0 22px 22px 0;
+    min-height: 100vh;
+    border-radius: 0;
   }
 
   .home-view {
-    min-height: calc(100vh - 20px);
+    min-height: 100vh;
     padding: 16px 22px 22px;
   }
 
