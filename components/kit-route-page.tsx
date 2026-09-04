@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationEvidenceCheckpoint } from '@/components/applications/application-evidence-checkpoint';
+import { ApplicationKitPanel } from '@/components/applications/application-kit-panel';
 import { ApplicationPageDraftCheckpoint } from '@/components/applications/application-page-draft-checkpoint';
 import { ApplicationPublicationCheckpoint } from '@/components/applications/application-publication-checkpoint';
 import { ApplicationResearchCheckpoint } from '@/components/applications/application-research-checkpoint';
@@ -1812,6 +1813,15 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
                 pending={workflow.decisionPending}
                 profile={workflow.run.profile}
                 research={workflow.run.research}
+                strategy={workflow.run.strategy}
+              />
+            ) : null}
+            {workflow.run?.research && workflow.run.strategy ? (
+              <ApplicationKitPanel
+                company={application.company}
+                profile={workflow.run.profile}
+                research={workflow.run.research}
+                role={application.role}
                 strategy={workflow.run.strategy}
               />
             ) : null}

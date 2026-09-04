@@ -592,9 +592,9 @@ Critères d'acceptation :
 - [x] Sélection des expériences et preuves éligibles.
 - [x] Proposition d'un angle de candidature.
 - [x] Identification honnête des écarts et objections.
-- [ ] Questions d'entretien recommandées.
-- [ ] Messages courts pour prise de contact et candidature.
-- [ ] Suggestion facultative d'une preuve de travail proportionnée.
+- [x] Questions d'entretien recommandées.
+- [x] Messages courts pour prise de contact et candidature.
+- [x] Suggestion facultative d'une preuve de travail proportionnée.
 - [x] Versionnement de la stratégie validée.
 
 Critères d'acceptation :

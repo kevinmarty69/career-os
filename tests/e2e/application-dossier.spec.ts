@@ -552,9 +552,24 @@ test('shows the grounded strategy and requires human approval before drafting', 
   await expect(
     page.getByText(
       'Lead with end-to-end ownership of a reliable production platform.',
+      { exact: true },
     ),
   ).toBeVisible();
   await expect(page.getByText('Topics to address honestly')).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Turn the approved strategy into the next conversation.',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText('Interview questions')).toBeVisible();
+  await expect(page.getByText('Short messages')).toBeVisible();
+  if (process.env.CAREER_OS_APPLICATION_KIT_SCREENSHOT)
+    await page.locator('.co-application-kit').screenshot({
+      path: process.env.CAREER_OS_APPLICATION_KIT_SCREENSHOT,
+    });
+  await page.getByRole('button', { name: 'FR' }).click();
+  await expect(page.getByText('Kit de candidature')).toBeVisible();
+  await page.getByRole('button', { name: 'EN' }).click();
   await page
     .getByRole('button', { name: 'Approve application strategy' })
     .click();
