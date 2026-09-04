@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { accessibleAccent } from './accent';
 import { httpUrlSchema } from './http-url';
 
 export const applicationCompanySourceSchema = z
@@ -35,7 +36,11 @@ export const applicationFieldsSchema = z
     role: z.string().min(1).max(200),
     description: z.string().min(1).max(20_000),
     url: httpUrlSchema.optional(),
-    accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    logoUrl: httpUrlSchema.optional(),
+    accent: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .transform(accessibleAccent),
     stage: applicationStageSchema.default('draft'),
     companySources: applicationCompanySourcesSchema.optional(),
   })

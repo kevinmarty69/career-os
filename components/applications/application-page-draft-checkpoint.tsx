@@ -13,12 +13,14 @@ export function ApplicationPageDraftCheckpoint({
   pending,
   profile,
   spec,
+  logoUrl,
 }: {
   error: boolean;
   onConfirm: () => void;
   pending: boolean;
   profile: PersistedRun['profile'];
   spec: PageSpec;
+  logoUrl?: string;
 }) {
   const { locale } = useI18n();
   const localize = useLocalizer([dossierMessages]);
@@ -63,7 +65,14 @@ export function ApplicationPageDraftCheckpoint({
         style={{ '--co-preview-accent': spec.company.accent } as CSSProperties}
       >
         <header>
-          <small>{spec.hero.eyebrow}</small>
+          <div>
+            {logoUrl ? (
+              // User-supplied remote hosts cannot be declared in Next image config.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt="" src={logoUrl} />
+            ) : null}
+            <small>{spec.hero.eyebrow}</small>
+          </div>
           <h3>{spec.hero.title}</h3>
           <p>{spec.hero.thesis}</p>
           <span>

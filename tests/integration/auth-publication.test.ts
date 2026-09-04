@@ -20,6 +20,7 @@ const opportunity = {
   company: 'Northstar Labs',
   role: 'Senior Product Engineer',
   description: 'Ship dependable product workflows.',
+  logoUrl: 'https://assets.example.test/northstar.svg',
   accent: '#21504b',
 };
 const livingProfile = structuredClone(syntheticProfile);
@@ -557,6 +558,7 @@ async function main() {
   );
   await expectStatus(publishedSnapshot, 200, 'anonymous capability read');
   const publishedPayload = await publishedSnapshot.json();
+  assert.deepEqual(publishedPayload.brand, { logoUrl: opportunity.logoUrl });
   assert.deepEqual(
     publishedPayload.profile.publicLinks,
     livingProfile.publicLinks,

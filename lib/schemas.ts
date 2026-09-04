@@ -145,7 +145,7 @@ export const pageSpecSchema = z
       .object({
         name: z.string().min(1).max(200),
         role: z.string().min(1).max(200),
-        logoUrl: z.string().url().max(2_048).optional(),
+        logoUrl: httpUrlSchema.optional(),
         accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
       })
       .strict(),

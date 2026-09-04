@@ -175,8 +175,16 @@ test('profile and publication inputs are bounded and separated', () => {
 
 test('published payload remains independently readable', () => {
   assert.deepEqual(
-    publishedPayloadSchema.parse({ profile: syntheticProfile, spec }),
-    { profile: syntheticProfile, spec },
+    publishedPayloadSchema.parse({
+      profile: syntheticProfile,
+      spec,
+      brand: { logoUrl: 'https://assets.example.test/logo.svg' },
+    }),
+    {
+      profile: syntheticProfile,
+      spec,
+      brand: { logoUrl: 'https://assets.example.test/logo.svg' },
+    },
   );
 });
 

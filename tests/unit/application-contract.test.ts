@@ -44,6 +44,17 @@ test('application mutations are strict and bounded', () => {
     true,
   );
   assert.equal(
+    applicationFieldsSchema.safeParse({
+      ...application,
+      logoUrl: 'data:image/svg+xml,unsafe',
+    }).success,
+    false,
+  );
+  assert.equal(
+    applicationFieldsSchema.parse({ ...application, accent: '#ffffff' }).accent,
+    '#21504b',
+  );
+  assert.equal(
     updateApplicationInputSchema.safeParse({
       ...application,
       description: 'x'.repeat(20_001),

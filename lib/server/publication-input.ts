@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { httpUrlSchema } from '../http-url';
 import { pageSpecSchema, profileSchema } from '../schemas';
 
 export const publishedPayloadSchema = z
   .object({
     profile: profileSchema,
     spec: pageSpecSchema,
+    brand: z.object({ logoUrl: httpUrlSchema.optional() }).strict().optional(),
   })
   .strict();
 

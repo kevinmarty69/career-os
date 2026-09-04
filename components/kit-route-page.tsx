@@ -20,7 +20,7 @@ import {
   applicationSchema,
   type Application,
 } from '@/lib/application-contract';
-import { readApplication } from '@/lib/career-api';
+import { readApplication, saveApplicationBrand } from '@/lib/career-api';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
@@ -801,9 +801,30 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
     application?: Application;
     error?: 'auth' | 'missing' | 'unavailable';
   }>();
+  const [brandState, setBrandState] = useState<
+    'ready' | 'saving' | 'saved' | 'error'
+  >('ready');
   const current = result?.applicationId === applicationId ? result : undefined;
   const application = current?.application;
   const error = current?.error;
+
+  async function saveBrand(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!application || workflow.run || brandState === 'saving') return;
+    const form = new FormData(event.currentTarget);
+    const logoUrl = String(form.get('logoUrl') ?? '').trim() || undefined;
+    const accent = String(form.get('accent') ?? '');
+    setBrandState('saving');
+    try {
+      const response = await saveApplicationBrand(application, logoUrl, accent);
+      if (!response.ok) throw new Error();
+      const parsed = applicationSchema.parse(await response.json());
+      setResult({ applicationId, application: parsed });
+      setBrandState('saved');
+    } catch {
+      setBrandState('error');
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -908,6 +929,70 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
               </div>
             </dl>
             <p>{application.description}</p>
+            <section className="co-company-brand">
+              <header>
+                <div>
+                  <h2>Identité visuelle de la page privée</h2>
+                  <p>
+                    Le logo et la couleur accompagnent cette candidature sans
+                    imiter le site de l’entreprise.
+                  </p>
+                </div>
+                <span
+                  aria-hidden="true"
+                  style={{ background: application.accent }}
+                >
+                  {application.logoUrl ? (
+                    // User-supplied remote hosts cannot be declared in Next image config.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt="" src={application.logoUrl} />
+                  ) : (
+                    application.company.slice(0, 2).toUpperCase()
+                  )}
+                </span>
+              </header>
+              {workflow.run ? (
+                <p>Identité figée dans le snapshot de ce run.</p>
+              ) : (
+                <form onSubmit={saveBrand}>
+                  <label>
+                    Logo de l’entreprise
+                    <input
+                      defaultValue={application.logoUrl ?? ''}
+                      name="logoUrl"
+                      placeholder="https://…"
+                      type="url"
+                    />
+                  </label>
+                  <label>
+                    Couleur principale accessible
+                    <input
+                      defaultValue={application.accent}
+                      name="accent"
+                      type="color"
+                    />
+                  </label>
+                  <button
+                    className="co-button quiet"
+                    disabled={brandState === 'saving'}
+                    type="submit"
+                  >
+                    {brandState === 'saving'
+                      ? 'Enregistrement…'
+                      : 'Enregistrer l’identité'}
+                  </button>
+                </form>
+              )}
+              {brandState === 'saved' ? (
+                <p role="status">Identité enregistrée pour le prochain run.</p>
+              ) : null}
+              {brandState === 'error' ? (
+                <p role="alert">
+                  L’identité n’a pas été enregistrée. Vérifiez l’URL et
+                  réessayez.
+                </p>
+              ) : null}
+            </section>
             <section className="co-live-workflow">
               <h2>Workflow agentique</h2>
               {workflow.loading ? (
@@ -1025,6 +1110,7 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
             workflow.run.stage === 'page_spec_review' ? (
               <ApplicationPageDraftCheckpoint
                 error={workflow.decisionError}
+                logoUrl={application.logoUrl}
                 onConfirm={() => void workflow.startReviews()}
                 pending={workflow.decisionPending}
                 profile={workflow.run.profile}

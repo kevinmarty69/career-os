@@ -628,11 +628,11 @@ Critères d'acceptation :
 - [x] Composition à partir de blocs approuvés et de données structurées.
 - [x] Hero spécifique au rôle et à l'entreprise.
 - [x] Lecture rapide suivie de preuves en divulgation progressive.
-- [ ] Personnalisation accessible avec logo, couleurs et tonalité.
+- [x] Personnalisation accessible avec logo, couleurs et tonalité.
 - [x] Indication claire de candidature indépendante.
 - [x] CV, LinkedIn, GitHub, portfolio et contact configurables.
 - [x] Aperçu desktop et mobile.
-- [ ] Contrôle de contraste, responsive et navigation clavier.
+- [x] Contrôle de contraste, responsive et navigation clavier.
 - [x] Lien privé non indexable, expirant et révocable.
 - [x] Session privée sans secret persistant dans l'URL.
 - [ ] Versionnement et remplacement d'une publication.

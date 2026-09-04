@@ -28,6 +28,18 @@ export const dossierMessages = {
   'Démarrage du workflow…': 'Starting workflow…',
   'Démarrer le workflow agentique': 'Start agent workflow',
   'Workflow agentique': 'Agent workflow',
+  'Identité visuelle de la page privée': 'Private page visual identity',
+  'Le logo et la couleur accompagnent cette candidature sans imiter le site de l’entreprise.':
+    'The logo and color personalize this application without imitating the company website.',
+  'Identité figée dans le snapshot de ce run.':
+    'Identity locked in this run snapshot.',
+  'Logo de l’entreprise': 'Company logo',
+  'Couleur principale accessible': 'Accessible primary color',
+  'Enregistrer l’identité': 'Save identity',
+  'Identité enregistrée pour le prochain run.':
+    'Identity saved for the next run.',
+  'L’identité n’a pas été enregistrée. Vérifiez l’URL et réessayez.':
+    'Identity could not be saved. Check the URL and try again.',
   'Recherche d’un run existant…': 'Looking for an existing run…',
   'Statut du run': 'Run status',
   'Étape active': 'Active stage',

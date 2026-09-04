@@ -145,11 +145,12 @@ export async function createPersistedRun(
           role: string;
           raw_text: string;
           url: string | null;
+          logo_url: string | null;
           accent: string;
           company_sources: unknown;
           revision: string;
         }>
-      >`select company, role, raw_text, url, accent, company_sources, revision
+      >`select company, role, raw_text, url, logo_url, accent, company_sources, revision
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${input.applicationId}
           and deleted_at is null
@@ -180,12 +181,12 @@ export async function createPersistedRun(
       const runId = randomUUID();
       await tx`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role,
-        raw_text, url, accent, company_sources, extraction_status
+        raw_text, url, logo_url, accent, company_sources, extraction_status
       ) values (
         ${opportunityId}, ${session.tenantId}, ${input.applicationId},
         ${input.applicationRevision}, ${application.company}, ${application.role},
-        ${application.raw_text}, ${application.url}, ${application.accent},
-        ${tx.json(companySources)}, 'ready'
+        ${application.raw_text}, ${application.url}, ${application.logo_url},
+        ${application.accent}, ${tx.json(companySources)}, 'ready'
       )`;
       await tx`insert into app.workflow_runs (
         id, tenant_id, opportunity_id, profile_id, source_profile_id,

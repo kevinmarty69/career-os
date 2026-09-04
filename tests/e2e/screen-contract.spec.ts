@@ -213,6 +213,7 @@ test('identifies a valid private page as an independent application', async ({
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
+        brand: { logoUrl: 'https://assets.example.test/signal-forge.svg' },
         profile: {
           name: 'Alex Morgan',
           headline: 'Product engineer',
@@ -250,6 +251,12 @@ test('identifies a valid private page as an independent application', async ({
       }),
     }),
   );
+  await page.route('https://assets.example.test/signal-forge.svg', (route) =>
+    route.fulfill({
+      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="white"/></svg>',
+      contentType: 'image/svg+xml',
+    }),
+  );
 
   await page.goto(`/p/${publicationId}`);
   await expect(
@@ -260,6 +267,7 @@ test('identifies a valid private page as an independent application', async ({
   await expect(
     page.getByRole('heading', { name: 'Alex Morgan × Signal Forge' }),
   ).toBeVisible();
+  await expect(page.getByAltText('Signal Forge logo')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Resume' })).toHaveAttribute(
     'href',
     'https://example.test/alex-resume.pdf',

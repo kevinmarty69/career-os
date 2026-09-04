@@ -22,6 +22,28 @@ export function readApplication(applicationId: string, signal: AbortSignal) {
   });
 }
 
+export function saveApplicationBrand(
+  application: import('./application-contract').Application,
+  logoUrl: string | undefined,
+  accent: string,
+) {
+  return fetch(`/api/applications/${application.applicationId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      company: application.company,
+      role: application.role,
+      description: application.description,
+      ...(application.url ? { url: application.url } : {}),
+      ...(logoUrl ? { logoUrl } : {}),
+      accent,
+      stage: application.stage,
+      companySources: application.companySources ?? [],
+      expectedRevision: application.revision,
+    }),
+  });
+}
+
 export function readApplicationRun(applicationId: string, signal: AbortSignal) {
   return fetch(`/api/applications/${applicationId}/run`, {
     cache: 'no-store',

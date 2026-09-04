@@ -15,7 +15,11 @@ import {
   type Profile,
 } from '@/lib/schemas';
 
-type Publication = { spec: PageSpec; profile: Profile };
+type Publication = {
+  spec: PageSpec;
+  profile: Profile;
+  brand?: { logoUrl?: string };
+};
 
 export function PrivatePublication() {
   const { capability } = useParams<{ capability: string }>();
@@ -53,7 +57,13 @@ export function PrivatePublication() {
         if (currentRequest !== request) return;
         setPublication(
           spec.success && profile.success
-            ? { spec: spec.data, profile: profile.data }
+            ? {
+                spec: spec.data,
+                profile: profile.data,
+                ...(parsed.brand?.logoUrl
+                  ? { brand: { logoUrl: parsed.brand.logoUrl } }
+                  : {}),
+              }
             : null,
         );
       } catch {
@@ -107,6 +117,7 @@ export function PrivatePublication() {
     );
 
   const { spec, profile } = publication;
+  const logoUrl = publication.brand?.logoUrl ?? spec.company.logoUrl;
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
   const publicLinks = profile.publicLinks ?? {};
 
@@ -117,9 +128,19 @@ export function PrivatePublication() {
     >
       <header>
         <span>
-          <i aria-hidden="true">
-            {spec.company.name.slice(0, 2).toUpperCase()}
-          </i>
+          {logoUrl ? (
+            // Published company logos may come from any validated HTTPS host.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              alt={`${spec.company.name} logo`}
+              className="co-public-company-logo"
+              src={logoUrl}
+            />
+          ) : (
+            <i aria-hidden="true">
+              {spec.company.name.slice(0, 2).toUpperCase()}
+            </i>
+          )}
           <span>
             <strong>{profile.name}</strong>
             <small>→ {spec.company.name}</small>
