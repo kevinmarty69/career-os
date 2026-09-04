@@ -62,12 +62,33 @@ export function PrivatePublication() {
   }, [capability]);
 
   if (publication === undefined)
-    return <main className="private-error">Checking private link…</main>;
+    return (
+      <main className="co-public-state" aria-busy="true">
+        <span className="co-public-mark" aria-hidden="true">
+          <i />
+        </span>
+        <p role="status">Vérification du lien privé…</p>
+      </main>
+    );
   if (!publication?.spec)
     return (
-      <main className="private-error">
-        <h1>Private application unavailable.</h1>
-        <p>The private link is invalid, expired, or revoked.</p>
+      <main className="co-public-state">
+        <span className="co-public-mark" aria-hidden="true">
+          <i />
+        </span>
+        <p>Page privée</p>
+        <span className="material-symbols-rounded" aria-hidden="true">
+          link_off
+        </span>
+        <h1>Ce lien n’est plus actif.</h1>
+        <strong>
+          Le candidat a révoqué l’accès ou la date d’expiration est passée.
+        </strong>
+        <small>Aucune information n’est conservée sur cette page.</small>
+        <a href="mailto:?subject=Demande%20de%20nouvel%20accès">
+          Demander un nouvel accès
+        </a>
+        <footer>Career OS · les pages privées ne sont jamais indexées</footer>
       </main>
     );
 
@@ -76,78 +97,111 @@ export function PrivatePublication() {
 
   return (
     <main
-      className="private-page"
+      className="co-public-page"
       style={{ '--company-accent': spec.company.accent } as React.CSSProperties}
     >
       <header>
-        <strong>{spec.company.name}</strong>
-        <span>{spec.company.role} · Private application</span>
+        <span>
+          <strong>{profile.name}</strong>
+          <small>→ {spec.company.name}</small>
+        </span>
+        <span>
+          <span className="material-symbols-rounded" aria-hidden="true">
+            lock
+          </span>
+          Lien privé · non indexable
+        </span>
       </header>
-      <section className="memo-hero">
-        <p className="section-label">Prepared for {spec.company.name}</p>
-        <h1>{spec.hero.title}</h1>
-        <p className="recipient-line">
-          {profile.name} · {spec.company.role}
+      <section className="co-public-hero">
+        <p>
+          Candidature · {spec.company.role} · {spec.company.name}
         </p>
-        <p className="thesis">{spec.hero.thesis}</p>
-        <div className="memo-meta">
-          <span>Why sent: a concise, evidence-backed fit assessment</span>
-          <span>3 min read</span>
-        </div>
-        <a className="memo-action" href="#strongest-evidence">
-          View Strongest Evidence
-        </a>
+        <h1>{spec.hero.title}</h1>
+        <p>{spec.hero.thesis}</p>
+        <a href="#strongest-evidence">Voir les preuves principales</a>
       </section>
-      {spec.blocks.map((block, index) => (
-        <section
-          className="proof-block"
-          id={index === 0 ? 'strongest-evidence' : undefined}
-          key={`${block.type}-${index}`}
-        >
-          <span>0{index + 1}</span>
-          <div>
-            <h2>{block.title}</h2>
-            {'claimIds' in block ? (
-              block.claimIds.map((id) => {
-                const claim = claims.get(id);
-                const evidence = claim?.evidenceIds
-                  .map((evidenceId) =>
-                    profile.evidence.find((item) => item.id === evidenceId),
-                  )
-                  .filter(Boolean);
-                return claim ? (
-                  <details key={id}>
-                    <summary>{claim.statement}</summary>
-                    <p>
-                      <span className={`level ${claim.level}`}>
-                        {claim.level}
-                      </span>{' '}
-                      ·{' '}
-                      {claim.evidenceIds.length
-                        ? `${claim.evidenceIds.length} linked proof`
-                        : 'No independent proof attached.'}
-                    </p>
-                    {evidence?.map((item) => {
-                      const source = profile.sources.find(
-                        (candidate) => candidate.id === item!.sourceId,
-                      );
-                      return (
-                        <p key={item!.id}>
-                          <strong>{source?.title}</strong>: “{item!.excerpt}”
+      <div className="co-public-body">
+        <article>
+          {spec.blocks.map((block, index) => (
+            <section
+              className="co-public-block"
+              id={index === 0 ? 'strongest-evidence' : undefined}
+              key={`${block.type}-${index}`}
+            >
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <div>
+                <h2>{block.title}</h2>
+                {'claimIds' in block ? (
+                  block.claimIds.map((id) => {
+                    const claim = claims.get(id);
+                    const evidence = claim?.evidenceIds
+                      .map((evidenceId) =>
+                        profile.evidence.find((item) => item.id === evidenceId),
+                      )
+                      .filter(Boolean);
+                    return claim ? (
+                      <details key={id}>
+                        <summary>{claim.statement}</summary>
+                        <p>
+                          <span className={`co-public-level ${claim.level}`}>
+                            {claim.level === 'verified'
+                              ? 'Sourcé'
+                              : claim.level === 'declared'
+                                ? 'Déclaré'
+                                : 'Sans source'}
+                          </span>
+                          {claim.evidenceIds.length
+                            ? ` · ${claim.evidenceIds.length} preuve${claim.evidenceIds.length > 1 ? 's' : ''} rattachée${claim.evidenceIds.length > 1 ? 's' : ''}`
+                            : ' · aucune preuve indépendante rattachée'}
                         </p>
-                      );
-                    })}
-                  </details>
-                ) : null;
-              })
-            ) : (
-              <p>{block.text}</p>
-            )}
-          </div>
-        </section>
-      ))}
+                        {evidence?.map((item) => {
+                          const source = profile.sources.find(
+                            (candidate) => candidate.id === item!.sourceId,
+                          );
+                          return (
+                            <blockquote key={item!.id}>
+                              <strong>{source?.title}</strong>
+                              <span>« {item!.excerpt} »</span>
+                              <small>
+                                Extrait partagé volontairement par le candidat.
+                                Le document complet n’est pas accessible.
+                              </small>
+                            </blockquote>
+                          );
+                        })}
+                      </details>
+                    ) : null;
+                  })
+                ) : (
+                  <p>{block.text}</p>
+                )}
+              </div>
+            </section>
+          ))}
+        </article>
+        <aside>
+          <span aria-hidden="true">
+            {profile.name.slice(0, 2).toUpperCase()}
+          </span>
+          <h2>{profile.name}</h2>
+          <p>{profile.headline}</p>
+          <h3>Documents</h3>
+          <a href="#strongest-evidence">
+            <span className="material-symbols-rounded" aria-hidden="true">
+              description
+            </span>
+            Preuves inspectables
+          </a>
+          <a href={`mailto:?subject=${encodeURIComponent(spec.company.role)}`}>
+            Proposer un échange
+            <span className="material-symbols-rounded" aria-hidden="true">
+              north_east
+            </span>
+          </a>
+        </aside>
+      </div>
       <footer>
-        Synthetic demonstration data · Access can be revoked by the sender
+        Page privée générée avec Career OS. Contenu validé par le candidat.
       </footer>
     </main>
   );
