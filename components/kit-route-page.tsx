@@ -2753,37 +2753,68 @@ function CompanyScreen() {
               source="Déduit d’un post LinkedIn, à vérifier en entretien"
             />
           </section>
+          <div className="co-company-context">
+            <section className="co-panel">
+              <small>Ce qu’ils disent publiquement</small>
+              <p>
+                <Icon>format_quote</Icon>« Nous voulons rester une petite équipe
+                très outillée. » · CTO, podcast août 2026
+              </p>
+              <p>
+                <Icon>format_quote</Icon>« La fiabilité du déploiement est notre
+                principal risque. » · blog ingénierie
+              </p>
+            </section>
+            <section className="co-panel">
+              <small>Points de vigilance</small>
+              <p>
+                <Icon>warning</Icon>Deux départs de l’équipe plateforme en six
+                mois.
+              </p>
+              <p>
+                <Icon>warning</Icon>Aucune information publique sur les niveaux
+                de rémunération.
+              </p>
+            </section>
+          </div>
         </section>
-        <aside className="co-stack">
+        <aside className="co-stack co-company-sources">
+          <h2>Sources retenues</h2>
+          {[
+            ['public', 'nimbus.ai/blog', '3 articles · août 2026'],
+            ['newspaper', 'Presse spécialisée', 'levée de fonds · juin 2026'],
+            ['code', 'github.com/nimbus', '2 dépôts publics'],
+            ['podcasts', 'Interview du CTO', 'transcription · 48 min'],
+          ].map(([icon, title, copy]) => (
+            <article key={title}>
+              <Icon>{icon}</Icon>
+              <span>
+                <strong>{title}</strong>
+                <small>{copy}</small>
+              </span>
+              <Icon>north_east</Icon>
+            </article>
+          ))}
           <section className="co-panel">
-            <h2>14 sources lues</h2>
-            <p>6 retenues, 8 écartées comme non fiables ou périmées.</p>
-          </section>
-          <section className="co-panel">
-            <h2>Ce qu’ils disent publiquement</h2>
-            <blockquote>
-              « Nous voulons rester une petite équipe très outillée. »
-              <small>CTO · podcast août 2026</small>
-            </blockquote>
-            <blockquote>
-              « La fiabilité du déploiement est notre principal risque. »
-              <small>blog ingénierie</small>
-            </blockquote>
-          </section>
-          <section className="co-panel">
-            <h2>Points de vigilance</h2>
+            <small>Écartées · 8</small>
             <p>
-              <Icon>warning</Icon>Deux départs de l’équipe plateforme en six
-              mois.
+              <Icon>block</Icon>Agrégateurs d’offres · contenu recopié
             </p>
             <p>
-              <Icon>warning</Icon>Aucune information publique sur les
-              rémunérations.
+              <Icon>block</Icon>Fiche société de 2023 · périmée
+            </p>
+            <p>
+              <Icon>block</Icon>Avis salariés anonymes · non vérifiables
             </p>
           </section>
-          <div className="co-note">
-            <Icon>shield</Icon>Sources publiques seules. Aucun scraping de
-            profils privés.
+          <div className="co-company-public-only">
+            <strong>
+              <Icon>shield</Icon>Sources publiques seules
+            </strong>
+            <p>
+              Aucun scraping de profils privés, aucun contact non consenti. Le
+              dossier ne contient que ce qu’un candidat pourrait lire lui-même.
+            </p>
           </div>
         </aside>
       </div>
@@ -2803,6 +2834,10 @@ function MessagesScreen() {
         </Link>
         <h1>Messages</h1>
         <p>4 brouillons · 2 relances dues</p>
+        <div className="co-message-tabs">
+          <button className="active">À envoyer</button>
+          <button>Envoyés</button>
+        </div>
         {[
           [
             'NR',
@@ -2837,7 +2872,10 @@ function MessagesScreen() {
             <strong>Candidature — Staff Product Engineer</strong>
             <small>Email · à Camille Lefort</small>
           </div>
-          <Button quiet>LinkedIn</Button>
+          <div className="co-message-channel">
+            <button className="active">Email</button>
+            <button>LinkedIn</button>
+          </div>
         </header>
         <div className="co-email-fields">
           <label>
@@ -2876,6 +2914,14 @@ function MessagesScreen() {
           </p>
         </article>
         <footer>
+          <div className="co-message-rewrites">
+            <button>
+              <Icon>short_text</Icon>Plus court
+            </button>
+            <button>
+              <Icon>tune</Icon>Plus sobre
+            </button>
+          </div>
           <span>148 mots · 1 lien · 1 chiffre sourcé</span>
           <Button quiet>Copier le texte</Button>
           <Button>Ouvrir dans mon client mail</Button>
@@ -2897,6 +2943,24 @@ function MessagesScreen() {
             Me le rappeler
           </label>
         </section>
+        <section className="co-panel co-message-templates">
+          <h3>Gabarits</h3>
+          {[
+            'Candidature spontanée',
+            'Remerciement post-entretien',
+            'Relance polie',
+            'Négociation d’offre',
+          ].map((template) => (
+            <p key={template}>
+              <Icon>mail</Icon>
+              {template}
+            </p>
+          ))}
+        </section>
+        <div className="co-note co-message-history">
+          <Icon>history</Icon>Une fois envoyé, marquez-le : l’app compte les
+          jours pour la relance.
+        </div>
       </aside>
     </main>
   );

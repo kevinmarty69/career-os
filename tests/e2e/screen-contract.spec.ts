@@ -74,6 +74,7 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
     '/applications/nimbus',
     '/applications/nimbus/review',
     '/applications/nimbus/page',
+    '/applications/nimbus/company',
     '/links',
     '/memory/interview',
     '/interviews/demo',

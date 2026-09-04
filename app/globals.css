@@ -3800,6 +3800,113 @@
   line-height: 1.35;
 }
 
+.co-company-context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.co-company-context small,
+.co-company-sources .co-panel > small {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--co-text-4);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.co-company-context p,
+.co-company-sources p {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 0;
+  color: var(--co-text-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.co-company-context p .co-icon {
+  color: var(--co-text-4);
+  font-size: 16px;
+}
+
+.co-company-context section:last-child p .co-icon,
+.co-company-sources .co-panel p .co-icon {
+  color: var(--co-warn-text);
+}
+
+.co-company-sources {
+  padding-left: 2px;
+}
+
+.co-company-sources > h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.co-company-sources > article {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid var(--co-border);
+  border-radius: 13px;
+  background: #fff;
+}
+
+.co-company-sources > article > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.co-company-sources > article strong,
+.co-company-sources > article small {
+  display: block;
+}
+
+.co-company-sources > article strong {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.co-company-sources > article small {
+  margin-top: 2px;
+  color: var(--co-text-4);
+  font-size: 9.5px;
+}
+
+.co-company-sources > article > .co-icon {
+  color: var(--co-text-4);
+  font-size: 17px;
+}
+
+.co-company-public-only {
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+  padding: 14px;
+  color: #fff;
+  border-radius: 15px;
+  background: var(--co-text);
+}
+
+.co-company-public-only strong {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.co-company-public-only p {
+  margin: 0;
+  color: rgb(255 255 255 / 72%);
+  font-size: 10.5px;
+}
+
 .co-panel blockquote {
   margin: 0 0 10px;
   padding: 12px;
@@ -3870,6 +3977,40 @@
 
 .co-messages > aside:first-child > button.active {
   background: #fff;
+}
+
+.co-message-tabs,
+.co-message-channel {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--co-fill-subtle);
+}
+
+.co-message-tabs button,
+.co-message-channel button,
+.co-message-rewrites button {
+  min-height: 30px;
+  padding: 0 11px;
+  color: var(--co-text-3);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.co-message-tabs button {
+  flex: 1;
+}
+
+.co-message-tabs button.active,
+.co-message-channel button.active {
+  color: var(--co-text);
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(21 23 32 / 8%);
 }
 
 .co-messages > aside:first-child > button strong,
@@ -3968,6 +4109,40 @@
   margin-right: auto;
   color: var(--co-text-4);
   font-size: 10.5px;
+}
+
+.co-message-rewrites {
+  display: flex;
+  gap: 5px;
+}
+
+.co-message-rewrites button {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  background: var(--co-fill-subtle);
+}
+
+.co-message-rewrites .co-icon {
+  font-size: 15px;
+}
+
+.co-message-templates p {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 0;
+  color: var(--co-text-2);
+  font-size: 11px;
+}
+
+.co-message-templates .co-icon {
+  color: var(--co-text-4);
+  font-size: 16px;
+}
+
+.co-message-history {
+  margin-top: auto;
 }
 
 .co-skill-row {
