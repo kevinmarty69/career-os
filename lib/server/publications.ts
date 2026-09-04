@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
+import { publicationEventSchema } from '../publication-analytics';
 import {
   decodePublicationCursor,
   encodePublicationCursor,
@@ -29,6 +30,12 @@ type PublicationSummaryRow = {
   status: 'active' | 'expired' | 'revoked';
   version: number;
   is_current: boolean;
+  first_opened_at: string | null;
+  last_opened_at: string | null;
+  opens: number;
+  sections: number;
+  actions: number;
+  downloads: number;
 };
 
 const PUBLICATION_PAGE_SIZE = 50;
@@ -160,6 +167,12 @@ export async function listPublications(
           status: row.status,
           version: row.version,
           isCurrent: row.is_current,
+          firstOpenedAt: row.first_opened_at,
+          lastOpenedAt: row.last_opened_at,
+          opens: row.opens,
+          sections: row.sections,
+          actions: row.actions,
+          downloads: row.downloads,
         }),
       );
       return {
@@ -169,6 +182,28 @@ export async function listPublications(
             ? encodePublicationCursor(page.at(-1)!)
             : null,
       };
+    });
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function recordPublicationEvent(
+  publicationId: string,
+  rawToken: string,
+  rawEvent: unknown,
+) {
+  const id = z.string().uuid().parse(publicationId);
+  const token = z.string().min(32).max(128).parse(rawToken);
+  const event = publicationEventSchema.parse(rawEvent);
+  const sql = database();
+  try {
+    await sql.begin(async (tx) => {
+      await tx.unsafe('set local role career_reader');
+      await tx`select app.record_shared_publication_event(
+        ${id}, ${createHash('sha256').update(token).digest()},
+        ${event.type}, ${event.key ?? null}
+      )`;
     });
   } finally {
     await sql.end();

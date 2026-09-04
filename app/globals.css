@@ -3884,6 +3884,12 @@
   font-size: 10px;
 }
 
+.co-publication-table .co-table-head,
+.co-publication-table .co-table-row {
+  grid-template-columns: minmax(180px, 1.5fr) repeat(4, minmax(48px, 0.5fr));
+  min-width: 0;
+}
+
 .co-company {
   padding: 0;
 }

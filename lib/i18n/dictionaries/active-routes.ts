@@ -1,6 +1,17 @@
 import type { MessageDictionary } from '../messages';
 
 export const activeRoutesMessages = {
+  'Mesures de la page': 'Page metrics',
+  'Première ouverture': 'First opened',
+  'Dernière ouverture': 'Last opened',
+  'Ces compteurs n’identifient pas le lecteur et ne prouvent pas son intérêt.':
+    'These counters do not identify the reader or prove their interest.',
+  'Aucune page publiée.': 'No published page.',
+  'Sections consultées': 'Sections viewed',
+  Actions: 'Actions',
+  Statut: 'Status',
+  'Aucun fingerprint, aucune adresse IP et aucun user-agent ne sont enregistrés.':
+    'No fingerprint, IP address, or user agent is recorded.',
   'Journal d’accès': 'Access log',
   'Page ouverte · 3 min': 'Page opened · 3 min',
   'aujourd’hui 09:12': 'today at 09:12',

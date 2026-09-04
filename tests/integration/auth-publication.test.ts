@@ -606,7 +606,9 @@ async function main() {
   };
   assert.equal(replacementPublication.version, 2);
   await expectStatus(
-    await capabilityReader.get(`/api/publications/${publication.publicationId}`),
+    await capabilityReader.get(
+      `/api/publications/${publication.publicationId}`,
+    ),
     404,
     'replaced capability',
   );
@@ -619,6 +621,20 @@ async function main() {
     204,
     'replacement capability exchange',
   );
+  for (const event of [
+    { type: 'open' },
+    { type: 'section', key: 'evidence:0:0' },
+    { type: 'action', key: 'linkedin' },
+    { type: 'download', key: 'resume' },
+  ])
+    await expectStatus(
+      await replacementReader.post(
+        `/api/publications/${replacementPublication.publicationId}/events`,
+        event,
+      ),
+      204,
+      `publication ${event.type} event`,
+    );
   const inventoryResponse = await owner.get('/api/publications');
   await expectStatus(inventoryResponse, 200, 'publication history');
   const inventory = (await inventoryResponse.json()) as {
@@ -627,6 +643,12 @@ async function main() {
       status: string;
       version: number;
       isCurrent: boolean;
+      firstOpenedAt: string | null;
+      lastOpenedAt: string | null;
+      opens: number;
+      sections: number;
+      actions: number;
+      downloads: number;
     }>;
   };
   assert.deepEqual(
@@ -635,6 +657,10 @@ async function main() {
       status: item.status,
       version: item.version,
       isCurrent: item.isCurrent,
+      opens: item.opens,
+      sections: item.sections,
+      actions: item.actions,
+      downloads: item.downloads,
     })),
     [
       {
@@ -642,15 +668,25 @@ async function main() {
         status: 'active',
         version: 2,
         isCurrent: true,
+        opens: 1,
+        sections: 1,
+        actions: 1,
+        downloads: 1,
       },
       {
         publicationId: publication.publicationId,
         status: 'revoked',
         version: 1,
         isCurrent: false,
+        opens: 0,
+        sections: 0,
+        actions: 0,
+        downloads: 0,
       },
     ],
   );
+  assert.ok(inventory.publications[0].firstOpenedAt);
+  assert.ok(inventory.publications[0].lastOpenedAt);
   const invitee = new BrowserSession();
   await expectStatus(
     await invitee.post(

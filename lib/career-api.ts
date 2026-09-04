@@ -15,6 +15,10 @@ export function readApplications(signal: AbortSignal) {
   return fetch('/api/applications', { cache: 'no-store', signal });
 }
 
+export function readPublications(signal: AbortSignal) {
+  return fetch('/api/publications', { cache: 'no-store', signal });
+}
+
 export function readApplication(applicationId: string, signal: AbortSignal) {
   return fetch(`/api/applications/${applicationId}`, {
     cache: 'no-store',

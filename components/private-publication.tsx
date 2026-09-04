@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
   LocaleSwitch,
@@ -26,6 +26,21 @@ export function PrivatePublication() {
   const { locale } = useI18n();
   const localize = useLocalizer([publicationMessages]);
   const [publication, setPublication] = useState<Publication | null>();
+  const recorded = useRef(new Set<string>());
+  const record = useCallback(
+    (type: 'open' | 'section' | 'action' | 'download', key?: string) => {
+      const signature = `${type}:${key ?? ''}`;
+      if (recorded.current.has(signature)) return;
+      recorded.current.add(signature);
+      void fetch(`/api/publications/${capability}/events`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type, ...(key ? { key } : {}) }),
+        keepalive: true,
+      }).catch(() => undefined);
+    },
+    [capability],
+  );
 
   useEffect(() => {
     let request = 0;
@@ -66,18 +81,17 @@ export function PrivatePublication() {
               }
             : null,
         );
+        if (spec.success && profile.success) record('open');
       } catch {
         if (currentRequest === request) setPublication(null);
       }
     }
 
     void load();
-    window.addEventListener('hashchange', load);
     return () => {
       request += 1;
-      window.removeEventListener('hashchange', load);
     };
-  }, [capability]);
+  }, [capability, record]);
 
   if (publication === undefined)
     return localize(
@@ -165,7 +179,12 @@ export function PrivatePublication() {
         </span>
         <h1>{spec.hero.title}</h1>
         <p>{spec.hero.thesis}</p>
-        <a href="#strongest-evidence">Voir les preuves principales</a>
+        <a
+          href="#strongest-evidence"
+          onClick={() => record('action', 'strongest-evidence')}
+        >
+          Voir les preuves principales
+        </a>
       </section>
       <div className="co-public-body">
         <article>
@@ -179,7 +198,7 @@ export function PrivatePublication() {
               <div>
                 <h2>{block.title}</h2>
                 {'claimIds' in block ? (
-                  block.claimIds.map((id) => {
+                  block.claimIds.map((id, claimIndex) => {
                     const claim = claims.get(id);
                     const evidence = claim?.evidenceIds
                       .map((evidenceId) =>
@@ -187,7 +206,16 @@ export function PrivatePublication() {
                       )
                       .filter(Boolean);
                     return claim ? (
-                      <details key={id}>
+                      <details
+                        key={id}
+                        onToggle={(event) => {
+                          if (event.currentTarget.open)
+                            record(
+                              'section',
+                              `evidence:${index}:${claimIndex}`,
+                            );
+                        }}
+                      >
                         <summary>{claim.statement}</summary>
                         <p>
                           <span className={`co-public-level ${claim.level}`}>
@@ -237,7 +265,10 @@ export function PrivatePublication() {
           <h2>{profile.name}</h2>
           <p>{profile.headline}</p>
           <h3>Liens du candidat</h3>
-          <a href="#strongest-evidence">
+          <a
+            href="#strongest-evidence"
+            onClick={() => record('action', 'inspectable-evidence')}
+          >
             <span className="material-symbols-rounded" aria-hidden="true">
               description
             </span>
@@ -246,6 +277,7 @@ export function PrivatePublication() {
           {publicLinks.resume ? (
             <a
               href={publicLinks.resume}
+              onClick={() => record('download', 'resume')}
               rel="noreferrer noopener"
               target="_blank"
             >
@@ -258,6 +290,7 @@ export function PrivatePublication() {
           {publicLinks.linkedin ? (
             <a
               href={publicLinks.linkedin}
+              onClick={() => record('action', 'linkedin')}
               rel="noreferrer noopener"
               target="_blank"
             >
@@ -270,6 +303,7 @@ export function PrivatePublication() {
           {publicLinks.github ? (
             <a
               href={publicLinks.github}
+              onClick={() => record('action', 'github')}
               rel="noreferrer noopener"
               target="_blank"
             >
@@ -282,6 +316,7 @@ export function PrivatePublication() {
           {publicLinks.portfolio ? (
             <a
               href={publicLinks.portfolio}
+              onClick={() => record('action', 'portfolio')}
               rel="noreferrer noopener"
               target="_blank"
             >
@@ -294,6 +329,7 @@ export function PrivatePublication() {
           {publicLinks.email ? (
             <a
               href={`mailto:${publicLinks.email}?subject=${encodeURIComponent(spec.company.role)}`}
+              onClick={() => record('action', 'contact')}
             >
               Proposer un échange
               <span className="material-symbols-rounded" aria-hidden="true">

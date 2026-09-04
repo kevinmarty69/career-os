@@ -4,6 +4,7 @@ import test from 'node:test';
 import { syntheticProfile } from '../../lib/fixture';
 import { parsePublicationCookie } from '../../lib/publication-cookie';
 import { profileSchema } from '../../lib/schemas';
+import { publicationEventSchema } from '../../lib/publication-analytics';
 import { buildPageSpec, buildStrategy } from '../../lib/workflow';
 import {
   isSensitiveSessionFresh,
@@ -200,6 +201,12 @@ test('publication inventory exposes metadata without capabilities', () => {
     status: 'active' as const,
     version: 1,
     isCurrent: true,
+    firstOpenedAt: null,
+    lastOpenedAt: null,
+    opens: 0,
+    sections: 0,
+    actions: 0,
+    downloads: 0,
   };
   assert.deepEqual(publicationSummarySchema.parse(summary), summary);
   assert.equal(
@@ -214,6 +221,36 @@ test('publication inventory exposes metadata without capabilities', () => {
   });
   assert.equal(decodePublicationCursor('not-json'), null);
   assert.equal(decodePublicationCursor('x'.repeat(513)), null);
+});
+
+test('private analytics accept only bounded anonymous interactions', () => {
+  assert.equal(
+    publicationEventSchema.safeParse({ type: 'open' }).success,
+    true,
+  );
+  assert.equal(
+    publicationEventSchema.safeParse({ type: 'section', key: 'evidence:0:0' })
+      .success,
+    true,
+  );
+  assert.equal(
+    publicationEventSchema.safeParse({ type: 'action' }).success,
+    false,
+  );
+  assert.equal(
+    publicationEventSchema.safeParse({
+      type: 'download',
+      key: 'x'.repeat(121),
+    }).success,
+    false,
+  );
+  assert.equal(
+    publicationEventSchema.safeParse({
+      type: 'open',
+      fingerprint: 'forbidden',
+    }).success,
+    false,
+  );
 });
 
 test('JSON reader stops an oversized streamed body', async () => {

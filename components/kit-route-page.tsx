@@ -20,7 +20,12 @@ import {
   applicationSchema,
   type Application,
 } from '@/lib/application-contract';
-import { readApplication, saveApplicationBrand } from '@/lib/career-api';
+import {
+  readApplication,
+  readPublications,
+  saveApplicationBrand,
+} from '@/lib/career-api';
+import type { PublicationSummary } from '@/lib/server/publication-input';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
@@ -1705,46 +1710,69 @@ function PageEditorScreen() {
 }
 
 function LinksScreen() {
+  const { locale } = useI18n();
+  const [publications, setPublications] = useState<PublicationSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const controller = new AbortController();
+    void readPublications(controller.signal)
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const body = (await response.json()) as {
+          publications?: PublicationSummary[];
+        };
+        setPublications(body.publications ?? []);
+      })
+      .catch(() => setPublications([]))
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, []);
+  const selected =
+    publications.find((item) => item.isCurrent) ?? publications[0];
+  const active = publications.filter((item) => item.status === 'active');
+  const date = (value: string | null) =>
+    value
+      ? new Intl.DateTimeFormat(locale, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(value))
+      : '—';
+
   return (
     <AppShell
       path="/links"
       aside={
         <section className="co-stack">
-          <h2>Journal d’accès</h2>
-          {[
-            ['visibility', 'Page ouverte · 3 min', 'aujourd’hui 09:12'],
-            [
-              'description',
-              'Preuve inspectée · build p50',
-              'aujourd’hui 09:14',
-            ],
-            ['download', 'CV téléchargé', 'aujourd’hui 09:15'],
-            ['share', 'Lien ouvert depuis une 2ᵉ IP', 'hier 17:40'],
-            ['send', 'Lien créé', '2 sept. 14:20'],
-          ].map(([icon, label, time]) => (
-            <div className="co-activity" key={label}>
-              <Icon>{icon}</Icon>
-              <span>
-                <strong>{label}</strong>
-                <small>{time}</small>
-              </span>
-            </div>
-          ))}
-          <h3>Réglages du lien</h3>
-          <label className="co-toggle">
-            <input defaultChecked type="checkbox" />
-            Inspection des preuves
-          </label>
-          <label className="co-toggle">
-            <input defaultChecked type="checkbox" />
-            Téléchargement du CV
-          </label>
-          <label className="co-toggle">
-            <input type="checkbox" />
-            Mot de passe à l’ouverture
-          </label>
-          <Button>Copier le lien</Button>
-          <Button danger>Révoquer ce lien</Button>
+          <h2>Mesures de la page</h2>
+          {selected ? (
+            <>
+              <Company
+                name={selected.company}
+                initials={initials(selected.company)}
+                sub={`Version ${selected.version}`}
+              />
+              <div className="co-activity">
+                <Icon>first_page</Icon>
+                <span>
+                  <strong>Première ouverture</strong>
+                  <small>{date(selected.firstOpenedAt)}</small>
+                </span>
+              </div>
+              <div className="co-activity">
+                <Icon>schedule</Icon>
+                <span>
+                  <strong>Dernière ouverture</strong>
+                  <small>{date(selected.lastOpenedAt)}</small>
+                </span>
+              </div>
+              <div className="co-note">
+                <Icon>privacy_tip</Icon>Ces compteurs n’identifient pas le
+                lecteur et ne prouvent pas son intérêt.
+              </div>
+            </>
+          ) : (
+            <p>{loading ? 'Chargement…' : 'Aucune page publiée.'}</p>
+          )}
         </section>
       }
     >
@@ -1752,86 +1780,54 @@ function LinksScreen() {
         title="Liens privés"
         copy="Un lien par entreprise, révocable, avec journal d’accès. Aucune page n’est indexable."
         actions={
-          <Button>
+          <Link className="co-button" href="/applications">
             <Icon>add_link</Icon>Nouveau lien
-          </Button>
+          </Link>
         }
       />
       <div className="co-stats">
-        <Stat icon="link" value="4" label="Liens actifs" />
-        <Stat icon="visibility" value="17" label="Ouvertures totales" />
-        <Stat icon="description" value="31" label="Preuves inspectées" />
+        <Stat icon="link" value={String(active.length)} label="Liens actifs" />
+        <Stat
+          icon="visibility"
+          value={String(
+            publications.reduce((sum, item) => sum + item.opens, 0),
+          )}
+          label="Ouvertures totales"
+        />
+        <Stat
+          icon="description"
+          value={String(
+            publications.reduce((sum, item) => sum + item.sections, 0),
+          )}
+          label="Sections consultées"
+        />
         <Stat
           icon="visibility_off"
-          value="2"
+          value={String(publications.filter((item) => item.opens === 0).length)}
           label="Jamais ouverts"
           tone="muted"
         />
       </div>
-      <DataTable
-        headers={['Destinataire', 'Ouvertures', 'Preuves', 'Expiration', '']}
-        rows={[
-          [
+      <div className="co-publication-table">
+        <DataTable
+          headers={['Destinataire', 'Ouvertures', 'Sections', 'Actions', 'CV']}
+          rows={publications.map((item) => [
             <Company
-              key="nimbus"
-              name="Nimbus Robotics"
-              initials="NR"
-              sub="/p/8f2c-nimbus"
+              key={item.publicationId}
+              name={item.company}
+              initials={initials(item.company)}
+              sub={`${item.role} · v${item.version} · ${item.status}`}
             />,
-            '4',
-            '12',
-            '12 oct.',
-            <Button key="revoke" danger>
-              Révoquer
-            </Button>,
-          ],
-          [
-            <Company
-              key="atlas"
-              name="Atlas Health"
-              initials="AH"
-              sub="/p/1a77-atlas"
-            />,
-            '9',
-            '14',
-            '28 sept.',
-            <Button key="revoke" danger>
-              Révoquer
-            </Button>,
-          ],
-          [
-            <Company
-              key="lumen"
-              name="Lumen"
-              initials="LU"
-              sub="/p/4d10-lumen"
-            />,
-            '0',
-            '—',
-            'dans 2 j',
-            <Button key="extend" quiet>
-              Prolonger
-            </Button>,
-          ],
-          [
-            <Company
-              key="vantage"
-              name="Vantage Labs"
-              initials="VL"
-              sub="/p/9b31-vantage"
-            />,
-            '4',
-            '5',
-            'sans limite',
-            <Button key="revoke" danger>
-              Révoquer
-            </Button>,
-          ],
-        ]}
-      />
+            String(item.opens),
+            String(item.sections),
+            String(item.actions),
+            String(item.downloads),
+          ])}
+        />
+      </div>
       <div className="co-note">
-        <Icon>policy</Icon>Révoquer coupe l’accès immédiatement, y compris pour
-        un onglet déjà ouvert. Les captures déjà faites échappent au système.
+        <Icon>policy</Icon>Aucun fingerprint, aucune adresse IP et aucun
+        user-agent ne sont enregistrés.
       </div>
     </AppShell>
   );

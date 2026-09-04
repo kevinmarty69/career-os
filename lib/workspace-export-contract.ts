@@ -1,7 +1,20 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 9;
+export const workspaceExportVersion = 10;
 
 export const workspaceExportTables = [
+  {
+    type: 'publication_events',
+    table: 'publication_events',
+    columns: [
+      'id',
+      'tenant_id',
+      'publication_id',
+      'event_type',
+      'event_key',
+      'occurred_at',
+    ],
+    orderBy: ['id'],
+  },
   {
     type: 'search_profiles',
     table: 'search_profiles',

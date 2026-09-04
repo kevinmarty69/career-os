@@ -29,6 +29,12 @@ export const publicationSummarySchema = z
     status: z.enum(['active', 'expired', 'revoked']),
     version: z.number().int().positive(),
     isCurrent: z.boolean(),
+    firstOpenedAt: z.string().datetime().nullable(),
+    lastOpenedAt: z.string().datetime().nullable(),
+    opens: z.number().int().nonnegative(),
+    sections: z.number().int().nonnegative(),
+    actions: z.number().int().nonnegative(),
+    downloads: z.number().int().nonnegative(),
   })
   .strict();
 

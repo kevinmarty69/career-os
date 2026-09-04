@@ -209,6 +209,14 @@ test('identifies a valid private page as an independent application', async ({
 }) => {
   await context.clearCookies();
   const publicationId = '988c0a00-0000-4000-8000-000000000024';
+  const events: Array<{ type: string; key?: string }> = [];
+  await page.route(
+    `**/api/publications/${publicationId}/events`,
+    async (route) => {
+      events.push(route.request().postDataJSON());
+      await route.fulfill({ status: 204 });
+    },
+  );
   await page.route(`**/api/publications/${publicationId}`, (route) =>
     route.fulfill({
       contentType: 'application/json',
@@ -268,6 +276,18 @@ test('identifies a valid private page as an independent application', async ({
     page.getByRole('heading', { name: 'Alex Morgan × Signal Forge' }),
   ).toBeVisible();
   await expect(page.getByAltText('Signal Forge logo')).toBeVisible();
+  await expect
+    .poll(() => events.some((event) => event.type === 'open'))
+    .toBe(true);
+  await page.getByRole('link', { name: 'View key evidence' }).click();
+  await expect
+    .poll(() =>
+      events.some(
+        (event) =>
+          event.type === 'action' && event.key === 'strongest-evidence',
+      ),
+    )
+    .toBe(true);
   await expect(page.getByRole('link', { name: 'Resume' })).toHaveAttribute(
     'href',
     'https://example.test/alex-resume.pdf',
@@ -282,4 +302,49 @@ test('identifies a valid private page as an independent application', async ({
     'href',
     'mailto:alex@example.test?subject=Staff%20Platform%20Engineer',
   );
+});
+
+test('shows anonymous private-page metrics in the links inventory', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await page.route('**/api/publications', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        publications: [
+          {
+            publicationId: '988c0a00-0000-4000-8000-000000000025',
+            applicationId: '988c0a00-0000-4000-8000-000000000026',
+            company: 'Signal Forge',
+            role: 'Staff Platform Engineer',
+            publishedAt: '2026-09-04T13:00:00.000Z',
+            revokedAt: null,
+            expiresAt: '2026-09-11T13:00:00.000Z',
+            status: 'active',
+            version: 2,
+            isCurrent: true,
+            firstOpenedAt: '2026-09-04T14:00:00.000Z',
+            lastOpenedAt: '2026-09-04T15:00:00.000Z',
+            opens: 4,
+            sections: 3,
+            actions: 2,
+            downloads: 1,
+          },
+        ],
+        nextCursor: null,
+      }),
+    }),
+  );
+
+  await page.goto('/links');
+  await expect(
+    page.getByText('No fingerprint, IP address, or user agent is recorded.'),
+  ).toBeVisible();
+  const row = page.locator('.co-table-row').filter({ hasText: 'Signal Forge' });
+  await expect(row).toContainText('Staff Platform Engineer');
+  await expect(row.locator(':scope > span').nth(1)).toHaveText('4');
+  await expect(row.locator(':scope > span').nth(2)).toHaveText('3');
+  await expect(row.locator(':scope > span').nth(3)).toHaveText('2');
 });
