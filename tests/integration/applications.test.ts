@@ -205,6 +205,11 @@ async function main() {
   });
   await expectStatus(saved, 200, 'profile creation');
   const profile = (await saved.json()) as { revision: number };
+  await expectStatus(
+    await owner.request(`/api/applications/${updated.applicationId}/run`),
+    204,
+    'application without run',
+  );
   const heartbeatPool = new Pool({ connectionString: databaseUrl });
   try {
     await heartbeatPool.query('begin');
@@ -228,6 +233,14 @@ async function main() {
   );
   await expectStatus(run, 202, 'run from application');
   const persistedRun = (await run.json()) as { runId: string };
+  const latestRun = await owner.request(
+    `/api/applications/${updated.applicationId}/run`,
+  );
+  await expectStatus(latestRun, 200, 'latest application run');
+  assert.equal(
+    ((await latestRun.json()) as { runId: string }).runId,
+    persistedRun.runId,
+  );
 
   const pool = new Pool({ connectionString: databaseUrl });
   try {
@@ -295,6 +308,11 @@ async function main() {
     await other.request(`/api/applications/${application.applicationId}`),
     404,
     'cross-tenant application read',
+  );
+  await expectStatus(
+    await other.request(`/api/applications/${application.applicationId}/run`),
+    204,
+    'cross-tenant application run',
   );
 
   await expectStatus(

@@ -25,6 +25,27 @@ export const dossierMessages = {
   'Aucune URL source enregistrée.': 'No source URL saved.',
   'Le dossier est prêt pour la recherche entreprise et le workflow agentique.':
     'This application is ready for company research and the agent workflow.',
+  'Démarrage du workflow…': 'Starting workflow…',
+  'Démarrer le workflow agentique': 'Start agent workflow',
+  'Workflow agentique': 'Agent workflow',
+  'Recherche d’un run existant…': 'Looking for an existing run…',
+  'Statut du run': 'Run status',
+  'Étape active': 'Active stage',
+  'Événements persistés': 'Persisted events',
+  'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
+    'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
+  'Compléter la mémoire professionnelle': 'Complete Career Memory',
+  'Connectez-vous pour lancer ce workflow.': 'Sign in to start this workflow.',
+  'Enregistrez d’abord votre mémoire professionnelle.':
+    'Save your Career Memory before starting.',
+  'La candidature ou la mémoire a changé. Rechargez ce dossier.':
+    'The application or Career Memory changed. Reload this page.',
+  'La limite de runs est atteinte. Réessayez dans une minute.':
+    'The run limit has been reached. Try again in one minute.',
+  'Le worker de recherche est indisponible. Vérifiez votre instance.':
+    'The research worker is unavailable. Check your instance.',
+  'Le workflow est momentanément indisponible.':
+    'The workflow is temporarily unavailable.',
   'Historique de la page privée': 'Private page history',
   'Dossier de candidature': 'Application workspace',
   'À valider': 'Needs review',

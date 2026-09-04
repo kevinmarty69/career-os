@@ -22,6 +22,13 @@ export function readApplication(applicationId: string, signal: AbortSignal) {
   });
 }
 
+export function readApplicationRun(applicationId: string, signal: AbortSignal) {
+  return fetch(`/api/applications/${applicationId}/run`, {
+    cache: 'no-store',
+    signal,
+  });
+}
+
 export function readOpportunities(signal: AbortSignal) {
   return fetch('/api/opportunities', { cache: 'no-store', signal });
 }

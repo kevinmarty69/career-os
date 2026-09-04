@@ -235,6 +235,39 @@ export async function readPersistedRun(session: RunSession, rawRunId: string) {
   }
 }
 
+export async function readLatestApplicationRun(
+  session: RunSession,
+  rawApplicationId: string,
+) {
+  const applicationId = idempotencyKeySchema(rawApplicationId);
+  const sql = database();
+  try {
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session, 'career_app');
+      const [run] = await tx<Array<{ id: string }>>`
+        select candidate.id
+        from app.workflow_runs candidate
+        join app.opportunities opportunity
+          on opportunity.tenant_id = candidate.tenant_id
+          and opportunity.id = candidate.opportunity_id
+        where candidate.tenant_id = ${session.tenantId}
+          and opportunity.application_id = ${applicationId}
+        order by (
+          select min(step.created_at)
+          from app.workflow_steps step
+          where step.tenant_id = candidate.tenant_id
+            and step.workflow_run_id = candidate.id
+        ) desc nulls last, candidate.revision_count desc
+        limit 1`;
+      return run
+        ? readRunProjection(tx, session.tenantId, run.id, true)
+        : undefined;
+    });
+  } finally {
+    await sql.end();
+  }
+}
+
 export async function confirmResearchSelection(
   session: RunSession,
   rawRunId: string,

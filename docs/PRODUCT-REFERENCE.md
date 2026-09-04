@@ -605,16 +605,16 @@ Critères d'acceptation :
 
 ### Lot 5 - Orchestration et review agentiques
 
-- [ ] Workers séparés pour recherche, matching, stratégie, composition et review.
-- [ ] Entrées et sorties strictement validées par schéma.
-- [ ] Contexte et outils minimaux par rôle.
-- [ ] Exécution durable avec leases, idempotence et reprise.
+- [x] Workers séparés pour recherche, matching, stratégie, composition et review.
+- [x] Entrées et sorties strictement validées par schéma.
+- [x] Contexte et outils minimaux par rôle.
+- [x] Exécution durable avec leases, idempotence et reprise.
 - [ ] Journal lisible des étapes, décisions, sources, coûts et erreurs.
-- [ ] Reviews recruteur, hiring manager et factuelle.
-- [ ] Nombre de corrections automatiques borné.
-- [ ] Relance ciblée d'une section sans régénérer toute la candidature.
+- [x] Reviews recruteur, hiring manager et factuelle.
+- [x] Nombre de corrections automatiques borné.
+- [x] Relance ciblée d'une section sans régénérer toute la candidature.
 - [ ] File de décisions humaines avec conserver, corriger, sourcer ou supprimer.
-- [ ] Blocage de publication tant qu'une objection factuelle subsiste.
+- [x] Blocage de publication tant qu'une objection factuelle subsiste.
 
 Critères d'acceptation :
 

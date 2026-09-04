@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+import { useApplicationWorkflow } from '@/components/applications/use-application-workflow';
 import { ApplicationsPage } from '@/components/applications/applications-page';
 import {
   LocaleSwitch,
@@ -48,14 +49,20 @@ function Button({
   children,
   quiet = false,
   danger = false,
+  disabled = false,
+  onClick,
 }: {
   children: ReactNode;
   quiet?: boolean;
   danger?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
       className={`co-button${quiet ? ' quiet' : ''}${danger ? ' danger' : ''}`}
+      disabled={disabled}
+      onClick={onClick}
       type="button"
     >
       {children}
@@ -749,6 +756,7 @@ function DossierShell({
 
 function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
   const { locale } = useI18n();
+  const workflow = useApplicationWorkflow(applicationId);
   const [result, setResult] = useState<{
     applicationId: string;
     application?: Application;
@@ -797,7 +805,19 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
 
   return (
     <DossierShell
-      actions={null}
+      actions={
+        application && !workflow.run ? (
+          <Button
+            disabled={workflow.loading || workflow.profileRevision === 0}
+            onClick={() => void workflow.start(application)}
+          >
+            <Icon>bolt</Icon>
+            {workflow.starting
+              ? 'Démarrage du workflow…'
+              : 'Démarrer le workflow agentique'}
+          </Button>
+        ) : null
+      }
       active="Brief"
       identity={identity}
       state={
@@ -849,6 +869,37 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
               </div>
             </dl>
             <p>{application.description}</p>
+            <section className="co-live-workflow">
+              <h2>Workflow agentique</h2>
+              {workflow.loading ? (
+                <p>Recherche d’un run existant…</p>
+              ) : workflow.run ? (
+                <dl>
+                  <div>
+                    <dt>Statut du run</dt>
+                    <dd>{runStatusLabel(workflow.run.status, locale)}</dd>
+                  </div>
+                  <div>
+                    <dt>Étape active</dt>
+                    <dd>{workflow.run.stage.replaceAll('-', ' ')}</dd>
+                  </div>
+                  <div>
+                    <dt>Événements persistés</dt>
+                    <dd>{workflow.run.events.length}</dd>
+                  </div>
+                </dl>
+              ) : workflow.error ? (
+                <p role="alert">{workflowErrorLabel(workflow.error)}</p>
+              ) : (
+                <p>
+                  Aucun run. Le bouton démarre une exécution bornée et persistée
+                  à partir de cette candidature et de votre mémoire.
+                </p>
+              )}
+              {workflow.error === 'profile-missing' ? (
+                <Link href="/memory">Compléter la mémoire professionnelle</Link>
+              ) : null}
+            </section>
             {application.url ? (
               <a
                 className="co-button"
@@ -3778,6 +3829,57 @@ function stageLabel(stage: Application['stage'], locale: 'en' | 'fr') {
     },
   } as const;
   return labels[locale][stage];
+}
+
+function runStatusLabel(
+  status:
+    | 'running'
+    | 'paused'
+    | 'awaiting_approval'
+    | 'completed'
+    | 'blocked'
+    | 'budget_exhausted'
+    | 'cancelled'
+    | 'failed',
+  locale: 'en' | 'fr',
+) {
+  const labels = {
+    en: {
+      running: 'Running',
+      paused: 'Paused',
+      awaiting_approval: 'Awaiting approval',
+      completed: 'Completed',
+      blocked: 'Blocked',
+      budget_exhausted: 'Budget exhausted',
+      cancelled: 'Cancelled',
+      failed: 'Failed',
+    },
+    fr: {
+      running: 'En cours',
+      paused: 'En pause',
+      awaiting_approval: 'Validation requise',
+      completed: 'Terminé',
+      blocked: 'Bloqué',
+      budget_exhausted: 'Budget épuisé',
+      cancelled: 'Annulé',
+      failed: 'Échec',
+    },
+  } as const;
+  return labels[locale][status];
+}
+
+function workflowErrorLabel(error: string) {
+  const labels: Record<string, string> = {
+    auth: 'Connectez-vous pour lancer ce workflow.',
+    'profile-missing': 'Enregistrez d’abord votre mémoire professionnelle.',
+    conflict: 'La candidature ou la mémoire a changé. Rechargez ce dossier.',
+    'rate-limited':
+      'La limite de runs est atteinte. Réessayez dans une minute.',
+    'worker-unavailable':
+      'Le worker de recherche est indisponible. Vérifiez votre instance.',
+    unavailable: 'Le workflow est momentanément indisponible.',
+  };
+  return labels[error] ?? labels.unavailable;
 }
 
 export function KitRoutePage({ path, query }: { path: string; query: Query }) {
