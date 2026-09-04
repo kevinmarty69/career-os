@@ -511,15 +511,15 @@ Le MVP est atteint lorsqu'un nouvel utilisateur peut, sans intervention de l'éq
 
 ### Lot 0 - Fondation de confiance
 
-- [ ] Authentification et sessions révocables.
-- [ ] Espaces isolés et autorisations côté serveur.
-- [ ] Schéma durable pour sources, affirmations, preuves, préférences, offres, candidatures et publications.
-- [ ] Provenance et usages autorisés obligatoires pour chaque affirmation.
-- [ ] Journal d'audit des décisions humaines et agentiques.
-- [ ] Budgets par workflow : temps, tours, tokens, coût et concurrence.
-- [ ] États d'erreur explicites, reprise et interruption.
-- [ ] Export et suppression complète d'un espace.
-- [ ] Tests d'isolation, de révocation et de non-publication des affirmations inéligibles.
+- [x] Authentification et sessions révocables.
+- [x] Espaces isolés et autorisations côté serveur.
+- [x] Schéma durable pour sources, affirmations, preuves, préférences, offres, candidatures et publications.
+- [x] Provenance et usages autorisés obligatoires pour chaque affirmation.
+- [x] Journal d'audit des décisions humaines et agentiques.
+- [x] Budgets par workflow : temps, tours, tokens, coût et concurrence.
+- [x] États d'erreur explicites, reprise et interruption.
+- [x] Export et suppression complète d'un espace.
+- [x] Tests d'isolation, de révocation et de non-publication des affirmations inéligibles.
 
 Critères d'acceptation :
 
@@ -571,9 +571,9 @@ Critères d'acceptation :
 - [x] Déduplication multi-source.
 - [x] Détection des modifications et fermetures.
 - [x] Matching déterministe pour les contraintes dures.
-- [ ] Analyse sémantique pour les compétences, responsabilités et transferts.
-- [ ] Recommandation expliquée avec preuves, gaps, risques et inconnues.
-- [ ] Inbox d'opportunités avec enregistrer, ignorer, archiver et corriger.
+- [x] Analyse sémantique pour les compétences, responsabilités et transferts.
+- [x] Recommandation expliquée avec preuves, gaps, risques et inconnues.
+- [x] Inbox d'opportunités avec enregistrer, ignorer, archiver et corriger.
 - [ ] Feedback utilisateur réutilisé pour le classement futur.
 - [ ] Alertes configurables uniquement au-dessus du seuil choisi.
 
