@@ -42,6 +42,7 @@ const tests = [
   'tests/integration/auth-publication.test.ts',
   'tests/integration/applications.test.ts',
   'tests/integration/opportunities.test.ts',
+  'tests/integration/opportunity-decisions.test.ts',
   'tests/integration/agent-runs.test.ts',
 ];
 const workerLogins = [
@@ -86,7 +87,10 @@ try {
     await run(
       'pnpm',
       ['exec', 'tsx', test],
-      test === 'tests/integration/opportunities.test.ts'
+      [
+        'tests/integration/opportunities.test.ts',
+        'tests/integration/opportunity-decisions.test.ts',
+      ].includes(test)
         ? {
             ...environment,
             NODE_OPTIONS: [

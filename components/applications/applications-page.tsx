@@ -15,13 +15,22 @@ import {
 import {
   importOpportunity,
   readApplications,
+  readOpportunityDecisions,
   readOpportunities,
+  readSearchProfiles,
+  saveOpportunityDecision,
 } from '@/lib/career-api';
 import {
   opportunityImportResponseSchema,
   opportunityListResponseSchema,
   type DiscoveredJob,
 } from '@/lib/discovered-job-contract';
+import {
+  opportunityDecisionListResponseSchema,
+  opportunityDecisionMutationResponseSchema,
+  type OpportunityDecision,
+} from '@/lib/opportunity-decision';
+import { searchProfileSchema, type SearchProfile } from '@/lib/search-profile';
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import styles from './applications-page.module.css';
@@ -44,6 +53,8 @@ export function ApplicationsPage({
 }) {
   const [opportunities, setOpportunities] = useState<DiscoveredJob[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [decisions, setDecisions] = useState<OpportunityDecision[]>([]);
+  const [searchProfiles, setSearchProfiles] = useState<SearchProfile[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState<string>();
   const [importOpen, setImportOpen] = useState(false);
@@ -52,14 +63,28 @@ export function ApplicationsPage({
     const controller = signal ? undefined : new AbortController();
     const activeSignal = signal ?? controller!.signal;
     try {
-      const [opportunityResponse, applicationResponse] = await Promise.all([
+      const [
+        opportunityResponse,
+        applicationResponse,
+        decisionResponse,
+        searchProfileResponse,
+      ] = await Promise.all([
         readOpportunities(activeSignal),
         readApplications(activeSignal),
+        readOpportunityDecisions(activeSignal),
+        readSearchProfiles(activeSignal),
       ]);
-      if (!opportunityResponse.ok || !applicationResponse.ok)
+      if (
+        !opportunityResponse.ok ||
+        !applicationResponse.ok ||
+        !decisionResponse.ok ||
+        !searchProfileResponse.ok
+      )
         throw new Error(
           opportunityResponse.status === 401 ||
-            applicationResponse.status === 401
+            applicationResponse.status === 401 ||
+            decisionResponse.status === 401 ||
+            searchProfileResponse.status === 401
             ? 'Connectez-vous pour retrouver vos opportunités et candidatures.'
             : 'Impossible de charger cet espace.',
         );
@@ -67,6 +92,10 @@ export function ApplicationsPage({
         await opportunityResponse.json(),
       );
       const applicationPayload: unknown = await applicationResponse.json();
+      const decisionPayload = opportunityDecisionListResponseSchema.parse(
+        await decisionResponse.json(),
+      );
+      const searchProfilePayload: unknown = await searchProfileResponse.json();
       const parsedApplications = applicationSchema
         .array()
         .parse(
@@ -78,6 +107,18 @@ export function ApplicationsPage({
         );
       setOpportunities(opportunityPayload.opportunities);
       setApplications(parsedApplications);
+      setDecisions(decisionPayload.decisions);
+      setSearchProfiles(
+        searchProfileSchema
+          .array()
+          .parse(
+            typeof searchProfilePayload === 'object' &&
+              searchProfilePayload !== null &&
+              'searchProfiles' in searchProfilePayload
+              ? searchProfilePayload.searchProfiles
+              : [],
+          ),
+      );
       setLoadState('ready');
     } catch (caught) {
       if (!activeSignal.aborted) {
@@ -113,6 +154,29 @@ export function ApplicationsPage({
     setError(undefined);
     void load();
   }
+
+  function decisionSaved(decision: OpportunityDecision) {
+    setDecisions((current) => [
+      decision,
+      ...current.filter((item) => item.decisionId !== decision.decisionId),
+    ]);
+  }
+
+  const decisionsByOpportunity = new Map(
+    decisions.map((decision) => [decision.opportunityId, decision]),
+  );
+  const activeOpportunities = opportunities.filter((opportunity) => {
+    const disposition = decisionsByOpportunity.get(
+      opportunity.opportunityId,
+    )?.disposition;
+    return disposition !== 'ignored' && disposition !== 'archived';
+  });
+  const processedOpportunities = opportunities.filter((opportunity) => {
+    const disposition = decisionsByOpportunity.get(
+      opportunity.opportunityId,
+    )?.disposition;
+    return disposition === 'ignored' || disposition === 'archived';
+  });
 
   return (
     <AppShell
@@ -176,13 +240,18 @@ export function ApplicationsPage({
           </header>
           {loadState === 'loading' ? (
             <LoadingRows label="Chargement des opportunités" />
-          ) : opportunities.length ? (
+          ) : activeOpportunities.length ? (
             <div className={styles.opportunityList}>
-              {opportunities.map((opportunity) => (
+              {activeOpportunities.map((opportunity) => (
                 <OpportunityCard
+                  decision={decisionsByOpportunity.get(
+                    opportunity.opportunityId,
+                  )}
                   Icon={Icon}
                   key={opportunity.opportunityId}
+                  onDecisionSaved={decisionSaved}
                   opportunity={opportunity}
+                  searchProfiles={searchProfiles}
                 />
               ))}
             </div>
@@ -197,6 +266,16 @@ export function ApplicationsPage({
             />
           ) : null}
         </section>
+
+        {loadState === 'ready' && processedOpportunities.length ? (
+          <ProcessedOpportunities
+            decisionsByOpportunity={decisionsByOpportunity}
+            Icon={Icon}
+            onDecisionSaved={decisionSaved}
+            opportunities={processedOpportunities}
+            searchProfiles={searchProfiles}
+          />
+        ) : null}
 
         <section
           className={styles.workspace}
@@ -248,16 +327,25 @@ export function ApplicationsPage({
 }
 
 function OpportunityCard({
+  decision,
   Icon,
+  onDecisionSaved,
   opportunity,
+  searchProfiles,
 }: {
+  decision?: OpportunityDecision;
   Icon: IconComponent;
+  onDecisionSaved: (decision: OpportunityDecision) => void;
   opportunity: DiscoveredJob;
+  searchProfiles: SearchProfile[];
 }) {
   const { locale } = useI18n();
   const localize = useLocalizer([applicationsMessages]);
   const source = opportunity.sources[0];
   const lifecycle = lifecycleCopy(opportunity.lifecycle);
+  const [editing, setEditing] = useState<
+    OpportunityDecision['disposition'] | undefined
+  >();
   return localize(
     <article
       className={`${styles.opportunityCard} ${styles[`lifecycle-${opportunity.lifecycle}`]}`}
@@ -391,6 +479,30 @@ function OpportunityCard({
       </div>
       <div className={styles.opportunityActions}>
         <span>Découverte {formatDate(opportunity.firstSeenAt, locale)}</span>
+        {decision ? (
+          <span
+            className={`${styles.decisionBadge} ${styles[decision.disposition]}`}
+          >
+            {dispositionStateCopy(decision.disposition)} ·{' '}
+            {qualificationCopy(decision.qualification)}
+          </span>
+        ) : null}
+        <div className={styles.decisionActions}>
+          {(['saved', 'ignored', 'archived'] as const).map((disposition) => (
+            <button
+              className={
+                decision?.disposition === disposition
+                  ? styles.currentAction
+                  : undefined
+              }
+              key={disposition}
+              onClick={() => setEditing(disposition)}
+              type="button"
+            >
+              {dispositionCopy(disposition)}
+            </button>
+          ))}
+        </div>
         <button
           disabled
           title="La promotion vers une candidature sera ajoutée dans une prochaine tranche."
@@ -398,9 +510,352 @@ function OpportunityCard({
         >
           Démarrer la candidature
         </button>
-        <small>Disponible prochainement</small>
       </div>
+      {editing ? (
+        <DecisionEditor
+          decision={decision}
+          initialDisposition={editing}
+          key={editing}
+          onCancel={() => setEditing(undefined)}
+          onSaved={(saved) => {
+            onDecisionSaved(saved);
+            setEditing(undefined);
+          }}
+          opportunityId={opportunity.opportunityId}
+          searchProfiles={searchProfiles}
+        />
+      ) : null}
     </article>,
+  );
+}
+
+function ProcessedOpportunities({
+  decisionsByOpportunity,
+  Icon,
+  onDecisionSaved,
+  opportunities,
+  searchProfiles,
+}: {
+  decisionsByOpportunity: Map<string, OpportunityDecision>;
+  Icon: IconComponent;
+  onDecisionSaved: (decision: OpportunityDecision) => void;
+  opportunities: DiscoveredJob[];
+  searchProfiles: SearchProfile[];
+}) {
+  const localize = useLocalizer([applicationsMessages]);
+  const [filter, setFilter] = useState<'all' | 'ignored' | 'archived'>('all');
+  const visible = opportunities.filter(
+    (opportunity) =>
+      filter === 'all' ||
+      decisionsByOpportunity.get(opportunity.opportunityId)?.disposition ===
+        filter,
+  );
+  return localize(
+    <section className={`${styles.workspace} ${styles.processedWorkspace}`}>
+      <header className={styles.processedHeader}>
+        <div>
+          <Icon>inventory_2</Icon>
+          <span>
+            <strong>Opportunités traitées</strong>
+            <small>
+              {opportunities.length}{' '}
+              {opportunities.length > 1
+                ? 'offres conservées'
+                : 'offre conservée'}
+            </small>
+          </span>
+        </div>
+        <div
+          className={styles.processedFilters}
+          role="group"
+          aria-label="Filtrer les opportunités traitées"
+        >
+          {(['all', 'ignored', 'archived'] as const).map((candidate) => (
+            <button
+              aria-pressed={filter === candidate}
+              key={candidate}
+              onClick={() => setFilter(candidate)}
+              type="button"
+            >
+              {processedFilterCopy(candidate)}
+            </button>
+          ))}
+        </div>
+      </header>
+      <div className={styles.processedList}>
+        {visible.map((opportunity) => (
+          <ProcessedOpportunityRow
+            decision={decisionsByOpportunity.get(opportunity.opportunityId)!}
+            key={opportunity.opportunityId}
+            onDecisionSaved={onDecisionSaved}
+            opportunity={opportunity}
+            searchProfiles={searchProfiles}
+          />
+        ))}
+      </div>
+    </section>,
+  );
+}
+
+function ProcessedOpportunityRow({
+  decision,
+  onDecisionSaved,
+  opportunity,
+  searchProfiles,
+}: {
+  decision: OpportunityDecision;
+  onDecisionSaved: (decision: OpportunityDecision) => void;
+  opportunity: DiscoveredJob;
+  searchProfiles: SearchProfile[];
+}) {
+  const localize = useLocalizer([applicationsMessages]);
+  const [editing, setEditing] = useState(false);
+  return localize(
+    <article className={styles.processedRow}>
+      <div className={styles.companyMark} aria-hidden="true">
+        {initials(opportunity.company ?? opportunity.role ?? 'Offre')}
+      </div>
+      <div>
+        <small>{opportunity.company ?? 'À vérifier'}</small>
+        <strong>{opportunity.role ?? 'À vérifier'}</strong>
+      </div>
+      <span
+        className={`${styles.decisionBadge} ${styles[decision.disposition]}`}
+      >
+        {dispositionStateCopy(decision.disposition)}
+      </span>
+      <span>{qualificationCopy(decision.qualification)}</span>
+      <button onClick={() => setEditing((current) => !current)} type="button">
+        {editing ? 'Fermer' : 'Corriger'}
+      </button>
+      {editing ? (
+        <DecisionEditor
+          decision={decision}
+          initialDisposition={decision.disposition}
+          onCancel={() => setEditing(false)}
+          onSaved={(saved) => {
+            onDecisionSaved(saved);
+            setEditing(false);
+          }}
+          opportunityId={opportunity.opportunityId}
+          searchProfiles={searchProfiles}
+        />
+      ) : null}
+    </article>,
+  );
+}
+
+function DecisionEditor({
+  decision,
+  initialDisposition,
+  onCancel,
+  onSaved,
+  opportunityId,
+  searchProfiles,
+}: {
+  decision?: OpportunityDecision;
+  initialDisposition: OpportunityDecision['disposition'];
+  onCancel: () => void;
+  onSaved: (decision: OpportunityDecision) => void;
+  opportunityId: string;
+  searchProfiles: SearchProfile[];
+}) {
+  const localize = useLocalizer([applicationsMessages]);
+  const [disposition, setDisposition] = useState(initialDisposition);
+  const [qualification, setQualification] = useState<
+    OpportunityDecision['qualification']
+  >(decision?.qualification ?? qualificationFor(initialDisposition));
+  const [reason, setReason] = useState<OpportunityDecision['reason'] | ''>(
+    decision?.reason ?? '',
+  );
+  const [note, setNote] = useState(decision?.note ?? '');
+  const [searchProfileId, setSearchProfileId] = useState(
+    decision?.searchProfileId ?? '',
+  );
+  const [operationKey, setOperationKey] = useState(() => crypto.randomUUID());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
+
+  function changed(action: () => void) {
+    action();
+    setOperationKey(crypto.randomUUID());
+    setError(undefined);
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!reason) {
+      setError('Choisissez une raison avant d’enregistrer.');
+      return;
+    }
+    setSaving(true);
+    setError(undefined);
+    try {
+      const response = await saveOpportunityDecision(
+        opportunityId,
+        {
+          searchProfileId: searchProfileId || null,
+          disposition,
+          qualification,
+          reason,
+          note: note.trim() || null,
+          expectedRevision: decision?.revision ?? 0,
+        },
+        operationKey,
+      );
+      if (!response.ok) throw new Error(decisionError(response.status));
+      const payload = opportunityDecisionMutationResponseSchema.parse(
+        await response.json(),
+      );
+      onSaved(payload.decision);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'La décision n’a pas pu être enregistrée.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return localize(
+    <form className={styles.decisionEditor} onSubmit={submit}>
+      <header>
+        <div>
+          <strong>Décision humaine</strong>
+          <small>
+            {decision ? (
+              <>
+                Révision {decision.revision} · {decision.history.length}{' '}
+                {decision.history.length > 1
+                  ? 'décisions conservées'
+                  : 'décision conservée'}
+              </>
+            ) : (
+              'Première décision'
+            )}
+          </small>
+        </div>
+        <button
+          aria-label="Fermer la décision"
+          onClick={onCancel}
+          type="button"
+        >
+          ×
+        </button>
+      </header>
+      <div className={styles.decisionFields}>
+        <label>
+          <span>État</span>
+          <select
+            disabled={saving}
+            onChange={(event) =>
+              changed(() =>
+                setDisposition(
+                  event.target.value as OpportunityDecision['disposition'],
+                ),
+              )
+            }
+            value={disposition}
+          >
+            <option value="saved">Enregistrée</option>
+            <option value="ignored">Ignorée</option>
+            <option value="archived">Archivée</option>
+          </select>
+        </label>
+        <label>
+          <span>Qualification corrigée</span>
+          <select
+            disabled={saving}
+            onChange={(event) =>
+              changed(() =>
+                setQualification(
+                  event.target.value as OpportunityDecision['qualification'],
+                ),
+              )
+            }
+            value={qualification}
+          >
+            <option value="priority">Prioritaire</option>
+            <option value="interesting">Intéressante</option>
+            <option value="exploratory">Exploratoire</option>
+            <option value="ignore">À ignorer</option>
+          </select>
+        </label>
+        <label>
+          <span>Raison</span>
+          <select
+            aria-invalid={!reason || undefined}
+            disabled={saving}
+            onChange={(event) =>
+              changed(() =>
+                setReason(event.target.value as OpportunityDecision['reason']),
+              )
+            }
+            required
+            value={reason}
+          >
+            <option value="">Choisir une raison</option>
+            {decisionReasons.map((candidate) => (
+              <option key={candidate} value={candidate}>
+                {reasonCopy(candidate)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Profil de recherche</span>
+          <select
+            disabled={saving}
+            onChange={(event) =>
+              changed(() => setSearchProfileId(event.target.value))
+            }
+            value={searchProfileId}
+          >
+            <option value="">Aucun profil associé</option>
+            {searchProfiles.map((profile) => (
+              <option
+                key={profile.searchProfileId}
+                value={profile.searchProfileId}
+              >
+                {profile.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className={styles.noteField}>
+        <span>
+          Note facultative <small>{note.length}/500</small>
+        </span>
+        <textarea
+          disabled={saving}
+          maxLength={500}
+          onChange={(event) => changed(() => setNote(event.target.value))}
+          placeholder="Ajoutez uniquement le contexte utile à vos prochaines décisions."
+          rows={2}
+          value={note}
+        />
+      </label>
+      {error ? (
+        <p className={styles.decisionError} role="alert">
+          {error}
+        </p>
+      ) : null}
+      <footer>
+        <button disabled={saving} onClick={onCancel} type="button">
+          Annuler
+        </button>
+        <button
+          className="co-button"
+          disabled={saving || !reason}
+          type="submit"
+        >
+          {saving ? 'Enregistrement…' : 'Enregistrer la décision'}
+        </button>
+      </footer>
+    </form>,
   );
 }
 
@@ -747,6 +1202,85 @@ function matchCopy(
     canonical_url: 'Même URL canonique',
     fingerprint: 'Même empreinte',
   }[matchedBy];
+}
+
+const decisionReasons: OpportunityDecision['reason'][] = [
+  'strong_fit',
+  'career_direction',
+  'hard_constraint',
+  'weak_evidence',
+  'compensation',
+  'location',
+  'company',
+  'duplicate',
+  'closed',
+  'other',
+];
+
+function dispositionCopy(disposition: OpportunityDecision['disposition']) {
+  return {
+    saved: 'Enregistrer',
+    ignored: 'Ignorer',
+    archived: 'Archiver',
+  }[disposition];
+}
+
+function qualificationCopy(
+  qualification: OpportunityDecision['qualification'],
+) {
+  return {
+    priority: 'Prioritaire',
+    interesting: 'Intéressante',
+    exploratory: 'Exploratoire',
+    ignore: 'À ignorer',
+  }[qualification];
+}
+
+function dispositionStateCopy(disposition: OpportunityDecision['disposition']) {
+  return {
+    saved: 'Enregistrée',
+    ignored: 'Ignorée',
+    archived: 'Archivée',
+  }[disposition];
+}
+
+function qualificationFor(
+  disposition: OpportunityDecision['disposition'],
+): OpportunityDecision['qualification'] {
+  return disposition === 'ignored' ? 'ignore' : 'interesting';
+}
+
+function reasonCopy(reason: OpportunityDecision['reason']) {
+  return {
+    strong_fit: 'Adéquation forte',
+    career_direction: 'Direction de carrière',
+    hard_constraint: 'Contrainte obligatoire',
+    weak_evidence: 'Preuves insuffisantes',
+    compensation: 'Rémunération',
+    location: 'Localisation',
+    company: 'Entreprise',
+    duplicate: 'Doublon',
+    closed: 'Offre fermée',
+    other: 'Autre raison',
+  }[reason];
+}
+
+function processedFilterCopy(filter: 'all' | 'ignored' | 'archived') {
+  return {
+    all: 'Toutes',
+    ignored: 'Ignorées',
+    archived: 'Archivées',
+  }[filter];
+}
+
+function decisionError(status: number) {
+  if (status === 400) return 'Vérifiez les champs de cette décision.';
+  if (status === 401) return 'Connectez-vous pour enregistrer cette décision.';
+  if (status === 404) return 'Cette opportunité ou ce profil n’existe plus.';
+  if (status === 409)
+    return 'Cette décision a changé dans une autre session. Rechargez la page.';
+  if (status === 413) return 'La note est trop longue.';
+  return 'La décision n’a pas pu être enregistrée.';
 }
 
 function importError(status: number) {

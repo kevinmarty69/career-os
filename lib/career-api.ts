@@ -1,6 +1,7 @@
 import type { ApplicationDossier } from './workspace-state';
 import { persistedPublicationOperation } from './run-operation';
 import type { SearchProfileFields } from './search-profile';
+import type { OpportunityDecisionInput } from './opportunity-decision';
 
 export function readProfile(signal: AbortSignal) {
   return fetch('/api/profile', { cache: 'no-store', signal });
@@ -16,6 +17,28 @@ export function readApplications(signal: AbortSignal) {
 
 export function readOpportunities(signal: AbortSignal) {
   return fetch('/api/opportunities', { cache: 'no-store', signal });
+}
+
+export function readOpportunityDecisions(signal: AbortSignal) {
+  return fetch('/api/opportunities/decisions', {
+    cache: 'no-store',
+    signal,
+  });
+}
+
+export function saveOpportunityDecision(
+  opportunityId: string,
+  input: OpportunityDecisionInput,
+  idempotencyKey: string,
+) {
+  return fetch(`/api/opportunities/${opportunityId}/decision`, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      'idempotency-key': idempotencyKey,
+    },
+    body: JSON.stringify(input),
+  });
 }
 
 export function importOpportunity(url: string, signal: AbortSignal) {

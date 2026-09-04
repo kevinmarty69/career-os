@@ -78,6 +78,31 @@ insert into app.search_profiles (
   'f2000000-0000-4000-8000-000000000001',
   'Delete search', '{}'::jsonb, '{}'::jsonb, true
 );
+insert into app.opportunity_decisions (
+  id, tenant_id, discovered_job_id, search_profile_id, disposition,
+  qualification, reason, actor_id
+) values (
+  'f70a0000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'f7050000-0000-4000-8000-000000000001',
+  'f7080000-0000-4000-8000-000000000001',
+  'ignored', 'ignore', 'hard_constraint',
+  'f1000000-0000-4000-8000-000000000001'
+);
+insert into app.opportunity_decision_events (
+  id, tenant_id, decision_id, discovered_job_id, search_profile_id,
+  disposition, qualification, reason, revision, actor_id, idempotency_key,
+  input_sha256, decision_created_at
+) values (
+  'f70b0000-0000-4000-8000-000000000001',
+  'f2000000-0000-4000-8000-000000000001',
+  'f70a0000-0000-4000-8000-000000000001',
+  'f7050000-0000-4000-8000-000000000001',
+  'f7080000-0000-4000-8000-000000000001',
+  'ignored', 'ignore', 'hard_constraint', 1,
+  'f1000000-0000-4000-8000-000000000001',
+  'f70c0000-0000-4000-8000-000000000001', repeat('d', 64), now()
+);
 insert into app.job_matches (
   id, tenant_id, discovered_job_id, job_revision, search_profile_id,
   search_profile_revision, decision, job_snapshot, search_profile_snapshot,
@@ -187,6 +212,8 @@ do $$ begin
     or exists(select 1 from app.job_source_records where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.job_observations where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.job_matches where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.opportunity_decisions where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.opportunity_decision_events where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then

@@ -73,6 +73,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const observationId = randomUUID();
   const searchProfileId = randomUUID();
   const matchId = randomUUID();
+  const opportunityDecisionId = randomUUID();
+  const opportunityDecisionEventId = randomUUID();
   const opportunityId = randomUUID();
   const runId = randomUUID();
   const stepId = randomUUID();
@@ -186,6 +188,23 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         'priority', '{"revision":1}'::jsonb, '{"revision":1}'::jsonb,
         '[]'::jsonb
       )`;
+      await transaction`insert into app.opportunity_decisions (
+        id, tenant_id, discovered_job_id, search_profile_id, disposition,
+        qualification, reason, note, actor_id
+      ) values (
+        ${opportunityDecisionId}, ${tenantId}, ${discoveredJobId},
+        ${searchProfileId}, 'saved', 'priority', 'strong_fit',
+        'visible decision note', ${ownerId}
+      )`;
+      await transaction`insert into app.opportunity_decision_events (
+        id, tenant_id, decision_id, discovered_job_id, search_profile_id,
+        disposition, qualification, reason, note, revision, actor_id,
+        idempotency_key, input_sha256, decision_created_at
+      ) select
+        ${opportunityDecisionEventId}, tenant_id, id, discovered_job_id,
+        search_profile_id, disposition, qualification, reason, note, revision,
+        actor_id, ${randomUUID()}, ${'d'.repeat(64)}, created_at
+      from app.opportunity_decisions where id = ${opportunityDecisionId}`;
       await transaction`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role, raw_text,
         extraction_status
@@ -289,6 +308,25 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
           record.type === 'applications' &&
           record.data.id === applicationId &&
           record.data.deleted_at,
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'opportunity_decisions' &&
+          record.data.id === opportunityDecisionId &&
+          record.data.disposition === 'saved' &&
+          record.data.qualification === 'priority',
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'opportunity_decision_events' &&
+          record.data.id === opportunityDecisionEventId &&
+          record.data.reason === 'strong_fit',
       ),
       true,
     );

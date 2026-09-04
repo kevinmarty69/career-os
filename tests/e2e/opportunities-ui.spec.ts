@@ -6,8 +6,9 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
   page,
 }) => {
   const opportunities: unknown[] = [];
+  const decisions: OpportunityDecisionMock[] = [];
   const importedUrls: string[] = [];
-  await mockWorkspace(page, opportunities, importedUrls);
+  await mockWorkspace(page, opportunities, decisions, importedUrls);
 
   await page.goto('/applications');
   await expect(
@@ -37,7 +38,6 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
   await expect(page.getByText('Republiée', { exact: true })).toBeVisible();
   const start = page.getByRole('button', { name: 'Démarrer la candidature' });
   await expect(start).toBeDisabled();
-  await expect(page.getByText('Disponible prochainement')).toBeVisible();
   await page.getByText('Provenance et historique · 4 observations').click();
   await expect(page.getByText('jobs.example.test').first()).toBeVisible();
   await expect(page.getByText('Contenu de l’offre modifié')).toBeVisible();
@@ -45,16 +45,63 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
   await expect(page.getByText('Offre republiée')).toBeVisible();
   expect(importedUrls).toEqual(['https://jobs.example.test/product-engineer']);
 
+  const opportunityCard = page.locator('article').filter({
+    has: page.getByRole('heading', { name: 'Product Engineer' }),
+  });
+  await opportunityCard.getByRole('button', { name: 'Ignorer' }).click();
+  await opportunityCard
+    .getByLabel('Qualification corrigée')
+    .selectOption('exploratory');
+  await opportunityCard.getByLabel('Raison').selectOption('location');
+  await opportunityCard
+    .getByLabel('Profil de recherche')
+    .selectOption(searchProfile.searchProfileId);
+  await opportunityCard
+    .getByLabel(/Note facultative/)
+    .fill('Outside the current commute boundary.');
+  await opportunityCard
+    .getByRole('button', { name: 'Enregistrer la décision' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Product Engineer' }),
+  ).toHaveCount(0);
+  await expect(page.getByText('Opportunités traitées')).toBeVisible();
+  await expect(page.getByText('Ignorée', { exact: true })).toBeVisible();
+
   await page.reload();
-  await expect(page.getByText('Product Engineer')).toBeVisible();
+  await expect(page.getByText('Ignorée', { exact: true })).toBeVisible();
   await expect(page.getByText('Existing Application Inc')).toBeVisible();
+
+  const processed = page
+    .locator('article')
+    .filter({ hasText: 'Product Engineer' });
+  await processed.getByRole('button', { name: 'Corriger' }).click();
+  await processed.getByLabel('État').selectOption('saved');
+  await processed.getByLabel('Qualification corrigée').selectOption('priority');
+  await processed.getByLabel('Raison').selectOption('strong_fit');
+  await processed
+    .getByRole('button', { name: 'Enregistrer la décision' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Product Engineer' }),
+  ).toBeVisible();
+
+  const restored = page.locator('article').filter({
+    has: page.getByRole('heading', { name: 'Product Engineer' }),
+  });
+  await restored.getByRole('button', { name: 'Archiver' }).click();
+  await restored.getByLabel('Raison').selectOption('career_direction');
+  await restored
+    .getByRole('button', { name: 'Enregistrer la décision' })
+    .click();
+  await expect(page.getByText('Archivée', { exact: true })).toBeVisible();
 });
 
 test('keeps the real opportunity workspace inside a mobile viewport', async ({
   page,
 }) => {
   const opportunities = [unknownOpportunity()];
-  await mockWorkspace(page, opportunities, []);
+  await mockWorkspace(page, opportunities, [], []);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/applications');
   await expect(page.getByText('Product Engineer')).toBeVisible();
@@ -72,9 +119,78 @@ test('keeps the real opportunity workspace inside a mobile viewport', async ({
   ).toBe(true);
 });
 
+test('defaults to English and keeps decision controls translated', async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  await mockWorkspace(page, [opportunity()], [], []);
+  await page.goto('/applications');
+  await expect(
+    page.getByRole('heading', { name: 'Discovered opportunities' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ignore' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Archive' })).toBeVisible();
+});
+
+type OpportunityDecisionMock = {
+  decisionId: string;
+  opportunityId: string;
+  searchProfileId: string | null;
+  disposition: 'saved' | 'ignored' | 'archived';
+  qualification: 'priority' | 'interesting' | 'exploratory' | 'ignore';
+  reason:
+    | 'strong_fit'
+    | 'career_direction'
+    | 'hard_constraint'
+    | 'weak_evidence'
+    | 'compensation'
+    | 'location'
+    | 'company'
+    | 'duplicate'
+    | 'closed'
+    | 'other';
+  note: string | null;
+  revision: number;
+  actor: 'human';
+  actorId: string;
+  createdAt: string;
+  updatedAt: string;
+  history: unknown[];
+};
+
+const searchProfile = {
+  searchProfileId: 'e55c0a00-0000-4000-8000-000000000005',
+  name: 'Product engineering',
+  hardConstraints: {
+    roles: [],
+    seniorities: [],
+    locations: [],
+    remoteModes: [],
+    timezones: [],
+    languages: [],
+    contractTypes: [],
+    excludedCompanies: [],
+    excludedNetworks: [],
+  },
+  softPreferences: {
+    stacks: [],
+    sectors: [],
+    productTypes: [],
+    companySizes: [],
+    cultures: [],
+  },
+  active: true,
+  revision: 1,
+  createdAt: now,
+  updatedAt: now,
+};
+
 async function mockWorkspace(
   page: Page,
   opportunities: unknown[],
+  decisions: OpportunityDecisionMock[],
   importedUrls: string[],
 ) {
   await page.route('**/api/opportunities/import-url', async (route) => {
@@ -92,6 +208,73 @@ async function mockWorkspace(
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ opportunities }),
+    });
+  });
+  await page.route('**/api/opportunities/decisions', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ decisions, feedback: [] }),
+    });
+  });
+  await page.route('**/api/opportunities/*/decision', async (route) => {
+    const opportunityId = route.request().url().split('/').at(-2)!;
+    const input = route.request().postDataJSON() as {
+      searchProfileId: string | null;
+      disposition: OpportunityDecisionMock['disposition'];
+      qualification: OpportunityDecisionMock['qualification'];
+      reason: OpportunityDecisionMock['reason'];
+      note: string | null;
+      expectedRevision: number;
+    };
+    const index = decisions.findIndex(
+      (decision) => decision.opportunityId === opportunityId,
+    );
+    const current = decisions[index];
+    if ((current?.revision ?? 0) !== input.expectedRevision) {
+      await route.fulfill({ status: 409, body: 'Conflict' });
+      return;
+    }
+    const revision = (current?.revision ?? 0) + 1;
+    const saved: OpportunityDecisionMock = {
+      decisionId: current?.decisionId ?? 'f66c0a00-0000-4000-8000-000000000006',
+      opportunityId,
+      searchProfileId: input.searchProfileId,
+      disposition: input.disposition,
+      qualification: input.qualification,
+      reason: input.reason,
+      note: input.note,
+      revision,
+      actor: 'human',
+      actorId: 'a77c0a00-0000-4000-8000-000000000007',
+      createdAt: current?.createdAt ?? now,
+      updatedAt: now,
+      history: [
+        {
+          eventId: crypto.randomUUID(),
+          searchProfileId: input.searchProfileId,
+          disposition: input.disposition,
+          qualification: input.qualification,
+          reason: input.reason,
+          note: input.note,
+          revision,
+          actor: 'human',
+          actorId: 'a77c0a00-0000-4000-8000-000000000007',
+          createdAt: now,
+        },
+        ...(current?.history ?? []),
+      ],
+    };
+    if (index === -1) decisions.unshift(saved);
+    else decisions[index] = saved;
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ decision: saved }),
+    });
+  });
+  await page.route('**/api/search-profiles', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ searchProfiles: [searchProfile] }),
     });
   });
   await page.route('**/api/applications', async (route) => {

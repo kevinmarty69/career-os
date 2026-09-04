@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 6;
+export const workspaceExportVersion = 7;
 
 export const workspaceExportTables = [
   {
@@ -146,6 +146,49 @@ export const workspaceExportTables = [
       'criteria',
       'created_at',
       'updated_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'opportunity_decisions',
+    table: 'opportunity_decisions',
+    columns: [
+      'id',
+      'tenant_id',
+      'discovered_job_id',
+      'search_profile_id',
+      'disposition',
+      'qualification',
+      'reason',
+      'note',
+      'revision',
+      'actor',
+      'actor_id',
+      'created_at',
+      'updated_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'opportunity_decision_events',
+    table: 'opportunity_decision_events',
+    columns: [
+      'id',
+      'tenant_id',
+      'decision_id',
+      'discovered_job_id',
+      'search_profile_id',
+      'disposition',
+      'qualification',
+      'reason',
+      'note',
+      'revision',
+      'actor',
+      'actor_id',
+      'idempotency_key',
+      'input_sha256',
+      'decision_created_at',
+      'created_at',
     ],
     orderBy: ['id'],
   },

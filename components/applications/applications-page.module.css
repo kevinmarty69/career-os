@@ -397,6 +397,286 @@
   opacity: 0.72;
 }
 
+.decisionActions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.decisionActions button {
+  min-height: 30px;
+  padding: 0 9px;
+  color: var(--co-text-2);
+  background: #fff;
+  font-size: 10px;
+}
+
+.decisionActions button:hover,
+.decisionActions .currentAction {
+  color: var(--co-accent-dark);
+  border-color: var(--co-accent);
+  background: var(--co-accent-soft);
+}
+
+.decisionBadge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--co-ok-text) !important;
+  border-radius: 999px;
+  background: var(--co-ok-bg);
+  font-size: 9.5px !important;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.decisionBadge.ignored {
+  color: var(--co-warn-text) !important;
+  background: var(--co-warn-bg);
+}
+
+.decisionBadge.archived {
+  color: var(--co-text-2) !important;
+  background: var(--co-fill);
+}
+
+.decisionEditor {
+  grid-column: 2 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--co-border);
+  border-radius: 14px;
+  background: var(--co-fill-subtle);
+}
+
+.decisionEditor > header,
+.decisionEditor > footer,
+.processedHeader,
+.processedHeader > div,
+.processedRow {
+  display: flex;
+  align-items: center;
+}
+
+.decisionEditor > header {
+  justify-content: space-between;
+}
+
+.decisionEditor > header strong,
+.decisionEditor > header small {
+  display: block;
+}
+
+.decisionEditor > header strong {
+  font-size: 12px;
+}
+
+.decisionEditor > header small {
+  margin-top: 2px;
+  color: var(--co-text-3);
+  font-size: 9.5px;
+}
+
+.decisionEditor > header button {
+  width: 30px;
+  height: 30px;
+  color: var(--co-text-2);
+  border: 0;
+  border-radius: 50%;
+  background: var(--co-fill);
+  font-size: 18px;
+}
+
+.decisionFields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.decisionEditor label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.decisionEditor label > span {
+  color: var(--co-text-2);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.decisionEditor select,
+.decisionEditor textarea {
+  width: 100%;
+  color: var(--co-text);
+  border: 1px solid var(--co-border);
+  border-radius: 9px;
+  background: #fff;
+  outline: 0;
+  font: inherit;
+  font-size: 10.5px;
+}
+
+.decisionEditor select {
+  min-height: 36px;
+  padding: 0 9px;
+}
+
+.decisionEditor textarea {
+  min-height: 58px;
+  padding: 9px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.decisionEditor select:focus,
+.decisionEditor textarea:focus {
+  border-color: var(--co-accent);
+  outline: 3px solid color-mix(in srgb, var(--co-accent) 20%, transparent);
+  outline-offset: 1px;
+}
+
+.noteField > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.noteField small {
+  color: var(--co-text-3);
+  font-weight: 550;
+}
+
+.decisionError {
+  margin: 0;
+  color: var(--co-crit-text);
+  font-size: 10.5px;
+}
+
+.decisionEditor > footer {
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.decisionEditor > footer button:not(:global(.co-button)) {
+  min-height: 35px;
+  padding: 0 11px;
+  color: var(--co-text-2);
+  border: 0;
+  background: transparent;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.processedWorkspace {
+  overflow: visible;
+}
+
+.processedHeader {
+  min-height: 58px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 15px;
+}
+
+.processedHeader > div:first-child {
+  gap: 9px;
+}
+
+.processedHeader :global(.co-icon) {
+  color: var(--co-text-3);
+  font-size: 20px;
+}
+
+.processedHeader strong,
+.processedHeader small {
+  display: block;
+}
+
+.processedHeader strong {
+  font-size: 12px;
+}
+
+.processedHeader small {
+  margin-top: 2px;
+  color: var(--co-text-3);
+  font-size: 9.5px;
+}
+
+.processedFilters {
+  display: flex;
+  gap: 4px;
+}
+
+.processedFilters button,
+.processedRow > button {
+  min-height: 30px;
+  padding: 0 9px;
+  color: var(--co-text-2);
+  border: 1px solid var(--co-border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.processedFilters button[aria-pressed='true'] {
+  color: var(--co-accent-dark);
+  border-color: var(--co-accent);
+  background: var(--co-accent-soft);
+}
+
+.processedList {
+  border-top: 1px solid var(--co-divider);
+}
+
+.processedRow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+  min-height: 58px;
+  padding: 9px 15px;
+  border-bottom: 1px solid var(--co-divider);
+}
+
+.processedRow:last-child {
+  border-bottom: 0;
+}
+
+.processedRow .companyMark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 9px;
+}
+
+.processedRow small,
+.processedRow strong {
+  display: block;
+}
+
+.processedRow small {
+  color: var(--co-text-3);
+  font-size: 9px;
+}
+
+.processedRow strong {
+  margin-top: 2px;
+  font-size: 11.5px;
+}
+
+.processedRow > span:not(.decisionBadge) {
+  color: var(--co-text-3);
+  font-size: 10px;
+}
+
+.processedRow .decisionEditor {
+  grid-column: 2 / -1;
+  width: 100%;
+}
+
 .applicationRow {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) auto auto 20px;
@@ -688,6 +968,12 @@
     grid-column: 2;
     justify-items: start;
   }
+  .decisionEditor {
+    grid-column: 1 / -1;
+  }
+  .decisionFields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .provenance {
     grid-template-columns: 1fr;
@@ -749,6 +1035,29 @@
   .empty {
     grid-template-columns: 44px minmax(0, 1fr);
     padding: 18px 14px;
+  }
+  .decisionActions {
+    justify-content: flex-start;
+  }
+  .processedHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .processedRow {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+  .processedRow > span:not(.decisionBadge) {
+    grid-column: 2;
+  }
+  .processedRow > button {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+  .processedRow .decisionEditor {
+    grid-column: 1 / -1;
+  }
+  .decisionFields {
+    grid-template-columns: 1fr;
   }
   .empty > button {
     grid-column: 2;
