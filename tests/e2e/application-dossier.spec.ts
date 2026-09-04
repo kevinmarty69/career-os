@@ -144,6 +144,37 @@ test('starts and restores the persisted workflow for this application', async ({
   ).toHaveCount(0);
 });
 
+test('refreshes an active workflow until its persisted status changes', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const running = savedRun();
+  const completed = {
+    ...running,
+    status: 'completed',
+    stage: 'completed',
+    steps: running.steps.map((step) => ({ ...step, status: 'completed' })),
+  } as const;
+  let reads = 0;
+  await mockApplication(page, running);
+  await page.unroute(`**/api/applications/${applicationId}/run`);
+  await page.route(`**/api/applications/${applicationId}/run`, (route) => {
+    reads += 1;
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(reads === 1 ? running : completed),
+    });
+  });
+
+  await page.goto(`/applications/${applicationId}`);
+  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(page.getByText('Completed', { exact: true })).toBeVisible({
+    timeout: 5_000,
+  });
+  expect(reads).toBeGreaterThanOrEqual(2);
+});
+
 test('keeps the persisted dossier readable on mobile', async ({ page }) => {
   await mockApplication(page);
   await page.setViewportSize({ width: 390, height: 844 });

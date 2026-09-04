@@ -83,6 +83,35 @@ export function useApplicationWorkflow(applicationId: string) {
     return () => controller.abort();
   }, [applicationId]);
 
+  useEffect(() => {
+    if (current?.run?.status !== 'running') return;
+    const controller = new AbortController();
+    let pending = false;
+    const timer = window.setInterval(() => {
+      if (pending) return;
+      pending = true;
+      void readApplicationRun(applicationId, controller.signal)
+        .then(async (response) => {
+          if (!response.ok) return;
+          const run = persistedRunSchema.safeParse(await response.json());
+          if (run.success)
+            setResult((latest) =>
+              latest?.applicationId === applicationId
+                ? { ...latest, run: run.data, error: undefined }
+                : latest,
+            );
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          pending = false;
+        });
+    }, 3_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [applicationId, current?.run?.status]);
+
   async function start(application: Application) {
     if (!current || current.profileRevision < 1 || starting) return;
     setStarting(true);

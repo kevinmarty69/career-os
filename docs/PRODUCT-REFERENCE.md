@@ -649,7 +649,7 @@ Critères d'acceptation :
 
 - [ ] Vue d'accueil avec prochaine action prioritaire.
 - [ ] Pipeline des opportunités et candidatures.
-- [ ] État en temps réel des workflows.
+- [x] État en temps réel des workflows.
 - [ ] File des arbitrages humains.
 - [ ] Gestion des liens privés actifs.
 - [ ] Ajout des contacts, entretiens, réponses et résultats.
