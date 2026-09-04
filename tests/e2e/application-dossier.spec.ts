@@ -768,3 +768,67 @@ test('keeps the persisted dossier readable on mobile', async ({ page }) => {
     ),
   ).toBe(true);
 });
+
+test('records application contacts, interviews, responses and outcomes', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockApplication(page);
+  const persisted = {
+    eventId: '988c0a00-0000-4000-8000-000000000024',
+    applicationId,
+    kind: 'interview',
+    title: 'Technical interview with the product team',
+    note: 'Next step: architecture discussion.',
+    occurredAt: '2026-09-04T14:30:00.000Z',
+    actor: 'human',
+    createdAt: '2026-09-04T14:31:00.000Z',
+  } as const;
+  let request: unknown;
+  await page.route(
+    `**/api/applications/${applicationId}/timeline`,
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        request = route.request().postDataJSON();
+        return route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(persisted),
+        });
+      }
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ events: [] }),
+      });
+    },
+  );
+
+  await page.goto(`/applications/${applicationId}/timeline`);
+  await expect(
+    page.getByRole('heading', {
+      name: 'Contacts, interviews, and outcomes',
+    }),
+  ).toBeVisible();
+  await page.getByLabel('Type').selectOption('interview');
+  await page.getByLabel('Date and time').fill('2026-09-04T16:30');
+  await page
+    .getByLabel('Title')
+    .fill('Technical interview with the product team');
+  await page.getByLabel('Notes').fill('Next step: architecture discussion.');
+  await page.getByRole('button', { name: 'Add to log' }).click();
+
+  await expect(page.getByText(persisted.title)).toBeVisible();
+  await expect(page.getByText(persisted.note)).toBeVisible();
+  expect(request).toEqual({
+    kind: 'interview',
+    title: persisted.title,
+    note: persisted.note,
+    occurredAt: new Date('2026-09-04T16:30').toISOString(),
+  });
+  if (process.env.CAREER_OS_MILESTONE_SCREENSHOT)
+    await page.screenshot({
+      path: 'docs/build-in-public/application-activity-en.png',
+      fullPage: true,
+    });
+});

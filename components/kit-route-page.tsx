@@ -21,7 +21,14 @@ import {
   type Application,
 } from '@/lib/application-contract';
 import {
+  applicationTimelineEventSchema,
+  applicationTimelineListSchema,
+  type ApplicationTimelineEvent,
+} from '@/lib/application-timeline';
+import {
+  createApplicationTimelineEvent,
   readApplication,
+  readApplicationTimeline,
   readApplicationRun,
   readApplications,
   readPublications,
@@ -225,7 +232,10 @@ export function AppShell({
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
       {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
-      <nav aria-label="Navigation mobile" className="co-mobile-nav">
+      <nav
+        aria-label="Navigation mobile"
+        className="co-mobile-nav co-dossier-mobile-nav"
+      >
         {screenNav.slice(0, 4).map(([href, icon, label]) => (
           <Link
             className={
@@ -850,7 +860,7 @@ function DossierNav({
     ['rule', 'Exigences ↔ preuves', ''],
     ['strategy', 'Stratégie', ''],
     ['folder', 'Livrables', 'page'],
-    ['groups', 'Contacts', ''],
+    ['groups', 'Contacts', 'timeline'],
     ['history', 'Versions', 'versions'],
   ];
   return localize(
@@ -875,6 +885,237 @@ function DossierNav({
       ))}
     </aside>,
   );
+}
+
+function ApplicationTimelineScreen({
+  applicationId,
+}: {
+  applicationId: string;
+}) {
+  const { locale } = useI18n();
+  const [result, setResult] = useState<{
+    applicationId: string;
+    application?: Application;
+    events?: ApplicationTimelineEvent[];
+    error?: 'auth' | 'missing' | 'unavailable';
+  }>();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const current = result?.applicationId === applicationId ? result : undefined;
+  const application = current?.application;
+  const events = current?.events ?? [];
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void Promise.all([
+      readApplication(applicationId, controller.signal),
+      readApplicationTimeline(applicationId, controller.signal),
+    ])
+      .then(async ([applicationResponse, timelineResponse]) => {
+        if (
+          applicationResponse.status === 401 ||
+          timelineResponse.status === 401
+        )
+          return setResult({ applicationId, error: 'auth' });
+        if (
+          applicationResponse.status === 404 ||
+          timelineResponse.status === 404
+        )
+          return setResult({ applicationId, error: 'missing' });
+        if (!applicationResponse.ok || !timelineResponse.ok)
+          return setResult({ applicationId, error: 'unavailable' });
+        const parsedApplication = applicationSchema.safeParse(
+          await applicationResponse.json(),
+        );
+        const parsedTimeline = applicationTimelineListSchema.safeParse(
+          await timelineResponse.json(),
+        );
+        if (!parsedApplication.success || !parsedTimeline.success)
+          return setResult({ applicationId, error: 'unavailable' });
+        setResult({
+          applicationId,
+          application: parsedApplication.data,
+          events: parsedTimeline.data.events,
+        });
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException) || error.name !== 'AbortError')
+          setResult({ applicationId, error: 'unavailable' });
+      });
+    return () => controller.abort();
+  }, [applicationId]);
+
+  async function addEvent(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!application || saving) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    setSaving(true);
+    setSaveError(false);
+    try {
+      const response = await createApplicationTimelineEvent(applicationId, {
+        kind: String(form.get('kind')) as ApplicationTimelineEvent['kind'],
+        title: String(form.get('title') ?? ''),
+        note: String(form.get('note') ?? ''),
+        occurredAt: new Date(String(form.get('occurredAt'))).toISOString(),
+      });
+      if (!response.ok) throw new Error();
+      const created = applicationTimelineEventSchema.parse(
+        await response.json(),
+      );
+      setResult({ applicationId, application, events: [created, ...events] });
+      formElement.reset();
+    } catch {
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const identity = application
+    ? { applicationId, company: application.company, role: application.role }
+    : { applicationId, company: 'Candidature', role: 'Chargement…' };
+
+  return (
+    <DossierShell
+      active="Contacts"
+      actions={null}
+      identity={identity}
+      state={
+        application ? (
+          <Badge tone="muted">Journal manuel · données persistées</Badge>
+        ) : undefined
+      }
+    >
+      <div className="co-dossier-content co-application-timeline">
+        {!application ? (
+          <section className="co-panel co-live-dossier-state">
+            <h1>
+              {current?.error === 'auth'
+                ? 'Connectez-vous pour ouvrir ce dossier.'
+                : current?.error === 'missing'
+                  ? 'Cette candidature est introuvable.'
+                  : current?.error === 'unavailable'
+                    ? 'Impossible de charger cette candidature.'
+                    : 'Chargement du suivi…'}
+            </h1>
+          </section>
+        ) : (
+          <>
+            <section className="co-panel co-timeline-intro">
+              <p>Suivi de candidature</p>
+              <h1>Contacts, entretiens et résultats</h1>
+              <span>
+                Consignez les échanges importants dans un journal factuel. Rien
+                n’est envoyé automatiquement.
+              </span>
+            </section>
+            <section className="co-panel co-timeline-form">
+              <h2>Ajouter un événement</h2>
+              <form onSubmit={addEvent}>
+                <label>
+                  Type
+                  <select defaultValue="contact" name="kind">
+                    <option value="contact">Contact</option>
+                    <option value="interview">Entretien</option>
+                    <option value="response">Réponse</option>
+                    <option value="outcome">Résultat</option>
+                  </select>
+                </label>
+                <label>
+                  Date et heure
+                  <input name="occurredAt" required type="datetime-local" />
+                </label>
+                <label className="wide">
+                  Titre
+                  <input
+                    maxLength={200}
+                    name="title"
+                    placeholder="Entretien technique avec l’équipe produit"
+                    required
+                  />
+                </label>
+                <label className="wide">
+                  Notes
+                  <textarea
+                    maxLength={2_000}
+                    name="note"
+                    placeholder="Décisions, attentes et prochaine étape…"
+                    rows={3}
+                  />
+                </label>
+                <button className="co-button" disabled={saving} type="submit">
+                  {saving ? 'Enregistrement…' : 'Ajouter au journal'}
+                </button>
+                {saveError ? (
+                  <p role="alert">L’événement n’a pas été enregistré.</p>
+                ) : null}
+              </form>
+            </section>
+            <section className="co-panel co-timeline-list">
+              <header>
+                <h2>Journal</h2>
+                <Badge>{events.length}</Badge>
+              </header>
+              {events.length ? (
+                events.map((event) => (
+                  <article key={event.eventId}>
+                    <Icon>{timelineIcon(event.kind)}</Icon>
+                    <div>
+                      <p>
+                        <strong>{event.title}</strong>
+                        <Badge tone={event.kind === 'outcome' ? 'ok' : 'muted'}>
+                          {timelineKindLabel(event.kind, locale)}
+                        </Badge>
+                      </p>
+                      <time dateTime={event.occurredAt}>
+                        {new Intl.DateTimeFormat(locale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(event.occurredAt))}
+                      </time>
+                      {event.note ? <span>{event.note}</span> : null}
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <div className="co-timeline-empty">
+                  <Icon>calendar_add_on</Icon>
+                  <h3>Aucun événement pour le moment</h3>
+                  <p>
+                    Ajoutez le premier contact ou entretien de cette
+                    candidature.
+                  </p>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </DossierShell>
+  );
+}
+
+function timelineKindLabel(
+  kind: ApplicationTimelineEvent['kind'],
+  locale: 'en' | 'fr',
+) {
+  const labels = {
+    contact: ['Contact', 'Contact'],
+    interview: ['Interview', 'Entretien'],
+    response: ['Response', 'Réponse'],
+    outcome: ['Outcome', 'Résultat'],
+  } as const;
+  return labels[kind][locale === 'en' ? 0 : 1];
+}
+
+function timelineIcon(kind: ApplicationTimelineEvent['kind']) {
+  return {
+    contact: 'person',
+    interview: 'record_voice_over',
+    response: 'mark_email_read',
+    outcome: 'flag',
+  }[kind];
 }
 
 function DossierShell({
@@ -939,6 +1180,11 @@ function DossierShell({
             'Entreprise',
           ],
           [`/applications/${identity.applicationId}/page`, 'web', 'Livrables'],
+          [
+            `/applications/${identity.applicationId}/timeline`,
+            'groups',
+            'Contacts',
+          ],
         ].map(([href, icon, label]) => (
           <Link href={href} key={href}>
             <Icon>{icon}</Icon>
@@ -4412,6 +4658,9 @@ export function KitRoutePage({ path, query }: { path: string; query: Query }) {
   if (/^\/applications\/[^/]+\/versions$/.test(path)) return <VersionsScreen />;
   if (path === '/runs') return <RunsScreen />;
   if (/^\/applications\/[^/]+\/company$/.test(path)) return <CompanyScreen />;
+  const timelineMatch = path.match(/^\/applications\/([^/]+)\/timeline$/);
+  if (timelineMatch)
+    return <ApplicationTimelineScreen applicationId={timelineMatch[1]} />;
   if (path === '/messages') return <MessagesScreen />;
   if (path === '/memory/skills') return <SkillsScreen />;
   if (path === '/onboarding/hosting') return <HostingScreen />;

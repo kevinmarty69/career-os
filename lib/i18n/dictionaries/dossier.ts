@@ -16,6 +16,30 @@ export const dossierMessages = {
   'Cette candidature est introuvable.': 'This application could not be found.',
   'Impossible de charger cette candidature.':
     'Unable to load this application.',
+  'Chargement du suivi…': 'Loading application activity…',
+  'Journal manuel · données persistées': 'Manual log · persisted data',
+  'Suivi de candidature': 'Application activity',
+  'Contacts, entretiens et résultats': 'Contacts, interviews, and outcomes',
+  'Consignez les échanges importants dans un journal factuel. Rien n’est envoyé automatiquement.':
+    'Keep important interactions in a factual log. Nothing is sent automatically.',
+  'Ajouter un événement': 'Add an event',
+  Type: 'Type',
+  'Date et heure': 'Date and time',
+  Titre: 'Title',
+  Notes: 'Notes',
+  'Entretien technique avec l’équipe produit':
+    'Technical interview with the product team',
+  'Décisions, attentes et prochaine étape…':
+    'Decisions, expectations, and next step…',
+  'Ajouter au journal': 'Add to log',
+  'L’événement n’a pas été enregistré.': 'The event could not be saved.',
+  Journal: 'Activity log',
+  Entretien: 'Interview',
+  Réponse: 'Response',
+  Résultat: 'Outcome',
+  'Aucun événement pour le moment': 'No activity yet',
+  'Ajoutez le premier contact ou entretien de cette candidature.':
+    'Add the first contact or interview for this application.',
   'Candidature réelle · données persistées':
     'Real application · persisted data',
   Étape: 'Stage',

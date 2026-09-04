@@ -199,6 +199,42 @@ async function main() {
   await expectStatus(unchanged, 200, 'unchanged application update');
   assert.equal(((await unchanged.json()) as { revision: number }).revision, 2);
 
+  await expectStatus(
+    await anonymous.request(
+      `/api/applications/${application.applicationId}/timeline`,
+    ),
+    401,
+    'anonymous application timeline',
+  );
+  const timelineEvent = {
+    kind: 'interview',
+    title: 'Technical interview',
+    note: 'Discussed product ownership and reliability.',
+    occurredAt: '2026-09-04T14:30:00.000Z',
+  };
+  const timelineCreate = await owner.request(
+    `/api/applications/${application.applicationId}/timeline`,
+    'POST',
+    timelineEvent,
+  );
+  await expectStatus(timelineCreate, 201, 'application timeline create');
+  const createdTimelineEvent = (await timelineCreate.json()) as {
+    applicationId: string;
+    kind: string;
+    title: string;
+  };
+  assert.equal(createdTimelineEvent.applicationId, application.applicationId);
+  assert.equal(createdTimelineEvent.kind, timelineEvent.kind);
+  assert.equal(createdTimelineEvent.title, timelineEvent.title);
+  const timeline = await owner.request(
+    `/api/applications/${application.applicationId}/timeline`,
+  );
+  await expectStatus(timeline, 200, 'application timeline list');
+  assert.equal(
+    ((await timeline.json()) as { events: unknown[] }).events.length,
+    1,
+  );
+
   const saved = await owner.request('/api/profile', 'PUT', {
     profile: livingProfile,
     expectedRevision: 0,
@@ -313,6 +349,13 @@ async function main() {
     await other.request(`/api/applications/${application.applicationId}/run`),
     204,
     'cross-tenant application run',
+  );
+  await expectStatus(
+    await other.request(
+      `/api/applications/${application.applicationId}/timeline`,
+    ),
+    404,
+    'cross-tenant application timeline',
   );
 
   await expectStatus(

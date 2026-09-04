@@ -652,7 +652,7 @@ Critères d'acceptation :
 - [x] État en temps réel des workflows.
 - [x] File des arbitrages humains.
 - [x] Gestion des liens privés actifs.
-- [ ] Ajout des contacts, entretiens, réponses et résultats.
+- [x] Ajout des contacts, entretiens, réponses et résultats.
 - [ ] Tâches et relances datées.
 - [ ] Recherche et filtres globaux.
 - [ ] Historique des versions et décisions.

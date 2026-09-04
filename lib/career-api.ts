@@ -2,6 +2,7 @@ import type { ApplicationDossier } from './workspace-state';
 import { persistedPublicationOperation } from './run-operation';
 import type { SearchProfileFields } from './search-profile';
 import type { OpportunityDecisionInput } from './opportunity-decision';
+import type { ApplicationTimelineInput } from './application-timeline';
 
 export function readProfile(signal: AbortSignal) {
   return fetch('/api/profile', { cache: 'no-store', signal });
@@ -23,6 +24,27 @@ export function readApplication(applicationId: string, signal: AbortSignal) {
   return fetch(`/api/applications/${applicationId}`, {
     cache: 'no-store',
     signal,
+  });
+}
+
+export function readApplicationTimeline(
+  applicationId: string,
+  signal: AbortSignal,
+) {
+  return fetch(`/api/applications/${applicationId}/timeline`, {
+    cache: 'no-store',
+    signal,
+  });
+}
+
+export function createApplicationTimelineEvent(
+  applicationId: string,
+  input: ApplicationTimelineInput,
+) {
+  return fetch(`/api/applications/${applicationId}/timeline`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
   });
 }
 
