@@ -48,6 +48,7 @@ export const searchProfileFieldsSchema = z
     name: z.string().trim().min(1).max(120),
     hardConstraints: searchHardConstraintsSchema,
     softPreferences: searchSoftPreferencesSchema,
+    alertThreshold: z.number().int().min(0).max(100).nullable().default(null),
     active: z.boolean(),
   })
   .strict();
@@ -74,6 +75,7 @@ export type SearchProfile = z.infer<typeof searchProfileSchema>;
 
 export const emptySearchProfile: SearchProfileFields = {
   name: '',
+  alertThreshold: null,
   active: true,
   hardConstraints: {
     roles: [],

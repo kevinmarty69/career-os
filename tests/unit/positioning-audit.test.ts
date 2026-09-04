@@ -99,6 +99,7 @@ test('audits imported channels, targets and missing proof without inventing fit'
       companySizes: [],
       cultures: [],
     },
+    alertThreshold: null,
   } satisfies SearchProfile;
 
   const audit = auditPositioning(profile, [searchProfile], ['result']);

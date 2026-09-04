@@ -401,6 +401,7 @@ async function main() {
   );
   const searchProfileInput = {
     name: 'Senior engineering search',
+    alertThreshold: 80,
     active: true,
     hardConstraints: {
       roles: ['Senior Engineer'],
@@ -430,8 +431,10 @@ async function main() {
   await expectStatus(createSearchProfile, 201, 'search profile create');
   const searchProfile = (await createSearchProfile.json()) as {
     searchProfileId: string;
+    alertThreshold: number | null;
     revision: number;
   };
+  assert.equal(searchProfile.alertThreshold, 80);
   const matchPath = `/api/opportunities/${connected.opportunity.opportunityId}/match`;
   await expectStatus(
     await owner.browser.request(
@@ -591,6 +594,7 @@ async function main() {
     'PATCH',
     {
       ...searchProfileInput,
+      alertThreshold: 70,
       hardConstraints: {
         ...searchProfileInput.hardConstraints,
         remoteModes: ['hybrid'],
@@ -599,6 +603,11 @@ async function main() {
     },
   );
   await expectStatus(updateSearchProfile, 200, 'search profile update');
+  assert.equal(
+    ((await updateSearchProfile.json()) as { alertThreshold: number | null })
+      .alertThreshold,
+    70,
+  );
   const revisedMatch = await owner.browser.request(matchPath, 'POST', {
     searchProfileId: searchProfile.searchProfileId,
   });

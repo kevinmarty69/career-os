@@ -13,6 +13,7 @@ type RankableDecision = Pick<
 export type OpportunityFeedbackRanking<T extends RankableOpportunity> = {
   opportunity: T;
   direction: 'up' | 'neutral' | 'down' | null;
+  humanFeedbackSignal: number | null;
   exampleCount: number;
   scopes: Array<'role' | 'company' | 'location'>;
 };
@@ -81,6 +82,10 @@ export function rankOpportunitiesByHumanFeedback<T extends RankableOpportunity>(
     .map((ranking) => ({
       opportunity: ranking.opportunity,
       direction: ranking.direction,
+      humanFeedbackSignal:
+        ranking.signal === undefined
+          ? null
+          : Math.round((ranking.signal / 3) * 100),
       exampleCount: ranking.exampleCount,
       scopes: ranking.scopes,
     }));
@@ -129,6 +134,7 @@ function emptyRanking<T extends RankableOpportunity>(opportunity: T) {
   return {
     opportunity,
     direction: null,
+    humanFeedbackSignal: null,
     exampleCount: 0,
     scopes: [] as Array<'role' | 'company' | 'location'>,
   };

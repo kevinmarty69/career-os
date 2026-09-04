@@ -68,6 +68,16 @@ test('search profile mutations are strict and bounded', () => {
   };
   assert.equal(searchProfileFieldsSchema.safeParse(input).success, true);
   assert.equal(
+    searchProfileFieldsSchema.safeParse({ ...input, alertThreshold: 100 })
+      .success,
+    true,
+  );
+  assert.equal(
+    searchProfileFieldsSchema.safeParse({ ...input, alertThreshold: 101 })
+      .success,
+    false,
+  );
+  assert.equal(
     searchProfileFieldsSchema.safeParse({
       ...input,
       tenantId: crypto.randomUUID(),

@@ -127,13 +127,14 @@
 
 .identity {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 140px auto;
   gap: 16px;
   align-items: end;
   padding: 5px 4px 3px;
 }
 
 .identity > label:first-child,
+.alertThreshold,
 .listField,
 .salary,
 .simulatorFields > label {
@@ -149,6 +150,11 @@
   color: var(--co-text-2);
   font-size: 11px;
   font-weight: 700;
+}
+
+.alertThreshold small {
+  color: var(--co-text-3);
+  font-size: 9.5px;
 }
 
 .identity input,

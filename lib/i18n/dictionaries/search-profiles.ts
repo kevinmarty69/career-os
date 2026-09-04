@@ -40,6 +40,9 @@ export const searchProfilesMessages = {
     'No saved profile. Start with this one.',
   'Éditeur du profil': 'Profile editor',
   'Nom du profil': 'Profile name',
+  'Seuil d’alerte': 'Alert threshold',
+  Désactivé: 'Disabled',
+  'Signal humain, en %': 'Human feedback signal, %',
   'Profil actif': 'Active profile',
   'Profil enregistré.': 'Profile saved.',
   'Les changements ne sont pas automatiques.':

@@ -270,6 +270,28 @@ export function SearchProfilesPage() {
                   value={draft.name}
                 />
               </label>
+              <label className={styles.alertThreshold}>
+                <span>Seuil d’alerte</span>
+                <input
+                  aria-describedby="alert-threshold-help"
+                  inputMode="numeric"
+                  max={100}
+                  min={0}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      alertThreshold:
+                        event.target.value === ''
+                          ? null
+                          : Number(event.target.value),
+                    }))
+                  }
+                  placeholder="Désactivé"
+                  type="number"
+                  value={draft.alertThreshold ?? ''}
+                />
+                <small id="alert-threshold-help">Signal humain, en %</small>
+              </label>
               <label className={styles.switch}>
                 <input
                   checked={draft.active}
@@ -746,6 +768,7 @@ function freshProfile(): SearchProfileFields {
 function fieldsFrom(profile: SearchProfile): SearchProfileFields {
   return {
     name: profile.name,
+    alertThreshold: profile.alertThreshold,
     active: profile.active,
     hardConstraints: structuredClone(profile.hardConstraints),
     softPreferences: structuredClone(profile.softPreferences),

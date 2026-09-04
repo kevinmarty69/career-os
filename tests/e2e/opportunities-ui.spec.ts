@@ -175,7 +175,17 @@ test('reuses related human decisions to rank future opportunities', async ({
       history: [],
     },
   ];
-  await mockWorkspace(page, [unrelated, related, prior], decisions, []);
+  await mockWorkspace(
+    page,
+    [unrelated, related, prior],
+    decisions,
+    [],
+    undefined,
+    {
+      ...searchProfile,
+      alertThreshold: 80,
+    },
+  );
   await page.goto('/applications');
 
   await expect(page.getByLabel('Ranking profile')).toHaveValue(
@@ -188,6 +198,14 @@ test('reuses related human decisions to rank future opportunities', async ({
   await expect(active.locator('article').first()).toContainText(
     'Raised by 1 related decision · same role',
   );
+  await expect(page.getByRole('status')).toContainText(
+    '1 opportunity has reached your 80% human-feedback alert threshold.',
+  );
+  if (process.env.CAREER_OS_ALERT_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_ALERT_SCREENSHOT,
+      fullPage: true,
+    });
   if (process.env.CAREER_OS_RANKING_SCREENSHOT)
     await page.screenshot({
       path: process.env.CAREER_OS_RANKING_SCREENSHOT,
@@ -200,6 +218,9 @@ test('reuses related human decisions to rank future opportunities', async ({
   await expect(
     page.locator('article').filter({ hasText: 'Future Labs' }).first(),
   ).toContainText('Remontée par 1 décision liée · même rôle');
+  await expect(page.getByRole('status')).toContainText(
+    '1 opportunité a atteint votre seuil d’alerte de 80 % fondé sur vos décisions.',
+  );
 });
 
 test('promotes an opportunity explicitly and opens the idempotent application', async ({
@@ -412,6 +433,7 @@ const searchProfile = {
     companySizes: [],
     cultures: [],
   },
+  alertThreshold: null as number | null,
   active: true,
   revision: 1,
   createdAt: now,
@@ -424,6 +446,7 @@ async function mockWorkspace(
   decisions: OpportunityDecisionMock[],
   importedUrls: string[],
   semantic?: SemanticMock,
+  profile = searchProfile,
 ) {
   await page.route('**/api/opportunities/import-url', async (route) => {
     const body = route.request().postDataJSON() as { url: string };
@@ -506,7 +529,7 @@ async function mockWorkspace(
   await page.route('**/api/search-profiles', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ searchProfiles: [searchProfile] }),
+      body: JSON.stringify({ searchProfiles: [profile] }),
     });
   });
   await page.route(

@@ -35,23 +35,40 @@ test('ranks future opportunities from related human decisions only', () => {
   );
 
   assert.deepEqual(
-    result.map(({ opportunity, direction, exampleCount, scopes }) => ({
-      id: opportunity.opportunityId,
-      direction,
-      exampleCount,
-      scopes,
-    })),
+    result.map(
+      ({
+        opportunity,
+        direction,
+        humanFeedbackSignal,
+        exampleCount,
+        scopes,
+      }) => ({
+        id: opportunity.opportunityId,
+        direction,
+        humanFeedbackSignal,
+        exampleCount,
+        scopes,
+      }),
+    ),
     [
-      { id: 'raised', direction: 'up', exampleCount: 1, scopes: ['role'] },
+      {
+        id: 'raised',
+        direction: 'up',
+        humanFeedbackSignal: 100,
+        exampleCount: 1,
+        scopes: ['role'],
+      },
       {
         id: 'lowered',
         direction: 'down',
+        humanFeedbackSignal: 0,
         exampleCount: 1,
         scopes: ['location'],
       },
       {
         id: 'unrelated',
         direction: null,
+        humanFeedbackSignal: null,
         exampleCount: 0,
         scopes: [],
       },
@@ -81,6 +98,7 @@ test('does not reuse hard-constraint or cross-profile decisions', () => {
   );
 
   assert.equal(result[0].direction, null);
+  assert.equal(result[0].humanFeedbackSignal, null);
   assert.equal(result[0].exampleCount, 0);
 });
 

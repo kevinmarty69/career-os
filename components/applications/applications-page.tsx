@@ -60,6 +60,7 @@ export function ApplicationsPage({
   AppShell: ShellComponent;
   Icon: IconComponent;
 }) {
+  const { locale } = useI18n();
   const [opportunities, setOpportunities] = useState<DiscoveredJob[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [decisions, setDecisions] = useState<OpportunityDecision[]>([]);
@@ -226,6 +227,18 @@ export function ApplicationsPage({
         opportunity.location ?? '',
       ),
   );
+  const rankingProfile = searchProfiles.find(
+    ({ searchProfileId }) => searchProfileId === rankingProfileId,
+  );
+  const alertThreshold = rankingProfile?.alertThreshold ?? null;
+  const alertRankings =
+    alertThreshold === null
+      ? []
+      : visibleActiveOpportunities.filter(
+          ({ humanFeedbackSignal }) =>
+            humanFeedbackSignal !== null &&
+            humanFeedbackSignal >= alertThreshold,
+        );
   const visibleApplications = applications.filter(
     (application) =>
       scope !== 'opportunities' &&
@@ -347,6 +360,18 @@ export function ApplicationsPage({
             <button onClick={retry} type="button">
               Réessayer
             </button>
+          </div>
+        ) : null}
+
+        {alertRankings.length ? (
+          <div className={styles.alertSummary} role="status">
+            <Icon>notifications_active</Icon>
+            <div>
+              <strong>
+                {alertCopy(alertRankings.length, alertThreshold!, locale)}
+              </strong>
+              <span>{rankingProfile?.name}</span>
+            </div>
           </div>
         ) : null}
 
@@ -1483,6 +1508,12 @@ function feedbackRankingCopy(
       ? `${ranking.exampleCount} related decision${ranking.exampleCount === 1 ? '' : 's'}`
       : `${ranking.exampleCount} décision${ranking.exampleCount === 1 ? '' : 's'} liée${ranking.exampleCount === 1 ? '' : 's'}`;
   return `${direction} ${locale === 'en' ? 'by' : 'par'} ${decisions} · ${scopes}`;
+}
+
+function alertCopy(count: number, threshold: number, locale: 'en' | 'fr') {
+  if (locale === 'en')
+    return `${count} opportunit${count === 1 ? 'y has' : 'ies have'} reached your ${threshold}% human-feedback alert threshold.`;
+  return `${count} opportunité${count === 1 ? ' a' : 's ont'} atteint votre seuil d’alerte de ${threshold} % fondé sur vos décisions.`;
 }
 
 const decisionReasons: OpportunityDecision['reason'][] = [

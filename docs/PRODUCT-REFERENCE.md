@@ -575,7 +575,7 @@ Critères d'acceptation :
 - [x] Recommandation expliquée avec preuves, gaps, risques et inconnues.
 - [x] Inbox d'opportunités avec enregistrer, ignorer, archiver et corriger.
 - [x] Feedback utilisateur réutilisé pour le classement futur.
-- [ ] Alertes configurables uniquement au-dessus du seuil choisi.
+- [x] Alertes in-app configurables uniquement au-dessus du seuil choisi.
 
 Critères d'acceptation :
 

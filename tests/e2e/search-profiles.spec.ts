@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 type StoredProfile = {
   searchProfileId: string;
   name: string;
+  alertThreshold: number | null;
   active: boolean;
   hardConstraints: Record<string, unknown>;
   softPreferences: Record<string, unknown>;
@@ -26,6 +27,7 @@ test('creates multiple profiles and explains deterministic hard-criterion effect
   ).toBeVisible();
 
   await page.getByLabel('Nom du profil').fill('Product Europe');
+  await page.getByLabel('Seuil d’alerte').fill('75');
   await page.getByLabel('Rôles').fill('Product Engineer, Software Engineer');
   await page.getByRole('button', { name: 'Enregistrer le profil' }).click();
   await expect(page.getByText('Profil enregistré.')).toBeVisible();
@@ -49,6 +51,9 @@ test('creates multiple profiles and explains deterministic hard-criterion effect
     page.getByRole('button', { name: /Founding US overlap/ }),
   ).toBeVisible();
   expect(stored).toHaveLength(2);
+  expect(
+    stored.find(({ name }) => name === 'Product Europe')?.alertThreshold,
+  ).toBe(75);
 });
 
 test('keeps the search profile editor inside a mobile viewport', async ({
