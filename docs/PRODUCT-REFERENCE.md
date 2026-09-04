@@ -635,7 +635,7 @@ Critères d'acceptation :
 - [x] Contrôle de contraste, responsive et navigation clavier.
 - [x] Lien privé non indexable, expirant et révocable.
 - [x] Session privée sans secret persistant dans l'URL.
-- [ ] Versionnement et remplacement d'une publication.
+- [x] Versionnement et remplacement d'une publication.
 - [ ] Analytics sobres : ouvertures, sections, actions et téléchargement.
 
 Critères d'acceptation :

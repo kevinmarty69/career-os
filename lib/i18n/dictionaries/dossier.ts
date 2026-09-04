@@ -106,6 +106,7 @@ export const dossierMessages = {
     'Publishing remains blocked while a decision is missing.',
   'Validation humaine finale': 'Final human approval',
   'Le lien privé est prêt': 'The private link is ready',
+  'Préparer une nouvelle version': 'Prepare a new version',
   'Le lien privé a été révoqué': 'The private link has been revoked',
   'Publiez uniquement ce que vous avez validé':
     'Publish only what you approved',

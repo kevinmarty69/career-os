@@ -679,6 +679,7 @@ test('publishes the approved snapshot and can revoke its private link', async ({
         publicationId,
         rawToken: 'f'.repeat(72),
         expiresAt: '2026-09-11T14:00:00.000Z',
+        version: 1,
       }),
     });
   });
@@ -708,6 +709,47 @@ test('publishes the approved snapshot and can revoke its private link', async ({
     page.getByRole('heading', { name: 'The private link has been revoked' }),
   ).toBeVisible();
   expect(revoked).toBe(true);
+});
+
+test('starts a fresh run while the published version remains available', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const run = publishableRun();
+  let replacementRequest: { applicationId?: string } | undefined;
+  await mockApplication(page, run);
+  await page.route('**/api/publications', (route) =>
+    route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        publicationId: '988c0a00-0000-4000-8000-000000000023',
+        rawToken: 'f'.repeat(72),
+        expiresAt: '2026-09-11T14:00:00.000Z',
+        version: 1,
+      }),
+    }),
+  );
+  await page.route('**/api/runs', async (route) => {
+    replacementRequest = route.request().postDataJSON();
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify(savedRun()),
+    });
+  });
+
+  await page.goto(`/applications/${applicationId}`);
+  await page
+    .getByRole('button', { name: 'Approve and create private link' })
+    .click();
+  await expect(page.getByText('Version 1')).toBeVisible();
+  await page.getByRole('button', { name: 'Prepare a new version' }).click();
+  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => replacementRequest?.applicationId)
+    .toBe(applicationId);
 });
 
 test('keeps the persisted dossier readable on mobile', async ({ page }) => {

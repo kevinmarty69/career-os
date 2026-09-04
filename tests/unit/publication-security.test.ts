@@ -198,6 +198,8 @@ test('publication inventory exposes metadata without capabilities', () => {
     revokedAt: null,
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
     status: 'active' as const,
+    version: 1,
+    isCurrent: true,
   };
   assert.deepEqual(publicationSummarySchema.parse(summary), summary);
   assert.equal(

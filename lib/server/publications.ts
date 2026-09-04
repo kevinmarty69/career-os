@@ -27,6 +27,8 @@ type PublicationSummaryRow = {
   revoked_at: Date | null;
   expires_at: Date | null;
   status: 'active' | 'expired' | 'revoked';
+  version: number;
+  is_current: boolean;
 };
 
 const PUBLICATION_PAGE_SIZE = 50;
@@ -46,7 +48,7 @@ export async function mintPublication(
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const sql = database();
   try {
-    const publicationId = await sql.begin(async (tx) => {
+    const publication = await sql.begin(async (tx) => {
       await authorize(tx, session);
       const [application] = await tx<{ id: string }[]>`
         select a.id from app.applications a
@@ -98,17 +100,32 @@ export async function mintPublication(
       }
 
       await tx.unsafe('set local role career_publisher');
-      const [publication] = await tx<{ id: string }[]>`
+      const [created] = await tx<{ id: string }[]>`
         select app.mint_publication(
           ${pageSpec.id}, ${tokenHash}, ${expiresAt}
         ) as id`;
       await authorize(tx, session);
+      const [metadata] = await tx<{ version: number }[]>`
+        select count(*)::integer as version
+        from app.publications publication
+        join app.page_specs spec on spec.tenant_id = publication.tenant_id
+          and spec.id = publication.page_spec_id
+        join app.workflow_runs workflow on workflow.tenant_id = spec.tenant_id
+          and workflow.id = spec.workflow_run_id
+        join app.opportunities opportunity on opportunity.tenant_id = workflow.tenant_id
+          and opportunity.id = workflow.opportunity_id
+        where publication.tenant_id = ${session.tenantId}
+          and opportunity.application_id = ${application.id}`;
       await tx`update app.workflow_runs set status = 'completed',
         state = 'publication_ready'
         where tenant_id = ${session.tenantId} and id = ${runId}`;
-      return publication.id;
+      return { publicationId: created.id, version: metadata.version };
     });
-    return { publicationId, rawToken, expiresAt: expiresAt.toISOString() };
+    return {
+      ...publication,
+      rawToken,
+      expiresAt: expiresAt.toISOString(),
+    };
   } finally {
     await sql.end();
   }
@@ -141,6 +158,8 @@ export async function listPublications(
           revokedAt: row.revoked_at?.toISOString() ?? null,
           expiresAt: row.expires_at?.toISOString() ?? null,
           status: row.status,
+          version: row.version,
+          isCurrent: row.is_current,
         }),
       );
       return {

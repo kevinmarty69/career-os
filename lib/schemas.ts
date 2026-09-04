@@ -195,6 +195,7 @@ export const createdPublicationSchema = z
     publicationId: z.string().uuid(),
     rawToken: z.string().min(64).max(128),
     expiresAt: z.string().datetime(),
+    version: z.number().int().positive(),
   })
   .strict();
 

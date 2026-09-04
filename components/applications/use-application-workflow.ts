@@ -141,7 +141,7 @@ export function useApplicationWorkflow(applicationId: string) {
     };
   }, [applicationId, current?.run?.status]);
 
-  async function start(application: Application) {
+  async function start(application: Application, forceNew = false) {
     if (!current || current.profileRevision < 1 || starting) return;
     setStarting(true);
     try {
@@ -154,6 +154,7 @@ export function useApplicationWorkflow(applicationId: string) {
         localStorage,
         `career-os-run-request:${applicationId}`,
         input,
+        forceNew,
       );
       const response = await createRun(input, operation.key);
       if (!response.ok) {
@@ -177,6 +178,10 @@ export function useApplicationWorkflow(applicationId: string) {
         run: persistedRunSchema.parse(await response.json()),
         error: undefined,
       });
+      if (forceNew) {
+        setPublication(undefined);
+        setPublicationRevoked(false);
+      }
     } catch {
       setResult({ ...current, error: 'unavailable' });
     } finally {

@@ -7,6 +7,7 @@ import type { CreatedPublication } from '@/lib/schemas';
 export function ApplicationPublicationCheckpoint({
   error,
   onCopy,
+  onNewVersion,
   onPublish,
   onRevoke,
   pending,
@@ -15,6 +16,7 @@ export function ApplicationPublicationCheckpoint({
 }: {
   error: boolean;
   onCopy: () => void;
+  onNewVersion: () => void;
   onPublish: () => void;
   onRevoke: () => void;
   pending: 'publish' | 'revoke' | undefined;
@@ -72,27 +74,33 @@ export function ApplicationPublicationCheckpoint({
           </div>
           <footer>
             <span>
+              Version {publication.version} ·{' '}
               {locale === 'en' ? 'Expires' : 'Expire le'}{' '}
               {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
                 new Date(publication.expiresAt),
               )}
             </span>
-            <button
-              disabled={Boolean(pending)}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    locale === 'en'
-                      ? 'Revoke this private link? Anyone using it will lose access immediately.'
-                      : 'Révoquer ce lien privé ? Toute personne qui l’utilise perdra immédiatement l’accès.',
+            <div>
+              <button disabled={Boolean(pending)} onClick={onNewVersion} type="button">
+                Préparer une nouvelle version
+              </button>
+              <button
+                disabled={Boolean(pending)}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      locale === 'en'
+                        ? 'Revoke this private link? Anyone using it will lose access immediately.'
+                        : 'Révoquer ce lien privé ? Toute personne qui l’utilise perdra immédiatement l’accès.',
+                    )
                   )
-                )
-                  onRevoke();
-              }}
-              type="button"
-            >
-              {pending === 'revoke' ? 'Révocation…' : 'Révoquer le lien'}
-            </button>
+                    onRevoke();
+                }}
+                type="button"
+              >
+                {pending === 'revoke' ? 'Révocation…' : 'Révoquer le lien'}
+              </button>
+            </div>
           </footer>
         </>
       ) : revoked ? (

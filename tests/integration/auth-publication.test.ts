@@ -525,15 +525,19 @@ async function main() {
   const publication = (await publicationResponse.json()) as {
     publicationId: string;
     rawToken: string;
+    version: number;
   };
+  assert.equal(publication.version, 1);
   const retryResponse = await owner.post('/api/publications', publishableBody);
   await expectStatus(retryResponse, 201, 'publication retry');
   const retryPublication = (await retryResponse.json()) as {
     publicationId: string;
     rawToken: string;
+    version: number;
   };
   assert.equal(retryPublication.publicationId, publication.publicationId);
   assert.equal(retryPublication.rawToken, publication.rawToken);
+  assert.equal(retryPublication.version, 1);
 
   const expiredReader = new BrowserSession();
   await expectStatus(
@@ -569,11 +573,84 @@ async function main() {
     expectedRevision: savedProfile.revision,
   });
   await expectStatus(updatedProfile, 200, 'profile update after publication');
+  const updatedProfileBody = (await updatedProfile.json()) as {
+    revision: number;
+  };
   const unchangedSnapshot = await capabilityReader.get(
     `/api/publications/${publication.publicationId}`,
   );
   await expectStatus(unchangedSnapshot, 200, 'snapshot after profile update');
   assert.deepEqual(await unchangedSnapshot.json(), publishedPayload);
+
+  const replacementRunResponse = await owner.post(
+    '/api/runs',
+    {
+      applicationId: application.applicationId,
+      applicationRevision: application.revision,
+      profileRevision: updatedProfileBody.revision,
+    },
+    { 'idempotency-key': randomUUID() },
+  );
+  await expectStatus(replacementRunResponse, 202, 'replacement run');
+  const replacementRun = (await replacementRunResponse.json()) as PersistedRun;
+  await makeRunPublishable(replacementRun, organization.id);
+  const replacementResponse = await owner.post('/api/publications', {
+    runId: replacementRun.runId,
+    rawToken: `${randomUUID()}${randomUUID()}`,
+  });
+  await expectStatus(replacementResponse, 201, 'replacement publication');
+  const replacementPublication = (await replacementResponse.json()) as {
+    publicationId: string;
+    rawToken: string;
+    version: number;
+  };
+  assert.equal(replacementPublication.version, 2);
+  await expectStatus(
+    await capabilityReader.get(`/api/publications/${publication.publicationId}`),
+    404,
+    'replaced capability',
+  );
+  const replacementReader = new BrowserSession();
+  await expectStatus(
+    await replacementReader.post(
+      `/api/publications/${replacementPublication.publicationId}/exchange`,
+      { token: replacementPublication.rawToken },
+    ),
+    204,
+    'replacement capability exchange',
+  );
+  const inventoryResponse = await owner.get('/api/publications');
+  await expectStatus(inventoryResponse, 200, 'publication history');
+  const inventory = (await inventoryResponse.json()) as {
+    publications: Array<{
+      publicationId: string;
+      status: string;
+      version: number;
+      isCurrent: boolean;
+    }>;
+  };
+  assert.deepEqual(
+    inventory.publications.slice(0, 2).map((item) => ({
+      publicationId: item.publicationId,
+      status: item.status,
+      version: item.version,
+      isCurrent: item.isCurrent,
+    })),
+    [
+      {
+        publicationId: replacementPublication.publicationId,
+        status: 'active',
+        version: 2,
+        isCurrent: true,
+      },
+      {
+        publicationId: publication.publicationId,
+        status: 'revoked',
+        version: 1,
+        isCurrent: false,
+      },
+    ],
+  );
   const invitee = new BrowserSession();
   await expectStatus(
     await invitee.post(
@@ -709,8 +786,8 @@ async function main() {
   }
 
   await expectStatus(
-    await capabilityReader.get(
-      `/api/publications/${publication.publicationId}`,
+    await replacementReader.get(
+      `/api/publications/${replacementPublication.publicationId}`,
     ),
     200,
     'capability after authenticated session expiry',

@@ -27,6 +27,8 @@ export const publicationSummarySchema = z
     revokedAt: z.string().datetime().nullable(),
     expiresAt: z.string().datetime().nullable(),
     status: z.enum(['active', 'expired', 'revoked']),
+    version: z.number().int().positive(),
+    isCurrent: z.boolean(),
   })
   .strict();
 

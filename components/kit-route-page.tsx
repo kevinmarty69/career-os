@@ -1133,6 +1133,7 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
               <ApplicationPublicationCheckpoint
                 error={workflow.publicationError}
                 onCopy={() => void workflow.copyPublicationLink()}
+                onNewVersion={() => void workflow.start(application, true)}
                 onPublish={() => void workflow.publish()}
                 onRevoke={() => void workflow.revoke()}
                 pending={workflow.publicationPending}
