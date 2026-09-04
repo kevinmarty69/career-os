@@ -59,10 +59,14 @@ function AppShell({
   path,
   children,
   aside,
+  sidebarContext,
+  sidebarFooter,
 }: {
   path: string;
   children: ReactNode;
   aside?: ReactNode;
+  sidebarContext?: ReactNode;
+  sidebarFooter?: ReactNode;
 }) {
   const [palette, setPalette] = useState(false);
   useEffect(() => {
@@ -103,65 +107,54 @@ function AppShell({
             </Link>
           ))}
         </nav>
-        <p className="co-nav-label">En cours</p>
-        <div className="co-current-list">
-          <Link href="/applications/nimbus">
-            <i className="accent">NR</i>
-            <span>Nimbus</span>
-            <b className="warn" />
-          </Link>
-          <Link href="/applications/atlas">
-            <i className="ok">AH</i>
-            <span>Atlas Health</span>
-            <b className="ok" />
-          </Link>
-          <Link href="/applications/keel">
-            <i>KE</i>
-            <span>Keel</span>
-            <Icon>autorenew</Icon>
-          </Link>
-        </div>
-        <div className="co-instance">
-          <Icon>cloud_done</Icon>
-          <strong>Instance saine</strong>
-          <small>
-            Auto-hébergé · 3 workers
-            <br />
-            dernière sauvegarde 03:00
-          </small>
-        </div>
+        {sidebarContext ?? <CurrentApplications />}
+        {sidebarFooter === undefined ? <InstanceCard /> : sidebarFooter}
       </aside>
       <section className="co-surface">
-        <header className="co-topbar">
-          <button
-            className="co-search"
-            onClick={() => setPalette(true)}
-            type="button"
-          >
-            <Icon>search</Icon>
-            <span>Chercher une preuve, une entreprise, une affirmation…</span>
-            <kbd>⌘K</kbd>
-          </button>
-          <div>
-            <Link className="co-button" href="/applications/new">
-              <Icon>add_link</Icon>Coller une offre
-            </Link>
-            <button
-              className="co-round"
-              aria-label="Notifications"
-              type="button"
-            >
-              <Icon>notifications</Icon>
-              <i />
-            </button>
-            <span className="co-avatar">MA</span>
-          </div>
-        </header>
         <div className="co-content">{children}</div>
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
       {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
     </main>
+  );
+}
+
+function CurrentApplications() {
+  return (
+    <>
+      <p className="co-nav-label">En cours</p>
+      <div className="co-current-list">
+        <Link href="/applications/nimbus">
+          <i className="accent">NR</i>
+          <span>Nimbus</span>
+          <b className="warn" />
+        </Link>
+        <Link href="/applications/atlas">
+          <i className="ok">AH</i>
+          <span>Atlas Health</span>
+          <b className="ok" />
+        </Link>
+        <Link href="/applications/keel">
+          <i>KE</i>
+          <span>Keel</span>
+          <Icon>autorenew</Icon>
+        </Link>
+      </div>
+    </>
+  );
+}
+
+function InstanceCard() {
+  return (
+    <div className="co-instance">
+      <Icon>cloud_done</Icon>
+      <strong>Instance saine</strong>
+      <small>
+        Auto-hébergé · 3 workers
+        <br />
+        dernière sauvegarde 03:00
+      </small>
+    </div>
   );
 }
 
@@ -222,7 +215,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
           </span>
         </Link>
         <p>Actions</p>
-        <Link href="/applications/new" onClick={onClose}>
+        <Link href="/applications#new" onClick={onClose}>
           <Icon>add_link</Icon>
           <span>
             <strong>Nouvelle candidature depuis une URL</strong>
@@ -320,9 +313,46 @@ function ClaimRow({
 
 function MemoryScreen() {
   return (
-    <AppShell path="/memory">
+    <AppShell
+      path="/memory"
+      sidebarContext={
+        <>
+          <p className="co-nav-label">Sources</p>
+          <div className="co-sidebar-sources">
+            <Link href="/memory/import">
+              <Icon>picture_as_pdf</Icon>
+              <span>Documents</span>
+              <b>18</b>
+            </Link>
+            <Link href="/memory/import">
+              <Icon>badge</Icon>
+              <span>LinkedIn</span>
+              <i className="ok" />
+            </Link>
+            <Link href="/memory/import">
+              <Icon>code</Icon>
+              <span>GitHub</span>
+              <i className="ok" />
+            </Link>
+            <Link className="muted" href="/memory/import">
+              <Icon>cloud_off</Icon>
+              <span>Drive</span>
+              <em>resync</em>
+            </Link>
+          </div>
+        </>
+      }
+      sidebarFooter={
+        <div className="co-sidebar-card">
+          <strong>Ajouter une source</strong>
+          <span>PDF, URL, dépôt, ou entretien guidé.</span>
+          <Link className="co-button" href="/memory/import">
+            Importer
+          </Link>
+        </div>
+      }
+    >
       <PageHeader
-        eyebrow="Mémoire pro"
         title="Mémoire professionnelle"
         copy="128 affirmations issues de 24 sources. Rien n’entre ici sans document daté."
         actions={
@@ -336,111 +366,172 @@ function MemoryScreen() {
           </>
         }
       />
-      <div className="co-memory-grid">
-        <aside className="co-panel co-source-list">
-          <h2>
-            Sources <Badge>24</Badge>
-          </h2>
-          {[
-            ['picture_as_pdf', 'Documents', '18'],
-            ['badge', 'LinkedIn', ''],
-            ['code', 'GitHub', ''],
-            ['cloud_off', 'Drive', 'resync'],
-          ].map(([i, l, n]) => (
-            <button key={l}>
-              <Icon>{i}</Icon>
-              <span>{l}</span>
-              <b>{n}</b>
-            </button>
-          ))}
-          <div className="co-dashed">
-            <Icon>add</Icon>
-            <span>
-              Ajouter une source
-              <small>PDF, URL, dépôt ou entretien guidé.</small>
-            </span>
+      <div className="co-memory-metrics">
+        <article>
+          <span>Complétude</span>
+          <div>
+            <strong>78 %</strong>
+            <b>+6 pts</b>
           </div>
-        </aside>
-        <section>
-          <div className="co-memory-summary">
-            <Stat icon="donut_large" value="78 %" label="Complétude · +6 pts" />
-            <Stat
-              icon="verified"
-              value="92"
-              label="affirmations vérifiées"
-              tone="ok"
-            />
-            <Stat icon="link_off" value="10" label="sans source" tone="warn" />
-            <Stat
-              icon="rule"
-              value="2"
-              label="conflits à arbitrer"
-              tone="crit"
-            />
+          <progress max="100" value="78" />
+        </article>
+        <article>
+          <span>Niveau de preuve</span>
+          <div>
+            <strong>92</strong>
+            <small>vérifiées</small>
           </div>
-          <div className="co-section-title">
-            <h2>Affirmations</h2>
-            <div>
-              <Badge tone="accent">Expériences</Badge>
-              <Badge>Projets</Badge>
-              <Badge>Compétences</Badge>
+          <footer>
+            <Badge tone="ok">92 vérifié</Badge>
+            <Badge tone="warn">26 déclaré</Badge>
+          </footer>
+        </article>
+        <article>
+          <span>À corriger</span>
+          <div>
+            <strong className="crit">10</strong>
+            <small>sans source</small>
+          </div>
+          <Link href="/inbox">Lancer la revue</Link>
+        </article>
+        <article>
+          <span>Conflits entre sources</span>
+          <div>
+            <strong>2</strong>
+            <small>à arbitrer</small>
+          </div>
+          <Link href="/memory/conflicts">Voir les conflits</Link>
+        </article>
+      </div>
+      <div className="co-memory-body">
+        <section className="co-memory-main">
+          <div className="co-memory-toolbar">
+            <div className="co-segment">
+              <button className="active">Affirmations</button>
+              <button>Expériences</button>
+              <button>Projets</button>
+              <button>Compétences</button>
             </div>
+            <Button quiet>
+              <Icon>filter_list</Icon>Niveau de preuve
+            </Button>
+            <button className="co-round" aria-label="Rechercher" type="button">
+              <Icon>search</Icon>
+            </button>
           </div>
-          <div className="co-claims">
-            <ClaimRow
-              label="Vérifié"
-              text="Temps de build ramené de 11 à 7 minutes (p50) sur un monorepo de 340 services."
-              source="Corvid · 2021-2024 · 2 preuves"
-            />
-            <ClaimRow
-              tone="crit"
-              label="Sans source"
-              text="Divisé les coûts d’infrastructure par deux."
-              source="utilisée dans 1 candidature"
-              action="Rattacher une preuve"
-            />
-            <ClaimRow
-              tone="warn"
-              label="Conflit"
-              text="Taille de l’équipe encadrée : 6 ou 9 personnes ?"
-              source="LinkedIn ≠ CV"
-              action="Arbitrer"
-            />
-            <ClaimRow
-              label="Vérifié"
-              text="Mainteneur principal d’un pont ROS2 utilisé en production par 4 entreprises."
-              source="open source · depuis 2023 · 1 preuve"
-            />
+          <div className="co-memory-claims">
+            <article>
+              <Icon>verified</Icon>
+              <div>
+                <header>
+                  <Badge tone="ok">Vérifié</Badge>
+                  <small>Corvid · 2021-2024</small>
+                  <code>2 preuves</code>
+                </header>
+                <strong>
+                  Temps de build ramené de 11 à 7 minutes (p50) sur un monorepo
+                  de 340 services.
+                </strong>
+                <footer>
+                  <span>
+                    <Icon>description</Icon>corvid_postmortem.md
+                  </span>
+                  <span>
+                    <Icon>picture_as_pdf</Icon>cv_2024.pdf · p.2
+                  </span>
+                </footer>
+              </div>
+            </article>
+            <article className="unsourced">
+              <Icon>link_off</Icon>
+              <div>
+                <header>
+                  <Badge tone="crit">Sans source</Badge>
+                  <small>utilisée dans 1 candidature</small>
+                </header>
+                <strong>« Divisé les coûts d’infrastructure par deux. »</strong>
+                <footer>
+                  <Button>Rattacher une preuve</Button>
+                  <Button quiet>Passer en « déclaré »</Button>
+                </footer>
+              </div>
+            </article>
+            <article>
+              <Icon>rule</Icon>
+              <div>
+                <header>
+                  <Badge tone="warn">Conflit</Badge>
+                  <small>LinkedIn ≠ CV</small>
+                </header>
+                <strong>
+                  Taille de l’équipe encadrée : <mark>6</mark> ou <mark>9</mark>{' '}
+                  personnes ?
+                </strong>
+                <Link href="/memory/conflicts">Arbitrer</Link>
+              </div>
+            </article>
+            <article>
+              <Icon>verified</Icon>
+              <div>
+                <header>
+                  <Badge tone="ok">Vérifié</Badge>
+                  <small>open source · depuis 2023</small>
+                  <code>1 preuve</code>
+                </header>
+                <strong>
+                  Mainteneur principal d’un pont ROS2 utilisé en production par
+                  4 entreprises.
+                </strong>
+              </div>
+            </article>
           </div>
         </section>
-        <aside className="co-stack">
-          <section className="co-panel">
-            <h2>
-              Compléter <Badge tone="warn">5 pistes</Badge>
-            </h2>
-            <div className="co-callout">
-              <Icon>record_voice_over</Icon>
-              <strong>Entretien guidé · 8 min</strong>
-              <span>
-                Quatre questions sur Corvid pour transformer vos notes en
-                affirmations sourcées.
-              </span>
-              <Link href="/memory/interview">Commencer</Link>
-            </div>
+        <aside className="co-memory-side">
+          <header>
+            <h2>Compléter</h2>
+            <Badge tone="accent">5 pistes</Badge>
+          </header>
+          <section>
+            <strong>Entretien guidé · 8 min</strong>
+            <span>
+              Quatre questions sur Corvid pour transformer vos notes en
+              affirmations sourcées.
+            </span>
+            <Link className="co-button" href="/memory/interview">
+              Commencer
+            </Link>
           </section>
-          <section className="co-panel">
+          <div className="co-memory-prompt-list">
+            <button>
+              <Icon>query_stats</Icon>Aucune métrique sur 2 projets
+              <Icon>chevron_right</Icon>
+            </button>
+            <button>
+              <Icon>school</Icon>Formations non renseignées
+              <Icon>chevron_right</Icon>
+            </button>
+            <button>
+              <Icon>group</Icon>Aucune recommandation importée
+              <Icon>chevron_right</Icon>
+            </button>
+          </div>
+          <footer>
             <h2>Confidentialité</h2>
             <dl>
               <div>
-                <dt>Sensibilité par défaut</dt>
+                <dt>
+                  <Icon>lock</Icon>Sensibilité par défaut
+                </dt>
                 <dd>privé</dd>
               </div>
               <div>
-                <dt>Usages autorisés</dt>
+                <dt>
+                  <Icon>policy</Icon>Usages autorisés
+                </dt>
                 <dd>3 / 5</dd>
               </div>
             </dl>
-          </section>
+          </footer>
         </aside>
       </div>
     </AppShell>
@@ -718,59 +809,126 @@ function DossierScreen({ running = false }: { running?: boolean }) {
 
 function AnalysisScreen() {
   return (
-    <DossierShell
-      active="Brief"
-      state={<Badge tone="accent">Analyse en cours · 42 %</Badge>}
-    >
-      <div className="co-analysis">
-        <header>
-          <p>Analyse de la candidature</p>
-          <h1>Les agents construisent votre dossier, étape par étape.</h1>
-          <span>
-            Chaque résultat intermédiaire est enregistré. Vous pouvez quitter
-            cette page.
-          </span>
-        </header>
-        <ol>
-          {[
-            ['check_circle', 'Lecture de l’offre', '1 842 mots · 12 exigences'],
-            [
-              'check_circle',
-              'Recherche entreprise',
-              '6 sources retenues sur 14',
-            ],
-            ['autorenew', 'Appariement des preuves', '128 → 6 · seuil 0,70'],
-            [
-              'radio_button_unchecked',
-              'Stratégie de candidature',
-              'en attente',
-            ],
-            ['radio_button_unchecked', 'Composition de la page', 'en attente'],
-            ['radio_button_unchecked', 'Revues spécialisées', 'en attente'],
-          ].map(([icon, title, meta], i) => (
-            <li
-              className={i < 2 ? 'done' : i === 2 ? 'active' : ''}
-              key={title}
-            >
-              <Icon>{icon}</Icon>
-              <span>
-                <strong>{title}</strong>
-                <small>{meta}</small>
-              </span>
-              {i === 2 ? <Badge tone="accent">en cours</Badge> : null}
-            </li>
-          ))}
-        </ol>
-        <aside>
-          <Icon>lock</Icon>
-          <strong>Votre mémoire reste inchangée</strong>
-          <span>
-            Les agents travaillent sur un instantané. Rien n’est ajouté ni
-            publié sans validation humaine.
-          </span>
+    <AppShell path="/applications">
+      <PageHeader
+        eyebrow="Fathom · Berlin / remote · importée il y a 48 s"
+        title="Platform Engineer"
+        actions={
+          <>
+            <Badge tone="accent">Analyse en cours</Badge>
+            <Button quiet>Voir l’offre d’origine</Button>
+            <Button danger>Annuler le run</Button>
+          </>
+        }
+      />
+      <div className="co-analysis-v2">
+        <section className="co-stack">
+          <section className="co-panel co-run-progress">
+            <header>
+              <h2>Progression du run</h2>
+              <code>≈ 50 s restantes</code>
+            </header>
+            <progress max="100" value="42" />
+            <ol>
+              {[
+                ['check_circle', 'Offre récupérée et nettoyée', '1 648 mots'],
+                ['check_circle', '14 exigences identifiées', '5 critiques'],
+                ['autorenew', 'Recherche entreprise', '4 sources lues'],
+                ['radio_button_unchecked', 'Appariement des preuves', ''],
+                ['radio_button_unchecked', 'Rédaction des livrables', ''],
+                ['radio_button_unchecked', 'Vérification factuelle', ''],
+              ].map(([icon, title, meta], index) => (
+                <li
+                  className={index < 2 ? 'done' : index === 2 ? 'active' : ''}
+                  key={title}
+                >
+                  <Icon>{icon}</Icon>
+                  <span>{title}</span>
+                  <small>{meta}</small>
+                </li>
+              ))}
+            </ol>
+          </section>
+          <section>
+            <div className="co-section-title">
+              <h2>Déjà lisible</h2>
+              <small>confirmé pendant que ça tourne</small>
+            </div>
+            <div className="co-readable-grid">
+              <article className="co-panel">
+                <h3>Exigences critiques</h3>
+                <ul>
+                  <li>Kubernetes multi-cluster</li>
+                  <li>Observabilité end-to-end</li>
+                  <li>Réduction du coût cloud</li>
+                  <li>Astreinte partagée</li>
+                  <li>Go ou Rust en production</li>
+                </ul>
+              </article>
+              <article className="co-panel">
+                <h3>À confirmer par vous</h3>
+                <dl>
+                  <div>
+                    <dt>Fourchette 90–110 k€ détectée</dt>
+                    <dd>Garder</dd>
+                  </div>
+                  <div>
+                    <dt>Contrat CDI plein temps</dt>
+                    <dd>Garder</dd>
+                  </div>
+                  <div>
+                    <dt>Remote 100 % ambigu</dt>
+                    <dd>Préciser</dd>
+                  </div>
+                </dl>
+              </article>
+            </div>
+          </section>
+          <div className="co-note">
+            <Icon>tune</Icon>Vous pouvez déjà faire le tri en amont : les agents
+            en tiendront compte à l’étape de rédaction.
+            <Button quiet>Cadrer</Button>
+          </div>
+        </section>
+        <aside className="co-stack co-analysis-aside">
+          <section className="co-panel">
+            <h2>Ce que l’agent a trouvé</h2>
+            <ul className="co-checklist">
+              <li className="done">Série A de 18 M€ en mars 2026</li>
+              <li className="done">Équipe technique de 23 personnes</li>
+              <li className="done">
+                Blog d’ingénierie : migration Go en cours
+              </li>
+              <li className="done">Recherche des signaux de recrutement…</li>
+            </ul>
+          </section>
+          <section className="co-panel co-fit-score">
+            <span>Prédiction d’adéquation</span>
+            <strong>0,79</strong>
+            <small>estimation provisoire</small>
+            <p>
+              Basée sur les exigences seules. L’appariement des preuves n’a pas
+              encore tourné.
+            </p>
+          </section>
+          <section className="co-dark-callout">
+            <Icon>notifications_active</Icon>
+            <strong>Vous prévenir</strong>
+            <span>
+              Une notification quand la revue est prête à être tranchée.
+            </span>
+            <label>
+              <input defaultChecked type="checkbox" /> Email + notification
+              navigateur
+            </label>
+          </section>
+          <Button quiet>Ouvrir une autre candidature</Button>
+          <small className="co-centered">
+            Le run continue en arrière-plan.
+          </small>
         </aside>
       </div>
-    </DossierShell>
+    </AppShell>
   );
 }
 
@@ -1534,59 +1692,195 @@ function InterviewPrepScreen({ debrief = false }: { debrief?: boolean }) {
 
 function AssetsScreen() {
   return (
-    <AppShell path="/assets">
+    <AppShell
+      path="/assets"
+      sidebarContext={
+        <>
+          <p className="co-nav-label">Types</p>
+          <div className="co-sidebar-sources">
+            {[
+              ['picture_as_pdf', 'CV', '4'],
+              ['web', 'Gabarits de page', '3'],
+              ['short_text', 'Blocs de texte', '11'],
+              ['mail', 'Emails types', '5'],
+              ['folder_zip', 'Portfolio', '2'],
+            ].map(([icon, label, count]) => (
+              <Link href="/assets" key={label}>
+                <Icon>{icon}</Icon>
+                <span>{label}</span>
+                <b>{count}</b>
+              </Link>
+            ))}
+          </div>
+        </>
+      }
+      sidebarFooter={
+        <div className="co-sidebar-card">
+          <strong>Règle d’or</strong>
+          <span>
+            Un asset ne contient jamais d’affirmation non sourcée. Les gabarits
+            refusent de se générer sinon.
+          </span>
+        </div>
+      }
+    >
       <PageHeader
-        title="Assets réutilisables"
-        copy="Documents, extraits et liens publics prêts à être mobilisés dans une candidature."
+        title="Assets"
+        copy="Ce qui se réutilise. Chaque asset garde le lien vers les preuves qu’il cite."
         actions={
-          <Button>
-            <Icon>upload_file</Icon>Ajouter un asset
-          </Button>
+          <>
+            <Button quiet>
+              <Icon>upload</Icon>Importer
+            </Button>
+            <Button>
+              <Icon>add</Icon>Nouvel asset
+            </Button>
+          </>
         }
       />
-      <div className="co-filterbar">
-        <Badge tone="accent">Tous · 18</Badge>
-        <Badge>CV · 3</Badge>
-        <Badge>Projets · 7</Badge>
-        <Badge>Open source · 4</Badge>
-        <Badge>Écriture · 4</Badge>
-      </div>
-      <div className="co-assets">
-        {[
-          [
-            'picture_as_pdf',
-            'CV · Product Engineer',
-            'PDF · mis à jour hier',
-            'Vérifié',
-          ],
-          ['code', 'Pont ROS2 open source', 'GitHub · public', 'Vérifié'],
-          ['web', 'Étude de cas Corvid', 'Page privée · 6 preuves', 'Sourcé'],
-          [
-            'description',
-            'Post-mortem de migration',
-            'Markdown · interne',
-            'Privé',
-          ],
-          ['movie', 'Démo MCP', 'Vidéo · 2 min 14', 'Déclaré'],
-          [
-            'article',
-            'Article sur l’évaluation LLM',
-            'Blog · public',
-            'Vérifié',
-          ],
-        ].map(([icon, title, meta, state]) => (
-          <article key={title}>
-            <div>
-              <Icon>{icon}</Icon>
-              <button>
-                <Icon>more_horiz</Icon>
-              </button>
+      <div className="co-assets-layout">
+        <section className="co-assets-main">
+          <div className="co-assets-toolbar">
+            <div className="co-segment">
+              <button className="active">CV</button>
+              <button>Gabarits</button>
+              <button>Blocs</button>
+              <button>Emails</button>
             </div>
-            <h2>{title}</h2>
-            <p>{meta}</p>
-            <Badge tone={state === 'Privé' ? 'warn' : 'ok'}>{state}</Badge>
-          </article>
-        ))}
+            <span>Trié par utilisation</span>
+          </div>
+          <div className="co-cv-assets">
+            {[
+              [
+                'CV — infra / plateforme',
+                'v7 · utilisé 9 fois · 14 affirmations sourcées',
+                'base',
+              ],
+              [
+                'CV — recherche',
+                'v3 · utilisé 2 fois · publications en tête',
+                '',
+              ],
+              [
+                'CV — Nimbus',
+                'Cite une affirmation en attente d’arbitrage.',
+                'warning',
+              ],
+            ].map(([title, meta, state]) => (
+              <article
+                className={state === 'warning' ? 'warning' : ''}
+                key={title}
+              >
+                <div className="co-cv-preview">
+                  <i />
+                  <i />
+                  <hr />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+                <section>
+                  <header>
+                    <h2>{title}</h2>
+                    {state === 'base' ? (
+                      <Badge tone="ok">base</Badge>
+                    ) : state === 'warning' ? (
+                      <Icon>gpp_maybe</Icon>
+                    ) : null}
+                  </header>
+                  <p>{meta}</p>
+                  <footer>
+                    <Button>
+                      {state === 'warning' ? 'Corriger' : 'Ouvrir'}
+                    </Button>
+                    {state !== 'warning' ? (
+                      <Button quiet>Dupliquer</Button>
+                    ) : null}
+                  </footer>
+                </section>
+              </article>
+            ))}
+          </div>
+          <div className="co-section-title">
+            <h2>Blocs de texte les plus réutilisés</h2>
+            <Link href="/assets">Tout voir</Link>
+          </div>
+          <div className="co-reusable-copy">
+            {[
+              [
+                'verified',
+                'Migration monorepo · version courte',
+                '« Build ramené de 11 à 7 minutes sur 340 services, déploiement 4×/jour. »',
+                '7 usages',
+              ],
+              [
+                'verified',
+                'Open source ROS2',
+                '« Mainteneur d’un pont utilisé en production par quatre entreprises. »',
+                '5 usages',
+              ],
+              [
+                'rule',
+                'Gap management · formulation assumée',
+                '« Tech lead de trois personnes, sans lien hiérarchique. »',
+                '4 usages',
+              ],
+            ].map(([icon, title, text, uses]) => (
+              <article key={title}>
+                <Icon>{icon}</Icon>
+                <span>
+                  <strong>{title}</strong>
+                  <small>{text}</small>
+                </span>
+                <code>{uses}</code>
+                <Icon>content_copy</Icon>
+              </article>
+            ))}
+          </div>
+        </section>
+        <aside className="co-assets-side">
+          <h2>CV — infra / plateforme</h2>
+          <section>
+            <h3>Versions</h3>
+            <ol>
+              <li className="active">
+                <strong>v7 · actuelle</strong>
+                <span>Chiffre de build corrigé en minutes · aujourd’hui</span>
+              </li>
+              <li>
+                <strong>v6</strong>
+                <span>Ajout du pont ROS2 · 28 août</span>
+              </li>
+              <li>
+                <strong>v5</strong>
+                <span>Retrait d’une affirmation sans preuve · 12 août</span>
+              </li>
+            </ol>
+            <Link href="/applications/nimbus/versions">
+              Comparer deux versions
+            </Link>
+          </section>
+          <section>
+            <h3>Preuves citées · 14</h3>
+            {[
+              ['description', 'corvid_postmortem.md', '4'],
+              ['picture_as_pdf', 'cv_2024.pdf', '6'],
+              ['code', 'oss/ros2-bridge', '2'],
+              ['badge', 'linkedin', '2'],
+            ].map(([icon, name, count]) => (
+              <p key={name}>
+                <Icon>{icon}</Icon>
+                <code>{name}</code>
+                <span>{count}</span>
+              </p>
+            ))}
+          </section>
+          <footer>
+            <Button>Exporter en PDF</Button>
+            <Button quiet>Définir comme CV de base</Button>
+          </footer>
+        </aside>
       </div>
     </AppShell>
   );
@@ -1860,44 +2154,94 @@ function PrivacyScreen() {
 
 function PublishedScreen() {
   return (
-    <main className="co-success-screen">
-      <section>
-        <span>
-          <Icon>check</Icon>
-        </span>
-        <p>Publication réussie</p>
-        <h1>Votre page Nimbus Robotics est en ligne.</h1>
-        <span>
-          Le lien est privé, non indexable et révocable à tout moment.
-        </span>
-        <div className="co-link-copy">
-          <code>career-os.app/p/8f2c-nimbus</code>
-          <Button>Copier</Button>
+    <AppShell path="/applications">
+      <div className="co-publish-topline">
+        <span>Candidatures</span>
+        <Icon>chevron_right</Icon>
+        <strong>Nimbus Robotics</strong>
+        <Badge tone="ok">Publié à 14:22</Badge>
+      </div>
+      <section className="co-publish-success">
+        <header>
+          <span>
+            <Icon>check_circle</Icon>
+          </span>
+          <div>
+            <h1>Votre page privée est en ligne pour Nimbus Robotics.</h1>
+            <p>
+              Douze affirmations, toutes sourcées. Le lien n’est accessible
+              qu’aux personnes à qui vous l’envoyez, et vous pouvez le couper à
+              tout instant.
+            </p>
+          </div>
+        </header>
+        <div className="co-publish-grid">
+          <article className="co-panel">
+            <p>Lien privé</p>
+            <div className="co-link-copy">
+              <Icon>lock</Icon>
+              <code>career-os.app/p/8f2c-nimbus</code>
+              <Button>Copier</Button>
+            </div>
+            <dl>
+              <div>
+                <dt>Expire le 12 oct.</dt>
+                <dd>
+                  <Icon>schedule</Icon>
+                </dd>
+              </div>
+              <div>
+                <dt>Preuves inspectables</dt>
+                <dd>
+                  <Icon>verified</Icon>
+                </dd>
+              </div>
+            </dl>
+            <footer>
+              <Link className="co-button" href="/messages">
+                Envoyer l’email préparé
+              </Link>
+              <Button quiet>Message LinkedIn</Button>
+            </footer>
+          </article>
+          <article className="co-panel co-shipped-assets">
+            <p>Ce qui part</p>
+            <ul>
+              <li>
+                <Icon>web</Icon>Page privée · 4 sections <b>12 preuves</b>
+              </li>
+              <li>
+                <Icon>description</Icon>CV adapté · 1 page <b>téléchargeable</b>
+              </li>
+              <li>
+                <Icon>fact_check</Icon>Extraits de preuves <b>6 sur 12</b>
+              </li>
+              <li>
+                <Icon>lock</Icon>review_q2.pdf <b className="crit">exclu</b>
+              </li>
+            </ul>
+            <small>
+              Les documents « interne » n’ont pas été utilisés, même en
+              reformulation.
+            </small>
+          </article>
         </div>
-        <dl>
-          <div>
-            <dt>Expire</dt>
-            <dd>12 oct. 2026</dd>
-          </div>
-          <div>
-            <dt>Inspection des preuves</dt>
-            <dd>Autorisée</dd>
-          </div>
-          <div>
-            <dt>Téléchargement du CV</dt>
-            <dd>Autorisé</dd>
-          </div>
-        </dl>
+        <div className="co-publish-memory">
+          <Icon>verified</Icon>
+          <span>
+            <strong>Deux affirmations ont été renforcées au passage</strong>« 11
+            → 7 minutes » et « équipe de 3 » sont désormais sourcées dans votre
+            mémoire : elles serviront à toutes vos prochaines candidatures.
+          </span>
+          <Link href="/memory">Voir la mémoire</Link>
+        </div>
         <footer>
-          <Link className="co-button quiet" href="/p/8f2c-nimbus">
-            Voir comme le recruteur
-          </Link>
-          <Link className="co-button" href="/messages">
-            Préparer le message
-          </Link>
+          <Button>Marquer comme envoyée</Button>
+          <Button quiet>Programmer une relance à J+8</Button>
+          <Link href="/applications">Retour aux candidatures</Link>
         </footer>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -2282,6 +2626,7 @@ function MessagesScreen() {
             <Icon>arrow_back</Icon>
           </Link>
           <div>
+            <h1 className="co-mobile-title">Messages</h1>
             <strong>Candidature — Staff Product Engineer</strong>
             <small>Email · à Camille Lefort</small>
           </div>
