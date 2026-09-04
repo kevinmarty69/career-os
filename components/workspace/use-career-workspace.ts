@@ -110,6 +110,12 @@ export const workerServiceDetails: Record<
     command: 'pnpm worker:factuality-reviewer',
     databaseVariable: 'CAREER_OS_FACTUALITY_REVIEWER_DATABASE_URL',
   },
+  'job-discovery': {
+    label: 'Découverte des offres',
+    stage: 'Analyse',
+    command: 'pnpm worker:job-discovery',
+    databaseVariable: 'CAREER_OS_DISCOVERY_DATABASE_URL',
+  },
 };
 
 const emptyProfile: Profile = {

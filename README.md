@@ -71,7 +71,7 @@ CI runs formatting, linting, TypeScript, the unit suite, a production build, and
 
 ## Run the real workflow
 
-The persisted workflow needs PostgreSQL, seven isolated worker credentials, and a loopback OpenAI-compatible model for the four model-backed roles.
+The persisted workflow needs PostgreSQL, eight isolated worker credentials, and a loopback OpenAI-compatible model for the four model-backed roles.
 
 See **[Self-hosting Career OS](docs/SELF_HOSTING.md)** for the complete setup, least-privilege role creation, worker supervision, and verification commands.
 

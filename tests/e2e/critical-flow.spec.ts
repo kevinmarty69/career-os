@@ -458,6 +458,7 @@ test('explains unavailable workers and recovers the same durable run', async ({
           'recruiter-reviewer',
           'hiring-manager-reviewer',
           'factuality-reviewer',
+          'job-discovery',
         ].map((service) => ({ service, status: 'missing' })),
       }),
     });

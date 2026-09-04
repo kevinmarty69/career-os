@@ -1,6 +1,42 @@
 import type { MessageDictionary } from '../messages';
 
 export const activeRoutesMessages = {
+  'Réglages de l’espace': 'Workspace settings',
+  'Contrôlez l’exécution et les données conservées dans ce navigateur.':
+    'Control execution and the data stored in this browser.',
+  'Disponibilité des workers': 'Worker availability',
+  'Les huit processus sont surveillés indépendamment.':
+    'All eight processes are monitored independently.',
+  Actualiser: 'Refresh',
+  'Connexion requise': 'Sign-in required',
+  'Connectez-vous pour vérifier les services de votre instance.':
+    'Sign in to check your instance services.',
+  'Se connecter': 'Sign in',
+  'Vérification de l’instance…': 'Checking the instance…',
+  'Lecture de l’état des services.': 'Reading service status.',
+  'État non disponible': 'Status unavailable',
+  'Impossible de vérifier les services pour le moment.':
+    'Services cannot be checked right now.',
+  '8 workers actifs': '8 active workers',
+  'Les processus répondent. Le modèle local et ses réponses sont vérifiés pendant l’exécution.':
+    'The processes are responding. The local model and its responses are checked during execution.',
+  'Configuration incomplète': 'Incomplete configuration',
+  Analyse: 'Analysis',
+  Vérification: 'Review',
+  'Lecture de l’entreprise': 'Company research',
+  'Sélection des preuves': 'Evidence selection',
+  'Stratégie de candidature': 'Application strategy',
+  'Composition de la page': 'Page composition',
+  'Revue recrutement': 'Recruiter review',
+  'Revue hiring manager': 'Hiring manager review',
+  'Contrôle factuel': 'Factual review',
+  'Découverte des offres': 'Job discovery',
+  'Arrêté ou sans réponse': 'Stopped or unresponsive',
+  'Non détecté': 'Not detected',
+  'Configurer les services': 'Configure services',
+  'Exportez les variables propres à chaque service avant de lancer ces commandes. Les workers ne chargent pas le fichier':
+    'Export each service-specific variable before running these commands. Workers do not load the',
+  'Revenir au brief': 'Return to the brief',
   'Mesures de la page': 'Page metrics',
   'Première ouverture': 'First opened',
   'Dernière ouverture': 'Last opened',

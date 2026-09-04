@@ -485,7 +485,7 @@ export function SettingsView({
         <div className="instance-settings-heading">
           <div>
             <h2>Disponibilité des workers</h2>
-            <p>Les sept processus doivent répondre pour terminer un dossier.</p>
+            <p>Les huit processus sont surveillés indépendamment.</p>
           </div>
           {signedIn ? (
             <button
@@ -519,7 +519,7 @@ export function SettingsView({
             </>
           ) : allWorkersActive ? (
             <>
-              <strong className="instance-ready">7 workers actifs</strong>
+              <strong className="instance-ready">8 workers actifs</strong>
               <p>
                 Les processus répondent. Le modèle local et ses réponses sont
                 vérifiés pendant l’exécution.

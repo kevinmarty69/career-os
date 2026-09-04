@@ -132,7 +132,7 @@ Worker commands intentionally do not load the application's `.env.local`: a shar
 
 Start each command from the table in a separate process. PostgreSQL assigns the next tenant-scoped job globally and returns an opaque lease token; workers never receive a tenant selector.
 
-For a durable host, run each role separately under your process supervisor. The supplied [`deploy/systemd`](../deploy/systemd) units cover the seven application agents; add the job-discovery command with its isolated database variable when scheduled search is enabled.
+For a durable host, use the units in [`deploy/systemd`](../deploy/systemd). They run the eight roles separately, restart failures, send `SIGTERM`, and allow an active iteration to drain before timeout.
 
 ## 5. Verify the installation
 

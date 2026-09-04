@@ -124,7 +124,7 @@ async function main() {
       await incompleteResponse.json(),
     );
     assert.equal(incomplete.mode, 'self-hosted');
-    assert.equal(incomplete.services.length, 7);
+    assert.equal(incomplete.services.length, 8);
     assert.ok(incomplete.services.every(({ status }) => status === 'missing'));
     assert.equal(JSON.stringify(incomplete).includes('last_seen_at'), false);
 

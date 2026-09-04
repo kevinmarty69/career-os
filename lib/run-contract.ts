@@ -61,6 +61,7 @@ export const workerServiceSchema = z.enum([
   'recruiter-reviewer',
   'hiring-manager-reviewer',
   'factuality-reviewer',
+  'job-discovery',
 ]);
 
 export const workerServices = workerServiceSchema.options;

@@ -9,6 +9,7 @@ import { searchProfileSchema, type SearchProfile } from '../search-profile';
 import { storeDiscoveredJob } from './discovered-jobs';
 import { safeFetchText } from './safe-http';
 import type { PublicationSession } from './publications';
+import { keepWorkerHeartbeatFresh } from './worker-heartbeat';
 
 const LEASE_MINUTES = 5;
 const RETRY_MINUTES = 15;
@@ -34,8 +35,11 @@ export async function processScheduledDiscoveryStep({
   databaseUrl: string;
 }) {
   const sql = postgres(databaseUrl, { max: 2, idle_timeout: 5 });
+  let stopHeartbeat: () => Promise<void> = async () => undefined;
   try {
     await verifyRestrictedCredential(sql);
+    stopHeartbeat = keepWorkerHeartbeatFresh(() => heartbeat(sql));
+    await heartbeat(sql);
     const claim = await claimProfile(sql);
     if (!claim) return { status: 'idle' as const };
     try {
@@ -62,8 +66,16 @@ export async function processScheduledDiscoveryStep({
       return { status: 'processed' as const, outcome: 'failed' as const };
     }
   } finally {
+    await stopHeartbeat();
     await sql.end();
   }
+}
+
+async function heartbeat(sql: postgres.Sql) {
+  await sql.begin(async (tx) => {
+    await authorizeWorker(tx);
+    await tx`select app.record_worker_heartbeat('job-discovery')`;
+  });
 }
 
 async function claimProfile(sql: postgres.Sql): Promise<DiscoveryClaim | null> {
@@ -178,10 +190,11 @@ async function verifyRestrictedCredential(sql: postgres.Sql) {
             not in (
               ('claim_scheduled_job_discovery', 'lease_seconds integer'),
               ('complete_scheduled_job_discovery', 'target_profile uuid, target_lease_token uuid, target_status text, target_summary jsonb, retry_minutes integer'),
-              ('active_job_discovery_lease', 'target_tenant uuid')
+              ('active_job_discovery_lease', 'target_tenant uuid'),
+              ('record_worker_heartbeat', 'target_service text')
             )
       )
-      or (select count(*) <> 3 from pg_proc procedure
+      or (select count(*) <> 4 from pg_proc procedure
         join pg_namespace namespace on namespace.oid = procedure.pronamespace
         where namespace.nspname = 'app'
           and has_function_privilege(target.rolname, procedure.oid, 'execute')

@@ -97,6 +97,17 @@ do $$ begin
 end $$;
 reset role;
 
+set local role career_job_discovery;
+select app.record_worker_heartbeat('job-discovery');
+do $$ begin
+  begin
+    perform app.record_worker_heartbeat('company-researcher');
+    raise exception 'job discovery spoofed company researcher';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+
 set local role career_reader;
 do $$ begin
   begin
@@ -191,7 +202,11 @@ insert into expected_worker_functions (role_name, signature) values
   ('career_factuality_reviewer', 'complete_factuality_reviewer_step(target_step uuid, target_lease_token uuid, step_output jsonb)'),
   ('career_factuality_reviewer', 'fail_factuality_reviewer_step(target_step uuid, target_lease_token uuid, target_failure_code text)'),
   ('career_factuality_reviewer', 'reap_expired_factuality_reviewer_step()'),
-  ('career_factuality_reviewer', 'record_worker_heartbeat(target_service text)');
+  ('career_factuality_reviewer', 'record_worker_heartbeat(target_service text)'),
+  ('career_job_discovery', 'claim_scheduled_job_discovery(lease_seconds integer)'),
+  ('career_job_discovery', 'complete_scheduled_job_discovery(target_profile uuid, target_lease_token uuid, target_status text, target_summary jsonb, retry_minutes integer)'),
+  ('career_job_discovery', 'active_job_discovery_lease(target_tenant uuid)'),
+  ('career_job_discovery', 'record_worker_heartbeat(target_service text)');
 
 do $$
 begin
@@ -204,7 +219,8 @@ begin
         ('career_page_composer'::name),
         ('career_recruiter_reviewer'::name),
         ('career_hiring_manager_reviewer'::name),
-        ('career_factuality_reviewer'::name)
+        ('career_factuality_reviewer'::name),
+        ('career_job_discovery'::name)
     ), actual as (
       select worker.role_name,
         procedure.proname || '(' ||

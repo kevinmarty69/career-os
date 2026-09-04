@@ -7,6 +7,7 @@ Wants=career-os-worker@page-composer.service
 Wants=career-os-worker@recruiter-reviewer.service
 Wants=career-os-worker@hiring-manager-reviewer.service
 Wants=career-os-worker@factuality-reviewer.service
+Wants=career-os-worker@job-discovery.service
 After=career-os-worker@company-researcher.service
 After=career-os-worker@evidence-archivist.service
 After=career-os-worker@recruiter-strategist.service
@@ -14,6 +15,7 @@ After=career-os-worker@page-composer.service
 After=career-os-worker@recruiter-reviewer.service
 After=career-os-worker@hiring-manager-reviewer.service
 After=career-os-worker@factuality-reviewer.service
+After=career-os-worker@job-discovery.service
 
 [Install]
 WantedBy=multi-user.target

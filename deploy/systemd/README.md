@@ -1,6 +1,6 @@
 # systemd worker pool
 
-The seven workers are separate processes and Linux users. Each process receives
+The eight workers are separate processes and Linux users. Each process receives
 one PostgreSQL credential; only the four generative workers also receive the
 loopback model configuration.
 
@@ -21,6 +21,7 @@ career-page-composer
 career-recruiter-reviewer
 career-hiring-manager-reviewer
 career-factuality-reviewer
+career-job-discovery
 ```
 
 Create one root-owned `0600` file per worker under
@@ -36,6 +37,7 @@ database URL:
 | `recruiter-reviewer.env`      | `CAREER_OS_RECRUITER_REVIEWER_DATABASE_URL`      | yes             |
 | `hiring-manager-reviewer.env` | `CAREER_OS_HIRING_MANAGER_REVIEWER_DATABASE_URL` | yes             |
 | `factuality-reviewer.env`     | `CAREER_OS_FACTUALITY_REVIEWER_DATABASE_URL`     | no              |
+| `job-discovery.env`           | `CAREER_OS_DISCOVERY_DATABASE_URL`               | no              |
 
 Add the three model variables only where the table says `yes`:
 
