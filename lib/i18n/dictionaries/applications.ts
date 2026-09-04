@@ -12,6 +12,19 @@ export const applicationsMessages = {
   'Consultez les offres collectées, puis suivez séparément les candidatures réellement démarrées.':
     'Review collected jobs, then track the applications you actually start separately.',
   'Coller une offre': 'Paste a job URL',
+  'Rechercher dans le pipeline': 'Search the pipeline',
+  'Rechercher une entreprise, un rôle ou un lieu…':
+    'Search a company, role, or location…',
+  Type: 'Type',
+  'Tout le pipeline': 'Entire pipeline',
+  Opportunités: 'Opportunities',
+  'Étape de candidature': 'Application stage',
+  'Toutes les étapes': 'All stages',
+  'Aucune opportunité ne correspond aux filtres.':
+    'No opportunity matches these filters.',
+  'Aucune candidature ne correspond aux filtres.':
+    'No application matches these filters.',
+  'Aucun résultat': 'No results',
   Réessayer: 'Try again',
   'Opportunités et candidatures': 'Opportunities and applications',
   'Opportunités découvertes': 'Discovered opportunities',

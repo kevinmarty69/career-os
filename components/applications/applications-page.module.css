@@ -36,6 +36,79 @@
   line-height: 1.5;
 }
 
+.filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--co-border);
+  border-radius: 16px;
+  background: var(--co-fill-subtle);
+}
+
+.filters label {
+  display: grid;
+  gap: 5px;
+  color: var(--co-text-3);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.filters input,
+.filters select {
+  min-height: 40px;
+  color: var(--co-text);
+  border: 1px solid var(--co-border);
+  border-radius: 11px;
+  background: #fff;
+  outline: 0;
+  font: inherit;
+  font-size: 11.5px;
+}
+
+.filters input:focus,
+.filters select:focus {
+  border-color: var(--co-accent);
+  outline: 3px solid color-mix(in srgb, var(--co-accent) 18%, transparent);
+}
+
+.filters select {
+  min-width: 150px;
+  padding: 0 30px 0 10px;
+}
+
+.filters select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.searchField {
+  position: relative;
+}
+
+.searchField :global(.co-icon) {
+  position: absolute;
+  bottom: 11px;
+  left: 11px;
+  color: var(--co-text-3);
+  font-size: 18px;
+}
+
+.searchField input {
+  width: 100%;
+  padding: 0 12px 0 37px;
+}
+
+.srOnly {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .workspace {
   overflow: hidden;
   min-width: 0;
@@ -1242,6 +1315,9 @@
   .header > button {
     align-self: flex-start;
   }
+  .filters {
+    grid-template-columns: minmax(0, 1fr) repeat(2, auto);
+  }
   .opportunityCard {
     grid-template-columns: 42px minmax(0, 1fr);
   }
@@ -1266,6 +1342,12 @@
 
 @media (max-width: 560px) {
   .header > button {
+    width: 100%;
+  }
+  .filters {
+    grid-template-columns: 1fr;
+  }
+  .filters select {
     width: 100%;
   }
   .sectionHeader {

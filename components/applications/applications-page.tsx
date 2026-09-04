@@ -36,6 +36,7 @@ import { searchProfileSchema, type SearchProfile } from '@/lib/search-profile';
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { semanticAnalysisMessages } from '@/lib/i18n/dictionaries/semantic-analysis';
+import { matchesSearchTerms } from '@/lib/global-search';
 import styles from './applications-page.module.css';
 import { SemanticAnalysisPanel } from './semantic-analysis-panel';
 
@@ -62,6 +63,11 @@ export function ApplicationsPage({
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [error, setError] = useState<string>();
   const [importOpen, setImportOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [scope, setScope] = useState<'all' | 'opportunities' | 'applications'>(
+    'all',
+  );
+  const [stage, setStage] = useState<Application['stage'] | 'all'>('all');
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const controller = signal ? undefined : new AbortController();
@@ -181,6 +187,39 @@ export function ApplicationsPage({
     )?.disposition;
     return disposition === 'ignored' || disposition === 'archived';
   });
+  const visibleActiveOpportunities = activeOpportunities.filter(
+    (opportunity) =>
+      scope !== 'applications' &&
+      matchesSearchTerms(
+        query,
+        opportunity.company ?? '',
+        opportunity.role ?? '',
+        opportunity.description ?? '',
+        opportunity.location ?? '',
+      ),
+  );
+  const visibleProcessedOpportunities = processedOpportunities.filter(
+    (opportunity) =>
+      scope !== 'applications' &&
+      matchesSearchTerms(
+        query,
+        opportunity.company ?? '',
+        opportunity.role ?? '',
+        opportunity.description ?? '',
+        opportunity.location ?? '',
+      ),
+  );
+  const visibleApplications = applications.filter(
+    (application) =>
+      scope !== 'opportunities' &&
+      (stage === 'all' || application.stage === stage) &&
+      matchesSearchTerms(
+        query,
+        application.company,
+        application.role,
+        application.description,
+      ),
+  );
 
   return (
     <AppShell
@@ -216,6 +255,54 @@ export function ApplicationsPage({
           </button>
         </header>
 
+        <div className={styles.filters} role="search">
+          <label className={styles.searchField}>
+            <Icon>search</Icon>
+            <span className={styles.srOnly}>Rechercher dans le pipeline</span>
+            <input
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Rechercher une entreprise, un rôle ou un lieu…"
+              type="search"
+              value={query}
+            />
+          </label>
+          <label>
+            <span>Type</span>
+            <select
+              aria-label="Type"
+              onChange={(event) =>
+                setScope(
+                  event.target.value as
+                    'all' | 'opportunities' | 'applications',
+                )
+              }
+              value={scope}
+            >
+              <option value="all">Tout le pipeline</option>
+              <option value="opportunities">Opportunités</option>
+              <option value="applications">Candidatures</option>
+            </select>
+          </label>
+          <label>
+            <span>Étape de candidature</span>
+            <select
+              aria-label="Étape de candidature"
+              disabled={scope === 'opportunities'}
+              onChange={(event) =>
+                setStage(event.target.value as Application['stage'] | 'all')
+              }
+              value={stage}
+            >
+              <option value="all">Toutes les étapes</option>
+              <option value="draft">Brouillon</option>
+              <option value="applied">Envoyée</option>
+              <option value="interview">Entretien</option>
+              <option value="offer">Offre reçue</option>
+              <option value="closed">Clôturée</option>
+            </select>
+          </label>
+        </div>
+
         {error ? (
           <div className={styles.error} role="alert">
             <Icon>error</Icon>
@@ -244,9 +331,9 @@ export function ApplicationsPage({
           </header>
           {loadState === 'loading' ? (
             <LoadingRows label="Chargement des opportunités" />
-          ) : activeOpportunities.length ? (
+          ) : visibleActiveOpportunities.length ? (
             <div className={styles.opportunityList}>
-              {activeOpportunities.map((opportunity) => (
+              {visibleActiveOpportunities.map((opportunity) => (
                 <OpportunityCard
                   decision={decisionsByOpportunity.get(
                     opportunity.opportunityId,
@@ -261,22 +348,38 @@ export function ApplicationsPage({
             </div>
           ) : loadState === 'ready' ? (
             <EmptyState
-              action="Coller une offre"
-              copy="Ajoutez l’URL d’une annonce pour conserver son contenu et sa provenance."
+              action={
+                query || scope === 'applications'
+                  ? undefined
+                  : 'Coller une offre'
+              }
+              copy={
+                query || scope === 'applications'
+                  ? 'Aucune opportunité ne correspond aux filtres.'
+                  : 'Ajoutez l’URL d’une annonce pour conserver son contenu et sa provenance.'
+              }
               Icon={Icon}
               icon="link"
-              onAction={() => setImportOpen(true)}
-              title="Aucune opportunité enregistrée"
+              onAction={
+                query || scope === 'applications'
+                  ? undefined
+                  : () => setImportOpen(true)
+              }
+              title={
+                query || scope === 'applications'
+                  ? 'Aucun résultat'
+                  : 'Aucune opportunité enregistrée'
+              }
             />
           ) : null}
         </section>
 
-        {loadState === 'ready' && processedOpportunities.length ? (
+        {loadState === 'ready' && visibleProcessedOpportunities.length ? (
           <ProcessedOpportunities
             decisionsByOpportunity={decisionsByOpportunity}
             Icon={Icon}
             onDecisionSaved={decisionSaved}
-            opportunities={processedOpportunities}
+            opportunities={visibleProcessedOpportunities}
             searchProfiles={searchProfiles}
           />
         ) : null}
@@ -299,9 +402,9 @@ export function ApplicationsPage({
           </header>
           {loadState === 'loading' ? (
             <LoadingRows label="Chargement des candidatures" />
-          ) : applications.length ? (
+          ) : visibleApplications.length ? (
             <div className={styles.applicationList}>
-              {applications.map((application) => (
+              {visibleApplications.map((application) => (
                 <ApplicationRow
                   Icon={Icon}
                   application={application}
@@ -311,10 +414,18 @@ export function ApplicationsPage({
             </div>
           ) : loadState === 'ready' ? (
             <EmptyState
-              copy="Aucun dossier n’a encore été démarré. Vos opportunités restent disponibles au-dessus."
+              copy={
+                query || scope === 'opportunities' || stage !== 'all'
+                  ? 'Aucune candidature ne correspond aux filtres.'
+                  : 'Aucun dossier n’a encore été démarré. Vos opportunités restent disponibles au-dessus.'
+              }
               Icon={Icon}
               icon="work_outline"
-              title="Aucune candidature en cours"
+              title={
+                query || scope === 'opportunities' || stage !== 'all'
+                  ? 'Aucun résultat'
+                  : 'Aucune candidature en cours'
+              }
             />
           ) : null}
         </section>

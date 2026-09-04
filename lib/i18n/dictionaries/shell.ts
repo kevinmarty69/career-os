@@ -22,6 +22,15 @@ export const shellMessages = {
   'Palette de commandes': 'Command palette',
   'Chercher une preuve, une entreprise, une action…':
     'Search evidence, a company, or an action…',
+  'Recherche globale': 'Global search',
+  'Recherche en cours…': 'Searching…',
+  'Recherche indisponible': 'Search unavailable',
+  Candidature: 'Application',
+  Opportunité: 'Opportunity',
+  Affirmation: 'Claim',
+  Preuve: 'Evidence',
+  'Aucun résultat pour cette recherche.': 'No results for this search.',
+  '↵ ouvrir le premier résultat': '↵ open first result',
   'Preuves · 3': 'Evidence · 3',
   'corvid_postmortem.md · §4 · vérifiée':
     'corvid_postmortem.md · §4 · verified',

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationEvidenceCheckpoint } from '@/components/applications/application-evidence-checkpoint';
 import { ApplicationPageDraftCheckpoint } from '@/components/applications/application-page-draft-checkpoint';
@@ -38,6 +39,8 @@ import {
   readApplicationTasks,
   readApplicationRun,
   readApplications,
+  readOpportunities,
+  readProfile,
   readPublications,
   revokePublication,
   saveApplicationBrand,
@@ -53,6 +56,13 @@ import {
   type DashboardItem,
 } from '@/lib/dashboard-priority';
 import { persistedRunSchema } from '@/lib/run-contract';
+import { opportunityListResponseSchema } from '@/lib/discovered-job-contract';
+import {
+  buildGlobalSearchIndex,
+  searchGlobalIndex,
+  type GlobalSearchItem,
+} from '@/lib/global-search';
+import { profileSchema } from '@/lib/schemas';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
@@ -240,10 +250,7 @@ export function AppShell({
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
       {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
-      <nav
-        aria-label="Navigation mobile"
-        className="co-mobile-nav co-dossier-mobile-nav"
-      >
+      <nav aria-label="Navigation mobile" className="co-mobile-nav">
         {screenNav.slice(0, 4).map(([href, icon, label]) => (
           <Link
             className={
@@ -308,7 +315,82 @@ function InstanceCard() {
 }
 
 function CommandPalette({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const { locale } = useI18n();
   const localize = useLocalizer([shellMessages]);
+  const [query, setQuery] = useState('');
+  const [index, setIndex] = useState<GlobalSearchItem[]>([]);
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const results = searchGlobalIndex(index, query);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void Promise.all([
+      readApplications(controller.signal),
+      readOpportunities(controller.signal),
+      readProfile(controller.signal),
+    ])
+      .then(
+        async ([applicationResponse, opportunityResponse, profileResponse]) => {
+          if (
+            !applicationResponse.ok ||
+            !opportunityResponse.ok ||
+            !profileResponse.ok
+          )
+            throw new Error('Workspace search unavailable.');
+          const applicationPayload: unknown = await applicationResponse.json();
+          const applications = applicationSchema
+            .array()
+            .parse(
+              typeof applicationPayload === 'object' &&
+                applicationPayload !== null &&
+                'applications' in applicationPayload
+                ? applicationPayload.applications
+                : [],
+            );
+          const opportunities = opportunityListResponseSchema.parse(
+            await opportunityResponse.json(),
+          ).opportunities;
+          const profilePayload: unknown = await profileResponse.json();
+          const profile = profileSchema
+            .nullable()
+            .parse(
+              typeof profilePayload === 'object' &&
+                profilePayload !== null &&
+                'profile' in profilePayload
+                ? profilePayload.profile
+                : null,
+            );
+          setIndex(
+            buildGlobalSearchIndex({
+              applications,
+              opportunities,
+              profile: profile ?? undefined,
+            }),
+          );
+          setState('ready');
+        },
+      )
+      .catch(() => {
+        if (!controller.signal.aborted) setState('error');
+      });
+    return () => controller.abort();
+  }, []);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const href = results[0]?.href;
+    if (!href) return;
+    onClose();
+    router.push(href);
+  }
+
+  const kindLabel = {
+    application: 'Candidature',
+    opportunity: 'Opportunité',
+    claim: 'Affirmation',
+    evidence: 'Preuve',
+  } as const;
   return localize(
     <div className="co-scrim" role="presentation" onMouseDown={onClose}>
       <section
@@ -318,52 +400,48 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
         aria-label="Palette de commandes"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <label>
-          <Icon>search</Icon>
-          <input
-            autoFocus
-            placeholder="Chercher une preuve, une entreprise, une action…"
-          />
-          <kbd>esc</kbd>
-        </label>
-        <p>Preuves · 3</p>
-        <Link href="/memory" onClick={onClose}>
-          <Icon>verified</Icon>
-          <span>
-            <strong>build p50 : 11 min → 7 min</strong>
-            <small>corvid_postmortem.md · §4 · vérifiée</small>
-          </span>
-          <kbd>↵</kbd>
-        </Link>
-        <Link href="/memory" onClick={onClose}>
-          <Icon>verified</Icon>
-          <span>
-            <strong>Cache de build partagé entre 340 services</strong>
-            <small>cv_2024.pdf · p.2</small>
-          </span>
-        </Link>
-        <Link href="/memory/conflicts" onClick={onClose}>
-          <Icon>rule</Icon>
-          <span>
-            <strong>Temps de build divisé par deux</strong>
-            <small>déclaré · en conflit avec la source</small>
-          </span>
-        </Link>
-        <p>Candidatures · 2</p>
-        <Link href="/applications/nimbus" onClick={onClose}>
-          <i>NR</i>
-          <span>
-            <strong>Nimbus Robotics — cite ce chiffre</strong>
-            <small>Staff Product Engineer · publiée</small>
-          </span>
-        </Link>
-        <Link href="/applications/fathom?state=running" onClick={onClose}>
-          <i>FT</i>
-          <span>
-            <strong>Fathom — appariement en cours</strong>
-            <small>Platform Engineer · brouillon</small>
-          </span>
-        </Link>
+        <form onSubmit={submit}>
+          <label>
+            <Icon>search</Icon>
+            <input
+              aria-label="Recherche globale"
+              autoFocus
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Chercher une preuve, une entreprise, une action…"
+              type="search"
+              value={query}
+            />
+            <kbd>esc</kbd>
+          </label>
+        </form>
+        <p>
+          {state === 'ready'
+            ? `${results.length} ${locale === 'en' ? (results.length === 1 ? 'result' : 'results') : 'résultat' + (results.length === 1 ? '' : 's')}`
+            : state === 'loading'
+              ? 'Recherche en cours…'
+              : 'Recherche indisponible'}
+        </p>
+        {results.map((result, position) => (
+          <Link
+            href={result.href}
+            key={`${result.kind}:${result.id}`}
+            onClick={onClose}
+          >
+            <Icon>{searchIcon(result.kind)}</Icon>
+            <span>
+              <strong>{result.title}</strong>
+              <small>
+                {kindLabel[result.kind]} · {searchResultDetail(result, locale)}
+              </small>
+            </span>
+            {position === 0 ? <kbd>↵</kbd> : null}
+          </Link>
+        ))}
+        {state === 'ready' && !results.length ? (
+          <div className="co-command-empty">
+            Aucun résultat pour cette recherche.
+          </div>
+        ) : null}
         <p>Actions</p>
         <Link href="/applications#new" onClick={onClose}>
           <Icon>add_link</Icon>
@@ -380,12 +458,36 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
           <kbd>⌘U</kbd>
         </Link>
         <footer>
-          ↑↓ naviguer <span>↵ ouvrir</span>
-          <span>⌘↵ nouvel onglet</span>
-          <b>recherche dans 128 preuves</b>
+          <span>↵ ouvrir le premier résultat</span>
+          <b>
+            {locale === 'en'
+              ? `${index.length} indexed items`
+              : `${index.length} éléments indexés`}
+          </b>
         </footer>
       </section>
     </div>,
+  );
+}
+
+function searchIcon(kind: GlobalSearchItem['kind']) {
+  return {
+    application: 'work_history',
+    opportunity: 'travel_explore',
+    claim: 'fact_check',
+    evidence: 'verified',
+  }[kind];
+}
+
+function searchResultDetail(result: GlobalSearchItem, locale: 'en' | 'fr') {
+  if (result.kind !== 'claim') return result.detail;
+  return (
+    {
+      verified: locale === 'en' ? 'verified' : 'vérifiée',
+      declared: locale === 'en' ? 'declared' : 'déclarée',
+      inferred: locale === 'en' ? 'inferred' : 'inférée',
+      unsupported: locale === 'en' ? 'unsupported' : 'non soutenue',
+    }[result.detail] ?? result.detail
   );
 }
 
@@ -1355,7 +1457,10 @@ function DossierShell({
         </header>
         {children}
       </section>
-      <nav aria-label="Navigation mobile" className="co-mobile-nav">
+      <nav
+        aria-label="Navigation mobile"
+        className="co-mobile-nav co-dossier-mobile-nav"
+      >
         {[
           ['/applications', 'arrow_back', 'Candidatures'],
           [`/applications/${identity.applicationId}`, 'description', 'Brief'],

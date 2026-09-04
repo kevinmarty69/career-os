@@ -81,6 +81,47 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
       }),
     }),
   );
+  await page.route('**/api/profile', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        revision: 1,
+        profile: {
+          name: 'Alex Morgan',
+          headline: 'Staff Platform Engineer',
+          sources: [
+            {
+              id: 'source-1',
+              kind: 'document',
+              title: 'Corvid postmortem',
+              sensitivity: 'private',
+              allowedUses: ['application', 'resume', 'interview'],
+              trust: 'untrusted-data',
+            },
+          ],
+          evidence: [
+            {
+              id: 'evidence-1',
+              sourceId: 'source-1',
+              label: 'Build time postmortem',
+              excerpt: 'Build p50 moved from 11 to 7 minutes.',
+            },
+          ],
+          claims: [
+            {
+              id: 'claim-1',
+              statement: 'Reduced build p50 from 11 to 7 minutes.',
+              kind: 'result',
+              level: 'verified',
+              evidenceIds: ['evidence-1'],
+              sensitivity: 'private',
+              allowedUses: ['application', 'resume', 'interview'],
+            },
+          ],
+        },
+      }),
+    }),
+  );
   await page.route('**/api/publications', (route) =>
     route.fulfill({
       contentType: 'application/json',

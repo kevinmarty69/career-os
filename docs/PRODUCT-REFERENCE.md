@@ -654,7 +654,7 @@ Critères d'acceptation :
 - [x] Gestion des liens privés actifs.
 - [x] Ajout des contacts, entretiens, réponses et résultats.
 - [x] Tâches et relances datées.
-- [ ] Recherche et filtres globaux.
+- [x] Recherche et filtres globaux.
 - [ ] Historique des versions et décisions.
 - [ ] Tendances personnelles sur les réponses, sans fausse causalité.
 

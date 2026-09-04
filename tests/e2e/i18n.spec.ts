@@ -106,6 +106,13 @@ test('switches from English to French and persists after reload', async ({
       exact: true,
     }),
   ).toBeVisible();
+  await expect(
+    page.getByPlaceholder('Rechercher une entreprise, un rôle ou un lieu…'),
+  ).toBeVisible();
+  await page.keyboard.press('Control+K');
+  await expect(
+    page.getByRole('searchbox', { name: 'Recherche globale' }),
+  ).toBeFocused();
 });
 
 test('separates persisted opportunities from started applications', async ({
@@ -130,6 +137,47 @@ test('separates persisted opportunities from started applications', async ({
     applications.getByText('Signal Forge', { exact: true }),
   ).toBeVisible();
   await expect(applications.getByText('Draft', { exact: true })).toBeVisible();
+});
+
+test('searches the persisted workspace and filters the application pipeline', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page);
+  await page.goto('/');
+
+  await page.keyboard.press('Control+K');
+  const search = page.getByRole('searchbox', { name: 'Global search' });
+  await expect(search).toBeFocused();
+  await search.fill('11 minutes');
+  await expect(
+    page.getByRole('link', {
+      name: /Reduced build p50 from 11 to 7 minutes/,
+    }),
+  ).toBeVisible();
+  if (process.env.CAREER_OS_SEARCH_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_SEARCH_SCREENSHOT,
+      fullPage: true,
+    });
+  await page.keyboard.press('Escape');
+
+  await page.goto('/applications');
+  const pipeline = page.getByRole('search');
+  await pipeline
+    .getByPlaceholder('Search a company, role, or location…')
+    .fill('Signal Forge');
+  await expect(page.getByText('Signal Forge', { exact: true })).toBeVisible();
+  await expect(page.getByText('Northstar Labs', { exact: true })).toHaveCount(
+    0,
+  );
+  await pipeline.getByLabel('Type').selectOption('opportunities');
+  await expect(page.getByText('Signal Forge', { exact: true })).toHaveCount(0);
+  await pipeline
+    .getByPlaceholder('Search a company, role, or location…')
+    .fill('Northstar');
+  await expect(page.getByText('Northstar Labs', { exact: true })).toBeVisible();
 });
 
 test('shows only persisted human decisions in the review queue', async ({
