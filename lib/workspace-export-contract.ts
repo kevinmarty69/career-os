@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 2;
+export const workspaceExportVersion = 3;
 
 export const workspaceExportTables = [
   {
@@ -72,6 +72,19 @@ export const workspaceExportTables = [
     orderBy: ['id'],
   },
   {
+    type: 'profile_revisions',
+    table: 'profile_revisions',
+    columns: [
+      'id',
+      'tenant_id',
+      'profile_id',
+      'revision',
+      'snapshot',
+      'created_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
     type: 'sources',
     table: 'sources',
     columns: [
@@ -95,6 +108,7 @@ export const workspaceExportTables = [
       'id',
       'tenant_id',
       'statement',
+      'kind',
       'level',
       'sensitivity',
       'allowed_uses',

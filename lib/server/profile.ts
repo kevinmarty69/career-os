@@ -59,11 +59,12 @@ export async function readLivingProfile(session: ProfileSession) {
         Array<{
           id: string;
           statement: string;
+          kind: Profile['claims'][number]['kind'];
           level: Profile['claims'][number]['level'];
           sensitivity: Profile['claims'][number]['sensitivity'];
           allowed_uses: Profile['claims'][number]['allowedUses'];
         }>
-      >`select id, statement, level, sensitivity, allowed_uses
+      >`select id, statement, kind, level, sensitivity, allowed_uses
         from app.claims where tenant_id = ${session.tenantId}
           and profile_id = ${profile.id} order by position, id`;
       const links = await tx<
@@ -95,6 +96,7 @@ export async function readLivingProfile(session: ProfileSession) {
           claims: claims.map((claim) => ({
             id: claim.id,
             statement: claim.statement,
+            kind: claim.kind,
             level: claim.level,
             evidenceIds: links
               .filter((link) => link.claim_id === claim.id)
@@ -193,11 +195,11 @@ export async function saveLivingProfile(
       for (const [position, claim] of profile.claims.entries()) {
         const [stored] = await tx<{ id: string }[]>`
           insert into app.claims (
-            tenant_id, profile_id, position, statement, level,
+            tenant_id, profile_id, position, statement, kind, level,
             sensitivity, allowed_uses
           ) values (
             ${session.tenantId}, ${storedProfile.id}, ${position},
-            ${claim.statement}, ${claim.level}, ${claim.sensitivity},
+            ${claim.statement}, ${claim.kind}, ${claim.level}, ${claim.sensitivity},
             ${claim.allowedUses}
           ) returning id`;
         const mappedEvidenceIds = claim.evidenceIds.map((evidenceId) =>
@@ -220,6 +222,21 @@ export async function saveLivingProfile(
         });
       }
 
+      const stored = profileSchema.parse({
+        name: profile.name,
+        headline: profile.headline,
+        sources: storedSources,
+        evidence: storedEvidence,
+        claims: storedClaims,
+      });
+
+      await tx`insert into app.profile_revisions (
+        tenant_id, profile_id, revision, snapshot
+      ) values (
+        ${session.tenantId}, ${storedProfile.id}, ${storedProfile.revision},
+        ${tx.json(stored)}
+      )`;
+
       await tx`select app.record_human_audit_event(
         ${session.tenantId},
         ${existing ? 'career_memory.updated' : 'career_memory.created'},
@@ -234,13 +251,7 @@ export async function saveLivingProfile(
       )`;
 
       return {
-        profile: profileSchema.parse({
-          name: profile.name,
-          headline: profile.headline,
-          sources: storedSources,
-          evidence: storedEvidence,
-          claims: storedClaims,
-        }),
+        profile: stored,
         revision: Number(storedProfile.revision),
       };
     });

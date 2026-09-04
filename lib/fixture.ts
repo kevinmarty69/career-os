@@ -27,6 +27,7 @@ export const syntheticProfile: Profile = {
       id: 'claim-demo-release',
       statement:
         'Reduced a fictional deployment workflow from 40 to 12 minutes.',
+      kind: 'result',
       level: 'verified',
       evidenceIds: ['evidence-demo-release'],
       sensitivity: 'private',
@@ -36,6 +37,7 @@ export const syntheticProfile: Profile = {
       id: 'claim-demo-collaboration',
       statement:
         'Enjoys turning ambiguous requirements into small, operated product slices.',
+      kind: 'summary',
       level: 'declared',
       evidenceIds: [],
       sensitivity: 'public',

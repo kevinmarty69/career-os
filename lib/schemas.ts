@@ -4,13 +4,24 @@ export const provenanceLevelSchema = z.enum([
   'verified',
   'declared',
   'inferred',
+  'unsupported',
 ]);
 export const sensitivitySchema = z.enum(['public', 'private', 'restricted']);
+export const claimKindSchema = z.enum([
+  'summary',
+  'experience',
+  'project',
+  'skill',
+  'education',
+  'result',
+  'preference',
+  'other',
+]);
 
 export const sourceSchema = z
   .object({
     id: z.string().min(1).max(200),
-    kind: z.enum(['document', 'web', 'manual']),
+    kind: z.enum(['document', 'web', 'manual', 'linkedin']),
     title: z.string().min(1).max(500),
     locator: z.string().max(2_048).optional(),
     sensitivity: sensitivitySchema,
@@ -34,6 +45,7 @@ export const claimSchema = z
   .object({
     id: z.string().min(1).max(200),
     statement: z.string().min(1).max(5_000),
+    kind: claimKindSchema.default('other'),
     level: provenanceLevelSchema,
     evidenceIds: z.array(z.string().min(1).max(200)).max(50),
     sensitivity: sensitivitySchema,
