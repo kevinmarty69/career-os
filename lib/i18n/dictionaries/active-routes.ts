@@ -10,6 +10,11 @@ export const activeRoutesMessages = {
   'Sections consultées': 'Sections viewed',
   Actions: 'Actions',
   Statut: 'Status',
+  Accès: 'Access',
+  'Révocation…': 'Revoking…',
+  Révoqué: 'Revoked',
+  Expiré: 'Expired',
+  'La révocation a échoué. Réessayez.': 'Revocation failed. Try again.',
   'Aucun fingerprint, aucune adresse IP et aucun user-agent ne sont enregistrés.':
     'No fingerprint, IP address, or user agent is recorded.',
   'Journal d’accès': 'Access log',

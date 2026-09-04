@@ -651,7 +651,7 @@ Critères d'acceptation :
 - [ ] Pipeline des opportunités et candidatures.
 - [x] État en temps réel des workflows.
 - [ ] File des arbitrages humains.
-- [ ] Gestion des liens privés actifs.
+- [x] Gestion des liens privés actifs.
 - [ ] Ajout des contacts, entretiens, réponses et résultats.
 - [ ] Tâches et relances datées.
 - [ ] Recherche et filtres globaux.

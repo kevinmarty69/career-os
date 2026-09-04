@@ -23,6 +23,7 @@ import {
 import {
   readApplication,
   readPublications,
+  revokePublication,
   saveApplicationBrand,
 } from '@/lib/career-api';
 import type { PublicationSummary } from '@/lib/server/publication-input';
@@ -1713,6 +1714,8 @@ function LinksScreen() {
   const { locale } = useI18n();
   const [publications, setPublications] = useState<PublicationSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [revoking, setRevoking] = useState<string>();
+  const [revokeError, setRevokeError] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     void readPublications(controller.signal)
@@ -1737,6 +1740,39 @@ function LinksScreen() {
           timeStyle: 'short',
         }).format(new Date(value))
       : '—';
+
+  async function revoke(publicationId: string) {
+    if (
+      !window.confirm(
+        locale === 'fr'
+          ? 'Révoquer ce lien maintenant ? Son accès sera coupé immédiatement.'
+          : 'Revoke this link now? Access will be cut off immediately.',
+      )
+    )
+      return;
+    setRevoking(publicationId);
+    setRevokeError(false);
+    try {
+      const response = await revokePublication(publicationId);
+      if (!response.ok) throw new Error();
+      setPublications((current) =>
+        current.map((item) =>
+          item.publicationId === publicationId
+            ? {
+                ...item,
+                isCurrent: false,
+                revokedAt: new Date().toISOString(),
+                status: 'revoked',
+              }
+            : item,
+        ),
+      );
+    } catch {
+      setRevokeError(true);
+    } finally {
+      setRevoking(undefined);
+    }
+  }
 
   return (
     <AppShell
@@ -1810,7 +1846,14 @@ function LinksScreen() {
       </div>
       <div className="co-publication-table">
         <DataTable
-          headers={['Destinataire', 'Ouvertures', 'Sections', 'Actions', 'CV']}
+          headers={[
+            'Destinataire',
+            'Ouvertures',
+            'Sections',
+            'Actions',
+            'CV',
+            'Accès',
+          ]}
           rows={publications.map((item) => [
             <Company
               key={item.publicationId}
@@ -1822,9 +1865,25 @@ function LinksScreen() {
             String(item.sections),
             String(item.actions),
             String(item.downloads),
+            item.status === 'active' ? (
+              <Button
+                danger
+                disabled={revoking === item.publicationId}
+                onClick={() => void revoke(item.publicationId)}
+              >
+                {revoking === item.publicationId ? 'Révocation…' : 'Révoquer'}
+              </Button>
+            ) : (
+              <Badge>{item.status === 'revoked' ? 'Révoqué' : 'Expiré'}</Badge>
+            ),
           ])}
         />
       </div>
+      {revokeError ? (
+        <p className="co-error" role="alert">
+          La révocation a échoué. Réessayez.
+        </p>
+      ) : null}
       <div className="co-note">
         <Icon>policy</Icon>Aucun fingerprint, aucune adresse IP et aucun
         user-agent ne sont enregistrés.

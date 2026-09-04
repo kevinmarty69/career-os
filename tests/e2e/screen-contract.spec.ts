@@ -309,13 +309,20 @@ test('shows anonymous private-page metrics in the links inventory', async ({
   page,
 }) => {
   await context.clearCookies();
+  const publicationId = '988c0a00-0000-4000-8000-000000000025';
+  let revoked = false;
+  await page.route(`**/api/publications/${publicationId}`, async (route) => {
+    expect(route.request().method()).toBe('DELETE');
+    revoked = true;
+    await route.fulfill({ status: 204 });
+  });
   await page.route('**/api/publications', (route) =>
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
         publications: [
           {
-            publicationId: '988c0a00-0000-4000-8000-000000000025',
+            publicationId,
             applicationId: '988c0a00-0000-4000-8000-000000000026',
             company: 'Signal Forge',
             role: 'Staff Platform Engineer',
@@ -347,4 +354,8 @@ test('shows anonymous private-page metrics in the links inventory', async ({
   await expect(row.locator(':scope > span').nth(1)).toHaveText('4');
   await expect(row.locator(':scope > span').nth(2)).toHaveText('3');
   await expect(row.locator(':scope > span').nth(3)).toHaveText('2');
+  page.once('dialog', (dialog) => void dialog.accept());
+  await row.getByRole('button', { name: 'Revoke' }).click();
+  await expect(row).toContainText('Revoked');
+  expect(revoked).toBe(true);
 });

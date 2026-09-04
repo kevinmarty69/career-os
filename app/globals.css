@@ -3886,7 +3886,7 @@
 
 .co-publication-table .co-table-head,
 .co-publication-table .co-table-row {
-  grid-template-columns: minmax(180px, 1.5fr) repeat(4, minmax(48px, 0.5fr));
+  grid-template-columns: minmax(170px, 1.5fr) repeat(5, minmax(48px, 0.5fr));
   min-width: 0;
 }
 
