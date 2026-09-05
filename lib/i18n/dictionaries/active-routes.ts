@@ -1,6 +1,16 @@
 import type { MessageDictionary } from '../messages';
 
 export const activeRoutesMessages = {
+  'Sessions actives': 'Active sessions',
+  'Révoquez un appareil que vous ne reconnaissez plus.':
+    'Revoke any device you no longer recognize.',
+  'Chargement…': 'Loading…',
+  'Les sessions ne sont pas disponibles. Reconnectez-vous, puis réessayez.':
+    'Sessions are unavailable. Sign in again, then retry.',
+  'Cet appareil': 'This device',
+  'Autre appareil': 'Other device',
+  'Dernière activité': 'Last active',
+  'Session courante': 'Current session',
   'Réglages de l’espace': 'Workspace settings',
   'Contrôlez l’exécution et les données conservées dans ce navigateur.':
     'Control execution and the data stored in this browser.',

@@ -23,6 +23,7 @@ import {
   useLocalizer,
 } from '@/components/i18n/i18n-provider';
 import { CareerMemoryContent } from '@/components/memory/career-memory-content';
+import { SessionManager } from '@/components/settings/session-manager';
 import {
   applicationSchema,
   type Application,
@@ -3660,6 +3661,7 @@ function PrivacyScreen() {
           ]}
         />
       </section>
+      <SessionManager />
       <div className="co-note">
         <Icon>shield</Icon>Un changement de permission n’altère jamais
         rétroactivement un livrable publié : Career OS demande une nouvelle

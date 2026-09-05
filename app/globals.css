@@ -5600,6 +5600,77 @@
   margin: 0;
 }
 
+.co-session-manager > header,
+.co-session-manager article {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.co-session-manager > header h2,
+.co-session-manager > header p {
+  margin: 0;
+}
+
+.co-session-manager > header p {
+  margin-top: 4px;
+  color: var(--co-text-3);
+  font-size: 12px;
+}
+
+.co-session-manager article {
+  padding: 14px 0;
+  border-top: 1px solid var(--co-divider);
+}
+
+.co-session-manager article:first-of-type {
+  margin-top: 14px;
+}
+
+.co-session-device {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  color: var(--co-accent-dark);
+  border-radius: 12px;
+  background: var(--co-accent-soft);
+  place-items: center;
+}
+
+.co-session-manager article > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.co-session-manager article strong,
+.co-session-manager article small {
+  display: block;
+}
+
+.co-session-manager article strong {
+  font-size: 13px;
+}
+
+.co-session-manager article small {
+  margin-top: 2px;
+  color: var(--co-text-3);
+  font-size: 11px;
+}
+
+.co-session-manager .co-button.danger {
+  color: var(--co-crit-text);
+  border-color: var(--co-crit-bg);
+  background: var(--co-crit-bg);
+}
+
+.co-session-error {
+  padding: 10px 12px;
+  color: var(--co-crit-text) !important;
+  border-radius: 10px;
+  background: var(--co-crit-bg);
+}
+
 .co-conflicts {
   display: grid;
   gap: 14px;
