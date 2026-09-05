@@ -51,10 +51,23 @@ for (const [network, prefix] of [
 export type SafeHttpResult = {
   requestedUrl: string;
   finalUrl: string;
-  contentType: 'text/html' | 'text/plain' | 'application/json';
+  contentType: TextContentType;
   bytes: number;
   text: string;
 };
+
+export type SafeImageResult = {
+  requestedUrl: string;
+  finalUrl: string;
+  contentType: ImageContentType;
+  bytes: number;
+  body: Uint8Array;
+};
+
+type TextContentType = 'text/html' | 'text/plain' | 'application/json';
+type ImageContentType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+type ContentType = TextContentType | ImageContentType;
+type FetchKind = 'text' | 'image';
 
 export class SafeHttpError extends Error {
   constructor(
@@ -117,6 +130,39 @@ export async function safeFetchText(
   rawUrl: string,
   resolve: (hostname: string) => Promise<LookupAddress[]> = resolveHostname,
 ): Promise<SafeHttpResult> {
+  const response = await safeFetch(rawUrl, resolve, 'text');
+  if (!isTextContentType(response.contentType))
+    throw new SafeHttpError('UNSUPPORTED_CONTENT');
+  return {
+    requestedUrl: response.requestedUrl,
+    finalUrl: response.finalUrl,
+    contentType: response.contentType,
+    bytes: response.bytes,
+    text: decodeUtf8(response.body),
+  };
+}
+
+export async function safeFetchImage(
+  rawUrl: string,
+  resolve: (hostname: string) => Promise<LookupAddress[]> = resolveHostname,
+): Promise<SafeImageResult> {
+  const response = await safeFetch(rawUrl, resolve, 'image');
+  if (!isImageContentType(response.contentType))
+    throw new SafeHttpError('UNSUPPORTED_CONTENT');
+  return {
+    requestedUrl: response.requestedUrl,
+    finalUrl: response.finalUrl,
+    contentType: response.contentType,
+    bytes: response.bytes,
+    body: response.body,
+  };
+}
+
+async function safeFetch(
+  rawUrl: string,
+  resolve: (hostname: string) => Promise<LookupAddress[]>,
+  kind: FetchKind,
+) {
   const requested = normalizeImportUrl(rawUrl);
   const deadline = Date.now() + REQUEST_TIMEOUT_MS;
   const seen = new Set<string>();
@@ -135,7 +181,7 @@ export async function safeFetchText(
     )
       throw new SafeHttpError('BLOCKED_DESTINATION');
 
-    const response = await requestPinned(current, addresses[0], deadline);
+    const response = await requestPinned(current, addresses[0], deadline, kind);
     if (response.status >= 300 && response.status < 400) {
       if (!response.location || redirects >= MAX_REDIRECTS)
         throw new SafeHttpError('REDIRECT_REJECTED');
@@ -158,7 +204,7 @@ export async function safeFetchText(
       finalUrl: current.href,
       contentType: response.contentType,
       bytes: response.body.byteLength,
-      text: decodeUtf8(response.body),
+      body: response.body,
     };
   }
 }
@@ -176,6 +222,7 @@ export async function requestPinned(
   url: URL,
   target: LookupAddress,
   deadline: number,
+  kind: FetchKind = 'text',
 ) {
   const controller = new AbortController();
   const timeout = setTimeout(
@@ -191,7 +238,7 @@ export async function requestPinned(
     return await new Promise<{
       status: number;
       location?: string;
-      contentType: 'text/html' | 'text/plain' | 'application/json';
+      contentType: ContentType;
       body: Uint8Array;
     }>((resolve, reject) => {
       const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
@@ -202,7 +249,10 @@ export async function requestPinned(
           path: `${url.pathname}${url.search}`,
           method: 'GET',
           headers: {
-            accept: 'application/json,text/html;q=0.9,text/plain;q=0.8',
+            accept:
+              kind === 'image'
+                ? 'image/png,image/jpeg,image/webp,image/gif'
+                : 'application/json,text/html;q=0.9,text/plain;q=0.8',
             'accept-encoding': 'identity',
             'user-agent': 'CareerOS/0.1 job-import',
           },
@@ -246,6 +296,7 @@ export async function requestPinned(
           }
           const contentType = parseContentType(
             response.headers['content-type'],
+            kind,
           );
           const declaredLength = Number(
             response.headers['content-length'] ?? 0,
@@ -309,13 +360,32 @@ export function decodeUtf8(body: Uint8Array) {
   }
 }
 
-function parseContentType(value: string | undefined) {
+function parseContentType(value: string | undefined, kind: FetchKind) {
   const mime = value?.split(';', 1)[0].trim().toLowerCase();
-  return mime === 'text/html' ||
-    mime === 'text/plain' ||
-    mime === 'application/json'
-    ? mime
-    : undefined;
+  return kind === 'text'
+    ? isTextContentType(mime)
+      ? mime
+      : undefined
+    : isImageContentType(mime)
+      ? mime
+      : undefined;
+}
+
+function isTextContentType(value: unknown): value is TextContentType {
+  return (
+    value === 'text/html' ||
+    value === 'text/plain' ||
+    value === 'application/json'
+  );
+}
+
+function isImageContentType(value: unknown): value is ImageContentType {
+  return (
+    value === 'image/png' ||
+    value === 'image/jpeg' ||
+    value === 'image/webp' ||
+    value === 'image/gif'
+  );
 }
 
 function singleHeader(value: string | string[] | undefined) {

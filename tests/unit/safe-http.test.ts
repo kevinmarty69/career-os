@@ -68,6 +68,11 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
       response.end('{"ok":true}');
       return;
     }
+    if (request.url === '/image') {
+      response.writeHead(200, { 'content-type': 'image/png' });
+      response.end(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      return;
+    }
     response.writeHead(200, { 'content-type': 'text/html' });
     response.end(Buffer.alloc(MAX_RESPONSE_BYTES + 1, 97));
   });
@@ -92,6 +97,26 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
     );
     assert.equal(json.contentType, 'application/json');
     assert.equal(new TextDecoder().decode(json.body), '{"ok":true}');
+
+    const image = await requestPinned(
+      new URL(`http://127.0.0.1:${address.port}/image`),
+      target,
+      Date.now() + 2_000,
+      'image',
+    );
+    assert.equal(image.contentType, 'image/png');
+    assert.deepEqual([...image.body], [0x89, 0x50, 0x4e, 0x47]);
+
+    await assert.rejects(
+      requestPinned(
+        new URL(`http://127.0.0.1:${address.port}/json`),
+        target,
+        Date.now() + 2_000,
+        'image',
+      ),
+      (error: unknown) =>
+        error instanceof SafeHttpError && error.code === 'UNSUPPORTED_CONTENT',
+    );
 
     await assert.rejects(
       requestPinned(

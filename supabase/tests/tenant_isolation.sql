@@ -1,6 +1,32 @@
 \set ON_ERROR_STOP on
 
 begin;
+
+do $$ begin
+  if exists (
+    select 1
+    from pg_class relation
+    join pg_namespace namespace on namespace.oid = relation.relnamespace
+    join pg_attribute column_definition
+      on column_definition.attrelid = relation.oid
+      and column_definition.attname = 'tenant_id'
+      and not column_definition.attisdropped
+    where namespace.nspname = 'app'
+      and relation.relkind in ('r', 'p')
+      and (not relation.relrowsecurity or not relation.relforcerowsecurity)
+  ) then
+    raise exception 'tenant table without forced RLS';
+  end if;
+  if exists (
+    select 1 from pg_roles
+    where rolname like 'career\_%' escape '\'
+      and rolname <> 'career_os'
+      and (rolsuper or rolbypassrls)
+  ) then
+    raise exception 'application role can bypass RLS';
+  end if;
+end $$;
+
 set local role career_app;
 
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);

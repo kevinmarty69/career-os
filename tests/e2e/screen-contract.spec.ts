@@ -32,7 +32,7 @@ const screens = [
     `/applications/${applicationId}/versions`,
     'Historique des versions et décisions',
   ],
-  ['/runs', 'Runs d’agents'],
+  ['/runs', 'Journal des agents'],
   ['/applications/nimbus/company', 'Dossier entreprise'],
   ['/messages', 'Messages'],
   ['/memory/skills', 'Compétences'],
@@ -218,6 +218,7 @@ test('identifies a valid private page as an independent application', async ({
   await context.clearCookies();
   const publicationId = '988c0a00-0000-4000-8000-000000000024';
   const events: Array<{ type: string; key?: string }> = [];
+  let thirdPartyLogoRequests = 0;
   await page.route(
     `**/api/publications/${publicationId}/events`,
     async (route) => {
@@ -267,12 +268,19 @@ test('identifies a valid private page as an independent application', async ({
       }),
     }),
   );
-  await page.route('https://assets.example.test/signal-forge.svg', (route) =>
+  await page.route(`**/api/publications/${publicationId}/logo`, (route) =>
     route.fulfill({
-      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="white"/></svg>',
-      contentType: 'image/svg+xml',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+      contentType: 'image/png',
     }),
   );
+  await page.route('https://assets.example.test/**', (route) => {
+    thirdPartyLogoRequests += 1;
+    return route.abort();
+  });
 
   await page.goto(`/p/${publicationId}`);
   await expect(
@@ -284,6 +292,7 @@ test('identifies a valid private page as an independent application', async ({
     page.getByRole('heading', { name: 'Alex Morgan × Signal Forge' }),
   ).toBeVisible();
   await expect(page.getByAltText('Signal Forge logo')).toBeVisible();
+  expect(thirdPartyLogoRequests).toBe(0);
   await expect
     .poll(() => events.some((event) => event.type === 'open'))
     .toBe(true);

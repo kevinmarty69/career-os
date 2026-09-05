@@ -1,7 +1,20 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import test from 'node:test';
-import { runWorkerLoop } from '../../scripts/worker-loop';
+import { runWorkerLoop, safeWorkerLog } from '../../scripts/worker-loop';
+
+test('logs only bounded operational fields', () => {
+  assert.deepEqual(
+    safeWorkerLog({
+      status: 'completed',
+      runId: 'run-1',
+      stored: 4,
+      secret: 'private candidate content',
+      content: { prompt: 'private candidate content' },
+    }),
+    { status: 'completed', runId: 'run-1', stored: 4 },
+  );
+});
 
 test('fails immediately when the first iteration fails', async () => {
   const signals = new EventEmitter();

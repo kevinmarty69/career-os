@@ -26,6 +26,7 @@ export function PrivatePublication() {
   const { locale } = useI18n();
   const localize = useLocalizer([publicationMessages]);
   const [publication, setPublication] = useState<Publication | null>();
+  const [logoFailed, setLogoFailed] = useState(false);
   const recorded = useRef(new Set<string>());
   const record = useCallback(
     (type: 'open' | 'section' | 'action' | 'download', key?: string) => {
@@ -48,6 +49,7 @@ export function PrivatePublication() {
     async function load() {
       const currentRequest = ++request;
       setPublication(undefined);
+      setLogoFailed(false);
       try {
         const token = location.hash.slice(1);
         if (token) {
@@ -142,13 +144,14 @@ export function PrivatePublication() {
     >
       <header>
         <span>
-          {logoUrl ? (
-            // Published company logos may come from any validated HTTPS host.
+          {logoUrl && !logoFailed ? (
+            // Keep the recruiter's browser away from third-party logo hosts.
             // eslint-disable-next-line @next/next/no-img-element
             <img
               alt={`${spec.company.name} logo`}
               className="co-public-company-logo"
-              src={logoUrl}
+              onError={() => setLogoFailed(true)}
+              src={`/api/publications/${capability}/logo`}
             />
           ) : (
             <i aria-hidden="true">

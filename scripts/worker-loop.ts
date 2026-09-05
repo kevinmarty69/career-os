@@ -43,7 +43,7 @@ export async function runWorkerLoop<Result extends { status: string }>({
       try {
         const result = await iteration();
         iterationSucceeded = true;
-        log(JSON.stringify(result));
+        log(JSON.stringify(safeWorkerLog(result)));
         if (once || stopping) return;
         await wait(
           result.status === 'idle' ? idleDelayMs : busyDelayMs,
@@ -61,6 +61,35 @@ export async function runWorkerLoop<Result extends { status: string }>({
     signalSource.removeListener('SIGINT', stop);
     signalSource.removeListener('SIGTERM', stop);
   }
+}
+
+const workerLogKeys = [
+  'status',
+  'runId',
+  'stepId',
+  'artifactId',
+  'failureCode',
+  'outcome',
+  'boards',
+  'jobsRead',
+  'stored',
+  'filtered',
+  'failedBoards',
+] as const;
+
+export function safeWorkerLog(result: unknown) {
+  if (!result || typeof result !== 'object') return { status: 'invalid' };
+  const source = result as Record<string, unknown>;
+  return Object.fromEntries(
+    workerLogKeys.flatMap((key) => {
+      const value = source[key];
+      return (typeof value === 'string' && value.length <= 200) ||
+        typeof value === 'number' ||
+        typeof value === 'boolean'
+        ? [[key, value]]
+        : [];
+    }),
+  );
 }
 
 function wait(milliseconds: number, signal: AbortSignal) {
