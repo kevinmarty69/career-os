@@ -77,3 +77,22 @@ test('rejects duplicated sources and unsupported verified confidence', () => {
     false,
   );
 });
+
+test('accepts only credential-free HTTP contact links', () => {
+  const output = (profileUrl: string) => ({
+    schemaVersion: 1,
+    purpose: 'application-contact-research-result',
+    contacts: [{ ...contact, profileUrl }],
+  });
+  assert.equal(
+    contactResearchOutputSchema.safeParse(output('javascript:alert(1)'))
+      .success,
+    false,
+  );
+  assert.equal(
+    contactResearchOutputSchema.safeParse(
+      output('https://user:password@company.example/profile'),
+    ).success,
+    false,
+  );
+});

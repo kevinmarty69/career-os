@@ -39,6 +39,10 @@ test('the app and private pages receive defensive browser headers', async () => 
     values['Content-Security-Policy'] ?? '',
     /frame-ancestors 'none'/,
   );
+  assert.match(values['Content-Security-Policy'] ?? '', /default-src 'self'/);
+  assert.match(values['Content-Security-Policy'] ?? '', /connect-src 'self'/);
+  assert.equal(values['Cross-Origin-Opener-Policy'], 'same-origin');
+  assert.equal(values['Strict-Transport-Security'], 'max-age=31536000');
   assert.equal(
     privatePage?.headers.find(({ key }) => key === 'Referrer-Policy')?.value,
     'no-referrer',

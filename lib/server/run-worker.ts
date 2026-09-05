@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import postgres from 'postgres';
 import { z } from 'zod';
 import { extractReadablePageText } from '../job-posting-extractor';
+import { httpUrlSchema } from '../http-url';
 import {
   COMPANY_RESEARCH_MAX_OUTPUT_TOKENS,
   LocalOpenAICompanyResearchClient,
@@ -15,25 +16,14 @@ const STEP_LEASE_SECONDS = 300;
 const sourceSchema = z
   .object({
     kind: z.literal('job-posting'),
-    url: z.string().url().max(2_048).optional(),
+    url: httpUrlSchema.optional(),
     trust: z.literal('untrusted-data'),
   })
   .strict();
 
 const companySourceSchema = z
   .object({
-    url: z
-      .string()
-      .url()
-      .max(2_048)
-      .refine((value) => {
-        const url = new URL(value);
-        return (
-          ['http:', 'https:'].includes(url.protocol) &&
-          !url.username &&
-          !url.password
-        );
-      }),
+    url: httpUrlSchema,
     origin: z.enum(['job-jsonld', 'api']),
   })
   .strict();
@@ -82,8 +72,8 @@ const companyDocumentSchema = z
     sourceId: z.string().regex(/^company-[1-3]$/),
     kind: z.literal('company-web'),
     origin: z.enum(['job-jsonld', 'api']),
-    requestedUrl: z.string().url().max(2_048),
-    finalUrl: z.string().url().max(2_048),
+    requestedUrl: httpUrlSchema,
+    finalUrl: httpUrlSchema,
     fetchedAt: z.string().datetime(),
     contentType: z.enum(['text/html', 'text/plain']),
     bytes: z.number().int().min(1).max(1_048_576),
@@ -95,7 +85,7 @@ const sourceFailureSchema = z
   .object({
     sourceId: z.string().regex(/^company-[1-3]$/),
     origin: z.enum(['job-jsonld', 'api']),
-    requestedUrl: z.string().url().max(2_048),
+    requestedUrl: httpUrlSchema,
     code: z.enum([
       'blocked',
       'timeout',

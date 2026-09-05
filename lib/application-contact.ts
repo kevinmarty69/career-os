@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrlSchema } from './http-url';
 
 export const applicationContactRelationshipSchema = z.enum([
   'hiring_manager',
@@ -32,7 +33,7 @@ const sourceSupportSchema = z.enum([
 
 export const applicationContactSourceSchema = z
   .object({
-    url: z.string().url().max(2_048),
+    url: httpUrlSchema,
     title: z.string().trim().min(1).max(240),
     collectedAt: z.string().datetime({ offset: true }),
     trust: z.enum(['authoritative', 'corroborating', 'weak']),
@@ -45,7 +46,7 @@ export const applicationContactDraftSchema = z
     rank: z.number().int().min(1).max(3),
     name: z.string().trim().min(1).max(200),
     role: z.string().trim().min(1).max(200),
-    profileUrl: z.string().url().max(2_048),
+    profileUrl: httpUrlSchema,
     relationship: applicationContactRelationshipSchema,
     rationale: z.string().trim().min(1).max(1_000),
     sources: z.array(applicationContactSourceSchema).min(1).max(6),
@@ -147,7 +148,7 @@ export const contactResearchInputSchema = z
       .array(
         z
           .object({
-            url: z.string().url().max(2_048),
+            url: httpUrlSchema,
             title: z.string().trim().min(1).max(240),
             collectedAt: z.string().datetime({ offset: true }),
             excerpt: z.string().trim().min(1).max(4_000),

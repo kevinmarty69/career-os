@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrlSchema } from './http-url';
 import { searchSoftPreferencesSchema } from './search-profile';
 import { profileSchema } from './schemas';
 
@@ -17,7 +18,7 @@ const semanticJobSchema = z
     source: z
       .object({
         sourceRecordId: z.string().uuid(),
-        url: z.string().url().max(2_048),
+        url: httpUrlSchema,
         fetchedAt: z.string().datetime({ offset: true }),
         contentSha256: hashSchema,
         trust: z.literal('untrusted-data'),
