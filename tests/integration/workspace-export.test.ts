@@ -38,6 +38,7 @@ test('workspace export contract covers every tenant table and field', async () =
       workspaceExportTables.map(({ table }) => table).sort(),
     );
     const intentionalExclusions: Record<string, string[]> = {
+      search_profiles: ['discovery_lease_token', 'discovery_lease_expires_at'],
       workflow_steps: ['lease_owner'],
       run_budget_reservations: ['owner_id'],
       share_links: ['token_hash'],
@@ -67,6 +68,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const tenantId = randomUUID();
   const otherTenantId = randomUUID();
   const applicationId = randomUUID();
+  const applicationTimelineEventId = randomUUID();
+  const applicationTaskId = randomUUID();
   const otherApplicationId = randomUUID();
   const discoveredJobId = randomUUID();
   const sourceRecordId = randomUUID();
@@ -125,10 +128,12 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         (${tenantId}, ${ownerId}, 'Export workspace'),
         (${otherTenantId}, ${otherOwnerId}, ${secret})`;
       await transaction`insert into app.search_profiles (
-        id, tenant_id, name, hard_constraints, soft_preferences, active
+        id, tenant_id, name, hard_constraints, soft_preferences,
+        discovery_sources, discovery_interval_hours, alert_threshold, active
       ) values (
         ${searchProfileId}, ${tenantId}, 'Visible search',
-        '{"roles":["Platform Engineer"]}'::jsonb, '{}'::jsonb, true
+        '{"roles":["Platform Engineer"]}'::jsonb, '{}'::jsonb,
+        '[{"url":"https://jobs.example.test/board"}]'::jsonb, 12, 82, true
       )`;
       await transaction`insert into app.profiles (
         id, tenant_id, name, headline, profile_kind, revision
@@ -161,6 +166,21 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         (${otherApplicationId}, ${otherTenantId}, null, ${secret}, 'Engineer',
           ${secret}, '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
           '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
+      await transaction`insert into app.application_timeline_events (
+        id, tenant_id, application_id, kind, title, note, occurred_at,
+        actor_id
+      ) values (
+        ${applicationTimelineEventId}, ${tenantId}, ${applicationId},
+        'interview', 'Visible interview', 'visible timeline note',
+        '2026-01-03 10:00:00+00'::timestamptz, ${ownerId}
+      )`;
+      await transaction`insert into app.application_tasks (
+        id, tenant_id, application_id, kind, title, due_at, actor_id
+      ) values (
+        ${applicationTaskId}, ${tenantId}, ${applicationId}, 'follow_up',
+        'Visible follow-up', '2026-01-04 10:00:00+00'::timestamptz,
+        ${ownerId}
+      )`;
       await transaction`insert into app.job_source_records (
         id, tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
         content_type, bytes, content_sha256, extraction
@@ -337,6 +357,35 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
           record.data.id === applicationId &&
           record.data.deleted_at &&
           record.data.discovered_job_id === discoveredJobId,
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'application_timeline_events' &&
+          record.data.id === applicationTimelineEventId &&
+          record.data.title === 'Visible interview',
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'application_tasks' &&
+          record.data.id === applicationTaskId &&
+          record.data.kind === 'follow_up',
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'search_profiles' &&
+          record.data.id === searchProfileId &&
+          record.data.alert_threshold === 82 &&
+          record.data.discovery_interval_hours === 12 &&
+          !('discovery_lease_token' in record.data),
       ),
       true,
     );

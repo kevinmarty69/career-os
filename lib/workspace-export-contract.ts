@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 10;
+export const workspaceExportVersion = 11;
 
 export const workspaceExportTables = [
   {
@@ -24,10 +24,17 @@ export const workspaceExportTables = [
       'name',
       'hard_constraints',
       'soft_preferences',
+      'discovery_sources',
+      'discovery_interval_hours',
+      'alert_threshold',
       'active',
       'revision',
       'created_at',
       'updated_at',
+      'next_discovery_at',
+      'last_discovery_at',
+      'last_discovery_status',
+      'last_discovery_summary',
     ],
     orderBy: ['id'],
   },
@@ -68,6 +75,41 @@ export const workspaceExportTables = [
       'deleted_at',
       'company_sources',
       'discovered_job_id',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'application_timeline_events',
+    table: 'application_timeline_events',
+    columns: [
+      'id',
+      'tenant_id',
+      'application_id',
+      'kind',
+      'title',
+      'note',
+      'occurred_at',
+      'actor',
+      'actor_id',
+      'created_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'application_tasks',
+    table: 'application_tasks',
+    columns: [
+      'id',
+      'tenant_id',
+      'application_id',
+      'kind',
+      'title',
+      'due_at',
+      'completed_at',
+      'revision',
+      'actor_id',
+      'created_at',
+      'updated_at',
     ],
     orderBy: ['id'],
   },
@@ -626,6 +668,6 @@ export const workspaceExportTables = [
 export const workspaceExportExclusions = [
   'Authentication credentials, provider tokens, password hashes, sessions and verification secrets.',
   'Raw private-link capabilities and their token hashes.',
-  'Worker ownership identifiers and global heartbeats.',
+  'Ephemeral worker lease state, ownership identifiers and global heartbeats.',
   'Browser-only drafts, caches and raw files that were never submitted to the server.',
 ] as const;
