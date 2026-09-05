@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import packageJson from '../../package.json';
 
@@ -25,4 +26,17 @@ test('exposes isolated production worker entrypoints', () => {
   assert.equal(packageJson.dependencies.tsx, '4.23.13');
   assert.equal('tsx' in packageJson.devDependencies, false);
   assert.equal('worker:all' in packageJson.scripts, false);
+
+  const entrypoints = new Set(
+    Object.values(expected).map((command) => command.split(' ').at(-1)!),
+  );
+  for (const entrypoint of entrypoints) {
+    const source = readFileSync(entrypoint, 'utf8');
+    assert.match(source, /runWorkerLoop/);
+    assert.doesNotMatch(source, /console\.(?:log|info|warn)\(/);
+    assert.doesNotMatch(
+      source,
+      /console\.error\([^'\"]|console\.error\([^)]*,/,
+    );
+  }
 });

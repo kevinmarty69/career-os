@@ -729,7 +729,7 @@ Critères d'acceptation :
 - [ ] Audit des frontières SSRF, uploads, sessions, RLS et liens privés.
 - [ ] Mesure des coûts par workflow et limites de sécurité.
 - [ ] Gestion des erreurs compréhensible par un utilisateur non technique.
-- [ ] Observabilité sans capture du contenu sensible par défaut.
+- [x] Observabilité sans capture du contenu sensible par défaut.
 - [x] Démonstration publique avec données entièrement fictives.
 - [x] Documentation produit, sécurité et auto-hébergement alignée.
 

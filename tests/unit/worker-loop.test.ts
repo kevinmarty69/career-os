@@ -14,6 +14,18 @@ test('logs only bounded operational fields', () => {
     }),
     { status: 'completed', runId: 'run-1', stored: 4 },
   );
+
+  assert.deepEqual(
+    safeWorkerLog({
+      status: 'completed',
+      prompt: 'private prompt',
+      input: 'private CV',
+      output: 'private model output',
+      evidence: 'private evidence',
+      email: 'candidate@example.com',
+    }),
+    { status: 'completed' },
+  );
 });
 
 test('fails immediately when the first iteration fails', async () => {
