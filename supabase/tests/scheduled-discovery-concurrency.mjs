@@ -12,6 +12,7 @@ const profileCount = 24;
 const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
 const databaseName = `career_os_discovery_${suffix}`;
 const admin = new Client({ connectionString: databaseUrl });
+let adminConnected = false;
 const testUrl = new URL(databaseUrl);
 testUrl.pathname = `/${databaseName}`;
 const target = new Client({ connectionString: testUrl.toString() });
@@ -53,6 +54,7 @@ async function complete(client, row) {
 
 try {
   await admin.connect();
+  adminConnected = true;
   await admin.query(`drop database if exists ${databaseName} with (force)`);
   await admin.query(`create database ${databaseName}`);
   await target.connect();
@@ -201,7 +203,7 @@ try {
 } finally {
   await Promise.allSettled(workers.map((client) => client.end()));
   await target.end().catch(() => undefined);
-  if (admin._connected)
+  if (adminConnected)
     await admin
       .query(`drop database if exists ${databaseName} with (force)`)
       .catch(() => undefined);

@@ -22,3 +22,11 @@ Measured on 5 September 2026 with Node.js 24.19.0 on arm64 macOS:
 | In-memory agent orchestration      | 100 workflows | 16.00 ms | 12.94 ms | 14.02 ms |
 
 The agent run produced 3,700 audit events and reported 44,000 input plus 22,000 output tokens. Those tokens are synthetic accounting from the fake provider; no model request or paid service was used.
+
+The PostgreSQL concurrency check is separate:
+
+```bash
+pnpm test:integration:discovery-concurrency
+```
+
+It runs four real database workers against 24 due profiles. The reference run completed with zero duplicate claims, recovered one expired lease and rejected its stale completion token. This verifies lease correctness, not end-to-end ATS or model capacity.
