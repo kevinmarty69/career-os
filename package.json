@@ -13,6 +13,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/unit/*.test.ts",
     "benchmark:mvp": "tsx scripts/benchmark-mvp.ts",
+    "test:load": "pnpm benchmark:mvp && pnpm test:integration:discovery-concurrency && DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/durable-step-concurrency.mjs",
     "test:integration:worker": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/*worker.test.ts",
     "test:integration:correction": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/page-correction-worker.test.ts",
     "test:integration:export": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/workspace-export.test.ts",
