@@ -141,7 +141,7 @@
   --co-text: #15161c;
   --co-text-2: #42444e;
   --co-text-3: #6e7079;
-  --co-text-4: #9a9ca6;
+  --co-text-4: #676974;
   --co-accent: #5647e0;
   --co-accent-dark: #3a2cb8;
   --co-accent-soft: #edeafd;
@@ -152,13 +152,13 @@
   --co-border: #eaebef;
   --co-divider: #f2f2f5;
   --co-ok: #149e6a;
-  --co-ok-text: #128a5c;
+  --co-ok-text: #0b6f48;
   --co-ok-bg: #e4f4ec;
   --co-warn: #e0a233;
-  --co-warn-text: #b4761a;
+  --co-warn-text: #87520a;
   --co-warn-bg: #fbf0da;
   --co-crit: #e0533d;
-  --co-crit-text: #c0492f;
+  --co-crit-text: #a83823;
   --co-crit-bg: #fce9e5;
   min-height: 100vh;
   color: var(--co-text);
@@ -7254,6 +7254,7 @@
   justify-items: center;
   padding: 12vh 20px 20px;
   background: rgb(21 23 32 / 32%);
+  overscroll-behavior: contain;
 }
 
 .co-command {
@@ -7279,6 +7280,11 @@
   border: 0;
   outline: 0;
   font-size: 14px;
+}
+
+.co-command input:focus-visible {
+  outline: 3px solid var(--co-accent);
+  outline-offset: -3px;
 }
 
 .co-command form {

@@ -38,6 +38,7 @@ import {
 } from '@/lib/opportunity-ranking';
 import { searchProfileSchema, type SearchProfile } from '@/lib/search-profile';
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useDialogFocus } from '@/components/use-dialog-focus';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { semanticAnalysisMessages } from '@/lib/i18n/dictionaries/semantic-analysis';
 import { matchesSearchTerms } from '@/lib/global-search';
@@ -1216,13 +1217,7 @@ function ImportDialog({
   const [url, setUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting) onClose();
-    };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
-  }, [onClose, submitting]);
+  const dialog = useDialogFocus<HTMLElement>(onClose, submitting);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -1255,6 +1250,7 @@ function ImportDialog({
         aria-labelledby="import-title"
         aria-modal="true"
         className={styles.dialog}
+        ref={dialog}
         role="dialog"
       >
         <header>
@@ -1278,7 +1274,7 @@ function ImportDialog({
           <label>
             <span>URL de l’annonce</span>
             <input
-              autoFocus
+              data-dialog-initial-focus
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://…"
               required

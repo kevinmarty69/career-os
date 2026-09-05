@@ -16,6 +16,7 @@ import {
 import { ApplicationStrategyCheckpoint } from '@/components/applications/application-strategy-checkpoint';
 import { useApplicationWorkflow } from '@/components/applications/use-application-workflow';
 import { ApplicationsPage } from '@/components/applications/applications-page';
+import { useDialogFocus } from '@/components/use-dialog-focus';
 import {
   LocaleSwitch,
   useI18n,
@@ -203,6 +204,9 @@ export function AppShell({
   }, []);
   return localize(
     <main className={`co-shell${aside ? ' has-aside' : ''}`}>
+      <a className="skip-link" href="#main-content">
+        Aller au contenu
+      </a>
       <aside className="co-sidebar" aria-label="Navigation principale">
         <Link className="co-brand" href="/">
           <span>
@@ -212,9 +216,14 @@ export function AppShell({
           <Icon>unfold_more</Icon>
         </Link>
         <LocaleSwitch />
-        <nav>
+        <nav aria-label="Navigation principale">
           {screenNav.map(([href, icon, label]) => (
             <Link
+              aria-current={
+                path === href || (href !== '/' && path.startsWith(href))
+                  ? 'page'
+                  : undefined
+              }
               className={
                 path === href || (href !== '/' && path.startsWith(href))
                   ? 'active'
@@ -266,13 +275,20 @@ export function AppShell({
             </div>
           </header>
         ) : null}
-        <div className="co-content">{children}</div>
+        <div className="co-content" id="main-content" tabIndex={-1}>
+          {children}
+        </div>
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
       {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
       <nav aria-label="Navigation mobile" className="co-mobile-nav">
         {screenNav.slice(0, 4).map(([href, icon, label]) => (
           <Link
+            aria-current={
+              path === href || (href !== '/' && path.startsWith(href))
+                ? 'page'
+                : undefined
+            }
             className={
               path === href || (href !== '/' && path.startsWith(href))
                 ? 'active'
@@ -341,6 +357,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState<GlobalSearchItem[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const dialog = useDialogFocus<HTMLElement>(onClose);
   const results = searchGlobalIndex(index, query);
 
   useEffect(() => {
@@ -415,6 +432,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
     <div className="co-scrim" role="presentation" onMouseDown={onClose}>
       <section
         className="co-command"
+        ref={dialog}
         role="dialog"
         aria-modal="true"
         aria-label="Palette de commandes"
@@ -425,7 +443,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
             <Icon>search</Icon>
             <input
               aria-label="Recherche globale"
-              autoFocus
+              data-dialog-initial-focus
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Chercher une preuve, une entreprise, une action…"
               type="search"
@@ -1014,6 +1032,7 @@ function DossierNav({
       <p>{company}</p>
       {items.map(([icon, label, path]) => (
         <Link
+          aria-current={active === label ? 'page' : undefined}
           className={active === label ? 'active' : ''}
           href={
             path
@@ -1458,12 +1477,15 @@ function DossierShell({
   const localize = useLocalizer(activeFrontMessages);
   return localize(
     <main className="co-dossier-shell">
+      <a className="skip-link" href="#main-content">
+        Aller au contenu
+      </a>
       <DossierNav
         active={active}
         applicationId={identity.applicationId}
         company={identity.company}
       />
-      <section>
+      <section id="main-content" tabIndex={-1}>
         <header className="co-dossier-top">
           <div>
             <i>{initials(identity.company)}</i>
@@ -1509,7 +1531,11 @@ function DossierShell({
             'Contacts',
           ],
         ].map(([href, icon, label]) => (
-          <Link href={href} key={href}>
+          <Link
+            aria-current={active === label ? 'page' : undefined}
+            href={href}
+            key={href}
+          >
             <Icon>{icon}</Icon>
             <span>{label}</span>
           </Link>
@@ -3383,7 +3409,12 @@ function SettingsNav({ active }: { active: string }) {
         ['payments', 'Abonnement', '/settings/billing'],
         ['import_export', 'Export & suppression', '/settings/data'],
       ].map(([i, l, h]) => (
-        <Link className={active === l ? 'active' : ''} href={h} key={l}>
+        <Link
+          aria-current={active === l ? 'page' : undefined}
+          className={active === l ? 'active' : ''}
+          href={h}
+          key={l}
+        >
           <Icon>{i}</Icon>
           {l}
         </Link>
@@ -3403,8 +3434,11 @@ function SettingsShell({
   const localize = useLocalizer(activeFrontMessages);
   return localize(
     <main className="co-settings-shell">
+      <a className="skip-link" href="#main-content">
+        Aller au contenu
+      </a>
       <SettingsNav active={active} />
-      <section>
+      <section id="main-content" tabIndex={-1}>
         <header>
           <Link className="co-brand" href="/">
             <span>

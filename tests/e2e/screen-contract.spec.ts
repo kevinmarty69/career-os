@@ -61,11 +61,65 @@ test('renders every routed handoff screen', async ({ page }) => {
 test('opens the documented command palette with the keyboard shortcut', async ({
   page,
 }) => {
-  await page.goto('/memory');
+  await mockPersistedWorkspace(page);
+  await page.goto('/');
+  const trigger = page.getByRole('button', {
+    name: /Chercher une preuve, une entreprise, une affirmation/,
+  });
+  await trigger.focus();
   await page.keyboard.press('ControlOrMeta+K');
+  const dialog = page.getByRole('dialog', { name: 'Palette de commandes' });
+  await expect(dialog).toBeVisible();
+  const search = dialog.getByRole('searchbox', { name: 'Recherche globale' });
+  await expect(search).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
   await expect(
-    page.getByRole('dialog', { name: 'Palette de commandes' }),
-  ).toBeVisible();
+    dialog.getByRole('link', {
+      name: /Importer un document dans la mémoire/,
+    }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(search).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('exposes current navigation and traps focus in the job import dialog', async ({
+  page,
+}) => {
+  await mockPersistedWorkspace(page);
+  await page.goto('/applications');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Navigation principale' })
+      .getByRole('link', {
+        name: 'Candidatures',
+        exact: true,
+      }),
+  ).toHaveAttribute('aria-current', 'page');
+
+  const trigger = page.getByRole('button', { name: 'Coller une offre' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Coller une offre' });
+  const input = dialog.getByRole('textbox', { name: 'URL de l’annonce' });
+  await expect(input).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Fermer' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Annuler' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
+test('offers a visible skip link to the primary content', async ({ page }) => {
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  const skip = page.getByRole('link', { name: 'Aller au contenu' });
+  await expect(skip).toBeFocused();
+  await skip.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
 });
 
 test('keeps the documented mobile surfaces inside the viewport', async ({

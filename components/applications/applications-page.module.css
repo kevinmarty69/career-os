@@ -1208,6 +1208,7 @@
   padding: 24px;
   background: rgb(21 22 28 / 46%);
   backdrop-filter: blur(5px);
+  overscroll-behavior: contain;
   place-items: center;
 }
 
