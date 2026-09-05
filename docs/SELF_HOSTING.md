@@ -167,6 +167,8 @@ pnpm test:e2e
 
 `pnpm test:integration:http` starts the production build on port 3019 and runs the application, workflow and private-publication HTTP contracts against it.
 
+The agent run journal reports the tokens and cost recorded for each workflow. PostgreSQL reserves both before dispatch, rejects concurrent reservations above the run budget, and limits each tenant to five active runs and thirty starts per hour.
+
 For a running instance, open **Settings → Worker availability**. The authenticated status endpoint reports each of the eight heartbeats as `fresh`, `stale` or `missing` without exposing timestamps. On a systemd host, also check:
 
 ```bash
