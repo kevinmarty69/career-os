@@ -728,7 +728,7 @@ Critères d'acceptation :
 - [ ] Tests de charge sur collecte, matching et exécution des agents.
 - [ ] Audit des frontières SSRF, uploads, sessions, RLS et liens privés.
 - [x] Mesure des coûts par workflow et limites de sécurité.
-- [ ] Gestion des erreurs compréhensible par un utilisateur non technique.
+- [x] Gestion des erreurs compréhensible par un utilisateur non technique.
 - [x] Observabilité sans capture du contenu sensible par défaut.
 - [x] Démonstration publique avec données entièrement fictives.
 - [x] Documentation produit, sécurité et auto-hébergement alignée.

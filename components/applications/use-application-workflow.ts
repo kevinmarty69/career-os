@@ -167,6 +167,10 @@ export function useApplicationWorkflow(applicationId: string) {
       );
       const response = await createRun(input, operation.key);
       if (!response.ok) {
+        const failure =
+          response.status === 503
+            ? await response.json().catch(() => undefined)
+            : undefined;
         setResult({
           ...current,
           error:
@@ -176,7 +180,7 @@ export function useApplicationWorkflow(applicationId: string) {
                 ? 'conflict'
                 : response.status === 429
                   ? 'rate-limited'
-                  : response.status === 503
+                  : isWorkerUnavailable(failure)
                     ? 'worker-unavailable'
                     : 'unavailable',
         });
@@ -477,6 +481,15 @@ export function useApplicationWorkflow(applicationId: string) {
     starting,
     revoke,
   };
+}
+
+function isWorkerUnavailable(value: unknown) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'code' in value &&
+    value.code === 'WORKER_UNAVAILABLE'
+  );
 }
 
 function publicationErrorFromStatus(status: number): PublicationActionError {

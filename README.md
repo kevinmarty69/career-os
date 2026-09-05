@@ -68,6 +68,7 @@ The repository currently proves the self-hosted implementation. A managed servic
 | URL import resists SSRF and unsafe redirects                   | [`safe-http.ts`](lib/server/safe-http.ts), [`safe-http.test.ts`](tests/unit/safe-http.test.ts)                                                   |
 | CV bytes stay in the browser and hostile documents fail closed | [`profile-import.worker.ts`](lib/profile-import.worker.ts), [`profile-import.test.ts`](tests/unit/profile-import.test.ts)                        |
 | Publication requires complete, current reviews                 | [`durable-reviewers.mjs`](supabase/tests/durable-reviewers.mjs), [`publication-security.test.ts`](tests/unit/publication-security.test.ts)       |
+| Critical failures explain the safe recovery action             | [`application-dossier.spec.ts`](tests/e2e/application-dossier.spec.ts), [`opportunities-ui.spec.ts`](tests/e2e/opportunities-ui.spec.ts)         |
 
 CI runs formatting, linting, TypeScript, the unit suite, a production build, and a production-dependency audit. PostgreSQL isolation, concurrency, worker integration, and browser suites remain separate because they require service processes; their commands are documented below and in the self-hosting guide.
 

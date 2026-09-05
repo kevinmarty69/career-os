@@ -1817,6 +1817,23 @@ function DynamicDossierScreen({ applicationId }: { applicationId: string }) {
               )}
               {workflow.error === 'profile-missing' ? (
                 <Link href="/memory">Compléter la mémoire professionnelle</Link>
+              ) : workflow.error === 'auth' ? (
+                <Link href="/sign-in">Se connecter</Link>
+              ) : workflow.error === 'worker-unavailable' ? (
+                <Link href="/settings/models">Vérifier les workers</Link>
+              ) : workflow.error === 'conflict' ? (
+                <button onClick={() => location.reload()} type="button">
+                  Recharger la candidature
+                </button>
+              ) : workflow.error === 'rate-limited' ||
+                workflow.error === 'unavailable' ? (
+                <button
+                  disabled={workflow.starting}
+                  onClick={() => void workflow.start(application)}
+                  type="button"
+                >
+                  Réessayer
+                </button>
               ) : null}
             </section>
             {workflow.run?.research &&

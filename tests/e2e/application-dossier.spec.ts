@@ -385,6 +385,51 @@ test('starts and restores the persisted workflow for this application', async ({
   ).toHaveCount(0);
 });
 
+test('distinguishes a worker outage from a general workflow failure', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockApplication(page);
+  let workerFailure = true;
+  await page.route('**/api/runs', (route) =>
+    route.fulfill(
+      workerFailure
+        ? {
+            status: 503,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              code: 'WORKER_UNAVAILABLE',
+              service: 'company-researcher',
+            }),
+          }
+        : { status: 503, body: 'Run unavailable.' },
+    ),
+  );
+
+  await page.goto(`/applications/${applicationId}`);
+  await page.getByRole('button', { name: 'Start agent workflow' }).click();
+  await expect(page.locator('p[role="alert"]')).toHaveText(
+    'The research worker is unavailable. Check your instance.',
+  );
+  await expect(
+    page.getByRole('link', { name: 'Check worker availability' }),
+  ).toHaveAttribute('href', '/settings/models');
+  if (process.env.CAREER_OS_WORKFLOW_ERROR_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_WORKFLOW_ERROR_SCREENSHOT,
+      fullPage: true,
+    });
+
+  workerFailure = false;
+  await page.reload();
+  await page.getByRole('button', { name: 'Start agent workflow' }).click();
+  await expect(page.locator('p[role="alert"]')).toHaveText(
+    'The workflow is temporarily unavailable.',
+  );
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+});
+
 test('refreshes an active workflow until its persisted status changes', async ({
   context,
   page,
