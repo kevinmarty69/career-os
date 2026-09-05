@@ -87,16 +87,18 @@ test('opens the documented command palette with the keyboard shortcut', async ({
 
 test('exposes current navigation and traps focus in the job import dialog', async ({
   page,
-}) => {
+}, testInfo) => {
   await mockPersistedWorkspace(page);
   await page.goto('/applications');
+  const navigationName =
+    testInfo.project.name === 'mobile'
+      ? 'Navigation mobile'
+      : 'Navigation principale';
   await expect(
-    page
-      .getByRole('navigation', { name: 'Navigation principale' })
-      .getByRole('link', {
-        name: 'Candidatures',
-        exact: true,
-      }),
+    page.getByRole('navigation', { name: navigationName }).getByRole('link', {
+      name: 'Candidatures',
+      exact: true,
+    }),
   ).toHaveAttribute('aria-current', 'page');
 
   const trigger = page.getByRole('button', { name: 'Coller une offre' });

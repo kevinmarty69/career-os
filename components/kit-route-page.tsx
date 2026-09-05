@@ -245,6 +245,7 @@ export function AppShell({
         {path === '/' ? (
           <header className="co-home-topbar">
             <button
+              aria-label="Chercher une preuve, une entreprise, une affirmation…"
               className="co-home-search"
               onClick={() => setPalette(true)}
               type="button"

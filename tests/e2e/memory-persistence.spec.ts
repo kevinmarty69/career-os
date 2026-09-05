@@ -10,21 +10,21 @@ test('persists a reviewed source, then reopens and corrects its provenance', asy
 
   await page.goto('/sign-in');
   await page
-    .getByRole('button', { name: 'Create Account', exact: true })
+    .getByRole('button', { name: 'Créer un compte', exact: true })
     .click();
-  await page.getByLabel('Name').fill('Memory Tester');
+  await page.getByLabel('Nom').fill('Memory Tester');
   await page
     .getByLabel('Email')
     .fill(`memory-${crypto.randomUUID()}@example.test`);
-  await page.getByLabel('Password').fill('safe-local-password');
+  await page.getByLabel('Mot de passe').fill('safe-local-password');
   await page
     .locator('form')
-    .getByRole('button', { name: 'Create Account' })
+    .getByRole('button', { name: 'Créer un compte' })
     .click();
   await expect(
-    page.getByRole('heading', { name: 'Create your workspace' }),
+    page.getByRole('heading', { name: 'Créez votre espace' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Create Workspace' }).click();
+  await page.getByRole('button', { name: 'Créer l’espace' }).click();
 
   await page.goto('/memory/import');
   await page.locator('input[type="file"]').setInputFiles({

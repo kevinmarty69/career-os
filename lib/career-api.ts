@@ -1,4 +1,3 @@
-import type { ApplicationDossier } from './workspace-state';
 import { persistedPublicationOperation } from './run-operation';
 import type { SearchProfileFields } from './search-profile';
 import type { OpportunityDecisionInput } from './opportunity-decision';
@@ -216,35 +215,6 @@ export function deleteSearchProfile(
 
 export function readRun(runId: string, signal: AbortSignal) {
   return fetch(`/api/runs/${runId}`, { cache: 'no-store', signal });
-}
-
-export function saveApplication(dossier: ApplicationDossier) {
-  const payload = {
-    company: dossier.opportunity.company,
-    role: dossier.opportunity.role,
-    description: dossier.opportunity.description,
-    ...(dossier.opportunity.url ? { url: dossier.opportunity.url } : {}),
-    companySources: dossier.opportunity.companySources ?? [],
-    accent: dossier.opportunity.accent,
-    stage: 'draft' as const,
-  };
-  return fetch(
-    dossier.applicationId
-      ? `/api/applications/${dossier.applicationId}`
-      : '/api/applications',
-    {
-      method: dossier.applicationId ? 'PATCH' : 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(!dossier.applicationId ? { 'idempotency-key': dossier.id } : {}),
-      },
-      body: JSON.stringify(
-        dossier.applicationId
-          ? { ...payload, expectedRevision: dossier.applicationRevision }
-          : payload,
-      ),
-    },
-  );
 }
 
 export function createRun(body: string, idempotencyKey: string) {
