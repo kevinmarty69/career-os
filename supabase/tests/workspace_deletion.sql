@@ -211,6 +211,11 @@ do $$ begin
 end $$;
 
 select set_config('request.jwt.claim.sub', 'f1000000-0000-4000-8000-000000000001', true);
+select app.record_human_audit_event(
+  'f2000000-0000-4000-8000-000000000001',
+  'workspace.ready_for_deletion', 'workspace',
+  'f2000000-0000-4000-8000-000000000001', '{}'
+);
 do $$ begin
   begin
     perform app.delete_workspace(
@@ -246,6 +251,7 @@ do $$ begin
     or exists(select 1 from app.opportunity_decisions where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.opportunity_decision_events where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.semantic_analyses where tenant_id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from app.audit_events where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from auth.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then

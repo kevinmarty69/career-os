@@ -125,6 +125,13 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
     assert.equal(json.contentType, 'application/json');
     assert.equal(new TextDecoder().decode(json.body), '{"ok":true}');
 
+    const hostname = await requestPinned(
+      new URL(`http://jobs.example.test:${address.port}/json`),
+      target,
+      Date.now() + 2_000,
+    );
+    assert.equal(new TextDecoder().decode(hostname.body), '{"ok":true}');
+
     const image = await requestPinned(
       new URL(`http://127.0.0.1:${address.port}/image`),
       target,

@@ -181,7 +181,8 @@ async function safeFetch(
     )
       throw new SafeHttpError('BLOCKED_DESTINATION');
 
-    const response = await requestPinned(current, addresses[0], deadline, kind);
+    const target = addresses.find(({ family }) => family === 4) ?? addresses[0];
+    const response = await requestPinned(current, target, deadline, kind);
     if (response.status >= 300 && response.status < 400) {
       current = resolveRedirect(current, response.location, redirects);
       continue;
@@ -239,9 +240,14 @@ export async function requestPinned(
   );
   const lookup: NonNullable<RequestOptions['lookup']> = (
     _hostname,
-    _options,
+    options,
     callback,
-  ) => callback(null, target.address, target.family);
+  ) =>
+    callback(
+      null,
+      options.all ? [target] : target.address,
+      options.all ? undefined : target.family,
+    );
   try {
     return await new Promise<{
       status: number;
