@@ -219,7 +219,7 @@ Restart the supervised Next.js process after the build, then verify worker avail
 - treat imported documents, job pages and model output as untrusted data;
 - use this permanent worker pool for a self-hosted instance, not as the isolation boundary of a public multi-tenant SaaS.
 
-The open-source release does not provide managed backups, email delivery, billing, remote paid-model routing or cloud sandbox isolation. Its synthetic demo remains available without infrastructure through **Explore with sample data**.
+The open-source release does not provide managed backups, email delivery, billing, remote paid-model routing or cloud sandbox isolation. Its read-only synthetic demo remains available without infrastructure at `/demo`.
 
 ## Security notes
 

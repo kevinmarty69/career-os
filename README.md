@@ -18,7 +18,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open [localhost:3000](http://localhost:3000), choose **Explore with sample data**, edit the sample job brief, then generate the application. The demo exercises the evidence, drafting, review, and provenance UI; persistence and private sharing are intentionally disabled until the server is configured.
+Open [localhost:3000/demo](http://localhost:3000/demo). The public journey explains how sourced career evidence becomes a tailored application, without authentication, state-changing requests, persistence, or publication.
 
 ![Career OS evidence-backed application workspace](docs/career-os-workspace.jpg)
 

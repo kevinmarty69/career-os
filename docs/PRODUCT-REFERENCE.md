@@ -730,7 +730,7 @@ Critères d'acceptation :
 - [ ] Mesure des coûts par workflow et limites de sécurité.
 - [ ] Gestion des erreurs compréhensible par un utilisateur non technique.
 - [ ] Observabilité sans capture du contenu sensible par défaut.
-- [ ] Démonstration publique avec données entièrement fictives.
+- [x] Démonstration publique avec données entièrement fictives.
 - [ ] Documentation produit, sécurité et auto-hébergement alignée.
 
 ## 10. Priorités du MVP
