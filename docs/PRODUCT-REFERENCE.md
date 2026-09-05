@@ -450,7 +450,7 @@ L'utilisateur peut :
 - supprimer son espace ;
 - interrompre un workflow ;
 - révoquer toutes ses publications ;
-- choisir un fournisseur de modèle compatible ;
+- dans une instance auto-hébergée, choisir et exploiter son propre modèle compatible ;
 - utiliser une instance auto-hébergée.
 
 ## 8. Modèle open source et cloud
@@ -468,9 +468,9 @@ L'édition open source comprend le cœur fonctionnel :
 - pages privées ;
 - suivi local ;
 - export et suppression ;
-- modèles locaux ou clés utilisateur.
+- contrat de modèle compatible, local ou configuré par l'opérateur.
 
-L'opérateur fournit l'infrastructure, les modèles, les accès aux sources et la supervision.
+L'opérateur fournit l'infrastructure, les modèles, les accès aux sources et la supervision. Career OS ne fournit dans cette édition ni compte fournisseur, ni crédits d'inférence, ni connexion à une API payante opérée par Career OS. L'opérateur reste libre de brancher un modèle local, une passerelle ou le fournisseur de son choix derrière le contrat documenté.
 
 ### 8.2 Service cloud managé
 
@@ -479,14 +479,33 @@ Le SaaS fournit la même expérience sans exploitation technique :
 - hébergement et mises à jour ;
 - exécution isolée des agents ;
 - connecteurs et collecte planifiée ;
-- modèles préconfigurés ;
-- quotas et rate limits ;
+- modèle managé utilisable sans clé ni compte fournisseur côté utilisateur ;
+- quotas d'inférence inclus dans l'offre et rate limits appliqués côté serveur ;
 - stockage, sauvegardes et supervision ;
 - email et notifications ;
 - publication publique sécurisée ;
 - support et récupération opérationnelle.
 
 Le paiement porte sur l'hébergement, l'exécution et le service, pas sur une dégradation artificielle du produit open source.
+
+Le choix du fournisseur et les clés associées restent une responsabilité interne du service. L'utilisateur cloud choisit un plan et une limite d'usage compréhensible ; il n'a pas à comprendre la facturation des API de modèles pour terminer son parcours.
+
+### 8.3 MCP du service cloud
+
+Le service cloud expose un serveur MCP distant comme interface complémentaire à l'application. Un utilisateur peut ainsi consulter sa mémoire professionnelle et piloter ses candidatures depuis un client compatible comme ChatGPT, Codex ou Claude, sans déplacer la source de vérité hors de Career OS.
+
+La première surface MCP couvre :
+
+- la recherche dans la mémoire et les preuves ;
+- la lecture des candidatures, runs, livrables et objections ;
+- la création d'une candidature depuis une offre ;
+- le lancement et le suivi d'un workflow ;
+- la résolution explicite d'une objection ;
+- la publication, la révocation et l'inspection d'une page privée.
+
+Le serveur utilise Streamable HTTP et OAuth. Chaque appel est rattaché à un utilisateur et un espace, limité par des scopes, validé côté serveur, journalisé et soumis aux mêmes quotas que l'application. Les outils de lecture et d'écriture sont distincts ; les actions irréversibles ou externes conservent une confirmation humaine.
+
+Le MCP ne remplace pas le modèle managé de Career OS. Le client ChatGPT ou Claude paie et exécute la conversation qui appelle les outils ; tout workflow agentique lancé dans Career OS consomme ensuite le quota cloud Career OS correspondant.
 
 ## 9. MVP avancé
 
@@ -763,6 +782,7 @@ Critères d'acceptation :
 
 ### Après le MVP
 
+- MCP distant authentifié pour ChatGPT, Codex et Claude ;
 - extension de navigateur ;
 - intégrations natives avec davantage de job boards et ATS ;
 - synchronisation LinkedIn automatisée si une voie officielle et conforme existe ;

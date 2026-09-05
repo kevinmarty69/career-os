@@ -1,12 +1,14 @@
 # ADR-001: Career OS owns orchestration
 
-Status: accepted, 2026-09-02
+Status: accepted, amended 2026-09-05
 
 ## Decision
 
 Career OS owns the durable workflow, artifact ledger, budgets, provenance, tool policies and human gates. The first vertical uses deterministic TypeScript workers behind typed inputs and outputs. A model API becomes the first execution runtime when generation is connected. Hermes remains an experimental, whole-process-sandboxed self-host runtime, never the shared cloud control plane. ADR-002 governs dependency selection after the formal stack benchmark.
 
-This is one product: self-hosters provide model keys or local endpoints; the managed cloud supplies isolated execution and enforces server-side quotas. Career Memory in PostgreSQL remains authoritative in both modes.
+This is one product with two operating contracts. Self-hosters connect and operate their own compatible model endpoint; the open-source distribution supplies no Career OS provider account, paid inference or managed provider connection. The managed cloud supplies the model, isolated execution and server-side quotas without asking users for API keys. Career Memory in PostgreSQL remains authoritative in both modes.
+
+The managed cloud may expose that same control plane through a remote OAuth-protected MCP server for ChatGPT, Codex and Claude. MCP is an interface, not a model-billing bypass: a Career OS workflow invoked through MCP still consumes the tenant's managed Career OS quota.
 
 ## Options considered
 
