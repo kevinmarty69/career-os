@@ -58,18 +58,19 @@ The repository currently proves the self-hosted implementation. A managed servic
 
 ## Proof map
 
-| Claim                                                          | Executable evidence                                                                                                                              |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Generated statements remain source-bound                       | [`schemas.ts`](lib/schemas.ts), [`reviewer.test.ts`](tests/unit/reviewer.test.ts)                                                                |
-| Tenant data cannot cross organization boundaries               | [`tenant_isolation.sql`](supabase/tests/tenant_isolation.sql), [`auth_security.sql`](supabase/tests/auth_security.sql)                           |
-| Retries do not duplicate accepted work or spend                | [`durable-step-concurrency.mjs`](supabase/tests/durable-step-concurrency.mjs), [`budget_concurrency.mjs`](supabase/tests/budget_concurrency.mjs) |
-| Workflow usage stays inside its token and cost budgets         | [`budget_concurrency.mjs`](supabase/tests/budget_concurrency.mjs), [`agent-runs.test.ts`](tests/integration/agent-runs.test.ts)                  |
-| Scheduled discovery does not double-claim due profiles         | [`scheduled-discovery-concurrency.mjs`](supabase/tests/scheduled-discovery-concurrency.mjs)                                                      |
-| URL import resists SSRF and unsafe redirects                   | [`safe-http.ts`](lib/server/safe-http.ts), [`safe-http.test.ts`](tests/unit/safe-http.test.ts)                                                   |
-| CV bytes stay in the browser and hostile documents fail closed | [`profile-import.worker.ts`](lib/profile-import.worker.ts), [`profile-import.test.ts`](tests/unit/profile-import.test.ts)                        |
-| Publication requires complete, current reviews                 | [`durable-reviewers.mjs`](supabase/tests/durable-reviewers.mjs), [`publication-security.test.ts`](tests/unit/publication-security.test.ts)       |
-| Critical failures explain the safe recovery action             | [`application-dossier.spec.ts`](tests/e2e/application-dossier.spec.ts), [`opportunities-ui.spec.ts`](tests/e2e/opportunities-ui.spec.ts)         |
-| Security boundaries fail closed as one executable gate         | [`SECURITY.md`](SECURITY.md), [`package.json`](package.json)                                                                                     |
+| Claim                                                           | Executable evidence                                                                                                                              |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Generated statements remain source-bound                        | [`schemas.ts`](lib/schemas.ts), [`reviewer.test.ts`](tests/unit/reviewer.test.ts)                                                                |
+| Tenant data cannot cross organization boundaries                | [`tenant_isolation.sql`](supabase/tests/tenant_isolation.sql), [`auth_security.sql`](supabase/tests/auth_security.sql)                           |
+| Retries do not duplicate accepted work or spend                 | [`durable-step-concurrency.mjs`](supabase/tests/durable-step-concurrency.mjs), [`budget_concurrency.mjs`](supabase/tests/budget_concurrency.mjs) |
+| Workflow usage stays inside its token and cost budgets          | [`budget_concurrency.mjs`](supabase/tests/budget_concurrency.mjs), [`agent-runs.test.ts`](tests/integration/agent-runs.test.ts)                  |
+| Scheduled discovery does not double-claim due profiles          | [`scheduled-discovery-concurrency.mjs`](supabase/tests/scheduled-discovery-concurrency.mjs)                                                      |
+| URL import resists SSRF and unsafe redirects                    | [`safe-http.ts`](lib/server/safe-http.ts), [`safe-http.test.ts`](tests/unit/safe-http.test.ts)                                                   |
+| CV bytes stay in the browser and hostile documents fail closed  | [`profile-import.worker.ts`](lib/profile-import.worker.ts), [`profile-import.test.ts`](tests/unit/profile-import.test.ts)                        |
+| Publication requires complete, current reviews                  | [`durable-reviewers.mjs`](supabase/tests/durable-reviewers.mjs), [`publication-security.test.ts`](tests/unit/publication-security.test.ts)       |
+| Critical failures explain the safe recovery action              | [`application-dossier.spec.ts`](tests/e2e/application-dossier.spec.ts), [`opportunities-ui.spec.ts`](tests/e2e/opportunities-ui.spec.ts)         |
+| Security boundaries fail closed as one executable gate          | [`SECURITY.md`](SECURITY.md), [`package.json`](package.json)                                                                                     |
+| The active front has keyboard, contrast and semantic-tree tests | [`accessibility.spec.ts`](tests/e2e/accessibility.spec.ts), [`ui-contrast.test.ts`](tests/unit/ui-contrast.test.ts)                              |
 
 CI runs formatting, linting, TypeScript, the unit suite, a production build, and a production-dependency audit. PostgreSQL isolation, concurrency, worker integration, and browser suites remain separate because they require service processes; their commands are documented below and in the self-hosting guide.
 
@@ -93,6 +94,7 @@ Database and browser verification:
 pnpm db:up
 pnpm db:test
 pnpm test:security
+pnpm test:accessibility
 pnpm test:integration:worker
 pnpm test:e2e
 pnpm db:down

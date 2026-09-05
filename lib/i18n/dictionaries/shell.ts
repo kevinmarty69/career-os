@@ -1,6 +1,7 @@
 import type { MessageDictionary } from '../messages';
 
 export const shellMessages = {
+  'Aller au contenu': 'Skip to main content',
   Accueil: 'Home',
   'À trancher': 'Needs review',
   Candidatures: 'Applications',

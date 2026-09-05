@@ -724,7 +724,7 @@ Critères d'acceptation :
 ### Lot 11 - Qualité de lancement
 
 - [x] Tests du parcours critique sur desktop et mobile.
-- [ ] Tests d'accessibilité clavier, contraste et lecteurs d'écran.
+- [x] Tests d'accessibilité clavier, contraste et lecteurs d'écran.
 - [ ] Tests de charge sur collecte, matching et exécution des agents.
 - [x] Audit des frontières SSRF, uploads, sessions, RLS et liens privés.
 - [x] Mesure des coûts par workflow et limites de sécurité.
