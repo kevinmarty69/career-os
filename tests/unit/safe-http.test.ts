@@ -99,6 +99,7 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
       response.end('not actually compressed');
       return;
     }
+    if (request.url === '/stall') return;
     response.writeHead(200, { 'content-type': 'text/html' });
     response.end(Buffer.alloc(MAX_RESPONSE_BYTES + 1, 97));
   });
@@ -142,6 +143,16 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
       ),
       (error: unknown) =>
         error instanceof SafeHttpError && error.code === 'UNSUPPORTED_CONTENT',
+    );
+
+    await assert.rejects(
+      requestPinned(
+        new URL(`http://127.0.0.1:${address.port}/stall`),
+        target,
+        Date.now() + 30,
+      ),
+      (error: unknown) =>
+        error instanceof SafeHttpError && error.code === 'TIMEOUT',
     );
 
     await assert.rejects(
