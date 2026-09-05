@@ -157,6 +157,7 @@ Choose a 6, 12, 24 or 72-hour interval. The discovery worker enumerates the publ
 pnpm check
 pnpm build
 pnpm db:test
+pnpm test:security
 pnpm test:integration:http
 pnpm test:integration:worker
 pnpm exec playwright install chromium
@@ -164,6 +165,8 @@ pnpm test:e2e
 ```
 
 `pnpm db:test` exercises migrations, RLS, capability security, tenant isolation, budgets, durable concurrency, reviews, and worker heartbeats. Run it against the disposable Compose database, never a production database.
+
+`pnpm test:security` is the focused launch gate for hostile CV uploads, SSRF, tenant RLS, sessions and revocable private links. It runs against the disposable Compose database and a temporary production server.
 
 `pnpm test:integration:http` starts the production build on port 3019 and runs the application, workflow and private-publication HTTP contracts against it.
 

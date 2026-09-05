@@ -726,7 +726,7 @@ Critères d'acceptation :
 - [x] Tests du parcours critique sur desktop et mobile.
 - [ ] Tests d'accessibilité clavier, contraste et lecteurs d'écran.
 - [ ] Tests de charge sur collecte, matching et exécution des agents.
-- [ ] Audit des frontières SSRF, uploads, sessions, RLS et liens privés.
+- [x] Audit des frontières SSRF, uploads, sessions, RLS et liens privés.
 - [x] Mesure des coûts par workflow et limites de sécurité.
 - [x] Gestion des erreurs compréhensible par un utilisateur non technique.
 - [x] Observabilité sans capture du contenu sensible par défaut.

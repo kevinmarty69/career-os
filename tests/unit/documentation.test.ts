@@ -7,6 +7,9 @@ const files = ['README.md', 'docs/SELF_HOSTING.md', 'SECURITY.md'] as const;
 const docs = Object.fromEntries(
   files.map((file) => [file, readFileSync(file, 'utf8')]),
 ) as Record<(typeof files)[number], string>;
+const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as {
+  scripts: Record<string, string>;
+};
 
 test('launch documentation matches the self-hosted product boundary', () => {
   for (const file of files) {
@@ -35,13 +38,10 @@ test('launch documentation matches the self-hosted product boundary', () => {
     ],
     ['CAREER_OS_DISCOVERY_DATABASE_URL', 'worker:job-discovery'],
   ] as const;
-  const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts as
-    Record<string, string> | undefined;
-
   for (const [variable, script] of workers) {
     assert.match(env, new RegExp(`^${variable}=`, 'm'));
     assert.ok(docs['docs/SELF_HOSTING.md'].includes('`' + variable + '`'));
-    assert.ok(scripts?.[script], `package.json: missing ${script}`);
+    assert.ok(packageJson.scripts[script], `package.json: missing ${script}`);
   }
 
   assert.match(env, /^CAREER_OS_DEPLOYMENT_MODE=self-hosted$/m);
@@ -54,6 +54,20 @@ test('launch documentation matches the self-hosted product boundary', () => {
     SECURITY,
     /Planned managed-cloud boundary, not yet implemented/i,
   );
+});
+
+test('the documented security gate covers every launch boundary', () => {
+  const command = packageJson.scripts['test:security'];
+  for (const evidence of [
+    'safe-http.test.ts',
+    'profile-import.test.ts',
+    'publication-security.test.ts',
+    'tenant_isolation.sql',
+    'auth_security.sql',
+    'capability_security.sql',
+    'test:integration:http',
+  ])
+    assert.match(command, new RegExp(evidence.replace('.', '\\.')));
 });
 
 const README = docs['README.md'];

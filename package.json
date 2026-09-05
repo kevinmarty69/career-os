@@ -18,6 +18,7 @@
     "test:integration:export": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os tsx --test --test-concurrency=1 tests/integration/workspace-export.test.ts",
     "test:integration:discovery-concurrency": "DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/scheduled-discovery-concurrency.mjs",
     "test:integration:http": "node scripts/run-http-integration-tests.mjs",
+    "test:security": "tsx --test tests/unit/safe-http.test.ts tests/unit/profile-import.test.ts tests/unit/publication-security.test.ts && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/tenant_isolation.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/auth_security.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/capability_security.sql && pnpm test:integration:http",
     "worker": "tsx scripts/run-agent-worker.ts",
     "worker:company-researcher": "tsx scripts/run-agent-worker.ts",
     "worker:evidence": "tsx scripts/run-evidence-worker.ts",
