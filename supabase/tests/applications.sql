@@ -86,6 +86,52 @@ set local role career_app;
 select 1 / (((select count(*) from app.applications) = 1)::integer)
   as application_tenant_isolation;
 
+insert into app.application_contacts (
+  id, tenant_id, application_id, rank, name, role, profile_url,
+  relationship, rationale, sources, confidence, connection_note,
+  accepted_message, actor_id
+) values
+  ('89000000-0000-0000-0000-000000000001', '29000000-0000-0000-0000-000000000001', '49000000-0000-0000-0000-000000000001', 1, 'Contact One', 'VP Engineering', 'https://company.example/contact-one', 'hiring_manager', 'Owns the hiring team', '[{"url":"https://company.example/team","title":"Team","collectedAt":"2026-09-05T08:00:00.000Z","trust":"authoritative","supports":["identity","current_role","hiring_scope"]}]'::jsonb, 'verified', 'Connection note', 'Accepted message', '19000000-0000-0000-0000-000000000001'),
+  ('89000000-0000-0000-0000-000000000002', '29000000-0000-0000-0000-000000000001', '49000000-0000-0000-0000-000000000001', 2, 'Contact Two', 'Staff Engineer', 'https://company.example/contact-two', 'team_leader', 'Leads the relevant team', '[{"url":"https://company.example/team","title":"Team","collectedAt":"2026-09-05T08:00:00.000Z","trust":"authoritative","supports":["identity","current_role"]}]'::jsonb, 'likely', 'Connection note', 'Accepted message', '19000000-0000-0000-0000-000000000001'),
+  ('89000000-0000-0000-0000-000000000003', '29000000-0000-0000-0000-000000000001', '49000000-0000-0000-0000-000000000001', 3, 'Contact Three', 'Recruiter', 'https://company.example/contact-three', 'internal_recruiter', 'Recruits for engineering', '[{"url":"https://company.example/team","title":"Team","collectedAt":"2026-09-05T08:00:00.000Z","trust":"authoritative","supports":["identity","current_role"]}]'::jsonb, 'likely', 'Connection note', 'Accepted message', '19000000-0000-0000-0000-000000000001');
+
+select 1 / (((select count(*) from app.application_contacts) = 3)::integer)
+  as application_contact_tenant_isolation;
+
+do $$ begin
+  begin
+    insert into app.application_contacts (
+      tenant_id, application_id, rank, name, role, profile_url,
+      relationship, rationale, sources, confidence, connection_note,
+      accepted_message, actor_id
+    ) values (
+      '29000000-0000-0000-0000-000000000001',
+      '49000000-0000-0000-0000-000000000001', 4, 'Fourth', 'Recruiter',
+      'https://company.example/fourth', 'internal_recruiter', 'Fourth contact',
+      '[{"url":"https://company.example/team","title":"Team","collectedAt":"2026-09-05T08:00:00.000Z","trust":"authoritative","supports":["identity"]}]'::jsonb,
+      'uncertain', 'Connection note', 'Accepted message',
+      '19000000-0000-0000-0000-000000000001'
+    );
+    raise exception 'fourth application contact was accepted';
+  exception when check_violation then null;
+  end;
+  begin
+    update app.application_contacts set name = 'Mutated identity',
+      revision = revision + 1
+    where id = '89000000-0000-0000-0000-000000000001';
+    raise exception 'application contact identity mutation succeeded';
+  exception when raise_exception then
+    if sqlerrm <> 'invalid application contact update' then raise; end if;
+  end;
+end $$;
+
+update app.application_contacts set status = 'contacted', revision = revision + 1
+where id = '89000000-0000-0000-0000-000000000001';
+select 1 / (((select status = 'contacted' and revision = 2
+  from app.application_contacts
+  where id = '89000000-0000-0000-0000-000000000001'))::integer)
+  as application_contact_tracking_updated;
+
 do $$
 declare changed integer;
 begin

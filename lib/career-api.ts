@@ -3,6 +3,10 @@ import type { SearchProfileFields } from './search-profile';
 import type { OpportunityDecisionInput } from './opportunity-decision';
 import type { ApplicationTimelineInput } from './application-timeline';
 import type { ApplicationTask, ApplicationTaskInput } from './application-task';
+import type {
+  ApplicationContactDraft,
+  UpdateApplicationContactInput,
+} from './application-contact';
 
 export function readProfile(signal: AbortSignal) {
   return fetch('/api/profile', { cache: 'no-store', signal });
@@ -81,6 +85,39 @@ export function setApplicationTaskCompleted(
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ completed, expectedRevision: task.revision }),
+  });
+}
+
+export function readApplicationContacts(
+  applicationId: string,
+  signal: AbortSignal,
+) {
+  return fetch(`/api/applications/${applicationId}/contacts`, {
+    cache: 'no-store',
+    signal,
+  });
+}
+
+export function createApplicationContact(
+  applicationId: string,
+  input: ApplicationContactDraft,
+) {
+  return fetch(`/api/applications/${applicationId}/contacts`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateApplicationContact(
+  applicationId: string,
+  contactId: string,
+  input: UpdateApplicationContactInput,
+) {
+  return fetch(`/api/applications/${applicationId}/contacts/${contactId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
   });
 }
 

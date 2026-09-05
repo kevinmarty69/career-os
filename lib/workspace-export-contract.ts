@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 11;
+export const workspaceExportVersion = 12;
 
 export const workspaceExportTables = [
   {
@@ -106,6 +106,33 @@ export const workspaceExportTables = [
       'title',
       'due_at',
       'completed_at',
+      'revision',
+      'actor_id',
+      'created_at',
+      'updated_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'application_contacts',
+    table: 'application_contacts',
+    columns: [
+      'id',
+      'tenant_id',
+      'application_id',
+      'rank',
+      'name',
+      'role',
+      'profile_url',
+      'relationship',
+      'rationale',
+      'sources',
+      'confidence',
+      'connection_note',
+      'accepted_message',
+      'follow_up_message',
+      'status',
+      'follow_up_at',
       'revision',
       'actor_id',
       'created_at',

@@ -293,6 +293,98 @@ async function main() {
   await expectStatus(tasks, 200, 'application task list');
   assert.equal(((await tasks.json()) as { tasks: unknown[] }).tasks.length, 1);
 
+  await expectStatus(
+    await anonymous.request(
+      `/api/applications/${application.applicationId}/contacts`,
+    ),
+    401,
+    'anonymous application contacts',
+  );
+  const contactSource = {
+    url: 'https://northstar.example/team',
+    title: 'Northstar leadership team',
+    collectedAt: '2026-09-05T08:00:00.000Z',
+    trust: 'authoritative',
+    supports: ['identity', 'current_role', 'hiring_scope'],
+  };
+  const contactInput = {
+    rank: 1,
+    name: 'Morgan Lee',
+    role: 'VP Engineering',
+    profileUrl: 'https://www.linkedin.com/in/morgan-lee',
+    relationship: 'hiring_manager',
+    rationale: 'Owns the team hiring for this role.',
+    sources: [contactSource],
+    confidence: 'verified',
+    connectionNote: 'Hello Morgan, I am applying to the product role.',
+    acceptedMessage: 'Thanks for connecting. Here is why I applied.',
+  };
+  const contactCreate = await owner.request(
+    `/api/applications/${application.applicationId}/contacts`,
+    'POST',
+    contactInput,
+  );
+  await expectStatus(contactCreate, 201, 'application contact create');
+  const contact = (await contactCreate.json()) as {
+    contactId: string;
+    revision: number;
+    status: string;
+  };
+  assert.equal(contact.revision, 1);
+  assert.equal(contact.status, 'suggested');
+  await expectStatus(
+    await owner.request(
+      `/api/applications/${application.applicationId}/contacts`,
+      'POST',
+      {
+        ...contactInput,
+        rank: 2,
+        name: 'Weak match',
+        profileUrl: 'https://www.linkedin.com/in/weak-match',
+        sources: [{ ...contactSource, trust: 'weak' }],
+        confidence: 'uncertain',
+      },
+    ),
+    400,
+    'weak hiring manager rejected',
+  );
+  await expectStatus(
+    await owner.request(
+      `/api/applications/${application.applicationId}/contacts`,
+      'POST',
+      { ...contactInput, name: 'Duplicate rank' },
+    ),
+    409,
+    'duplicate contact rank rejected',
+  );
+  const contactUpdate = await owner.request(
+    `/api/applications/${application.applicationId}/contacts/${contact.contactId}`,
+    'PATCH',
+    {
+      connectionNote: contactInput.connectionNote,
+      acceptedMessage: contactInput.acceptedMessage,
+      followUpMessage: 'Following up manually next week.',
+      status: 'follow_up',
+      followUpAt: '2026-09-12T08:00:00.000Z',
+      expectedRevision: 1,
+    },
+  );
+  await expectStatus(contactUpdate, 200, 'application contact update');
+  const updatedContact = (await contactUpdate.json()) as {
+    revision: number;
+    status: string;
+  };
+  assert.equal(updatedContact.revision, 2);
+  assert.equal(updatedContact.status, 'follow_up');
+  const contacts = await owner.request(
+    `/api/applications/${application.applicationId}/contacts`,
+  );
+  await expectStatus(contacts, 200, 'application contact list');
+  assert.equal(
+    ((await contacts.json()) as { contacts: unknown[] }).contacts.length,
+    1,
+  );
+
   const saved = await owner.request('/api/profile', 'PUT', {
     profile: livingProfile,
     expectedRevision: 0,
@@ -419,6 +511,13 @@ async function main() {
     await other.request(`/api/applications/${application.applicationId}/tasks`),
     404,
     'cross-tenant application tasks',
+  );
+  await expectStatus(
+    await other.request(
+      `/api/applications/${application.applicationId}/contacts`,
+    ),
+    404,
+    'cross-tenant application contacts',
   );
 
   await expectStatus(

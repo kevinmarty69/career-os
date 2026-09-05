@@ -70,6 +70,7 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const applicationId = randomUUID();
   const applicationTimelineEventId = randomUUID();
   const applicationTaskId = randomUUID();
+  const applicationContactId = randomUUID();
   const otherApplicationId = randomUUID();
   const discoveredJobId = randomUUID();
   const sourceRecordId = randomUUID();
@@ -180,6 +181,27 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         ${applicationTaskId}, ${tenantId}, ${applicationId}, 'follow_up',
         'Visible follow-up', '2026-01-04 10:00:00+00'::timestamptz,
         ${ownerId}
+      )`;
+      await transaction`insert into app.application_contacts (
+        id, tenant_id, application_id, rank, name, role, profile_url,
+        relationship, rationale, sources, confidence, connection_note,
+        accepted_message, actor_id
+      ) values (
+        ${applicationContactId}, ${tenantId}, ${applicationId}, 1,
+        'Visible contact', 'VP Engineering',
+        'https://company.example/visible-contact', 'hiring_manager',
+        'Owns the hiring team',
+        ${transaction.json([
+          {
+            url: 'https://company.example/team',
+            title: 'Company team',
+            collectedAt: '2026-01-03T10:00:00.000Z',
+            trust: 'authoritative',
+            supports: ['identity', 'current_role', 'hiring_scope'],
+          },
+        ])},
+        'verified', 'A visible connection note',
+        'A visible accepted message', ${ownerId}
       )`;
       await transaction`insert into app.job_source_records (
         id, tenant_id, discovered_job_id, requested_url, final_url, fetched_url, fetched_at,
@@ -357,6 +379,16 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
           record.data.id === applicationId &&
           record.data.deleted_at &&
           record.data.discovered_job_id === discoveredJobId,
+      ),
+      true,
+    );
+    assert.equal(
+      records.some(
+        (record) =>
+          record.type === 'application_contacts' &&
+          record.data.id === applicationContactId &&
+          record.data.confidence === 'verified' &&
+          record.data.status === 'suggested',
       ),
       true,
     );

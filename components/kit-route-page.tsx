@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ApplicationEvidenceCheckpoint } from '@/components/applications/application-evidence-checkpoint';
+import { ApplicationContactsPanel } from '@/components/applications/application-contacts-panel';
 import { ApplicationKitPanel } from '@/components/applications/application-kit-panel';
 import { ApplicationPageDraftCheckpoint } from '@/components/applications/application-page-draft-checkpoint';
 import { ApplicationPublicationCheckpoint } from '@/components/applications/application-publication-checkpoint';
@@ -1174,6 +1175,7 @@ function ApplicationTimelineScreen({
                 n’est envoyé automatiquement.
               </span>
             </section>
+            <ApplicationContactsPanel applicationId={applicationId} />
             <section className="co-panel co-timeline-form">
               <h2>Ajouter un événement</h2>
               <form onSubmit={addEvent}>
