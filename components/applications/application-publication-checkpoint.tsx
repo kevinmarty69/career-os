@@ -3,6 +3,7 @@
 import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { CreatedPublication } from '@/lib/schemas';
+import type { PublicationActionError } from './use-application-workflow';
 
 export function ApplicationPublicationCheckpoint({
   error,
@@ -14,7 +15,7 @@ export function ApplicationPublicationCheckpoint({
   publication,
   revoked,
 }: {
-  error: boolean;
+  error?: PublicationActionError;
   onCopy: () => void;
   onNewVersion: () => void;
   onPublish: () => void;
@@ -138,11 +139,24 @@ export function ApplicationPublicationCheckpoint({
           </footer>
         </>
       )}
-      {error ? (
-        <p role="alert">
-          L’action n’a pas abouti. Vérifiez votre session puis réessayez.
-        </p>
-      ) : null}
+      {error ? <p role="alert">{publicationErrorMessage(error)}</p> : null}
     </section>,
   );
+}
+
+function publicationErrorMessage(error: PublicationActionError) {
+  switch (error) {
+    case 'auth':
+      return 'Votre session a expiré. Reconnectez-vous, puis réessayez.';
+    case 'review-rejected':
+      return 'La page ne passe plus les contrôles de publication. Rouvrez la revue et résolvez le point restant.';
+    case 'conflict':
+      return 'La candidature a changé pendant la publication. Rechargez-la avant de réessayer.';
+    case 'rate-limited':
+      return 'Trop de tentatives de publication. Attendez une minute avant de réessayer.';
+    case 'revocation-rejected':
+      return 'Ce lien ne peut pas être révoqué depuis cet espace. Rechargez la candidature puis réessayez.';
+    case 'unavailable':
+      return 'Le service de publication est momentanément indisponible. La page validée n’a pas été publiée ; réessayez plus tard.';
+  }
 }

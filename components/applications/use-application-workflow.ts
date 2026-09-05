@@ -33,6 +33,14 @@ type WorkflowError =
   | 'worker-unavailable'
   | 'unavailable';
 
+export type PublicationActionError =
+  | 'auth'
+  | 'review-rejected'
+  | 'conflict'
+  | 'rate-limited'
+  | 'revocation-rejected'
+  | 'unavailable';
+
 export function useApplicationWorkflow(applicationId: string) {
   const [result, setResult] = useState<{
     applicationId: string;
@@ -49,7 +57,8 @@ export function useApplicationWorkflow(applicationId: string) {
   const [publicationPending, setPublicationPending] = useState<
     'publish' | 'revoke'
   >();
-  const [publicationError, setPublicationError] = useState(false);
+  const [publicationError, setPublicationError] =
+    useState<PublicationActionError>();
   const [publicationRevoked, setPublicationRevoked] = useState(false);
   const current = result?.applicationId === applicationId ? result : undefined;
 
@@ -391,11 +400,11 @@ export function useApplicationWorkflow(applicationId: string) {
   async function publish() {
     if (!current?.run?.publicationEligible || publicationPending) return;
     setPublicationPending('publish');
-    setPublicationError(false);
+    setPublicationError(undefined);
     try {
       const response = await createPublication(current.run.runId);
       if (!response.ok) {
-        setPublicationError(true);
+        setPublicationError(publicationErrorFromStatus(response.status));
         return;
       }
       const created = createdPublicationSchema.parse(await response.json());
@@ -410,7 +419,7 @@ export function useApplicationWorkflow(applicationId: string) {
         },
       });
     } catch {
-      setPublicationError(true);
+      setPublicationError('unavailable');
     } finally {
       setPublicationPending(undefined);
     }
@@ -426,17 +435,21 @@ export function useApplicationWorkflow(applicationId: string) {
   async function revoke() {
     if (!publication || publicationPending) return;
     setPublicationPending('revoke');
-    setPublicationError(false);
+    setPublicationError(undefined);
     try {
       const response = await revokePublication(publication.publicationId);
       if (!response.ok) {
-        setPublicationError(true);
+        setPublicationError(
+          response.status === 403
+            ? 'revocation-rejected'
+            : publicationErrorFromStatus(response.status),
+        );
         return;
       }
       setPublication(undefined);
       setPublicationRevoked(true);
     } catch {
-      setPublicationError(true);
+      setPublicationError('unavailable');
     } finally {
       setPublicationPending(undefined);
     }
@@ -464,4 +477,12 @@ export function useApplicationWorkflow(applicationId: string) {
     starting,
     revoke,
   };
+}
+
+function publicationErrorFromStatus(status: number): PublicationActionError {
+  if (status === 401) return 'auth';
+  if (status === 400) return 'review-rejected';
+  if (status === 409) return 'conflict';
+  if (status === 429) return 'rate-limited';
+  return 'unavailable';
 }

@@ -13,7 +13,7 @@ import {
   workerServices,
 } from '../../lib/run-contract';
 import { syntheticProfile } from '../../lib/fixture';
-import { assertOpenSourceDeploymentMode } from '../../next.config';
+import nextConfig, { assertOpenSourceDeploymentMode } from '../../next.config';
 
 const applicationId = randomUUID();
 
@@ -22,6 +22,26 @@ test('the public repository rejects managed deployment mode', () => {
   assert.throws(
     () => assertOpenSourceDeploymentMode('managed'),
     /separate cloud control plane/,
+  );
+});
+
+test('the app and private pages receive defensive browser headers', async () => {
+  const rules = (await nextConfig.headers?.()) ?? [];
+  const global = rules.find((rule) => rule.source === '/:path*');
+  const privatePage = rules.find((rule) => rule.source === '/p/:path*');
+  const values = Object.fromEntries(
+    (global?.headers ?? []).map(({ key, value }) => [key, value]),
+  );
+
+  assert.equal(values['X-Content-Type-Options'], 'nosniff');
+  assert.equal(values['X-Frame-Options'], 'DENY');
+  assert.match(
+    values['Content-Security-Policy'] ?? '',
+    /frame-ancestors 'none'/,
+  );
+  assert.equal(
+    privatePage?.headers.find(({ key }) => key === 'Referrer-Policy')?.value,
+    'no-referrer',
   );
 });
 

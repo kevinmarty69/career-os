@@ -166,8 +166,18 @@ export const dossierMessages = {
     'No link is created without this action.',
   'Création du lien…': 'Creating link…',
   'Valider et créer le lien privé': 'Approve and create private link',
-  'L’action n’a pas abouti. Vérifiez votre session puis réessayez.':
-    'The action failed. Check your session and try again.',
+  'Votre session a expiré. Reconnectez-vous, puis réessayez.':
+    'Your session has expired. Sign in again, then retry.',
+  'La page ne passe plus les contrôles de publication. Rouvrez la revue et résolvez le point restant.':
+    'The page no longer passes the publication checks. Reopen the review and resolve the remaining issue.',
+  'La candidature a changé pendant la publication. Rechargez-la avant de réessayer.':
+    'The application changed while publishing. Reload it before retrying.',
+  'Trop de tentatives de publication. Attendez une minute avant de réessayer.':
+    'Too many publication attempts. Wait one minute before retrying.',
+  'Ce lien ne peut pas être révoqué depuis cet espace. Rechargez la candidature puis réessayez.':
+    'This link cannot be revoked from this workspace. Reload the application, then retry.',
+  'Le service de publication est momentanément indisponible. La page validée n’a pas été publiée ; réessayez plus tard.':
+    'The publication service is temporarily unavailable. The approved page was not published; retry later.',
   'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
     'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
   'Compléter la mémoire professionnelle': 'Complete Career Memory',

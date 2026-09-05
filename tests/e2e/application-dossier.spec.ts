@@ -726,6 +726,41 @@ test('publishes the approved snapshot and can revoke its private link', async ({
   expect(revoked).toBe(true);
 });
 
+for (const [status, message] of [
+  [401, 'Your session has expired. Sign in again, then retry.'],
+  [
+    400,
+    'The page no longer passes the publication checks. Reopen the review and resolve the remaining issue.',
+  ],
+  [429, 'Too many publication attempts. Wait one minute before retrying.'],
+  [
+    503,
+    'The publication service is temporarily unavailable. The approved page was not published; retry later.',
+  ],
+] as const) {
+  test(`explains publication failure ${status} without technical jargon`, async ({
+    context,
+    page,
+  }) => {
+    await context.clearCookies();
+    await mockApplication(page, publishableRun());
+    await page.route('**/api/publications', (route) =>
+      route.fulfill({ status, body: 'Rejected' }),
+    );
+
+    await page.goto(`/applications/${applicationId}`);
+    await page
+      .getByRole('button', { name: 'Approve and create private link' })
+      .click();
+    await expect(page.locator('p[role="alert"]')).toHaveText(message);
+    if (status === 400 && process.env.CAREER_OS_PUBLICATION_ERROR_SCREENSHOT)
+      await page.screenshot({
+        path: process.env.CAREER_OS_PUBLICATION_ERROR_SCREENSHOT,
+        fullPage: true,
+      });
+  });
+}
+
 test('starts a fresh run while the published version remains available', async ({
   context,
   page,
