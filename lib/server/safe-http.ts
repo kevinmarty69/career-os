@@ -183,18 +183,7 @@ async function safeFetch(
 
     const response = await requestPinned(current, addresses[0], deadline, kind);
     if (response.status >= 300 && response.status < 400) {
-      if (!response.location || redirects >= MAX_REDIRECTS)
-        throw new SafeHttpError('REDIRECT_REJECTED');
-      let next: URL;
-      try {
-        next = normalizeImportUrl(new URL(response.location, current).href);
-      } catch (error) {
-        if (error instanceof SafeHttpError) throw error;
-        throw new SafeHttpError('REDIRECT_REJECTED');
-      }
-      if (current.protocol === 'https:' && next.protocol !== 'https:')
-        throw new SafeHttpError('REDIRECT_REJECTED');
-      current = next;
+      current = resolveRedirect(current, response.location, redirects);
       continue;
     }
     if (response.status < 200 || response.status >= 300)
@@ -207,6 +196,25 @@ async function safeFetch(
       body: response.body,
     };
   }
+}
+
+export function resolveRedirect(
+  current: URL,
+  location: string | undefined,
+  redirects: number,
+) {
+  if (!location || redirects >= MAX_REDIRECTS)
+    throw new SafeHttpError('REDIRECT_REJECTED');
+  let next: URL;
+  try {
+    next = normalizeImportUrl(new URL(location, current).href);
+  } catch (error) {
+    if (error instanceof SafeHttpError) throw error;
+    throw new SafeHttpError('REDIRECT_REJECTED');
+  }
+  if (current.protocol === 'https:' && next.protocol !== 'https:')
+    throw new SafeHttpError('REDIRECT_REJECTED');
+  return next;
 }
 
 async function resolveHostname(hostname: string) {

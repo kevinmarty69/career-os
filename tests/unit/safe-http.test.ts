@@ -7,6 +7,7 @@ import {
   MAX_RESPONSE_BYTES,
   normalizeImportUrl,
   requestPinned,
+  resolveRedirect,
   SafeHttpError,
   safeFetchText,
 } from '../../lib/server/safe-http';
@@ -49,6 +50,23 @@ test('rejects a hostname when any resolved address is forbidden', async () => {
   );
 });
 
+test('redirects preserve the SSRF boundary and HTTPS', () => {
+  const https = new URL('https://jobs.example.com/role');
+  assert.equal(
+    resolveRedirect(https, '/next#ignored', 0).href,
+    'https://jobs.example.com/next',
+  );
+  for (const [location, redirects, code] of [
+    ['http://jobs.example.com/next', 0, 'REDIRECT_REJECTED'],
+    ['https://jobs.example.com/next', 3, 'REDIRECT_REJECTED'],
+    ['http://127.0.0.1/private', 0, 'BLOCKED_DESTINATION'],
+  ] as const)
+    assert.throws(
+      () => resolveRedirect(https, location, redirects),
+      (error: unknown) => error instanceof SafeHttpError && error.code === code,
+    );
+});
+
 test('pins the socket, destroys redirect bodies and bounds final bodies', async () => {
   let redirectSocketClosed = false;
   const server = createServer((request, response) => {
@@ -71,6 +89,14 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
     if (request.url === '/image') {
       response.writeHead(200, { 'content-type': 'image/png' });
       response.end(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      return;
+    }
+    if (request.url === '/compressed') {
+      response.writeHead(200, {
+        'content-type': 'text/plain',
+        'content-encoding': 'gzip',
+      });
+      response.end('not actually compressed');
       return;
     }
     response.writeHead(200, { 'content-type': 'text/html' });
@@ -126,6 +152,16 @@ test('pins the socket, destroys redirect bodies and bounds final bodies', async 
       ),
       (error: unknown) =>
         error instanceof SafeHttpError && error.code === 'RESPONSE_TOO_LARGE',
+    );
+
+    await assert.rejects(
+      requestPinned(
+        new URL(`http://127.0.0.1:${address.port}/compressed`),
+        target,
+        Date.now() + 2_000,
+      ),
+      (error: unknown) =>
+        error instanceof SafeHttpError && error.code === 'UNSUPPORTED_CONTENT',
     );
   } finally {
     server.closeAllConnections();
