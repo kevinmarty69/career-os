@@ -174,6 +174,8 @@ systemctl is-active career-os-workers.target
 systemctl --failed 'career-os-worker@*.service'
 ```
 
+Account sessions are visible under **Settings → Privacy**. Revoke any device you no longer recognize; the current session remains identified separately and raw session tokens are never rendered.
+
 ## 6. Back up and restore
 
 Back up before every upgrade and at the interval required by your recovery objective:

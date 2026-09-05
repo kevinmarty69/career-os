@@ -731,7 +731,7 @@ Critères d'acceptation :
 - [ ] Gestion des erreurs compréhensible par un utilisateur non technique.
 - [ ] Observabilité sans capture du contenu sensible par défaut.
 - [x] Démonstration publique avec données entièrement fictives.
-- [ ] Documentation produit, sécurité et auto-hébergement alignée.
+- [x] Documentation produit, sécurité et auto-hébergement alignée.
 
 ## 10. Priorités du MVP
 
