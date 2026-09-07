@@ -730,10 +730,19 @@ test('keeps review objections visible until the human decides', async ({
 
   await page.goto(`/applications/${applicationId}/review`);
   await expect(
-    page.getByRole('heading', { name: 'Three perspectives before publishing' }),
+    page.getByRole('heading', { name: 'Make the opening more direct.' }),
   ).toBeVisible();
-  await expect(page.getByText('Make the opening more direct.')).toBeVisible();
-  await expect(page.getByText('Factual review')).toBeVisible();
+  await expect(
+    page.getByText('No supporting evidence is attached.'),
+  ).toBeVisible();
+  await expect(page.getByText('Recruiter review')).toBeVisible();
+  if (process.env.CAREER_OS_REVIEW_SCREENSHOT) {
+    await page.waitForTimeout(400);
+    await page.screenshot({
+      path: process.env.CAREER_OS_REVIEW_SCREENSHOT,
+      fullPage: true,
+    });
+  }
   await page.getByRole('button', { name: 'Keep as written' }).click();
   await expect(
     page.getByText('All checks are resolved. Ready for your final approval.'),

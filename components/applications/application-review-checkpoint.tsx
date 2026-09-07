@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
+import { Badge, Icon } from '@/components/ui/primitives';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
+import styles from './application-flow.module.css';
 
 export type ReviewDecision = 'keep' | 'correct';
 
@@ -114,6 +116,7 @@ export function ApplicationReviewCheckpoint({
       ({ issueIndex, review }) =>
         !decisions.has(`${review.reviewId}:${issueIndex}`),
     );
+  const current = Math.min(issueCount, issueCount - unresolved + 1);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -139,89 +142,128 @@ export function ApplicationReviewCheckpoint({
   }, [active, applicationId, onDecide, pending, router]);
 
   return (
-    <section className="co-panel co-research-checkpoint co-review-checkpoint">
-      <header>
-        <div>
-          <p>{t('dossier.independent.checks')}</p>
-          <h2>{t('dossier.three.perspectives.before.publishing')}</h2>
-        </div>
-        <span>
-          {locale === 'en'
-            ? `${unresolved} decision${unresolved === 1 ? '' : 's'} remaining`
-            : `${unresolved} décision${unresolved === 1 ? '' : 's'} restante${unresolved === 1 ? '' : 's'}`}
-        </span>
-      </header>
-      <p>
-        {t(
-          'dossier.every.objection.remains.visible.with.its.author.a.correction',
-        )}{' '}
-      </p>
-      <div className="co-review-list">
-        {active ? (
-          <article key={`${active.review.reviewId}:${active.issueIndex}`}>
-            <header>
-              <strong>{reviewerLabel(active.review.reviewer, locale)}</strong>
-              <span data-passed={false}>
-                {active.issue.blocking
-                  ? t('dossier.blocking')
-                  : t('dossier.suggestion')}
+    <section className={styles.reviewWizard}>
+      {active ? (
+        <div
+          className={styles.reviewDecision}
+          key={`${active.review.reviewId}:${active.issueIndex}`}
+        >
+          <header className={styles.reviewIntro}>
+            <Badge tone={active.issue.blocking ? 'crit' : 'warn'}>
+              <Icon>{active.issue.blocking ? 'gpp_maybe' : 'rate_review'}</Icon>
+              {active.issue.blocking
+                ? t('dossier.blocking')
+                : t('dossier.suggestion')}
+            </Badge>
+            <h1>{active.issue.message}</h1>
+            <p>
+              {t(
+                'dossier.every.objection.remains.visible.with.its.author.a.correction',
+              )}
+            </p>
+          </header>
+
+          <div className={styles.reviewComparison}>
+            <article>
+              <span className={styles.reviewTile}>
+                <Icon>description</Icon>
               </span>
-            </header>
-            <section>
-              <small>{active.issue.section}</small>
-              <h3>{active.issue.message}</h3>
-              {(active.issue.evidenceIds?.length ?? 0) > 0 ? (
-                <p>
-                  {locale === 'en'
-                    ? `${active.issue.evidenceIds?.length ?? 0} attached evidence source${active.issue.evidenceIds?.length === 1 ? '' : 's'}`
-                    : `${active.issue.evidenceIds?.length ?? 0} source${active.issue.evidenceIds?.length === 1 ? '' : 's'} de preuve rattachée${active.issue.evidenceIds?.length === 1 ? '' : 's'}`}
-                </p>
-              ) : (
-                <p>
-                  {locale === 'en'
+              <div>
+                <strong>
+                  {locale === 'en' ? 'Attached evidence' : 'Preuve rattachée'}
+                </strong>
+                <small>{active.issue.section}</small>
+              </div>
+              <p>
+                {(active.issue.evidenceIds?.length ?? 0) > 0
+                  ? locale === 'en'
+                    ? `${active.issue.evidenceIds?.length ?? 0} supporting source${active.issue.evidenceIds?.length === 1 ? '' : 's'}`
+                    : `${active.issue.evidenceIds?.length ?? 0} source${active.issue.evidenceIds?.length === 1 ? '' : 's'} justificative${active.issue.evidenceIds?.length === 1 ? '' : 's'}`
+                  : locale === 'en'
                     ? 'No supporting evidence is attached.'
                     : 'Aucune preuve justificative n’est rattachée.'}
-                </p>
-              )}
-              <ApplicationReviewIssueActions
-                issue={active.issue}
-                issueIndex={active.issueIndex}
-                onDecide={onDecide}
-                pending={pending}
-                review={active.review}
-              />
-            </section>
-          </article>
-        ) : (
-          <article>
-            <h3>
-              {t(
-                'dossier.all.checks.are.resolved.ready.for.your.final.approval',
-              )}
-            </h3>
-            <Link
-              className="co-button"
-              href={`/applications/${applicationId}/page`}
-            >
-              {t('dossier.review.the.draft.before.the.checks')}
-            </Link>
-          </article>
-        )}
-      </div>
+              </p>
+              <Link
+                href={
+                  active.issue.claimId
+                    ? `/memory#claim-${active.issue.claimId}`
+                    : '/memory'
+                }
+              >
+                <Icon>visibility</Icon>
+                {locale === 'en' ? 'Open career memory' : 'Ouvrir la mémoire'}
+              </Link>
+            </article>
+
+            <article className={styles.reviewPerspective}>
+              <span className={styles.reviewTile}>
+                <Icon>how_to_reg</Icon>
+              </span>
+              <div>
+                <strong>{reviewerLabel(active.review.reviewer, locale)}</strong>
+                <small>
+                  {locale === 'en'
+                    ? `Decision ${current} of ${issueCount}`
+                    : `Décision ${current} sur ${issueCount}`}
+                </small>
+              </div>
+              <p>
+                {active.issue.blocking
+                  ? locale === 'en'
+                    ? 'Publishing stays locked until you correct or remove this claim.'
+                    : 'La publication reste verrouillée tant que cette affirmation n’est pas corrigée ou retirée.'
+                  : locale === 'en'
+                    ? 'You retain final authority over this reviewer suggestion.'
+                    : 'Vous gardez l’autorité finale sur cette suggestion du reviewer.'}
+              </p>
+            </article>
+          </div>
+
+          {active.review.reviewer === 'factuality' ? (
+            <aside className={styles.reviewConstraint}>
+              <Icon>shield</Icon>
+              <span>
+                {locale === 'en'
+                  ? 'There is no “publish without evidence” option. Factual objections must be resolved first.'
+                  : 'Il n’existe pas d’option « publier sans preuve ». Les objections factuelles doivent d’abord être résolues.'}
+              </span>
+            </aside>
+          ) : null}
+
+          <footer className={styles.reviewFooter}>
+            <span>
+              {locale === 'en'
+                ? '↵ correct · ⌫ keep · esc exit'
+                : '↵ corriger · ⌫ garder · échap quitter'}
+            </span>
+            <ApplicationReviewIssueActions
+              issue={active.issue}
+              issueIndex={active.issueIndex}
+              onDecide={onDecide}
+              pending={pending}
+              review={active.review}
+            />
+          </footer>
+        </div>
+      ) : (
+        <div className={styles.reviewComplete}>
+          <Icon>verified</Icon>
+          <h1>
+            {t('dossier.all.checks.are.resolved.ready.for.your.final.approval')}
+          </h1>
+          <Link
+            className="co-button"
+            href={`/applications/${applicationId}/page`}
+          >
+            {t('dossier.review.the.draft.before.the.checks')}
+          </Link>
+        </div>
+      )}
       {error ? (
-        <p role="alert">
+        <p className={styles.error} role="alert">
           {t('dossier.the.decision.was.not.saved.you.can.retry.without')}{' '}
         </p>
       ) : null}
-      <footer>
-        <span>
-          {issueCount === 0 || (unresolved === 0 && run.publicationEligible)
-            ? t('dossier.all.checks.are.resolved.ready.for.your.final.approval')
-            : t(
-                'dossier.publishing.remains.blocked.while.a.decision.is.missing',
-              )}
-        </span>
-      </footer>
     </section>
   );
 }

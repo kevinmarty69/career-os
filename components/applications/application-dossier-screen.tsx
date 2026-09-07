@@ -164,17 +164,62 @@ export function DynamicDossierScreen({
           : undefined;
 
   if (route === 'review' || checkpoint) {
+    const reviewIssueCount =
+      run?.reviews.reduce((count, review) => count + review.issues.length, 0) ??
+      0;
+    const reviewUnresolved = Math.max(
+      0,
+      reviewIssueCount - (run?.reviewDecisions.length ?? 0),
+    );
+    const reviewCurrent = Math.min(
+      reviewIssueCount,
+      reviewIssueCount - reviewUnresolved + 1,
+    );
+    const fullscreenIdentity =
+      !checkpoint && run
+        ? {
+            ...identity,
+            company:
+              locale === 'en'
+                ? `Review · ${identity.company}`
+                : `Arbitrage · ${identity.company}`,
+            role:
+              locale === 'en'
+                ? `Decision ${reviewCurrent} of ${reviewIssueCount}`
+                : `Décision ${reviewCurrent} sur ${reviewIssueCount}`,
+          }
+        : identity;
+
     return (
       <DossierShell
         active=""
         fullscreen
-        identity={identity}
+        identity={fullscreenIdentity}
         state={
-          <Badge tone="warn">
-            {run
-              ? runStatusLabel(run.status, locale)
-              : t('dossier.needs.review')}
-          </Badge>
+          !checkpoint && reviewIssueCount ? (
+            <span
+              aria-label={
+                locale === 'en'
+                  ? `${reviewUnresolved} decisions remaining`
+                  : `${reviewUnresolved} décisions restantes`
+              }
+              className={styles.reviewHeaderProgress}
+            >
+              {Array.from({ length: reviewIssueCount }, (_, index) => (
+                <i data-active={index === reviewCurrent - 1} key={index} />
+              ))}
+              <small>
+                ≈ {reviewUnresolved} min{' '}
+                {locale === 'en' ? 'remaining' : 'restantes'}
+              </small>
+            </span>
+          ) : (
+            <Badge tone="warn">
+              {run
+                ? runStatusLabel(run.status, locale)
+                : t('dossier.needs.review')}
+            </Badge>
+          )
         }
       >
         <div className={styles.checkpointStage}>

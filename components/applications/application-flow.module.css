@@ -189,6 +189,197 @@
   margin: 0 auto;
 }
 
+.reviewWizard {
+  display: grid;
+  min-height: calc(100dvh - 85px);
+  place-items: center;
+  padding: 34px;
+}
+
+.reviewDecision {
+  display: grid;
+  width: min(100%, var(--spacing-wizard));
+  gap: 26px;
+  animation: review-in var(--dur-slow) var(--ease-out-quart) both;
+}
+
+.reviewIntro {
+  display: grid;
+  gap: 16px;
+}
+
+.reviewIntro :global(.co-badge) {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-self: start;
+  padding: 8px 13px;
+}
+
+.reviewIntro :global(.co-icon) {
+  font-size: 17px;
+}
+
+.reviewIntro h1,
+.reviewIntro p,
+.reviewComparison p,
+.reviewComplete h1 {
+  margin: 0;
+}
+
+.reviewIntro h1 {
+  max-width: 26ch;
+  font-size: var(--text-decision);
+  line-height: 1.17;
+  letter-spacing: -0.04em;
+}
+
+.reviewIntro p {
+  max-width: 76ch;
+  color: var(--color-ink-700);
+  font-size: var(--text-body-lg);
+  line-height: 1.65;
+}
+
+.reviewComparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.reviewComparison article {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 16px 12px;
+  padding: 24px;
+  border-radius: var(--radius-panel);
+  background: var(--color-panel);
+}
+
+.reviewComparison article.reviewPerspective {
+  background: var(--color-indigo-tint);
+}
+
+.reviewTile {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-green-text);
+}
+
+.reviewPerspective .reviewTile {
+  color: var(--color-indigo-text);
+}
+
+.reviewComparison article > div {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+}
+
+.reviewComparison strong {
+  font-size: var(--text-body-sm);
+}
+
+.reviewComparison small {
+  overflow: hidden;
+  color: var(--color-ink-500);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--text-mono-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reviewComparison p {
+  grid-column: 1 / -1;
+  min-height: 52px;
+  color: var(--color-ink-800);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.reviewComparison a {
+  display: inline-flex;
+  grid-column: 1 / -1;
+  gap: 11px;
+  align-items: center;
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+  text-decoration: none;
+}
+
+.reviewConstraint {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 20px 22px;
+  border-radius: var(--radius-card-lg);
+  background: var(--color-panel);
+  color: var(--color-ink-700);
+  font-size: var(--text-ui);
+  line-height: 1.6;
+}
+
+.reviewConstraint :global(.co-icon) {
+  flex: 0 0 auto;
+  color: var(--color-ink-500);
+  font-size: 21px;
+}
+
+.reviewFooter {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding-top: 22px;
+  border-top: 1px solid var(--color-ink-200);
+}
+
+.reviewFooter > span {
+  overflow: hidden;
+  color: var(--color-ink-500);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--text-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reviewFooter :global(.co-review-actions) {
+  margin-left: auto;
+  flex-wrap: nowrap;
+}
+
+.reviewComplete {
+  display: grid;
+  max-width: 620px;
+  gap: 18px;
+  justify-items: start;
+}
+
+.reviewComplete > :global(.co-icon) {
+  color: var(--color-green-text);
+  font-size: 32px;
+}
+
+.reviewComplete h1 {
+  font-size: var(--text-h1);
+  line-height: var(--text-h1-line-height);
+  letter-spacing: var(--text-h1-letter-spacing);
+}
+
+.error {
+  color: var(--color-clay-text);
+}
+
+@keyframes review-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
 .fullscreenShell {
   min-height: 100dvh;
   background: var(--color-canvas);
@@ -222,6 +413,31 @@
 
 .fullscreenHeader small {
   color: var(--color-ink-600);
+}
+
+.reviewHeaderProgress {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reviewHeaderProgress i {
+  display: block;
+  width: 34px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-200);
+}
+
+.reviewHeaderProgress i[data-active='true'] {
+  background: var(--color-ink-900);
+}
+
+.reviewHeaderProgress small {
+  margin-left: 8px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--text-mono);
+  white-space: nowrap;
 }
 
 .brandForm {
@@ -294,5 +510,34 @@
 
   .fullscreenHeader > :nth-child(n + 4) {
     display: none;
+  }
+
+  .reviewWizard {
+    min-height: calc(100dvh - 72px);
+    padding: 24px 18px;
+  }
+
+  .reviewComparison {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewIntro h1 {
+    font-size: var(--text-h1);
+  }
+
+  .reviewFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reviewFooter :global(.co-review-actions) {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reviewDecision {
+    animation: none;
   }
 }
