@@ -10,6 +10,40 @@ Reduced a deployment workflow from eleven minutes to seven minutes.
 Projects
 Created a private portfolio for evidence-backed applications.`;
 
+test('keeps the desktop sidebar viewport-sized while the import content scrolls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockProfilePort(page, []);
+  await page.goto('/memory/import');
+  const sidebar = page.locator('aside[class*="sidebar"]').first();
+  const initial = await sidebar.boundingBox();
+  expect(initial?.height).toBe(900);
+  await page.getByLabel('Contenu à analyser').fill(profileText);
+  await page.getByRole('button', { name: 'Lire ce texte' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Relisez ce qui a été extrait' }),
+  ).toBeVisible();
+  const content = page.locator('#memory-import-content');
+  expect(
+    await content.evaluate((el) => el.scrollHeight > el.clientHeight),
+  ).toBe(true);
+  await content.hover();
+  await page.mouse.wheel(0, 700);
+  await expect
+    .poll(() => content.evaluate((el) => el.scrollTop))
+    .toBeGreaterThan(0);
+  expect(await sidebar.boundingBox()).toEqual(initial);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  // A short desktop viewport must still allow access to the sidebar footer.
+  await page.setViewportSize({ width: 1440, height: 600 });
+  await sidebar.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  expect((await sidebar.boundingBox())?.height).toBe(600);
+  await expect(sidebar.locator('details > summary')).toBeInViewport();
+});
+
 test('keeps accordion and secondary action hovers on light surfaces', async ({
   page,
 }) => {

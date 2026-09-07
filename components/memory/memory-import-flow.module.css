@@ -1395,6 +1395,26 @@
   }
 }
 
+@media (min-width: 1081px) {
+  .screen {
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .sidebar,
+  .content {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .sidebar > * {
+    flex-shrink: 0;
+  }
+  .sidebar details > div {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 1080px) {
   .screen {
     display: block;
