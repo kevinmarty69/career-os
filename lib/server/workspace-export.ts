@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import postgres from 'postgres';
+import { databaseTls } from '../database-tls';
 import { authorize } from './database';
 import {
   workspaceExportExclusions,
@@ -36,6 +37,7 @@ export async function exportWorkspace(session: ExportSession) {
   const sql = postgres(databaseUrl, {
     max: 1,
     idle_timeout: 5,
+    ssl: databaseTls(),
     types: {
       timestampText: {
         to: 1184,

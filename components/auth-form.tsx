@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
-import { authClient } from '@/lib/auth-client';
+import { useEffect, useState, type FormEvent } from 'react';
+import { browserSupabase } from '@/lib/auth-client';
 import {
   LocaleSwitch,
   useI18n,
@@ -21,20 +21,33 @@ export function AuthForm() {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [accountName, setAccountName] = useState('Personal');
   const [organizations, setOrganizations] = useState<OrganizationChoice[]>([]);
 
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('workspace')) return;
+    let active = true;
+    void fetch('/api/auth/workspaces', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const workspaces = await response.json();
+        if (active) {
+          setOrganizations(workspaces);
+          setMode('workspace');
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function continueWithWorkspace(name: string) {
-    const session = await authClient.getSession();
-    if (session.data?.session.activeOrganizationId) {
-      router.push('/');
-      router.refresh();
-      return;
-    }
-    const organizations = await authClient.organization.list();
-    if (organizations.error) throw new Error('WORKSPACE_FAILED');
+    const response = await fetch('/api/auth/workspaces', { cache: 'no-store' });
+    if (!response.ok) throw new Error('WORKSPACE_FAILED');
     setAccountName(name || 'Personal');
-    setOrganizations(organizations.data ?? []);
+    setOrganizations(await response.json());
     setMode('workspace');
     setPending(false);
   }
@@ -43,6 +56,7 @@ export function AuthForm() {
     event.preventDefault();
     setPending(true);
     setError('');
+    setNotice('');
     const form = new FormData(event.currentTarget);
     const email = String(form.get('email') ?? '').trim();
     const password = String(form.get('password') ?? '');
@@ -51,11 +65,33 @@ export function AuthForm() {
     try {
       const result =
         mode === 'sign-up'
-          ? await authClient.signUp.email({ email, password, name })
-          : await authClient.signIn.email({ email, password });
+          ? await browserSupabase().auth.signUp({
+              email,
+              password,
+              options: {
+                data: { name },
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
+              },
+            })
+          : await browserSupabase().auth.signInWithPassword({
+              email,
+              password,
+            });
       if (result.error) throw new Error('AUTH_FAILED');
+      if (!result.data.session) {
+        setNotice(
+          locale === 'fr'
+            ? 'Vérifiez votre boîte mail pour confirmer votre compte, puis connectez-vous.'
+            : 'Check your email to confirm your account, then sign in.',
+        );
+        setMode('sign-in');
+        setPending(false);
+        return;
+      }
       await continueWithWorkspace(
-        mode === 'sign-up' ? name : (result.data?.user.name ?? 'Personal'),
+        mode === 'sign-up'
+          ? name
+          : String(result.data.user?.user_metadata.name ?? 'Personal'),
       );
     } catch (cause) {
       setError(
@@ -73,8 +109,12 @@ export function AuthForm() {
   async function selectOrganization(organizationId: string) {
     setPending(true);
     setError('');
-    const result = await authClient.organization.setActive({ organizationId });
-    if (result.error) {
+    const result = await fetch('/api/auth/workspaces', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: organizationId }),
+    }).catch(() => null);
+    if (!result?.ok) {
       setError(t('auth.the.workspace.could.not.be.selected.retry'));
       setPending(false);
       return;
@@ -89,11 +129,12 @@ export function AuthForm() {
     setError('');
     const form = new FormData(event.currentTarget);
     const name = String(form.get('workspace') ?? '').trim();
-    const result = await authClient.organization.create({
-      name,
-      slug: `personal-${crypto.randomUUID()}`,
-    });
-    if (result.error) {
+    const result = await fetch('/api/auth/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).catch(() => null);
+    if (!result?.ok) {
       setError(t('auth.the.workspace.could.not.be.created.retry'));
       setPending(false);
       return;
@@ -163,6 +204,12 @@ export function AuthForm() {
                   )}
           </p>
         </header>
+        {notice ? <p role="status">{notice}</p> : null}
+        {mode === 'workspace' && error ? (
+          <p role="alert" className="auth-error">
+            {error}
+          </p>
+        ) : null}
         {mode === 'workspace' && organizations.length ? (
           <div className="organization-list">
             {organizations.map((organization) => (

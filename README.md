@@ -82,6 +82,11 @@ See **[Self-hosting Career OS](docs/SELF_HOSTING.md)** for the complete setup, l
 
 ## Development
 
+**Supabase Auth migration branch:** account/session flows now use Supabase Auth.
+Fresh-instance setup and live smoke commands are in [ADR-006](docs/ADR-006-supabase-auth.md).
+The historical PostgreSQL-only/Better Auth integration harness below still needs
+porting before merge; do not interpret it as verified for this branch.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for module boundaries and the checks expected for each change.
 
 ```bash

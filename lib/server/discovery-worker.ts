@@ -1,5 +1,6 @@
 import 'server-only';
 import postgres from 'postgres';
+import { databaseTls } from '../database-tls';
 import {
   discoverSearchProfile,
   emptyDiscoverySummary,
@@ -34,7 +35,11 @@ export async function processScheduledDiscoveryStep({
 }: {
   databaseUrl: string;
 }) {
-  const sql = postgres(databaseUrl, { max: 2, idle_timeout: 5 });
+  const sql = postgres(databaseUrl, {
+    max: 2,
+    idle_timeout: 5,
+    ssl: databaseTls(),
+  });
   let stopHeartbeat: () => Promise<void> = async () => undefined;
   try {
     await verifyRestrictedCredential(sql);
@@ -135,7 +140,7 @@ async function verifyRestrictedCredential(sql: postgres.Sql) {
     ) as "unexpectedRole",
     exists(
       select 1 from pg_namespace namespace
-      where namespace.nspname in ('app', 'auth') and (
+      where namespace.nspname in ('app', 'career_identity') and (
         has_schema_privilege(current_user, namespace.oid, 'usage')
         or has_schema_privilege(current_user, namespace.oid, 'create')
       )
@@ -153,7 +158,7 @@ async function verifyRestrictedCredential(sql: postgres.Sql) {
       or exists(
         select 1 from pg_class relation
         join pg_namespace namespace on namespace.oid = relation.relnamespace
-        where namespace.nspname in ('app', 'auth')
+        where namespace.nspname in ('app', 'career_identity')
           and relation.relkind in ('r', 'p', 'v', 'm', 'f')
           and (
             (
@@ -184,7 +189,7 @@ async function verifyRestrictedCredential(sql: postgres.Sql) {
       or exists(
         select 1 from pg_proc procedure
         join pg_namespace namespace on namespace.oid = procedure.pronamespace
-        where namespace.nspname in ('app', 'auth')
+        where namespace.nspname in ('app', 'career_identity')
           and has_function_privilege(target.rolname, procedure.oid, 'execute')
           and (procedure.proname, pg_get_function_identity_arguments(procedure.oid))
             not in (

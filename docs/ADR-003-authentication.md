@@ -1,6 +1,7 @@
 # ADR-003: Authentication and tenant membership
 
-Status: accepted for implementation
+Status: superseded by [ADR-006: Supabase Auth](ADR-006-supabase-auth.md).
+The following records the previous Better Auth architecture, not the active implementation.
 
 ## Decision
 

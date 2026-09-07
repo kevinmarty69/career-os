@@ -155,7 +155,7 @@ export async function saveLivingProfile(
 
   return await sql.begin(async (tx) => {
     const [owner] = await tx<{ user_id: string }[]>`
-        select "userId" as user_id from auth."member"
+        select "userId" as user_id from career_identity."member"
         where "organizationId" = ${session.tenantId} and role = 'owner'
         order by "createdAt" limit 1`;
     await authorize(tx, session);

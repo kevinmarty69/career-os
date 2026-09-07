@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
-import { authClient } from '@/lib/auth-client';
+import { browserSupabase } from '@/lib/auth-client';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 
 type DeviceSession = {
@@ -24,16 +24,13 @@ export function SessionManager() {
 
   useEffect(() => {
     let active = true;
-    void Promise.all([authClient.listSessions(), authClient.getSession()])
-      .then(([listed, current]) => {
+    void fetch('/api/auth/sessions', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Sessions unavailable');
+        const data = await response.json();
         if (!active) return;
-        if (listed.error) {
-          setSessions([]);
-          setError(true);
-          return;
-        }
-        setSessions(listed.data ?? []);
-        setCurrentToken(current.data?.session.token);
+        setSessions(data.sessions);
+        setCurrentToken(data.currentSessionId);
       })
       .catch(() => {
         if (active) {
@@ -46,15 +43,15 @@ export function SessionManager() {
     };
   }, []);
 
-  async function revoke(token: string) {
-    setRevoking(token);
+  async function revokeOthers() {
+    setRevoking('others');
     setError(false);
     try {
-      const result = await authClient.revokeSession({ token });
+      const result = await browserSupabase().auth.signOut({ scope: 'others' });
       if (result.error) setError(true);
       else
         setSessions((current) =>
-          current?.filter((item) => item.token !== token),
+          current?.filter((item) => item.token === currentToken),
         );
     } catch {
       setError(true);
@@ -68,13 +65,31 @@ export function SessionManager() {
       <header>
         <div>
           <h2>{t('active-routes.active.sessions')}</h2>
-          <p>{t('active-routes.revoke.any.device.you.no.longer.recognize')}</p>
+          <p>
+            {locale === 'fr'
+              ? 'Déconnectez vos autres appareils sans quitter celui-ci.'
+              : 'Sign out your other devices without leaving this one.'}
+          </p>
         </div>
         <span className="co-badge muted">
           {sessions
             ? `${sessions.length} ${locale === 'fr' ? 'actives' : 'active'}`
             : t('active-routes.loading')}
         </span>
+        {sessions && sessions.length > 1 ? (
+          <button
+            className="co-button quiet danger"
+            disabled={Boolean(revoking)}
+            onClick={() => void revokeOthers()}
+            type="button"
+          >
+            {revoking
+              ? t('active-routes.revoking')
+              : locale === 'fr'
+                ? 'Déconnecter les autres appareils'
+                : 'Sign out other devices'}
+          </button>
+        ) : null}
       </header>
       {error ? (
         <p className="co-session-error" role="alert">
@@ -109,18 +124,7 @@ export function SessionManager() {
               <span className="co-badge ok">
                 {t('active-routes.current.session')}
               </span>
-            ) : (
-              <button
-                className="co-button quiet danger"
-                disabled={Boolean(revoking)}
-                onClick={() => void revoke(session.token)}
-                type="button"
-              >
-                {revoking === session.token
-                  ? t('active-routes.revoking')
-                  : t('active-routes.revoke')}
-              </button>
-            )}
+            ) : null}
           </article>
         );
       })}

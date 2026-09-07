@@ -8,7 +8,6 @@ import { publicationEventSchema } from '../../lib/publication-analytics';
 import { buildPageSpec, buildStrategy } from '../../lib/workflow';
 import {
   isSensitiveSessionFresh,
-  organizationOptions,
   sensitiveSessionFreshAgeSeconds,
 } from '../../lib/server/auth-config';
 import {
@@ -39,11 +38,6 @@ const spec = buildPageSpec(
   opportunity,
   buildStrategy(syntheticProfile, opportunity),
 );
-
-test('organization invitations require a verified email', () => {
-  assert.equal(organizationOptions.requireEmailVerificationOnInvitation, true);
-  assert.equal(organizationOptions.disableOrganizationDeletion, true);
-});
 
 test('sensitive actions require a session created in the last ten minutes', () => {
   const now = Date.now();

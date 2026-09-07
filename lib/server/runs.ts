@@ -847,7 +847,7 @@ async function readRunProjection(
   const profile = await readProfileGraph(tx, tenantId, snapshot);
   const [researchArtifact] = await tx<
     Array<{ id: string; body: unknown; artifact_hash: string }>
-  >`select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
+  >`select id, body, encode(extensions.digest(body::text, 'sha256'), 'hex') artifact_hash
     from app.artifacts
     where tenant_id = ${tenantId}
       and workflow_run_id = any(${tx.array(lineageRunIds)}::uuid[])
@@ -857,7 +857,7 @@ async function readRunProjection(
   const [evidenceArtifact] = await tx<
     Array<{ id: string; body: unknown; artifact_hash: string }>
   >`
-    select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
+    select id, body, encode(extensions.digest(body::text, 'sha256'), 'hex') artifact_hash
     from app.artifacts
     where tenant_id = ${tenantId}
       and workflow_run_id = any(${tx.array(lineageRunIds)}::uuid[])
@@ -867,7 +867,7 @@ async function readRunProjection(
   const [strategyArtifact] = await tx<
     Array<{ id: string; body: unknown; artifact_hash: string }>
   >`
-    select id, body, encode(digest(body::text, 'sha256'), 'hex') artifact_hash
+    select id, body, encode(extensions.digest(body::text, 'sha256'), 'hex') artifact_hash
     from app.artifacts
     where tenant_id = ${tenantId}
       and workflow_run_id = any(${tx.array(lineageRunIds)}::uuid[])
@@ -883,7 +883,7 @@ async function readRunProjection(
       source_artifact_hash: string | null;
     }>
   >`select page.id, page.spec, page.spec_hash, page.source_artifact_id,
-      encode(digest(artifact.body::text, 'sha256'), 'hex') source_artifact_hash
+      encode(extensions.digest(artifact.body::text, 'sha256'), 'hex') source_artifact_hash
     from app.page_specs page
     join app.artifacts artifact on artifact.tenant_id = page.tenant_id
       and artifact.id = page.source_artifact_id

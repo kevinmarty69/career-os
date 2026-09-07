@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from 'pg';
+import { migrationSql } from '../lib/migration-sql';
+import { databaseTls } from '../lib/database-tls';
 
 const MIGRATION_PATTERN = /^\d{4}_[a-z0-9_]+\.sql$/;
 const MIGRATION_LOCK = 1_220_251_833;
@@ -9,15 +11,26 @@ const MIGRATION_LOCK = 1_220_251_833;
 type Migration = { name: string; checksum: string; sql: string };
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl =
+    process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('DATABASE_URL is required.');
   const baseline = parseBaseline(process.argv.slice(2));
   const migrationDirectory = path.resolve('supabase/migrations');
   const migrations = await loadMigrations(migrationDirectory);
-  const client = new Client({ connectionString: databaseUrl });
+  const client = new Client({
+    connectionString: databaseUrl,
+    ssl: databaseTls(),
+  });
   await client.connect();
   try {
     await client.query('select pg_advisory_lock($1::bigint)', [MIGRATION_LOCK]);
+    const legacy =
+      await client.query(`select to_regclass('auth."user"') is not null
+      and to_regnamespace('career_identity') is null as present`);
+    if (legacy.rows[0]?.present)
+      throw new Error(
+        'Legacy Better Auth database: export and migrate identities before switching. No data was changed.',
+      );
     await client.query(`create table if not exists public.career_os_schema_migrations (
       name text primary key,
       checksum text not null check (checksum ~ '^[0-9a-f]{64}$'),
@@ -26,6 +39,12 @@ async function main() {
     await client.query(
       'revoke all on public.career_os_schema_migrations from public',
     );
+    // Supabase applies explicit default grants to public tables, beyond PUBLIC.
+    await client.query(`do $$ declare grantee text; begin
+      for grantee in select rolname from pg_roles where rolname in ('anon', 'authenticated') loop
+        execute format('revoke all on public.career_os_schema_migrations from %I', grantee);
+      end loop;
+    end $$`);
     const applied = await readApplied(client);
     const hasAppSchema = Boolean(
       (
@@ -54,7 +73,7 @@ async function main() {
       if (current.has(migration.name)) continue;
       await client.query('begin');
       try {
-        await client.query(migration.sql);
+        await client.query(migrationSql(migration.name, migration.sql));
         await client.query(
           `insert into public.career_os_schema_migrations (name, checksum)
            values ($1, $2) on conflict (name) do update

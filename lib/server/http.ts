@@ -2,7 +2,8 @@ export class PayloadTooLargeError extends Error {}
 
 export function isSameOrigin(request: Request) {
   try {
-    const configuredUrl = process.env.BETTER_AUTH_URL;
+    const configuredUrl =
+      process.env.CAREER_OS_APP_URL ?? process.env.BETTER_AUTH_URL;
     if (!configuredUrl) return false;
     const expected = new URL(configuredUrl);
     return (

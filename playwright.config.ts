@@ -11,8 +11,7 @@ export default defineConfig({
       DATABASE_URL:
         process.env.DATABASE_URL ??
         'postgres://career_os:career_os@127.0.0.1:54329/career_os',
-      BETTER_AUTH_URL: 'http://localhost:3117',
-      BETTER_AUTH_SECRET: 'career-os-local-test-secret-change-me',
+      CAREER_OS_APP_URL: 'http://localhost:3117',
       CAREER_OS_E2E: '1',
     },
   },

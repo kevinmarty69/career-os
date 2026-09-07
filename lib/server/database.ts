@@ -1,5 +1,6 @@
 import 'server-only';
 import postgres from 'postgres';
+import { databaseTls } from '../database-tls';
 
 // Keep a bounded pool per credential across requests and Next development reloads.
 const processState = globalThis as typeof globalThis & {
@@ -12,7 +13,11 @@ export function database(databaseUrl = process.env.DATABASE_URL): postgres.Sql {
   if (!databaseUrl) throw new Error('DATABASE_URL is required.');
   let sql = pools.get(databaseUrl);
   if (!sql) {
-    sql = postgres(databaseUrl, { max: 5, idle_timeout: 5 });
+    sql = postgres(databaseUrl, {
+      max: 5,
+      idle_timeout: 5,
+      ssl: databaseTls(),
+    });
     pools.set(databaseUrl, sql);
   }
   return sql;

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import postgres from 'postgres';
+import { databaseTls } from '../database-tls';
 import { z } from 'zod';
 import { extractReadablePageText } from '../job-posting-extractor';
 import { httpUrlSchema } from '../http-url';
@@ -128,7 +129,11 @@ export async function processCompanyResearchStep(input: {
   client: LocalOpenAICompanyResearchClient;
   fetchText?: (url: string) => Promise<SafeHttpResult>;
 }) {
-  const sql = postgres(input.databaseUrl, { max: 1, idle_timeout: 5 });
+  const sql = postgres(input.databaseUrl, {
+    max: 1,
+    idle_timeout: 5,
+    ssl: databaseTls(),
+  });
   let claimed: ClaimedStep | undefined;
   let dispatched = false;
   let stopHeartbeat: () => Promise<void> = async () => undefined;
@@ -414,7 +419,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
       as expected_role,
     exists(
       select 1 from pg_namespace namespace
-      where namespace.nspname in ('app', 'auth') and (
+      where namespace.nspname in ('app', 'career_identity') and (
         has_schema_privilege(current_user, namespace.oid, 'usage')
         or has_schema_privilege(current_user, namespace.oid, 'create')
       )
@@ -427,7 +432,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists(
       select 1 from pg_class relation
       join pg_namespace namespace on namespace.oid = relation.relnamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and case when relation.relkind in ('r', 'p', 'v', 'm', 'f') then
           (
             has_table_privilege(
@@ -443,7 +448,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists(
       select 1 from pg_class relation
       join pg_namespace namespace on namespace.oid = relation.relnamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and case when relation.relkind = 'S' then
           has_sequence_privilege(
             current_user, relation.oid, 'usage,select,update'
@@ -453,7 +458,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists(
       select 1 from pg_proc procedure
       join pg_namespace namespace on namespace.oid = procedure.pronamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and has_function_privilege(current_user, procedure.oid, 'execute')
     ) as has_function_access,
     database_owner.oid = target.oid as target_database_owner,
@@ -467,7 +472,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
       as target_app_usage,
     exists(
       select 1 from pg_namespace namespace
-      where namespace.nspname = 'auth' and (
+      where namespace.nspname in ('auth', 'career_identity') and (
         has_schema_privilege(target.rolname, namespace.oid, 'usage')
         or has_schema_privilege(target.rolname, namespace.oid, 'create')
       )
@@ -480,7 +485,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists(
       select 1 from pg_class relation
       join pg_namespace namespace on namespace.oid = relation.relnamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and case when relation.relkind in ('r', 'p', 'v', 'm', 'f') then
           (
             has_table_privilege(
@@ -496,7 +501,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists(
       select 1 from pg_class relation
       join pg_namespace namespace on namespace.oid = relation.relnamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and case when relation.relkind = 'S' then
           has_sequence_privilege(
             target.rolname, relation.oid, 'usage,select,update'
@@ -506,7 +511,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists(
       select 1 from pg_proc procedure
       join pg_namespace namespace on namespace.oid = procedure.pronamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and has_function_privilege(target.rolname, procedure.oid, 'execute')
         and not (
           namespace.nspname = 'app'

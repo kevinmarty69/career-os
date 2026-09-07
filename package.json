@@ -46,7 +46,8 @@
     "test:integration:semantic": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=${DATABASE_URL:-postgres://career_os:career_os@127.0.0.1:54329/career_os} tsx --test tests/integration/semantic-analyses.test.ts"
   },
   "dependencies": {
-    "better-auth": "1.7.2",
+    "@supabase/ssr": "^0.12.6",
+    "@supabase/supabase-js": "^2.115.0",
     "mammoth": "1.12.2",
     "next": "16.3.4",
     "pg": "8.23.0",

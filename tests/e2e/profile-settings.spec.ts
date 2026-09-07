@@ -3,7 +3,7 @@ import { mockPersistedWorkspace } from './persisted-workspace';
 
 async function account(page: Page) {
   await mockPersistedWorkspace(page);
-  await page.route('**/api/auth/get-session**', (route) =>
+  await page.route('**/api/auth/session', (route) =>
     route.fulfill({
       json: {
         session: {

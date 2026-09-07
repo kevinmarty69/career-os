@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { PageHeader } from '@/components/ui/primitives';
-import { authClient } from '@/lib/auth-client';
+import { useAuthUser } from '@/lib/auth-client';
 import styles from './profile-settings-screen.module.css';
 
 export function ProfileSettingsScreen() {
   const { locale, setLocale } = useI18n();
-  const { data: session } = authClient.useSession();
+  const user = useAuthUser();
   const [saved, setSaved] = useState(false);
   const fr = locale === 'fr';
   return (
@@ -23,10 +23,10 @@ export function ProfileSettingsScreen() {
         }
       />
       <section className={styles.preferences}>
-        {session?.user ? (
+        {user ? (
           <header>
-            <h2>{session.user.name}</h2>
-            <p>{session.user.email}</p>
+            <h2>{user.name}</h2>
+            <p>{user.email}</p>
           </header>
         ) : null}
         <h2>{fr ? 'Préférences' : 'Preferences'}</h2>

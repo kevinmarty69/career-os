@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { authClient } from '@/lib/auth-client';
+import { useAuthUser } from '@/lib/auth-client';
 import { initials } from '@/lib/initials';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { Icon } from '@/components/ui/primitives';
@@ -14,12 +14,12 @@ export function ProfileMenu({
   placement?: 'above' | 'below';
 }) {
   const { locale } = useI18n();
-  const { data: session } = authClient.useSession();
+  const user = useAuthUser();
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const root = useRef<HTMLDetailsElement>(null);
   const label = locale === 'fr' ? 'Mon compte' : 'My account';
-  const name = session?.user.name.trim().split(/\s+/)[0] || label;
+  const name = user?.name.trim().split(/\s+/)[0] || label;
 
   useEffect(() => {
     const dismiss = (event: PointerEvent) => {
@@ -35,8 +35,8 @@ export function ProfileMenu({
     setPending(true);
     setFailed(false);
     try {
-      const result = await authClient.signOut();
-      if (result.error) throw new Error('Sign out failed');
+      const result = await fetch('/api/auth/sign-out', { method: 'POST' });
+      if (!result.ok) throw new Error('Sign out failed');
       try {
         // The CV import review is tab-local and must not survive an account change.
         sessionStorage.removeItem('career-os-memory-import:v1');
@@ -72,13 +72,7 @@ export function ProfileMenu({
       }}
     >
       <summary aria-label={`${label} · ${name}`}>
-        <i>
-          {session?.user.name ? (
-            initials(session.user.name)
-          ) : (
-            <Icon>person</Icon>
-          )}
-        </i>
+        <i>{user?.name ? initials(user.name) : <Icon>person</Icon>}</i>
         <span>{name}</span>
         <Icon>unfold_more</Icon>
       </summary>

@@ -56,7 +56,7 @@ export async function createApplication(
         hashtextextended(${`${session.tenantId}:application:${idempotencyKey}`}, 0)
       )`;
     const [owner] = await tx<{ user_id: string }[]>`
-        select "userId" as user_id from auth."member"
+        select "userId" as user_id from career_identity."member"
         where "organizationId" = ${session.tenantId} and role = 'owner'
         order by "createdAt" limit 1`;
     await authorize(tx, session);

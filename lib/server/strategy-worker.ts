@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { databaseTls } from '../database-tls';
 import { parseRecruiterStrategyInput } from '../recruiter-strategy';
 import {
   LocalOpenAIRecruiterStrategyClient,
@@ -21,7 +22,11 @@ export async function processRecruiterStrategyStep(input: {
   databaseUrl: string;
   client: LocalOpenAIRecruiterStrategyClient;
 }) {
-  const sql = postgres(input.databaseUrl, { max: 1, idle_timeout: 5 });
+  const sql = postgres(input.databaseUrl, {
+    max: 1,
+    idle_timeout: 5,
+    ssl: databaseTls(),
+  });
   let claimed: ClaimedStep | undefined;
   let dispatched = false;
   let stopHeartbeat: () => Promise<void> = async () => undefined;
@@ -146,14 +151,14 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     pg_has_role(current_user, target.oid, 'member') as expected_role,
     exists (
       select 1 from pg_namespace namespace
-      where namespace.nspname in ('app', 'auth') and (
+      where namespace.nspname in ('app', 'career_identity') and (
         has_schema_privilege(current_user, namespace.oid, 'usage')
         or has_schema_privilege(current_user, namespace.oid, 'create')
       )
     ) or exists (
       select 1 from pg_class relation
       join pg_namespace namespace on namespace.oid = relation.relnamespace
-      where namespace.nspname in ('app', 'auth') and case
+      where namespace.nspname in ('app', 'career_identity') and case
         when relation.relkind in ('r', 'p', 'v', 'm', 'f') then
           has_table_privilege(current_user, relation.oid,
             'select,insert,update,delete,truncate,references,trigger')
@@ -166,7 +171,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     ) or exists (
       select 1 from pg_proc procedure
       join pg_namespace namespace on namespace.oid = procedure.pronamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and has_function_privilege(current_user, procedure.oid, 'execute')
     ) as login_has_access,
     exists (
@@ -180,7 +185,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists (
       select 1 from pg_class relation
       join pg_namespace namespace on namespace.oid = relation.relnamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and relation.relkind in ('r', 'p', 'v', 'm', 'f')
         and (has_table_privilege(target.rolname, relation.oid,
           'select,insert,update,delete,truncate,references,trigger')
@@ -191,7 +196,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists (
       select 1 from pg_class relation
       join pg_namespace namespace on namespace.oid = relation.relnamespace
-      where namespace.nspname in ('app', 'auth') and case
+      where namespace.nspname in ('app', 'career_identity') and case
         when relation.relkind = 'S' then
           has_sequence_privilege(target.rolname, relation.oid, 'usage,select,update')
         else false end
@@ -201,7 +206,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     has_schema_privilege(target.rolname, app_namespace.oid, 'usage')
       as target_app_usage,
     exists (
-      select 1 from pg_namespace namespace where namespace.nspname = 'auth'
+      select 1 from pg_namespace namespace where namespace.nspname in ('auth', 'career_identity')
         and (has_schema_privilege(target.rolname, namespace.oid, 'usage')
           or has_schema_privilege(target.rolname, namespace.oid, 'create'))
     ) as target_auth_access,
@@ -213,7 +218,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     exists (
       select 1 from pg_proc procedure
       join pg_namespace namespace on namespace.oid = procedure.pronamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and has_function_privilege(target.rolname, procedure.oid, 'execute')
         and not (namespace.nspname = 'app' and
           (procedure.proname, pg_get_function_identity_arguments(procedure.oid)) in (
