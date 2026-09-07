@@ -57,7 +57,7 @@ export function DemoPage() {
         <header className={styles.topbar}>
           <div className={styles.brand}>
             <span aria-hidden="true" className={styles.mark} />
-            Career OS
+            careeros
           </div>
           <LocaleSwitch compact />
         </header>

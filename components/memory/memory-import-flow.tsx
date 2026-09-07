@@ -52,7 +52,7 @@ function Brand() {
         src="/brand/symbol/careeros-symbol-ink.svg"
         width={30}
       />
-      <span>Career OS</span>
+      <span>careeros</span>
     </Link>
   );
 }
@@ -80,7 +80,6 @@ function AppChrome({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
-          <LocaleSwitch compact />
           <section className={styles.setup} aria-labelledby="setup-title">
             <h2 id="setup-title">Mise en route</h2>
             <ol>
@@ -98,6 +97,9 @@ function AppChrome({ children }: { children: React.ReactNode }) {
               </li>
             </ol>
           </section>
+          <div className={styles.sidebarLocale}>
+            <LocaleSwitch compact />
+          </div>
           <div className={styles.localNote}>
             <Icon>lock</Icon>
             <span>

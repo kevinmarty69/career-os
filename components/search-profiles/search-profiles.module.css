@@ -14,7 +14,7 @@
   margin: 0 0 6px;
   color: var(--co-accent);
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -22,7 +22,7 @@
 .header h1 {
   margin: 0;
   font-size: clamp(26px, 2.7vw, 34px);
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.08;
   letter-spacing: -0.04em;
 }
@@ -106,7 +106,7 @@
 .profileList > button span {
   overflow: hidden;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -149,7 +149,7 @@
 .checkGroup legend {
   color: var(--co-text-2);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .alertThreshold small {
@@ -171,7 +171,7 @@
   border-radius: 11px;
   outline: 0;
   background: #fff;
-  box-shadow: 0 1px 1px rgb(21 22 28 / 2%);
+  box-shadow: none;
   font: inherit;
   font-size: 13px;
 }
@@ -199,7 +199,7 @@
   border-radius: 11px;
   background: #fff;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .switch input,
@@ -324,7 +324,7 @@
 .sourceList label > span {
   color: var(--co-text-2);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .discoveryControls select,
@@ -416,8 +416,8 @@
 }
 
 .simulator {
-  border-color: #d9d5fb;
-  background: linear-gradient(135deg, #fff 0%, #faf9ff 100%);
+  border-color: var(--co-border);
+  background: var(--co-surface);
 }
 
 .simulatorFields {
@@ -489,7 +489,7 @@
   align-items: center;
   padding: 12px 14px;
   color: var(--co-crit-text);
-  border: 1px solid #f0d6ce;
+  border: 1px solid #f7e6e3;
   border-radius: 12px;
   background: var(--co-crit-bg);
   font-size: 12px;
@@ -501,7 +501,7 @@
   color: inherit;
   border: 0;
   background: transparent;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
 }
 
@@ -626,4 +626,36 @@
   .actions > div {
     margin: 0 0 3px;
   }
+}
+
+/* Design system v2.0: screen-specific authority. */
+.page :where(h1, h2, h3, strong, b) {
+  font-weight: 600;
+}
+
+.header p {
+  color: var(--co-text-4);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.header h1 {
+  font-size: clamp(27px, 2.4vw, 30px);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.profileList,
+.editor,
+.criteria,
+.simulator {
+  border-color: var(--co-border);
+  box-shadow: none;
+}
+
+.profileList > button.selected {
+  color: var(--co-surface);
+  background: var(--co-text);
 }

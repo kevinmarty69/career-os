@@ -214,7 +214,7 @@ export function AppShell({
           <span>
             <i />
           </span>
-          <strong>Career OS</strong>
+          <strong>careeros</strong>
           <Icon>unfold_more</Icon>
         </Link>
         <LocaleSwitch />

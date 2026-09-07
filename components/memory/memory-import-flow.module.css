@@ -10,10 +10,10 @@
   --accent: #5b6cc4;
   --accent-strong: #4356a8;
   --accent-soft: #e9ecf9;
-  --ok: #17865c;
-  --ok-soft: #e5f5ee;
-  --danger: #b54735;
-  --danger-soft: #faebe7;
+  --ok: #2a7a55;
+  --ok-soft: #dff0e7;
+  --danger: #a85643;
+  --danger-soft: #f7e6e3;
   min-height: 100svh;
   color: var(--ink);
   background: var(--screen);
@@ -76,7 +76,7 @@
   display: grid;
   width: 100%;
   min-height: 100svh;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: 212px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -87,27 +87,31 @@
   padding: 24px 16px;
 }
 
-.sidebar > :global(.co-locale-switch) {
-  position: absolute;
-  top: 25px;
-  right: 16px;
-}
-
 .brand {
   display: flex;
   gap: 11px;
   align-items: center;
-  padding: 0 88px 30px 10px;
+  padding: 0 10px 30px;
   color: var(--ink);
   font-size: 17px;
-  font-weight: 750;
+  font-weight: 600;
   letter-spacing: -0.04em;
   text-decoration: none;
 }
 
 .brand img {
+  flex: 0 0 auto;
   width: 30px;
   height: 30px;
+}
+
+.brand span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebarLocale {
+  margin: 14px 12px 0;
 }
 
 .navigation {
@@ -134,7 +138,7 @@
 }
 
 .navigation a.active {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .navigation a:focus-visible,
@@ -153,7 +157,7 @@
   font-family: 'Material Symbols Rounded';
   font-size: 20px;
   font-style: normal;
-  font-weight: normal;
+  font-weight: 300;
   line-height: 1;
   letter-spacing: normal;
   text-transform: none;
@@ -197,7 +201,7 @@
 }
 
 .setup li:not(.current) .icon {
-  color: #858792;
+  color: #8a8c95;
 }
 
 .localNote {
@@ -258,14 +262,14 @@
 .pageHeading p {
   color: var(--accent-strong);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .pageHeading h1 {
   font-size: clamp(30px, 3vw, 42px);
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1.08;
   letter-spacing: -0.045em;
 }
@@ -301,7 +305,7 @@
 .savedPanel {
   border-radius: 20px;
   background: var(--surface);
-  box-shadow: 0 1px 2px rgb(13 13 15 / 4%);
+  box-shadow: none;
 }
 
 .sourcePanel {
@@ -317,7 +321,7 @@
     border-color 160ms ease,
     background 160ms ease;
   text-align: center;
-  border: 1.5px dashed #c9cad2;
+  border: 1.5px dashed #c5c6cd;
   border-radius: 15px;
   place-items: center;
   align-content: center;
@@ -407,7 +411,7 @@
   gap: 7px;
   color: var(--body);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .pastePanel > label {
@@ -441,7 +445,8 @@
 .identityFields input:focus,
 .editorGrid select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgb(91 108 196 / 15%);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .pastePanel > button {
@@ -460,12 +465,12 @@
 }
 
 .privacyPanel .safeIcon {
-  color: #8ee0bd;
-  background: #1c2924;
+  color: #22a06b;
+  background: #1b6b4a;
 }
 
 .privacyPanel .panelTitle p {
-  color: #b8bbc4;
+  color: #c5c6cd;
 }
 
 .privacyPanel ul {
@@ -478,11 +483,11 @@
   display: flex;
   gap: 13px;
   padding: 18px 0;
-  border-top: 1px solid #303137;
+  border-top: 1px solid #3a3b42;
 }
 
 .privacyPanel li > .icon {
-  color: #8ee0bd;
+  color: #22a06b;
 }
 
 .privacyPanel li span {
@@ -495,7 +500,7 @@
 }
 
 .privacyPanel li small {
-  color: #b8bbc4;
+  color: #c5c6cd;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -512,7 +517,7 @@
   border: 0;
   border-radius: 999px;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
 }
@@ -537,12 +542,12 @@
 
 .primaryButton:hover,
 .primaryButton:focus-visible {
-  background: #29292e;
+  background: #3a3b42;
 }
 
 .secondaryButton:hover,
 .secondaryButton:focus-visible {
-  border-color: #b8bac4;
+  border-color: #c5c6cd;
   background: var(--fill);
 }
 
@@ -570,8 +575,8 @@
   align-items: center;
   margin-bottom: 16px;
   padding: 13px 16px;
-  color: #812f22;
-  border: 1px solid #edc9c1;
+  color: #a8402c;
+  border: 1px solid #f7e6e3;
   border-radius: 13px;
   background: var(--danger-soft);
   font-size: 13px;
@@ -803,7 +808,7 @@
 
 .usageOptions input:checked + span {
   color: var(--accent-strong);
-  border-color: #bdc5ec;
+  border-color: #e9ecf9;
   background: var(--accent-soft);
 }
 
@@ -827,7 +832,7 @@
 .sourceDetail summary {
   color: var(--body);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -882,8 +887,8 @@
 }
 
 .validationPanel > p {
-  color: #aeb0b9;
-  font-weight: 700;
+  color: #9a9ba3;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -896,7 +901,7 @@
 .validationPanel > span {
   display: block;
   margin-top: 10px;
-  color: #c9cad1;
+  color: #c5c6cd;
   font-size: 12px;
   line-height: 1.55;
 }
@@ -907,8 +912,8 @@
   align-items: flex-start;
   margin: 22px 0;
   padding: 14px;
-  color: #e8e8eb;
-  border: 1px solid #3a3b41;
+  color: #edeef1;
+  border: 1px solid #3a3b42;
   border-radius: 12px;
   font-size: 12px;
   line-height: 1.45;
@@ -930,7 +935,7 @@
 .validationPanel > small {
   display: block;
   margin-top: 12px;
-  color: #aeb0b9;
+  color: #9a9ba3;
   font-size: 10px;
   line-height: 1.5;
   text-align: center;
@@ -982,7 +987,7 @@
   margin-top: 20px;
   color: var(--ok);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -1071,7 +1076,7 @@
     grid-template-columns: repeat(4, 1fr);
     border-top: 1px solid var(--line);
     background: rgb(255 255 255 / 96%);
-    backdrop-filter: blur(12px);
+    backdrop-filter: none;
   }
 
   .mobileNavigation a {
@@ -1195,4 +1200,35 @@
   .indeterminate i {
     animation-duration: 3s;
   }
+}
+
+/* Design system v2.0: screen-specific authority. */
+.canvas :where(h1, h2, h3, strong, b) {
+  font-weight: 600;
+}
+
+.navigation a.active {
+  color: var(--surface);
+  background: var(--ink);
+}
+
+.navigation a.active .icon {
+  color: var(--surface);
+}
+
+.main,
+.content {
+  border-radius: 0;
+}
+
+.card,
+.pastePanel,
+.privacyPanel,
+.identityPanel,
+.candidates,
+.sourceSummary,
+.validationPanel,
+.readingPanel,
+.savedPanel {
+  box-shadow: none;
 }
