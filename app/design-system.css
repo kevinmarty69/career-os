@@ -29,6 +29,7 @@
   --color-clay-text: #a14d3b;
   --color-clay-strong: #a8402c;
   --color-clay-tint: #f7e6e3;
+  --color-clay-hover: #8e3524;
   --color-indigo: #5b6cc4;
   --color-indigo-text: #4356a8;
   --color-indigo-deep: #22305c;
@@ -73,6 +74,16 @@
   --text-ui: 13px;
   --text-label: 12.5px;
   --text-caption: 11.5px;
+  --text-overline: 11.5px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 11px;
+  --space-4: 14px;
+  --space-5: 16px;
+  --space-6: 18px;
+  --space-7: 24px;
+  --space-8: 40px;
 
   /* Compatibility names while the screen markup is migrated by feature. */
   --canvas: var(--color-canvas);
@@ -417,8 +428,8 @@ pre {
 }
 
 .co-button.danger:hover {
-  border-color: #8e3524;
-  background: #8e3524;
+  border-color: var(--color-clay-hover);
+  background: var(--color-clay-hover);
 }
 
 .co-panel,

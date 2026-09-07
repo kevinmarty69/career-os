@@ -1,6 +1,4 @@
 'use client';
-import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
-import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 
 import {
   LocaleSwitch,
@@ -33,37 +31,16 @@ export function AppShell({
   sidebarContext?: ReactNode;
   sidebarFooter?: ReactNode;
 }) {
-  const t = useTranslations([
-    activeRoutesMessages,
-    memoryMessages,
-    shellMessages,
-  ]);
+  const t = useTranslations([shellMessages]);
 
   const nav = [
     ['/', 'space_dashboard', t('shell.home')],
-    ['/inbox', 'inbox', t('shell.needs.review')],
-    ['/applications', 'work_history', t('shell.applications')],
+    ['/applications', 'account_tree', t('shell.applications')],
     ['/memory', 'database', t('shell.career.memory')],
-    ['/search-profiles', 'tune', t('shell.search.profiles')],
-    ['/links', 'link', t('shell.private.links')],
-    ['/insights', 'monitoring', 'Insights'],
+    ['/links', 'send', t('shell.private.links')],
     ['/settings/models', 'settings', t('shell.settings')],
   ] as const;
   const [palette, setPalette] = useState(false);
-  const screenNav =
-    path === '/assets'
-      ? [
-          ...nav.slice(0, 4),
-          ['/assets', 'description', 'Assets'] as const,
-          ...nav.slice(4),
-        ]
-      : path === '/runs'
-        ? [
-            ...nav.slice(0, 4),
-            ['/runs', 'bolt', t('active-routes.agent.runs')] as const,
-            ...nav.slice(4),
-          ]
-        : nav;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -90,7 +67,7 @@ export function AppShell({
         </Link>
         <LocaleSwitch />
         <nav aria-label={t('shell.main.navigation')}>
-          {screenNav.map(([href, icon, label]) => (
+          {nav.map(([href, icon, label]) => (
             <Link
               aria-current={
                 path === href || (href !== '/' && path.startsWith(href))
@@ -134,8 +111,8 @@ export function AppShell({
       </section>
       {aside ? <aside className="co-sidepanel">{aside}</aside> : null}
       {palette ? <CommandPalette onClose={() => setPalette(false)} /> : null}
-      <nav aria-label={t('memory.mobile.navigation')} className="co-mobile-nav">
-        {screenNav.slice(0, 4).map(([href, icon, label]) => (
+      <nav aria-label={t('shell.main.navigation')} className="co-mobile-nav">
+        {nav.slice(0, 4).map(([href, icon, label]) => (
           <Link
             aria-current={
               path === href || (href !== '/' && path.startsWith(href))
