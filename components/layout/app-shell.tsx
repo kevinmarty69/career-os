@@ -1,20 +1,24 @@
 'use client';
 
-import {
-  LocaleSwitch,
-  useI18n,
-  useTranslations,
-} from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { CommandPalette } from '@/components/search/command-palette';
 import { Icon } from '@/components/ui/primitives';
 import {
   type Application,
   applicationSchema,
 } from '@/lib/application-contract';
-import { readApplications, readInstanceStatus } from '@/lib/career-api';
+import {
+  readApplications,
+  readProfile,
+  readPublications,
+} from '@/lib/career-api';
 import { shellMessages } from '@/lib/i18n/dictionaries/shell';
 import { initials } from '@/lib/initials';
-import { instanceStatusSchema } from '@/lib/run-contract';
+import { profileSchema, type Profile } from '@/lib/schemas';
+import {
+  publicationSummarySchema,
+  type PublicationSummary,
+} from '@/lib/server/publication-input';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 
@@ -32,13 +36,30 @@ export function AppShell({
   sidebarFooter?: ReactNode;
 }) {
   const t = useTranslations([shellMessages]);
+  const { locale } = useI18n();
+  const sidebar = useSidebarState();
 
   const nav = [
-    ['/', 'space_dashboard', t('shell.home')],
-    ['/applications', 'account_tree', t('shell.applications')],
-    ['/memory', 'database', t('shell.career.memory')],
-    ['/links', 'send', t('shell.private.links')],
-    ['/settings/models', 'settings', t('shell.settings')],
+    ['/', 'grid_view', t('shell.home'), undefined],
+    [
+      '/applications',
+      'account_tree',
+      t('shell.applications'),
+      sidebar?.applications.length,
+    ],
+    [
+      '/memory',
+      'database',
+      t('shell.career.memory'),
+      sidebar?.profile.claims.length,
+    ],
+    [
+      '/links',
+      'send',
+      t('shell.private.links'),
+      sidebar?.publications.filter(({ status }) => status === 'active').length,
+    ],
+    ['/settings/models', 'settings', t('shell.settings'), undefined],
   ] as const;
   const [palette, setPalette] = useState(false);
   useEffect(() => {
@@ -58,16 +79,14 @@ export function AppShell({
         {t('shell.skip.to.main.content')}{' '}
       </a>
       <aside className="co-sidebar" aria-label={t('shell.main.navigation')}>
-        <Link className="co-brand" href="/">
+        <Link aria-label="Career OS" className="co-brand" href="/">
           <span>
             <Icon>layers</Icon>
           </span>
           <strong>careeros</strong>
-          <Icon>unfold_more</Icon>
         </Link>
-        <LocaleSwitch />
         <nav aria-label={t('shell.main.navigation')}>
-          {nav.map(([href, icon, label]) => (
+          {nav.map(([href, icon, label, count]) => (
             <Link
               aria-current={
                 path === href || (href !== '/' && path.startsWith(href))
@@ -84,27 +103,23 @@ export function AppShell({
             >
               <Icon>{icon}</Icon>
               <span>{label}</span>
+              {count ? <b>{count}</b> : null}
             </Link>
           ))}
         </nav>
-        {sidebarContext ?? <CurrentApplications />}
-        {sidebarFooter === undefined ? <InstanceCard /> : sidebarFooter}
+        {sidebarContext ?? (
+          <CurrentApplications
+            applications={sidebar?.applications ?? []}
+            locale={locale}
+          />
+        )}
+        {sidebarFooter === undefined ? (
+          <SidebarProfile profile={sidebar?.profile} />
+        ) : (
+          sidebarFooter
+        )}
       </aside>
       <section className="co-surface">
-        {path === '/' ? (
-          <header className="co-home-topbar">
-            <button
-              aria-label={t('shell.search.evidence.a.company.or.a.claim')}
-              className="co-home-search"
-              onClick={() => setPalette(true)}
-              type="button"
-            >
-              <Icon>search</Icon>
-              <span>{t('shell.search.evidence.a.company.or.a.claim')}</span>
-              <kbd>⌘K</kbd>
-            </button>
-          </header>
-        ) : null}
         <div className="co-content" id="main-content" tabIndex={-1}>
           {children}
         </div>
@@ -132,52 +147,91 @@ export function AppShell({
           </Link>
         ))}
       </nav>
-      <div className="co-mobile-locale">
-        <LocaleSwitch compact />
-      </div>
     </main>
   );
 }
 
-export function CurrentApplications() {
-  const t = useTranslations([shellMessages]);
-  const { locale } = useI18n();
-  const [applications, setApplications] = useState<Application[]>();
+function useSidebarState() {
+  const [state, setState] = useState<{
+    applications: Application[];
+    profile: Profile;
+    publications: PublicationSummary[];
+  }>();
 
   useEffect(() => {
     const controller = new AbortController();
-    void readApplications(controller.signal)
-      .then(async (response) => {
-        if (!response.ok) throw new Error();
-        const payload = (await response.json()) as { applications?: unknown };
-        setApplications(
-          applicationSchema
-            .array()
-            .parse(payload.applications ?? [])
-            .slice(0, 3),
-        );
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setApplications([]);
-      });
+    void Promise.all([
+      readApplications(controller.signal),
+      readProfile(controller.signal),
+      readPublications(controller.signal),
+    ])
+      .then(
+        async ([
+          applicationsResponse,
+          profileResponse,
+          publicationsResponse,
+        ]) => {
+          if (
+            !applicationsResponse.ok ||
+            !profileResponse.ok ||
+            !publicationsResponse.ok
+          )
+            return;
+          const applicationsPayload = (await applicationsResponse.json()) as {
+            applications?: unknown;
+          };
+          const profilePayload = (await profileResponse.json()) as {
+            profile?: unknown;
+          };
+          const publicationsPayload = (await publicationsResponse.json()) as {
+            publications?: unknown;
+          };
+          const profile = profileSchema
+            .nullable()
+            .parse(profilePayload.profile);
+          if (!profile) return;
+          setState({
+            applications: applicationSchema
+              .array()
+              .parse(applicationsPayload.applications ?? []),
+            profile,
+            publications: publicationSummarySchema
+              .array()
+              .parse(publicationsPayload.publications ?? []),
+          });
+        },
+      )
+      .catch(() => undefined);
     return () => controller.abort();
   }, []);
+
+  return state;
+}
+
+export function CurrentApplications({
+  applications,
+  locale,
+}: {
+  applications: Application[];
+  locale: 'en' | 'fr';
+}) {
+  const t = useTranslations([shellMessages]);
 
   return (
     <>
       <p className="co-nav-label">{t('shell.in.progress')}</p>
       <div className="co-current-list">
-        {applications?.map((application) => (
+        {applications.slice(0, 1).map((application) => (
           <Link
             href={`/applications/${application.applicationId}`}
             key={application.applicationId}
           >
-            <i>{initials(application.company)}</i>
-            <span>{application.company}</span>
             <b className={application.stage === 'closed' ? '' : 'ok'} />
+            <span>{application.company}</span>
+            <small>{stageLabel(application.stage, locale)}</small>
           </Link>
         ))}
-        {applications && !applications.length ? (
+        {!applications.length ? (
           <Link href="/applications/new">
             <i>+</i>
             <span>
@@ -190,53 +244,52 @@ export function CurrentApplications() {
   );
 }
 
-export function InstanceCard() {
-  const t = useTranslations([shellMessages]);
+function SidebarProfile({ profile }: { profile?: Profile }) {
   const { locale } = useI18n();
-  const [status, setStatus] =
-    useState<ReturnType<typeof instanceStatusSchema.parse>>();
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void readInstanceStatus(controller.signal)
-      .then(async (response) => {
-        if (!response.ok) throw new Error();
-        setStatus(instanceStatusSchema.parse(await response.json()));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setStatus(undefined);
-      });
-    return () => controller.abort();
-  }, []);
-
-  const fresh = status?.services.filter(
-    ({ status }) => status === 'fresh',
+  const sourced = profile?.claims.filter(
+    ({ evidenceIds }) => evidenceIds.length,
   ).length;
-  const healthy = status && fresh === status.services.length;
+  const total = profile?.claims.length ?? 0;
+  const coverage = total ? Math.round(((sourced ?? 0) / total) * 100) : 0;
+  const missing = total - (sourced ?? 0);
   return (
-    <div className="co-instance">
-      <Icon>{healthy ? 'cloud_done' : 'cloud_off'}</Icon>
-      <strong>
-        {healthy
-          ? locale === 'fr'
-            ? t('shell.instance.healthy')
-            : 'Healthy instance'
-          : locale === 'fr'
-            ? 'Workers à vérifier'
-            : 'Workers need attention'}
-      </strong>
-      <small>
-        {status
-          ? `${status.mode === 'self-hosted' ? (locale === 'fr' ? 'Auto-hébergé' : 'Self-hosted') : 'Cloud'} · ${fresh}/${status.services.length} ${locale === 'fr' ? 'workers actifs' : 'active workers'}`
-          : locale === 'fr'
-            ? 'État des workers indisponible'
-            : 'Worker status unavailable'}
-      </small>
-      {!healthy ? (
-        <Link href="/settings/models">
-          {locale === 'fr' ? 'Voir la config' : 'Open settings'}
-        </Link>
-      ) : null}
+    <div className="co-sidebar-profile">
+      <Link className="co-sidebar-memory" href="/memory">
+        <span>
+          <Icon>verified</Icon>
+          <strong>
+            {coverage}% {locale === 'fr' ? 'sourcé' : 'sourced'}
+          </strong>
+        </span>
+        <i aria-hidden="true">
+          <b style={{ width: `${coverage}%` }} />
+        </i>
+        <small>
+          {missing
+            ? locale === 'fr'
+              ? `${missing} affirmation${missing > 1 ? 's' : ''} à documenter`
+              : `${missing} claim${missing > 1 ? 's' : ''} to document`
+            : locale === 'fr'
+              ? 'Mémoire entièrement sourcée'
+              : 'Career memory fully sourced'}
+        </small>
+      </Link>
+      <Link className="co-sidebar-user" href="/settings/profile">
+        <i>{initials(profile?.name || 'Career OS')}</i>
+        <span>{profile?.name || 'Career OS'}</span>
+        <Icon>unfold_more</Icon>
+      </Link>
     </div>
   );
+}
+
+function stageLabel(stage: Application['stage'], locale: 'en' | 'fr') {
+  const labels = {
+    draft: locale === 'fr' ? 'brouillon' : 'draft',
+    applied: locale === 'fr' ? 'envoyée' : 'sent',
+    interview: locale === 'fr' ? 'entretien' : 'interview',
+    offer: locale === 'fr' ? 'offre' : 'offer',
+    closed: locale === 'fr' ? 'fermée' : 'closed',
+  } as const;
+  return labels[stage];
 }

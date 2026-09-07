@@ -36,7 +36,7 @@
   letter-spacing: -0.036em;
 }
 
-.header span {
+.header > div > span {
   display: block;
   margin-top: var(--space-2);
   color: var(--color-ink-600);
@@ -305,7 +305,7 @@
   margin: 0;
 }
 
-.header span {
+.header > div > span {
   display: block;
   max-width: 680px;
   margin-top: 8px;

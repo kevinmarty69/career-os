@@ -33,7 +33,9 @@ export function useCareerMemory() {
       .then(async ([profileResponse, historyResponse]) => {
         if (profileResponse.status === 401) {
           setMessage(
-            'Connectez-vous pour consulter votre mémoire professionnelle.',
+            locale === 'fr'
+              ? 'Connectez-vous pour consulter votre mémoire professionnelle.'
+              : 'Sign in to view your career memory.',
           );
           return;
         }
@@ -55,21 +57,27 @@ export function useCareerMemory() {
       .catch(() => {
         if (!controller.signal.aborted)
           setMessage(
-            'La mémoire professionnelle est momentanément indisponible.',
+            locale === 'fr'
+              ? 'La mémoire professionnelle est momentanément indisponible.'
+              : 'Career memory is temporarily unavailable.',
           );
       })
       .finally(() => {
         if (!controller.signal.aborted) setState('ready');
       });
     return () => controller.abort();
-  }, []);
+  }, [locale]);
 
   const coverage = useMemo(() => memoryCoverage(profile), [profile]);
 
   async function save() {
     const parsed = profileSchema.safeParse(profile);
     if (!parsed.success) {
-      setMessage('Complétez le nom, le positionnement et les champs signalés.');
+      setMessage(
+        locale === 'fr'
+          ? 'Complétez le nom, le positionnement et les champs signalés.'
+          : 'Complete your name, positioning and the highlighted fields.',
+      );
       return false;
     }
     setState('saving');
@@ -78,7 +86,9 @@ export function useCareerMemory() {
       const response = await saveProfile(parsed.data, revision);
       if (response.status === 409) {
         setMessage(
-          'Cette mémoire a changé dans une autre session. Rechargez la page.',
+          locale === 'fr'
+            ? 'Cette mémoire a changé dans une autre session. Rechargez la page.'
+            : 'This memory changed in another session. Reload the page.',
         );
         return false;
       }
@@ -100,12 +110,16 @@ export function useCareerMemory() {
         ...current.filter(({ revision: item }) => item !== payload.revision),
       ]);
       setMessage(
-        'Mémoire enregistrée. La correction reste disponible dans l’historique.',
+        locale === 'fr'
+          ? 'Mémoire enregistrée. La correction reste disponible dans l’historique.'
+          : 'Memory saved. The previous version remains available in history.',
       );
       return true;
     } catch {
       setMessage(
-        'Échec de l’enregistrement. Vos corrections restent dans cette page.',
+        locale === 'fr'
+          ? 'Échec de l’enregistrement. Vos corrections restent dans cette page.'
+          : 'Save failed. Your changes remain on this page.',
       );
       return false;
     } finally {

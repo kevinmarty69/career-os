@@ -1,257 +1,290 @@
 'use client';
 
-import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
-
 import {
   runStageLabel,
   runStatusLabel,
 } from '@/components/applications/workflow-labels';
 import { useWorkflowDashboard } from '@/components/dashboard/use-workflow-dashboard';
-import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
+import { useI18n } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
-import { Icon, Stat } from '@/components/ui/primitives';
+import { useCareerMemory } from '@/components/memory/use-career-memory';
+import { Icon } from '@/components/ui/primitives';
 import {
   dashboardActions,
   type DashboardAction,
 } from '@/lib/dashboard-priority';
-import { homeMessages } from '@/lib/i18n/dictionaries/home';
-import { operationalMessages } from '@/lib/i18n/dictionaries/operational';
-import { type PublicationSummary } from '@/lib/server/publication-input';
+import { initials } from '@/lib/initials';
 import Link from 'next/link';
 
-export function HomeAside({
-  loading,
-  publications,
-}: {
-  loading: boolean;
-  publications: PublicationSummary[];
-}) {
-  const { locale } = useI18n();
-  const t = useTranslations([homeMessages, activeRoutesMessages]);
-  const active = publications.filter((item) => item.status === 'active');
-  return (
-    <div className="co-home-aside">
-      <section className="co-home-links">
-        <header>
-          <h2>{t('home.active.private.links')}</h2>
-          <Link href="/links">{t('home.view.all')}</Link>
-        </header>
-        {active.slice(0, 3).map((publication) => (
-          <Link
-            href={`/applications/${publication.applicationId}`}
-            key={publication.publicationId}
-          >
-            <Icon>{publication.opens ? 'visibility' : 'visibility_off'}</Icon>
-            <span>
-              <strong>{publication.company}</strong>
-              <small>
-                {publication.opens
-                  ? locale === 'fr'
-                    ? `${publication.opens} ouverture${publication.opens > 1 ? 's' : ''}`
-                    : `${publication.opens} opening${publication.opens > 1 ? 's' : ''}`
-                  : locale === 'fr'
-                    ? t('home.never.opened')
-                    : 'Never opened'}
-              </small>
-            </span>
-            <Icon>arrow_forward</Icon>
-          </Link>
-        ))}
-        {loading ? <p>{t('active-routes.loading')}</p> : null}
-        {!loading && !active.length ? <p>{t('home.no.active.link')}</p> : null}
-      </section>
-      <section className="co-home-aside-note">
-        <Icon>privacy_tip</Icon>
-        <h2>{t('home.explainable.priorities')}</h2>
-        <p>{t('home.the.next.action.comes.only.from.the.recorded.state')}</p>
-      </section>
-    </div>
-  );
-}
-
 export function HomeScreen() {
-  const t = useTranslations([
-    activeRoutesMessages,
-    homeMessages,
-    operationalMessages,
-  ]);
-
   const { locale } = useI18n();
   const { dashboard, error: dashboardError } = useWorkflowDashboard();
+  const memory = useCareerMemory();
 
   const actions = dashboardActions(dashboard?.items ?? []);
   const priority = actions[0];
-  const activeLinks =
-    dashboard?.publications.filter((item) => item.status === 'active').length ??
-    0;
-  const copy = homePriorityCopy(priority, locale, dashboardError);
   const latestSignal = [...(dashboard?.publications ?? [])]
     .filter((item) => item.status === 'active' && item.lastOpenedAt)
     .sort((left, right) =>
       (right.lastOpenedAt ?? '').localeCompare(left.lastOpenedAt ?? ''),
     )[0];
-  const activeApplications =
-    dashboard?.applications.filter((item) => item.stage !== 'closed').length ??
-    0;
+  const activeApplications = (dashboard?.applications ?? []).filter(
+    (item) => item.stage !== 'closed',
+  );
+  const evidenceGaps = memory.profile.claims.filter(
+    (claim) => claim.level === 'unsupported' || claim.evidenceIds.length === 0,
+  );
+  const firstName = memory.profile.name.trim().split(/\s+/)[0];
+  const today = new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date());
 
   return (
-    <AppShell
-      aside={
-        <HomeAside
-          loading={!dashboard && !dashboardError}
-          publications={dashboard?.publications ?? []}
-        />
-      }
-      path="/"
-      sidebarFooter={
-        <div className="co-home-hosting">
-          <strong>{t('active-routes.self.hosted')}</strong>
-          <span>{t('home.your.evidence.never.leaves.your.instance')}</span>
-          <Link href="/settings/models">{t('home.view.configuration')}</Link>
-        </div>
-      }
-    >
-      <div className="co-home-screen">
-        <header className="co-followup-heading">
-          <p>{t('operations.home.welcome')}</p>
-          <h1>{copy.title}</h1>
-          <span>{copy.detail}</span>
+    <AppShell path="/">
+      <div className="co-home-v2">
+        <header className="co-home-v2-header">
+          <div>
+            <time dateTime={new Date().toISOString()} suppressHydrationWarning>
+              {today}
+            </time>
+            <h1>
+              {locale === 'fr' ? 'Bonjour' : 'Hello'}
+              {firstName ? ` ${firstName}` : ''}
+            </h1>
+          </div>
+          <Link className="co-home-import" href="/applications/new">
+            <Icon>link</Icon>
+            <span>
+              {locale === 'fr' ? 'Coller une offre…' : 'Paste a job URL…'}
+            </span>
+            <i>
+              <Icon>arrow_forward</Icon>
+            </i>
+          </Link>
         </header>
 
-        <section
-          className={`co-access-signal${latestSignal ? '' : ' is-empty'}`}
-        >
-          <div className="co-access-signal-copy">
-            <span className="co-signal-icon">
+        <section className="co-home-signal">
+          <div>
+            <p>
               <Icon>{latestSignal ? 'visibility' : 'visibility_off'}</Icon>
+              {locale === 'fr' ? 'SIGNAL FORT' : 'STRONG SIGNAL'}
+            </p>
+            <h2>
+              {latestSignal
+                ? locale === 'fr'
+                  ? `${latestSignal.company} a ouvert votre page ${latestSignal.opens} fois.`
+                  : `${latestSignal.company} opened your page ${latestSignal.opens} times.`
+                : locale === 'fr'
+                  ? 'Aucun signal de lecture pour le moment.'
+                  : 'No reading signal yet.'}
+            </h2>
+            <span>
+              {latestSignal
+                ? locale === 'fr'
+                  ? `${latestSignal.sections} sections consultées · ${latestSignal.actions} actions · ${latestSignal.downloads} téléchargements.`
+                  : `${latestSignal.sections} sections viewed · ${latestSignal.actions} actions · ${latestSignal.downloads} downloads.`
+                : locale === 'fr'
+                  ? 'Les liens actifs restent suivis sans adresse IP, empreinte ni user agent.'
+                  : 'Active links remain monitored without IP addresses, fingerprints, or user agents.'}
             </span>
             <div>
-              <p>{t('operations.home.signal')}</p>
+              <Link href="/links">
+                <Icon>visibility</Icon>
+                {locale === 'fr'
+                  ? 'Voir le journal d’accès'
+                  : 'View access log'}
+              </Link>
+              <Link
+                href={
+                  priority
+                    ? `/applications/${priority.application.applicationId}`
+                    : '/applications'
+                }
+              >
+                {locale === 'fr'
+                  ? 'Voir les candidatures'
+                  : 'View applications'}
+              </Link>
+            </div>
+          </div>
+          <aside>
+            <p>{locale === 'fr' ? 'PREUVES CONSULTÉES' : 'PROOFS CONSULTED'}</p>
+            {[
+              [
+                locale === 'fr' ? 'Sections ouvertes' : 'Sections opened',
+                latestSignal?.sections ?? 0,
+              ],
+              [
+                locale === 'fr' ? 'Actions réalisées' : 'Actions taken',
+                latestSignal?.actions ?? 0,
+              ],
+              [
+                locale === 'fr' ? 'CV téléchargés' : 'CV downloads',
+                latestSignal?.downloads ?? 0,
+              ],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <i className={Number(value) ? 'active' : ''} />
+                <span>{label}</span>
+                <b>{value}</b>
+              </div>
+            ))}
+            <small>
+              {locale === 'fr'
+                ? latestSignal
+                  ? 'Activité agrégée et anonyme de ce lien privé.'
+                  : 'Aucune preuve ouverte pour le moment.'
+                : latestSignal
+                  ? 'Anonymous aggregate activity from this private link.'
+                  : 'No proof opened yet.'}
+            </small>
+          </aside>
+        </section>
+
+        <div className="co-home-v2-grid">
+          <section className="co-home-applications">
+            <header>
               <h2>
-                {latestSignal
-                  ? t('operations.home.signal.title', {
-                      company: latestSignal.company,
-                      count: latestSignal.opens,
-                    })
-                  : t('operations.home.signal.empty.title')}
+                {locale === 'fr' ? 'Vos candidatures' : 'Your applications'}
               </h2>
               <span>
-                {latestSignal
-                  ? t('operations.home.signal.detail', {
-                      sections: latestSignal.sections,
-                      actions: latestSignal.actions,
-                      downloads: latestSignal.downloads,
-                    })
-                  : t('operations.home.signal.empty.detail')}
+                {activeApplications.length}{' '}
+                {locale === 'fr' ? 'active' : 'active'}
               </span>
-              <small>
-                {latestSignal ? t('operations.home.signal.caveat') : null}
-              </small>
-            </div>
-          </div>
-          {latestSignal ? (
-            <dl className="co-signal-metrics">
-              {[
-                [t('operations.home.openings'), latestSignal.opens],
-                [t('operations.home.sections'), latestSignal.sections],
-                [t('operations.home.actions'), latestSignal.actions],
-                [t('operations.home.downloads'), latestSignal.downloads],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
-          <div className="co-access-signal-actions">
-            <Link
-              className="co-button dark"
-              href={
-                latestSignal
-                  ? `/applications/${latestSignal.applicationId}`
-                  : priority
-                    ? `/applications/${priority.application.applicationId}`
-                    : dashboardError === 'auth'
-                      ? '/sign-in'
-                      : '/applications'
-              }
-            >
-              {latestSignal
-                ? t('operations.home.open.application')
-                : copy.action}
-              <Icon>arrow_forward</Icon>
-            </Link>
-            <Link className="co-button secondary" href="/links">
-              {t('home.view.activity.log')}
-            </Link>
-          </div>
-        </section>
-
-        <section className="co-home-stats" aria-label={t('home.key.metrics')}>
-          <Stat
-            icon="work_history"
-            value={String(activeApplications)}
-            label={t('operations.home.active.applications')}
-          />
-          <Stat
-            icon="rule"
-            tone="warn"
-            value={String(actions.length)}
-            label={t('home.priority.actions')}
-          />
-          <Stat
-            icon="lock"
-            tone="ok"
-            value={String(activeLinks)}
-            label={t('home.active.private.links')}
-          />
-        </section>
-
-        <section className="co-home-review-queue">
-          <header>
-            <div>
-              <h2>{t('home.do.now')}</h2>
-              <span>
-                {t('operations.home.active.count', {
-                  count: activeApplications,
-                })}
-              </span>
-            </div>
-          </header>
-          {actions.slice(0, 3).map((action) => (
-            <article
-              className="co-home-review-card compact"
-              key={action.application.applicationId}
-            >
-              <Icon>{homePriorityIcon(action.kind)}</Icon>
-              <div>
-                <h3>
-                  {action.application.company} · {action.application.role}
-                </h3>
-                <p>{homePriorityRow(action, locale)}</p>
-              </div>
-              <Link href={`/applications/${action.application.applicationId}`}>
-                {t('active-routes.open')}
+            </header>
+            {activeApplications.slice(0, 1).map((application) => (
+              <Link
+                href={`/applications/${application.applicationId}`}
+                key={application.applicationId}
+              >
+                <i>{initials(application.company)}</i>
+                <span>
+                  <strong>{application.company}</strong>
+                  <small>{application.role}</small>
+                </span>
+                <em className="active" />
+                <b>{homeApplicationState(application.stage, locale)}</b>
+                <Icon>chevron_right</Icon>
               </Link>
-            </article>
-          ))}
-          {!actions.length ? (
-            <div className="co-note">
-              <Icon>{dashboardError ? 'cloud_off' : 'check_circle'}</Icon>
-              {dashboardError
-                ? locale === 'fr'
-                  ? 'Les priorités ne sont pas disponibles.'
-                  : 'Priorities are unavailable.'
-                : locale === 'fr'
-                  ? 'Aucune candidature ne demande votre attention.'
-                  : 'No application needs your attention.'}
+            ))}
+            {!activeApplications.length ? (
+              <div className="co-home-empty">
+                {dashboardError === 'auth'
+                  ? locale === 'fr'
+                    ? 'Connectez-vous pour retrouver vos candidatures.'
+                    : 'Sign in to view your applications.'
+                  : locale === 'fr'
+                    ? 'Aucune candidature active.'
+                    : 'No active application.'}
+              </div>
+            ) : null}
+            <h3>{locale === 'fr' ? 'Le calendrier' : 'Calendar'}</h3>
+            <div className="co-home-calendar">
+              {actions.slice(0, 3).map((action, index) => (
+                <Link
+                  href={`/applications/${action.application.applicationId}`}
+                  key={action.application.applicationId}
+                >
+                  <i>J+{index + 1}</i>
+                  <span>
+                    <strong>{action.application.company}</strong>
+                    <small>{homePriorityRow(action, locale)}</small>
+                  </span>
+                  <b>{locale === 'fr' ? 'Ouvrir' : 'Open'}</b>
+                </Link>
+              ))}
+              {!actions.length ? (
+                <div className="co-home-empty compact">
+                  {locale === 'fr'
+                    ? 'Aucune prochaine action.'
+                    : 'No next action.'}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </section>
+          </section>
+
+          <aside className="co-home-strengthen">
+            <header>
+              <Icon>insights</Icon>
+              <h2>
+                {locale === 'fr'
+                  ? 'Renforcer votre dossier'
+                  : 'Strengthen your application'}
+              </h2>
+            </header>
+            <p>
+              {locale === 'fr'
+                ? 'Les prochaines actions les plus utiles, selon vos preuves réelles.'
+                : 'The most useful next actions, based on your actual evidence.'}
+            </p>
+            <div>
+              {evidenceGaps.slice(0, 3).map((claim, index) => (
+                <Link
+                  className={index === 0 ? 'priority' : undefined}
+                  href="/memory"
+                  key={claim.id}
+                >
+                  <span>
+                    <Icon>
+                      {claim.kind === 'skill' ? 'code' : 'psychology'}
+                    </Icon>
+                    <strong>{claim.statement}</strong>
+                    <b>
+                      {locale === 'fr' ? 'PREUVE MANQUANTE' : 'EVIDENCE GAP'}
+                    </b>
+                  </span>
+                  <small>
+                    {locale === 'fr'
+                      ? 'Ajoutez une source ou gardez cette affirmation explicitement déclarée.'
+                      : 'Attach a source or keep this claim explicitly declared.'}
+                  </small>
+                </Link>
+              ))}
+              {!evidenceGaps.length ? (
+                <div className="co-home-strengthen-complete">
+                  <Icon>verified</Icon>
+                  <strong>
+                    {locale === 'fr'
+                      ? 'Aucun trou prioritaire détecté.'
+                      : 'No priority evidence gap detected.'}
+                  </strong>
+                  <small>
+                    {locale === 'fr'
+                      ? 'Votre mémoire actuelle couvre les affirmations enregistrées.'
+                      : 'Your current memory covers the claims on record.'}
+                  </small>
+                </div>
+              ) : null}
+            </div>
+            <footer>
+              <Icon>bolt</Icon>
+              <span>
+                {locale === 'fr'
+                  ? 'Chaque preuve ajoutée sert à toutes vos candidatures futures.'
+                  : 'Every proof you add supports future applications too.'}
+              </span>
+            </footer>
+          </aside>
+        </div>
       </div>
     </AppShell>
   );
+}
+
+function homeApplicationState(
+  stage: 'draft' | 'applied' | 'interview' | 'offer' | 'closed',
+  locale: 'en' | 'fr',
+) {
+  const labels = {
+    draft: locale === 'fr' ? 'Brouillon' : 'Draft',
+    applied: locale === 'fr' ? 'Envoyée' : 'Sent',
+    interview: locale === 'fr' ? 'Entretien' : 'Interview',
+    offer: locale === 'fr' ? 'Offre' : 'Offer',
+    closed: locale === 'fr' ? 'Fermée' : 'Closed',
+  };
+  return labels[stage];
 }
 
 export function homePriorityCopy(
