@@ -55,6 +55,7 @@ import {
   readApplicationTasks,
   readApplicationRun,
   readApplications,
+  readInstanceStatus,
   readOpportunityDecisions,
   readOpportunities,
   readProfile,
@@ -73,6 +74,7 @@ import {
 } from '@/lib/dashboard-priority';
 import {
   persistedRunSchema,
+  instanceStatusSchema,
   reviewIssueDecisionResultSchema,
   type PersistedRun,
 } from '@/lib/run-contract';
@@ -149,7 +151,6 @@ const nav = [
   ['/applications', 'work_history', 'Candidatures'],
   ['/memory', 'database', 'Mémoire pro'],
   ['/search-profiles', 'tune', 'Profils de recherche'],
-  ['/interviews/demo', 'record_voice_over', 'Entretiens'],
   ['/links', 'link', 'Liens privés'],
   ['/insights', 'monitoring', 'Insights'],
   ['/settings/models', 'settings', 'Réglages'],
@@ -316,25 +317,50 @@ export function AppShell({
 
 function CurrentApplications() {
   const localize = useLocalizer([shellMessages]);
+  const { locale } = useI18n();
+  const [applications, setApplications] = useState<Application[]>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void readApplications(controller.signal)
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const payload = (await response.json()) as { applications?: unknown };
+        setApplications(
+          applicationSchema
+            .array()
+            .parse(payload.applications ?? [])
+            .slice(0, 3),
+        );
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setApplications([]);
+      });
+    return () => controller.abort();
+  }, []);
+
   return localize(
     <>
       <p className="co-nav-label">En cours</p>
       <div className="co-current-list">
-        <Link href="/applications/nimbus">
-          <i className="accent">NR</i>
-          <span>Nimbus</span>
-          <b className="warn" />
-        </Link>
-        <Link href="/applications/atlas">
-          <i className="ok">AH</i>
-          <span>Atlas Health</span>
-          <b className="ok" />
-        </Link>
-        <Link href="/applications/keel">
-          <i>KE</i>
-          <span>Keel</span>
-          <Icon>autorenew</Icon>
-        </Link>
+        {applications?.map((application) => (
+          <Link
+            href={`/applications/${application.applicationId}`}
+            key={application.applicationId}
+          >
+            <i>{initials(application.company)}</i>
+            <span>{application.company}</span>
+            <b className={application.stage === 'closed' ? '' : 'ok'} />
+          </Link>
+        ))}
+        {applications && !applications.length ? (
+          <Link href="/applications#new">
+            <i>+</i>
+            <span>
+              {locale === 'fr' ? 'Nouvelle candidature' : 'New application'}
+            </span>
+          </Link>
+        ) : null}
       </div>
     </>,
   );
@@ -342,15 +368,51 @@ function CurrentApplications() {
 
 function InstanceCard() {
   const localize = useLocalizer([shellMessages]);
+  const { locale } = useI18n();
+  const [status, setStatus] =
+    useState<ReturnType<typeof instanceStatusSchema.parse>>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void readInstanceStatus(controller.signal)
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        setStatus(instanceStatusSchema.parse(await response.json()));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setStatus(undefined);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const fresh = status?.services.filter(
+    ({ status }) => status === 'fresh',
+  ).length;
+  const healthy = status && fresh === status.services.length;
   return localize(
     <div className="co-instance">
-      <Icon>cloud_done</Icon>
-      <strong>Instance saine</strong>
+      <Icon>{healthy ? 'cloud_done' : 'cloud_off'}</Icon>
+      <strong>
+        {healthy
+          ? locale === 'fr'
+            ? 'Instance saine'
+            : 'Healthy instance'
+          : locale === 'fr'
+            ? 'Workers à vérifier'
+            : 'Workers need attention'}
+      </strong>
       <small>
-        Auto-hébergé · 3 workers
-        <br />
-        dernière sauvegarde 03:00
+        {status
+          ? `${status.mode === 'self-hosted' ? (locale === 'fr' ? 'Auto-hébergé' : 'Self-hosted') : 'Cloud'} · ${fresh}/${status.services.length} ${locale === 'fr' ? 'workers actifs' : 'active workers'}`
+          : locale === 'fr'
+            ? 'État des workers indisponible'
+            : 'Worker status unavailable'}
       </small>
+      {!healthy ? (
+        <Link href="/settings/models">
+          {locale === 'fr' ? 'Voir la config' : 'Open settings'}
+        </Link>
+      ) : null}
     </div>,
   );
 }
@@ -5736,20 +5798,19 @@ function runSources(application: Application, run: PersistedRun) {
   return [...new Set(urls)];
 }
 
-export function KitRoutePage({ path, query }: { path: string; query: Query }) {
+export function KitRoutePage({ path }: { path: string; query: Query }) {
   if (path === '/') return <HomeScreen />;
   if (path === '/memory') return <MemoryScreen />;
   if (path === '/applications') return <ApplicationsScreen />;
   const applicationMatch = path.match(/^\/applications\/([^/]+)$/);
   if (applicationMatch)
-    return query.state === 'running' ? (
-      <DossierScreen running />
-    ) : (
-      <DynamicDossierScreen applicationId={applicationMatch[1]} />
-    );
-  if (/^\/applications\/[^/]+\/review$/.test(path)) return <ReviewScreen />;
+    return <DynamicDossierScreen applicationId={applicationMatch[1]} />;
+  const reviewMatch = path.match(/^\/applications\/([^/]+)\/review$/);
+  if (reviewMatch)
+    return <DynamicDossierScreen applicationId={reviewMatch[1]} />;
   if (path === '/memory/import') return <ImportScreen />;
-  if (/^\/applications\/[^/]+\/page$/.test(path)) return <PageEditorScreen />;
+  const pageMatch = path.match(/^\/applications\/([^/]+)\/page$/);
+  if (pageMatch) return <DynamicDossierScreen applicationId={pageMatch[1]} />;
   if (path === '/links') return <LinksScreen />;
   if (path === '/insights') return <InsightsScreen />;
   if (path === '/memory/interview') return <InterviewMemoryScreen />;
@@ -5760,8 +5821,9 @@ export function KitRoutePage({ path, query }: { path: string; query: Query }) {
   if (path === '/settings/models') return <ModelsScreen />;
   if (path === '/memory/conflicts') return <ConflictsScreen />;
   if (path === '/settings/privacy') return <PrivacyScreen />;
-  if (/^\/applications\/[^/]+\/published$/.test(path))
-    return <PublishedScreen />;
+  const publishedMatch = path.match(/^\/applications\/([^/]+)\/published$/);
+  if (publishedMatch)
+    return <DynamicDossierScreen applicationId={publishedMatch[1]} />;
   const versionsMatch = path.match(/^\/applications\/([^/]+)\/versions$/);
   if (versionsMatch) return <VersionsScreen applicationId={versionsMatch[1]} />;
   if (path === '/runs') return <RunsScreen />;
