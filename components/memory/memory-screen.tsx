@@ -8,13 +8,15 @@ import { demoMessages } from '@/lib/i18n/dictionaries/demo';
 import { AppShell } from '@/components/layout/app-shell';
 import Link from 'next/link';
 import { Icon, PageHeader } from '@/components/ui/primitives';
-import { CareerMemoryContent } from '@/components/memory/career-memory-content';
+import { CareerMemoryOverview } from '@/components/memory/career-memory-overview';
+import { memoryOverviewMessages } from '@/lib/i18n/dictionaries/memory-overview';
 
 export function MemoryScreen() {
   const t = useTranslations([
     memoryMessages,
     activeRoutesMessages,
     demoMessages,
+    memoryOverviewMessages,
   ]);
 
   return (
@@ -55,11 +57,15 @@ export function MemoryScreen() {
     >
       <PageHeader
         title={t('demo.career.memory')}
-        copy={t(
-          'memory.review.source.and.control.the.information.available.to.your',
-        )}
+        copy={t('memory.overview.copy')}
+        actions={
+          <Link className="co-button" href="/memory/import">
+            <Icon>upload_file</Icon>
+            {t('memory.overview.import')}
+          </Link>
+        }
       />
-      <CareerMemoryContent />
+      <CareerMemoryOverview />
     </AppShell>
   );
 }

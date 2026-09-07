@@ -1,0 +1,226 @@
+.workspace {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.status {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  color: var(--color-ink-700);
+  border-radius: var(--radius-control);
+  background: var(--color-panel);
+  font-size: var(--text-body-sm);
+}
+
+.tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+}
+
+.tabs button {
+  min-height: 36px;
+  padding: 0 var(--space-5);
+  color: var(--color-ink-600);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-size: var(--text-label);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--color-card);
+  background: var(--color-ink-900);
+  font-weight: 600;
+}
+
+.graph {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 288px minmax(300px, 1fr) 348px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.graph > section {
+  overflow: hidden;
+  min-width: 0;
+  border-radius: var(--radius-card-lg);
+  background: var(--color-card);
+}
+
+.graph > section > header {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.graph > section > header span {
+  color: var(--color-ink-700);
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+
+.graph > section > header b {
+  min-width: 24px;
+  padding: 2px 8px;
+  color: var(--color-ink-600);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+.graph > section > div {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.graph > section > div > p {
+  margin: 0;
+  padding: var(--space-7) var(--space-4);
+  color: var(--color-ink-500);
+  font-size: var(--text-body-sm);
+  line-height: 1.55;
+  text-align: center;
+}
+
+.sources article,
+.claims button {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+}
+
+.sources article {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.sources article > :global(.co-icon) {
+  color: var(--color-ink-500);
+  font-size: 19px;
+}
+
+.sources article > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.sources strong,
+.sources small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sources strong {
+  color: var(--color-ink-700);
+  font-size: var(--text-label);
+}
+
+.sources small {
+  color: var(--color-ink-500);
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+}
+
+.claims button {
+  width: 100%;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  color: var(--color-ink-700);
+  text-align: left;
+  cursor: pointer;
+}
+
+.claims button[aria-pressed='true'] {
+  border-color: var(--color-ink-900);
+  box-shadow: var(--shadow-raised);
+}
+
+.claims button strong {
+  font-size: var(--text-ui);
+  line-height: 1.5;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-amber);
+}
+
+.dot[data-level='verified'] {
+  background: var(--color-green);
+}
+
+.dot[data-level='unsupported'] {
+  background: var(--color-clay);
+}
+
+.evidence article {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-tile);
+  background: var(--color-panel);
+}
+
+.evidence article > span {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--color-ink-500);
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-caption);
+}
+
+.evidence blockquote {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-ink-700);
+  border-left: 3px solid var(--color-green);
+  font-size: var(--text-body);
+  line-height: 1.65;
+}
+
+@media (max-width: 1180px) {
+  .graph {
+    grid-template-columns: 240px minmax(300px, 1fr);
+  }
+
+  .evidence {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .tabs {
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .graph {
+    grid-template-columns: 1fr;
+  }
+
+  .evidence {
+    grid-column: auto;
+  }
+}
