@@ -1,5 +1,41 @@
 import type { MessageDictionary } from '../messages';
 export const applicationsMessages = {
+  'applications.pipeline.eyebrow': {
+    fr: 'Espace de suivi',
+    en: 'Application workspace',
+  },
+  'applications.pipeline.copy': {
+    fr: 'Une prochaine action claire pour chaque poste.',
+    en: 'One clear next action for every role.',
+  },
+  'applications.pipeline.board': {
+    fr: 'Candidatures par étape',
+    en: 'Applications by stage',
+  },
+  'applications.pipeline.empty.stage': {
+    fr: 'Aucune candidature à cette étape.',
+    en: 'No application at this stage.',
+  },
+  'applications.pipeline.reusable.eyebrow': {
+    fr: 'Mémoire professionnelle',
+    en: 'Career memory',
+  },
+  'applications.pipeline.reusable.title': {
+    fr: 'Preuves les plus réutilisables',
+    en: 'Most reusable evidence',
+  },
+  'applications.pipeline.open.memory': {
+    fr: 'Ouvrir la mémoire',
+    en: 'Open memory',
+  },
+  'applications.pipeline.sources': {
+    fr: 'source(s)',
+    en: 'source(s)',
+  },
+  'applications.pipeline.no.reusable.proof': {
+    fr: 'Aucune preuve réutilisable pour le moment.',
+    en: 'No reusable evidence yet.',
+  },
   'applications.two.distinct.stages': {
     fr: 'Deux états distincts',
     en: 'Two distinct stages',

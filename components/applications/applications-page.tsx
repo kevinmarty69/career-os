@@ -1,143 +1,72 @@
 'use client';
 
-import { useTranslations } from '@/components/i18n/i18n-provider';
-import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
-import { useApplicationsPipeline } from './use-applications-pipeline';
-
-import { ApplicationRow } from '@/components/applications/application-row';
-import styles from '@/components/applications/applications-page.module.css';
 import { ImportDialog } from '@/components/applications/import-dialog';
 import { OpportunityCard } from '@/components/applications/opportunity-card';
-import { alertCopy } from '@/components/applications/opportunity-labels';
-import {
-  EmptyState,
-  LoadingRows,
-} from '@/components/applications/pipeline-empty-state';
 import { ProcessedOpportunities } from '@/components/applications/processed-opportunities';
-import { useI18n } from '@/components/i18n/i18n-provider';
+import { useApplicationsPipeline } from '@/components/applications/use-applications-pipeline';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
-import { Icon } from '@/components/ui/primitives';
+import { useCareerMemory } from '@/components/memory/use-career-memory';
+import { Badge, Icon } from '@/components/ui/primitives';
 import { type Application } from '@/lib/application-contract';
-import { matchesSearchTerms } from '@/lib/global-search';
+import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
+import { initials } from '@/lib/initials';
 import { rankOpportunitiesByHumanFeedback } from '@/lib/opportunity-ranking';
+import Link from 'next/link';
 import { useState } from 'react';
+import styles from './applications-page.module.css';
+
+const stages: Array<{ stage: Application['stage']; icon: string }> = [
+  { stage: 'draft', icon: 'edit_note' },
+  { stage: 'applied', icon: 'send' },
+  { stage: 'interview', icon: 'forum' },
+  { stage: 'offer', icon: 'celebration' },
+  { stage: 'closed', icon: 'archive' },
+];
 
 export function ApplicationsPage() {
   const t = useTranslations([applicationsMessages]);
-
   const { locale } = useI18n();
-  const {
-    opportunities,
-    applications,
-    decisions,
-    searchProfiles,
-    rankingProfileId,
-    setRankingProfileId,
-    loadState,
-    error,
-    retry,
-    addOpportunity,
-    decisionSaved,
-  } = useApplicationsPipeline();
+  const pipeline = useApplicationsPipeline();
+  const memory = useCareerMemory();
   const [importOpen, setImportOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [scope, setScope] = useState<'all' | 'opportunities' | 'applications'>(
-    'all',
-  );
-  const [stage, setStage] = useState<Application['stage'] | 'all'>('all');
 
   const decisionsByOpportunity = new Map(
-    decisions.map((decision) => [decision.opportunityId, decision]),
+    pipeline.decisions.map((decision) => [decision.opportunityId, decision]),
   );
-  const activeOpportunities = opportunities.filter((opportunity) => {
+  const activeOpportunities = pipeline.opportunities.filter((opportunity) => {
     const disposition = decisionsByOpportunity.get(
       opportunity.opportunityId,
     )?.disposition;
     return disposition !== 'ignored' && disposition !== 'archived';
   });
-  const processedOpportunities = opportunities.filter((opportunity) => {
-    const disposition = decisionsByOpportunity.get(
-      opportunity.opportunityId,
-    )?.disposition;
-    return disposition === 'ignored' || disposition === 'archived';
-  });
-  const visibleActiveOpportunities = rankOpportunitiesByHumanFeedback(
+  const processedOpportunities = pipeline.opportunities.filter(
+    (opportunity) => {
+      const disposition = decisionsByOpportunity.get(
+        opportunity.opportunityId,
+      )?.disposition;
+      return disposition === 'ignored' || disposition === 'archived';
+    },
+  );
+  const rankedOpportunities = rankOpportunitiesByHumanFeedback(
     activeOpportunities,
-    opportunities,
-    decisions,
-    rankingProfileId,
-  ).filter(
-    ({ opportunity }) =>
-      scope !== 'applications' &&
-      matchesSearchTerms(
-        query,
-        opportunity.company ?? '',
-        opportunity.role ?? '',
-        opportunity.description ?? '',
-        opportunity.location ?? '',
-      ),
+    pipeline.opportunities,
+    pipeline.decisions,
+    pipeline.rankingProfileId,
   );
-  const visibleProcessedOpportunities = processedOpportunities.filter(
-    (opportunity) =>
-      scope !== 'applications' &&
-      matchesSearchTerms(
-        query,
-        opportunity.company ?? '',
-        opportunity.role ?? '',
-        opportunity.description ?? '',
-        opportunity.location ?? '',
-      ),
-  );
-  const rankingProfile = searchProfiles.find(
-    ({ searchProfileId }) => searchProfileId === rankingProfileId,
-  );
-  const alertThreshold = rankingProfile?.alertThreshold ?? null;
-  const alertRankings =
-    alertThreshold === null
-      ? []
-      : visibleActiveOpportunities.filter(
-          ({ humanFeedbackSignal }) =>
-            humanFeedbackSignal !== null &&
-            humanFeedbackSignal >= alertThreshold,
-        );
-  const visibleApplications = applications.filter(
-    (application) =>
-      scope !== 'opportunities' &&
-      (stage === 'all' || application.stage === stage) &&
-      matchesSearchTerms(
-        query,
-        application.company,
-        application.role,
-        application.description,
-      ),
-  );
+  const reusableClaims = memory.profile.claims
+    .filter((claim) => claim.level === 'verified' || claim.level === 'declared')
+    .sort((a, b) => b.evidenceIds.length - a.evidenceIds.length)
+    .slice(0, 4);
 
   return (
-    <AppShell
-      path="/applications"
-      sidebarContext={
-        <div className={styles.sidebarNote}>
-          <Icon>source</Icon>
-          <strong>{t('applications.two.distinct.stages')}</strong>
-          <span>
-            {t(
-              'applications.an.imported.job.remains.an.opportunity.until.you.start',
-            )}{' '}
-          </span>
-        </div>
-      }
-      sidebarFooter={<></>}
-    >
+    <AppShell path="/applications">
       <div className={styles.page}>
         <header className={styles.header}>
           <div>
-            <p>{t('applications.job.search.pipeline')}</p>
+            <p>{t('applications.pipeline.eyebrow')}</p>
             <h1>{t('applications.applications')}</h1>
-            <span>
-              {t(
-                'applications.review.collected.jobs.then.track.the.applications.you.actually',
-              )}{' '}
-            </span>
+            <span>{t('applications.pipeline.copy')}</span>
           </div>
           <button
             className="co-button"
@@ -145,236 +74,146 @@ export function ApplicationsPage() {
             type="button"
           >
             <Icon>add_link</Icon>
-            {t('applications.paste.a.job.url')}{' '}
+            {t('applications.paste.a.job.url')}
           </button>
         </header>
 
-        <div className={styles.filters} role="search">
-          <label className={styles.searchField}>
-            <Icon>search</Icon>
-            <span className={styles.srOnly}>
-              {t('applications.search.the.pipeline')}
-            </span>
-            <input
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('applications.search.a.company.role.or.location')}
-              type="search"
-              value={query}
-            />
-          </label>
-          <label>
-            <span>{t('applications.type')}</span>
-            <select
-              aria-label={t('applications.type')}
-              onChange={(event) =>
-                setScope(
-                  event.target.value as
-                    'all' | 'opportunities' | 'applications',
-                )
-              }
-              value={scope}
-            >
-              <option value="all">{t('applications.entire.pipeline')}</option>
-              <option value="opportunities">
-                {t('applications.opportunities')}
-              </option>
-              <option value="applications">
-                {t('applications.applications')}
-              </option>
-            </select>
-          </label>
-          <label>
-            <span>{t('applications.application.stage')}</span>
-            <select
-              aria-label={t('applications.application.stage')}
-              disabled={scope === 'opportunities'}
-              onChange={(event) =>
-                setStage(event.target.value as Application['stage'] | 'all')
-              }
-              value={stage}
-            >
-              <option value="all">{t('applications.all.stages')}</option>
-              <option value="draft">{t('applications.draft')}</option>
-              <option value="applied">{t('applications.sent')}</option>
-              <option value="interview">{t('applications.interview')}</option>
-              <option value="offer">{t('applications.offer.received')}</option>
-              <option value="closed">{t('applications.closed.2')}</option>
-            </select>
-          </label>
-          <label>
-            <span>{t('applications.ranking')}</span>
-            <select
-              aria-label={t('applications.ranking.profile')}
-              onChange={(event) => setRankingProfileId(event.target.value)}
-              value={rankingProfileId}
-            >
-              <option value="">{t('applications.discovery.order')}</option>
-              {searchProfiles
-                .filter(({ active }) => active)
-                .map((profile) => (
-                  <option
-                    key={profile.searchProfileId}
-                    value={profile.searchProfileId}
-                  >
-                    {profile.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-        </div>
-
-        {error ? (
+        {pipeline.error ? (
           <div className={styles.error} role="alert">
             <Icon>error</Icon>
-            <span>{error}</span>
-            <button onClick={retry} type="button">
-              {t('applications.try.again')}{' '}
+            <span>{pipeline.error}</span>
+            <button onClick={pipeline.retry} type="button">
+              {t('applications.try.again')}
             </button>
           </div>
         ) : null}
 
-        {alertRankings.length ? (
-          <div className={styles.alertSummary} role="status">
-            <Icon>notifications_active</Icon>
-            <div>
-              <strong>
-                {alertCopy(alertRankings.length, alertThreshold!, locale)}
-              </strong>
-              <span>{rankingProfile?.name}</span>
-            </div>
-          </div>
-        ) : null}
-
         <section
-          className={styles.workspace}
-          aria-label={t('applications.opportunities.and.applications')}
+          className={styles.board}
+          aria-label={t('applications.pipeline.board')}
         >
-          <header className={styles.sectionHeader}>
-            <div className={styles.sectionIcon}>
-              <Icon>travel_explore</Icon>
-            </div>
+          {stages.map(({ stage, icon }) => {
+            const items = pipeline.applications.filter(
+              (application) => application.stage === stage,
+            );
+            return (
+              <section className={styles.column} key={stage}>
+                <header>
+                  <span>
+                    <Icon>{icon}</Icon>
+                    {stageLabel(stage, locale)}
+                  </span>
+                  <b>{items.length}</b>
+                </header>
+                <div>
+                  {items.map((application) => (
+                    <Link
+                      className={styles.applicationCard}
+                      href={`/applications/${application.applicationId}`}
+                      key={application.applicationId}
+                    >
+                      <i aria-hidden="true">{initials(application.company)}</i>
+                      <span>
+                        <small>{application.company}</small>
+                        <strong>{application.role}</strong>
+                      </span>
+                      <Icon>chevron_right</Icon>
+                    </Link>
+                  ))}
+                  {pipeline.loadState === 'ready' && !items.length ? (
+                    <p className={styles.emptyColumn}>
+                      {t('applications.pipeline.empty.stage')}
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+            );
+          })}
+        </section>
+
+        <section className={styles.reusable}>
+          <header>
             <div>
-              <h2>{t('applications.discovered.opportunities')}</h2>
-              <p>
-                {t(
-                  'applications.jobs.saved.with.their.source.not.yet.turned.into',
-                )}{' '}
-              </p>
+              <p>{t('applications.pipeline.reusable.eyebrow')}</p>
+              <h2>{t('applications.pipeline.reusable.title')}</h2>
             </div>
+            <Link href="/memory">{t('applications.pipeline.open.memory')}</Link>
           </header>
-          {loadState === 'loading' ? (
-            <LoadingRows label={t('applications.loading.opportunities')} />
-          ) : visibleActiveOpportunities.length ? (
+          <div>
+            {reusableClaims.map((claim) => (
+              <article key={claim.id}>
+                <span className={styles.proofDot} data-level={claim.level} />
+                <strong>{claim.statement}</strong>
+                <Badge tone={claim.level === 'verified' ? 'ok' : 'warn'}>
+                  {claim.evidenceIds.length}{' '}
+                  {t('applications.pipeline.sources')}
+                </Badge>
+              </article>
+            ))}
+            {memory.state === 'ready' && !reusableClaims.length ? (
+              <p className={styles.emptyEvidence}>
+                {t('applications.pipeline.no.reusable.proof')}
+              </p>
+            ) : null}
+          </div>
+        </section>
+
+        {activeOpportunities.length ? (
+          <section className={styles.savedJobs}>
+            <header>
+              <div>
+                <p>{t('applications.opportunities')}</p>
+                <h2>{t('applications.discovered.opportunities')}</h2>
+              </div>
+              <span>{activeOpportunities.length}</span>
+            </header>
             <div className={styles.opportunityList}>
-              {visibleActiveOpportunities.map((ranking) => (
+              {rankedOpportunities.map(({ opportunity, ...ranking }) => (
                 <OpportunityCard
                   decision={decisionsByOpportunity.get(
-                    ranking.opportunity.opportunityId,
+                    opportunity.opportunityId,
                   )}
-
-                  key={ranking.opportunity.opportunityId}
-                  onDecisionSaved={decisionSaved}
-                  opportunity={ranking.opportunity}
-                  ranking={ranking}
-                  searchProfiles={searchProfiles}
+                  key={opportunity.opportunityId}
+                  onDecisionSaved={pipeline.decisionSaved}
+                  opportunity={opportunity}
+                  ranking={{ opportunity, ...ranking }}
+                  searchProfiles={pipeline.searchProfiles}
                 />
               ))}
             </div>
-          ) : loadState === 'ready' ? (
-            <EmptyState
-              action={
-                query || scope === 'applications'
-                  ? undefined
-                  : t('applications.paste.a.job.url')
-              }
-              copy={
-                query || scope === 'applications'
-                  ? t('applications.no.opportunity.matches.these.filters')
-                  : t('applications.add.a.job.url.to.preserve.its.content.and')
-              }
-
-              icon="link"
-              onAction={
-                query || scope === 'applications'
-                  ? undefined
-                  : () => setImportOpen(true)
-              }
-              title={
-                query || scope === 'applications'
-                  ? t('applications.no.results')
-                  : t('applications.no.saved.opportunities')
-              }
-            />
-          ) : null}
-        </section>
-
-        {loadState === 'ready' && visibleProcessedOpportunities.length ? (
-          <ProcessedOpportunities
-            decisionsByOpportunity={decisionsByOpportunity}
-
-            onDecisionSaved={decisionSaved}
-            opportunities={visibleProcessedOpportunities}
-            searchProfiles={searchProfiles}
-          />
+          </section>
         ) : null}
 
-        <section
-          className={styles.workspace}
-          aria-label={t('applications.started.applications')}
-        >
-          <header className={styles.sectionHeader}>
-            <div className={`${styles.sectionIcon} ${styles.applicationIcon}`}>
-              <Icon>work_history</Icon>
-            </div>
-            <div>
-              <h2>{t('applications.applications')}</h2>
-              <p>
-                {t(
-                  'applications.only.the.applications.you.chose.to.prepare.or.send',
-                )}{' '}
-              </p>
-            </div>
-          </header>
-          {loadState === 'loading' ? (
-            <LoadingRows label={t('applications.loading.applications')} />
-          ) : visibleApplications.length ? (
-            <div className={styles.applicationList}>
-              {visibleApplications.map((application) => (
-                <ApplicationRow
-                  application={application}
-                  key={application.applicationId}
-                />
-              ))}
-            </div>
-          ) : loadState === 'ready' ? (
-            <EmptyState
-              copy={
-                query || scope === 'opportunities' || stage !== 'all'
-                  ? t('applications.no.application.matches.these.filters')
-                  : t(
-                      'applications.no.application.has.been.started.yet.your.opportunities.remain',
-                    )
-              }
-
-              icon="work_outline"
-              title={
-                query || scope === 'opportunities' || stage !== 'all'
-                  ? t('applications.no.results')
-                  : t('applications.no.active.applications')
-              }
-            />
-          ) : null}
-        </section>
+        {processedOpportunities.length ? (
+          <ProcessedOpportunities
+            decisionsByOpportunity={decisionsByOpportunity}
+            onDecisionSaved={pipeline.decisionSaved}
+            opportunities={processedOpportunities}
+            searchProfiles={pipeline.searchProfiles}
+          />
+        ) : null}
       </div>
+
       {importOpen ? (
         <ImportDialog
           onClose={() => setImportOpen(false)}
           onImported={(opportunity) => {
-            addOpportunity(opportunity);
+            pipeline.addOpportunity(opportunity);
             setImportOpen(false);
           }}
         />
       ) : null}
     </AppShell>
   );
+}
+
+function stageLabel(stage: Application['stage'], locale: 'en' | 'fr') {
+  const labels: Record<Application['stage'], [string, string]> = {
+    draft: ['À préparer', 'To prepare'],
+    applied: ['Envoyées', 'Sent'],
+    interview: ['Entretiens', 'Interviews'],
+    offer: ['Offres', 'Offers'],
+    closed: ['Terminées', 'Closed'],
+  };
+  return labels[stage][locale === 'fr' ? 0 : 1];
 }

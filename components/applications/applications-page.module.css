@@ -3,6 +3,292 @@
   gap: 18px;
 }
 
+/* Handoff v2 — U2 pipeline. Existing opportunity styles below remain shared. */
+.page {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.header {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-7);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.header p,
+.reusable header p,
+.savedJobs > header p {
+  margin: 0 0 var(--space-1);
+  color: var(--color-ink-400);
+  font-size: var(--text-overline);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: var(--text-display);
+  line-height: 1.15;
+  letter-spacing: -0.036em;
+}
+
+.header span {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--color-ink-600);
+  font-size: var(--text-body-sm);
+  line-height: 1.55;
+}
+
+.board {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(5, minmax(170px, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel);
+}
+
+.column {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-3);
+}
+
+.column > header {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.column > header span {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--color-ink-700);
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+
+.column > header :global(.co-icon) {
+  color: var(--color-ink-500);
+  font-size: 18px;
+}
+
+.column > header b,
+.savedJobs > header > span {
+  min-width: 24px;
+  padding: 3px 8px;
+  color: var(--color-ink-600);
+  border-radius: var(--radius-pill);
+  background: var(--color-card);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+.column > div {
+  display: flex;
+  min-height: 214px;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-card) 46%, transparent);
+}
+
+.applicationCard {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  color: var(--color-ink-900);
+  border-radius: var(--radius-tile);
+  background: var(--color-card);
+  text-decoration: none;
+}
+
+.applicationCard:hover {
+  outline: 1px solid var(--color-ink-250);
+}
+
+.applicationCard > i {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  color: var(--color-indigo-text);
+  border-radius: 10px;
+  background: var(--color-indigo-tint);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  place-items: center;
+}
+
+.applicationCard > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.applicationCard small,
+.applicationCard strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.applicationCard small {
+  color: var(--color-ink-500);
+  font-size: var(--text-caption);
+}
+
+.applicationCard strong {
+  font-size: var(--text-body-sm);
+  letter-spacing: -0.015em;
+}
+
+.applicationCard :global(.co-icon) {
+  color: var(--color-ink-300);
+  font-size: 17px;
+}
+
+.emptyColumn {
+  display: grid;
+  flex: 1;
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--color-ink-400);
+  border: 1px dashed var(--color-ink-250);
+  border-radius: var(--radius-control);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  text-align: center;
+  place-items: center;
+}
+
+.reusable,
+.savedJobs {
+  overflow: hidden;
+  border-radius: var(--radius-card-lg);
+  background: var(--color-card);
+}
+
+.reusable > header,
+.savedJobs > header {
+  display: flex;
+  gap: var(--space-5);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.reusable h2,
+.savedJobs h2 {
+  margin: 0;
+  font-size: var(--text-section);
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+
+.reusable header a {
+  color: var(--color-ink-900);
+  font-size: var(--text-ui);
+  font-weight: 600;
+}
+
+.reusable > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reusable article {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-5) var(--space-6);
+  border-right: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.reusable article strong {
+  overflow: hidden;
+  color: var(--color-ink-700);
+  font-size: var(--text-ui);
+  font-weight: 500 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proofDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-amber);
+}
+
+.proofDot[data-level='verified'] {
+  background: var(--color-green);
+}
+
+.emptyEvidence {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--space-7);
+  color: var(--color-ink-500);
+  font-size: var(--text-body-sm);
+}
+
+.savedJobs > header > span {
+  background: var(--color-panel);
+}
+
+@media (max-width: 1280px) {
+  .board {
+    overflow-x: auto;
+    grid-template-columns: repeat(5, minmax(188px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .board {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .column {
+    width: min(82vw, 320px);
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .reusable > div {
+    grid-template-columns: 1fr;
+  }
+
+  .reusable article {
+    border-right: 0;
+  }
+}
+
 .header {
   display: flex;
   gap: 24px;
