@@ -44,6 +44,10 @@ export const publicationMessages = {
     fr: 'Voir les preuves principales',
     en: 'View key evidence',
   },
+  'publication.key.evidence': {
+    fr: 'Preuves principales',
+    en: 'Key evidence',
+  },
   'publication.sourced': {
     fr: 'Sourcé',
     en: 'Sourced',

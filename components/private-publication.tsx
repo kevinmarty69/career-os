@@ -140,6 +140,19 @@ export function PrivatePublication() {
   const logoUrl = publication.brand?.logoUrl ?? spec.company.logoUrl;
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
   const publicLinks = profile.publicLinks ?? {};
+  const featuredClaims = [
+    ...new Set(
+      spec.blocks.flatMap((block) =>
+        'claimIds' in block ? block.claimIds : [],
+      ),
+    ),
+  ]
+    .map((id) => claims.get(id))
+    .filter(
+      (claim): claim is NonNullable<typeof claim> =>
+        claim?.level === 'verified',
+    )
+    .slice(0, 4);
 
   return (
     <main
@@ -194,6 +207,23 @@ export function PrivatePublication() {
           {t('publication.view.key.evidence')}{' '}
         </a>
       </section>
+      {featuredClaims.length ? (
+        <nav
+          aria-label={t('publication.key.evidence')}
+          className="co-public-proof-strip"
+        >
+          {featuredClaims.map((claim, index) => (
+            <a
+              href={`#proof-${claim.id}`}
+              key={claim.id}
+              onClick={() => record('action', `proof:${index}`)}
+            >
+              <strong>{claim.evidenceIds.length}</strong>
+              <span>{claim.statement}</span>
+            </a>
+          ))}
+        </nav>
+      ) : null}
       <div className="co-public-body">
         <article>
           {spec.blocks.map((block, index) => (
@@ -215,6 +245,7 @@ export function PrivatePublication() {
                       .filter(Boolean);
                     return claim ? (
                       <details
+                        id={`proof-${id}`}
                         key={id}
                         onToggle={(event) => {
                           if (event.currentTarget.open)

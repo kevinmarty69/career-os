@@ -594,9 +594,15 @@ pre {
 
 .co-public-page,
 .co-public-state {
-  --co-public-deep: var(--company-deep, var(--color-pub-deep));
   --co-public-accent: var(--company-accent, var(--color-pub-accent));
-  --co-public-light: var(--company-light, var(--color-pub-light));
+  --co-public-deep: var(
+    --company-deep,
+    color-mix(in srgb, var(--co-public-accent) 24%, var(--color-ink-900))
+  );
+  --co-public-light: var(
+    --company-light,
+    color-mix(in srgb, var(--co-public-accent) 35%, var(--color-card))
+  );
   --co-public-body: var(--color-pub-body);
   --co-public-line: var(--color-pub-line);
   --co-public-bg: var(--color-pub-bg);
@@ -649,6 +655,38 @@ pre {
 .co-public-body {
   grid-template-columns: minmax(0, 1fr) 220px;
   gap: 24px;
+}
+
+.co-public-proof-strip {
+  display: grid;
+  width: min(100%, 820px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 auto;
+  padding: 16px 30px;
+  background: var(--co-public-accent);
+}
+
+.co-public-proof-strip > a {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding-right: 14px;
+  color: var(--color-card);
+  text-decoration: none;
+}
+
+.co-public-proof-strip strong {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.co-public-proof-strip span {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-card) 82%, transparent);
+  font-size: var(--text-caption);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .co-public-block {
@@ -713,6 +751,12 @@ pre {
 
   .co-public-hero h1 {
     font-size: 30px;
+  }
+
+  .co-public-proof-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 16px 18px;
   }
 }
 
