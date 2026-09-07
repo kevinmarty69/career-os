@@ -9,6 +9,7 @@ import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import { initials } from '@/lib/initials';
 import Link from 'next/link';
 import { type ReactNode } from 'react';
+import flowStyles from '@/components/applications/application-flow.module.css';
 
 export function DossierNav({
   active,
@@ -59,12 +60,14 @@ export function DossierShell({
   state,
   actions,
   identity,
+  fullscreen = false,
 }: {
   active: string;
   children: ReactNode;
   state?: ReactNode;
   actions?: ReactNode;
   identity: { applicationId: string; company: string; role: string };
+  fullscreen?: boolean;
 }) {
   const t = useTranslations([
     applicationsMessages,
@@ -72,6 +75,34 @@ export function DossierShell({
     memoryMessages,
     shellMessages,
   ]);
+  if (fullscreen) {
+    return (
+      <main className={flowStyles.fullscreenShell}>
+        <a className="skip-link" href="#main-content">
+          {t('shell.skip.to.main.content')}
+        </a>
+        <header className={flowStyles.fullscreenHeader}>
+          <Link
+            aria-label={t('dossier.application.workspace')}
+            href={`/applications/${identity.applicationId}`}
+          >
+            <Icon>close</Icon>
+          </Link>
+          <span>
+            <strong>{identity.company}</strong>
+            <small>{identity.role}</small>
+          </span>
+          <LocaleSwitch compact />
+          {state}
+          {actions}
+        </header>
+        <section id="main-content" tabIndex={-1}>
+          {children}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="co-dossier-shell">
       <a className="skip-link" href="#main-content">

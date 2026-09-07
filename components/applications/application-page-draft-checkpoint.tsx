@@ -14,6 +14,7 @@ export function ApplicationPageDraftCheckpoint({
   profile,
   spec,
   logoUrl,
+  mode = 'draft',
 }: {
   error: boolean;
   onConfirm: () => void;
@@ -21,6 +22,7 @@ export function ApplicationPageDraftCheckpoint({
   profile: PersistedRun['profile'];
   spec: PageSpec;
   logoUrl?: string;
+  mode?: 'draft' | 'preview';
 }) {
   const { locale } = useI18n();
   const t = useTranslations([dossierMessages]);
@@ -32,7 +34,13 @@ export function ApplicationPageDraftCheckpoint({
       <header>
         <div>
           <p>{t('dossier.structured.page')}</p>
-          <h2>{t('dossier.review.the.draft.before.the.checks')}</h2>
+          <h2>
+            {mode === 'preview'
+              ? locale === 'en'
+                ? 'Review before creating the private link'
+                : 'Vérifiez avant de créer le lien privé'
+              : t('dossier.review.the.draft.before.the.checks')}
+          </h2>
         </div>
         <span>
           {locale === 'en'
@@ -100,9 +108,13 @@ export function ApplicationPageDraftCheckpoint({
         </div>
       </section>
       <p>
-        {t(
-          'dossier.three.reviewers.will.now.check.recruiter.readability.hiring.manager',
-        )}{' '}
+        {mode === 'preview'
+          ? locale === 'en'
+            ? 'This is the exact immutable snapshot the recipient will see. Evidence remains inspectable and the page is not indexed.'
+            : 'Voici l’instantané immuable exact que verra le destinataire. Les preuves restent consultables et la page n’est pas indexée.'
+          : t(
+              'dossier.three.reviewers.will.now.check.recruiter.readability.hiring.manager',
+            )}
       </p>
       {error ? (
         <p role="alert">
@@ -112,7 +124,11 @@ export function ApplicationPageDraftCheckpoint({
         </p>
       ) : null}
       <footer>
-        <span>{t('dossier.publishing.remains.blocked.during.the.checks')}</span>
+        <span>
+          {mode === 'preview'
+            ? t('dossier.no.link.is.created.without.this.action')
+            : t('dossier.publishing.remains.blocked.during.the.checks')}
+        </span>
         <button
           className="co-button"
           disabled={pending}
@@ -121,11 +137,19 @@ export function ApplicationPageDraftCheckpoint({
         >
           {pending
             ? locale === 'en'
-              ? 'Starting reviews…'
-              : 'Démarrage des reviews…'
+              ? mode === 'preview'
+                ? 'Creating link…'
+                : 'Starting reviews…'
+              : mode === 'preview'
+                ? 'Création du lien…'
+                : 'Démarrage des reviews…'
             : locale === 'en'
-              ? 'Start the three reviews'
-              : 'Lancer les trois reviews'}
+              ? mode === 'preview'
+                ? 'Approve and create private link'
+                : 'Start the three reviews'
+              : mode === 'preview'
+                ? 'Valider et créer le lien privé'
+                : 'Lancer les trois reviews'}
         </button>
       </footer>
     </section>

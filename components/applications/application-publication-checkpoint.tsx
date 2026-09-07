@@ -3,9 +3,12 @@
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { CreatedPublication } from '@/lib/schemas';
+import type { Application } from '@/lib/application-contract';
+import type { PersistedRun } from '@/lib/run-contract';
 import type { PublicationActionError } from './use-application-workflow';
 
 export function ApplicationPublicationCheckpoint({
+  application,
   busy = false,
   error,
   onCopy,
@@ -14,8 +17,11 @@ export function ApplicationPublicationCheckpoint({
   onRevoke,
   pending,
   publication,
+  profile,
   revoked,
+  spec,
 }: {
+  application?: Application;
   busy?: boolean;
   error?: PublicationActionError;
   onCopy: () => void;
@@ -24,13 +30,27 @@ export function ApplicationPublicationCheckpoint({
   onRevoke: () => void;
   pending: 'publish' | 'revoke' | undefined;
   publication?: CreatedPublication;
+  profile?: PersistedRun['profile'];
   revoked: boolean;
+  spec?: PersistedRun['spec'];
 }) {
   const { locale } = useI18n();
   const t = useTranslations([dossierMessages]);
   const href = publication
     ? `/p/${publication.publicationId}#${publication.rawToken}`
     : undefined;
+  const absoluteHref = href;
+  const emailSubject = application
+    ? locale === 'en'
+      ? `Application — ${application.role}`
+      : `Candidature — ${application.role}`
+    : '';
+  const emailBody =
+    application && profile && absoluteHref
+      ? locale === 'en'
+        ? `Hello,\n\nI prepared a concise, evidence-backed view of my fit for the ${application.role} role at ${application.company}:\n${absoluteHref}\n\nBest,\n${profile.name}`
+        : `Bonjour,\n\nJ’ai préparé une présentation concise et sourcée de mon adéquation au poste de ${application.role} chez ${application.company} :\n${absoluteHref}\n\nBien à vous,\n${profile.name}`
+      : '';
 
   return (
     <section className="co-panel co-research-checkpoint co-publication-checkpoint">
@@ -116,6 +136,22 @@ export function ApplicationPublicationCheckpoint({
               </button>
             </div>
           </footer>
+          {application && profile && spec ? (
+            <section>
+              <h3>
+                {locale === 'en' ? 'Application email' : 'Email de candidature'}
+              </h3>
+              <p>{emailBody}</p>
+              <a
+                className="co-button quiet"
+                href={`mailto:?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+              >
+                {locale === 'en'
+                  ? 'Open in email app'
+                  : 'Ouvrir dans la messagerie'}
+              </a>
+            </section>
+          ) : null}
         </>
       ) : revoked ? (
         <p>

@@ -24,12 +24,16 @@ const stages: Array<{ stage: Application['stage']; icon: string }> = [
   { stage: 'closed', icon: 'archive' },
 ];
 
-export function ApplicationsPage() {
+export function ApplicationsPage({
+  initialImportUrl,
+}: {
+  initialImportUrl?: string;
+}) {
   const t = useTranslations([applicationsMessages]);
   const { locale } = useI18n();
   const pipeline = useApplicationsPipeline();
   const memory = useCareerMemory();
-  const [importOpen, setImportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(initialImportUrl !== undefined);
 
   const decisionsByOpportunity = new Map(
     pipeline.decisions.map((decision) => [decision.opportunityId, decision]),
@@ -196,6 +200,7 @@ export function ApplicationsPage() {
 
       {importOpen ? (
         <ImportDialog
+          initialUrl={initialImportUrl}
           onClose={() => setImportOpen(false)}
           onImported={(opportunity) => {
             pipeline.addOpportunity(opportunity);

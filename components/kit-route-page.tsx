@@ -37,6 +37,7 @@ const unavailableRoutes: Record<string, [string, string, string]> = {
 
 export function KitRoutePage({
   path,
+  query,
 }: {
   path: string;
   query: Record<string, string | string[] | undefined>;
@@ -45,8 +46,14 @@ export function KitRoutePage({
   if (path === '/') return <HomeScreen />;
   if (path === '/memory') return <MemoryScreen />;
   if (path === '/applications') return <ApplicationsPage />;
+  if (path === '/applications/new')
+    return (
+      <ApplicationsPage
+        initialImportUrl={typeof query.source === 'string' ? query.source : ''}
+      />
+    );
   const application = path.match(
-    /^\/applications\/([^/]+)(?:\/(review|page|published|versions|company|timeline))?$/,
+    /^\/applications\/([^/]+)(?:\/(run|review|preview|publish|page|published|versions|company|timeline))?$/,
   );
   if (application) {
     const applicationId = application[1];

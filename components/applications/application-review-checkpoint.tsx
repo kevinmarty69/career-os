@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
@@ -67,11 +69,13 @@ export function ApplicationReviewIssueActions({
 }
 
 export function ApplicationReviewCheckpoint({
+  applicationId,
   error,
   onDecide,
   pending,
   run,
 }: {
+  applicationId: string;
   error: boolean;
   onDecide: (
     reviewId: string,
@@ -81,6 +85,7 @@ export function ApplicationReviewCheckpoint({
   pending?: string;
   run: PersistedRun;
 }) {
+  const router = useRouter();
   const { locale } = useI18n();
   const t = useTranslations([dossierMessages]);
   const decisions = new Map(
@@ -101,6 +106,37 @@ export function ApplicationReviewCheckpoint({
       ).length,
     0,
   );
+  const active = run.reviews
+    .flatMap((review) =>
+      review.issues.map((issue, issueIndex) => ({ issue, issueIndex, review })),
+    )
+    .find(
+      ({ issueIndex, review }) =>
+        !decisions.has(`${review.reviewId}:${issueIndex}`),
+    );
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!active || pending) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, button, a')) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        router.push(`/applications/${applicationId}`);
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        onDecide(active.review.reviewId, active.issueIndex, 'correct');
+      } else if (
+        event.key === 'Backspace' &&
+        active.review.reviewer !== 'factuality'
+      ) {
+        event.preventDefault();
+        onDecide(active.review.reviewId, active.issueIndex, 'keep');
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [active, applicationId, onDecide, pending, router]);
 
   return (
     <section className="co-panel co-research-checkpoint co-review-checkpoint">
@@ -121,56 +157,56 @@ export function ApplicationReviewCheckpoint({
         )}{' '}
       </p>
       <div className="co-review-list">
-        {run.reviews.map((review) => (
-          <article key={review.reviewId}>
+        {active ? (
+          <article key={`${active.review.reviewId}:${active.issueIndex}`}>
             <header>
-              <strong>{reviewerLabel(review.reviewer, locale)}</strong>
-              <span data-passed={review.passed}>
-                {review.passed
-                  ? locale === 'en'
-                    ? 'Passed'
-                    : 'Validée'
-                  : locale === 'en'
-                    ? 'Needs a decision'
-                    : 'Décision requise'}
+              <strong>{reviewerLabel(active.review.reviewer, locale)}</strong>
+              <span data-passed={false}>
+                {active.issue.blocking
+                  ? t('dossier.blocking')
+                  : t('dossier.suggestion')}
               </span>
             </header>
-            {review.issues.length ? (
-              review.issues.map((issue, index) => {
-                const key = `${review.reviewId}:${index}`;
-                const decision = decisions.get(key);
-                return (
-                  <section key={key}>
-                    <small>
-                      {issue.section} ·{' '}
-                      {issue.blocking
-                        ? t('dossier.blocking')
-                        : t('dossier.suggestion')}
-                    </small>
-                    <p>{issue.message}</p>
-                    {decision ? (
-                      <strong>
-                        {decision === 'keep'
-                          ? t('dossier.kept.by.you')
-                          : t('dossier.correction.started')}
-                      </strong>
-                    ) : (
-                      <ApplicationReviewIssueActions
-                        issue={issue}
-                        issueIndex={index}
-                        onDecide={onDecide}
-                        pending={pending}
-                        review={review}
-                      />
-                    )}
-                  </section>
-                );
-              })
-            ) : (
-              <p>{t('dossier.no.objections')}</p>
-            )}
+            <section>
+              <small>{active.issue.section}</small>
+              <h3>{active.issue.message}</h3>
+              {(active.issue.evidenceIds?.length ?? 0) > 0 ? (
+                <p>
+                  {locale === 'en'
+                    ? `${active.issue.evidenceIds?.length ?? 0} attached evidence source${active.issue.evidenceIds?.length === 1 ? '' : 's'}`
+                    : `${active.issue.evidenceIds?.length ?? 0} source${active.issue.evidenceIds?.length === 1 ? '' : 's'} de preuve rattachée${active.issue.evidenceIds?.length === 1 ? '' : 's'}`}
+                </p>
+              ) : (
+                <p>
+                  {locale === 'en'
+                    ? 'No supporting evidence is attached.'
+                    : 'Aucune preuve justificative n’est rattachée.'}
+                </p>
+              )}
+              <ApplicationReviewIssueActions
+                issue={active.issue}
+                issueIndex={active.issueIndex}
+                onDecide={onDecide}
+                pending={pending}
+                review={active.review}
+              />
+            </section>
           </article>
-        ))}
+        ) : (
+          <article>
+            <h3>
+              {t(
+                'dossier.all.checks.are.resolved.ready.for.your.final.approval',
+              )}
+            </h3>
+            <Link
+              className="co-button"
+              href={`/applications/${applicationId}/page`}
+            >
+              {t('dossier.review.the.draft.before.the.checks')}
+            </Link>
+          </article>
+        )}
       </div>
       {error ? (
         <p role="alert">

@@ -14,14 +14,16 @@ import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { useState } from 'react';
 
 export function ImportDialog({
+  initialUrl = '',
   onClose,
   onImported,
 }: {
+  initialUrl?: string;
   onClose: () => void;
   onImported: (opportunity: DiscoveredJob) => void;
 }) {
   const t = useTranslations([applicationsMessages]);
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(initialUrl);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const dialog = useDialogFocus<HTMLElement>(onClose, submitting);
