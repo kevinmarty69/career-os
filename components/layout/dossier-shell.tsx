@@ -3,7 +3,8 @@ import { shellMessages } from '@/lib/i18n/dictionaries/shell';
 import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 
-import { LocaleSwitch, useTranslations } from '@/components/i18n/i18n-provider';
+import { useTranslations } from '@/components/i18n/i18n-provider';
+import { ProfileMenu } from './profile-menu';
 import { Badge, Icon } from '@/components/ui/primitives';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import { initials } from '@/lib/initials';
@@ -92,7 +93,7 @@ export function DossierShell({
             <strong>{identity.company}</strong>
             <small>{identity.role}</small>
           </span>
-          <LocaleSwitch compact />
+          <ProfileMenu placement="below" />
           {state}
           {actions}
         </header>
@@ -128,7 +129,7 @@ export function DossierShell({
               </strong>
             </span>
           </div>
-          <LocaleSwitch compact />
+          <ProfileMenu placement="below" />
           {state ?? <Badge tone="warn">{t('dossier.needs.review')}</Badge>}
           {actions}
         </header>

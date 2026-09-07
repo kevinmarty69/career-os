@@ -13,6 +13,7 @@ import { useI18n } from '@/components/i18n/i18n-provider';
 import { MemoryScreen } from '@/components/memory/memory-screen';
 import { LinksScreen } from '@/components/publications/links-screen';
 import { DataScreen } from '@/components/settings/data-screen';
+import { ProfileSettingsScreen } from '@/components/settings/profile-settings-screen';
 import {
   BillingScreen,
   IntegrationsScreen,
@@ -32,7 +33,6 @@ const unavailableRoutes: Record<string, [string, string, string]> = {
   '/assets': ['Assets', 'Assets', '/applications'],
   '/messages': ['Messages', 'Messages', '/applications'],
   '/onboarding/hosting': ['Hébergement', 'Hosting', '/settings/models'],
-  '/settings/profile': ['Profil', 'Profile', '/memory'],
 };
 
 export function KitRoutePage({
@@ -43,6 +43,7 @@ export function KitRoutePage({
   query: Record<string, string | string[] | undefined>;
 }) {
   const { locale } = useI18n();
+  if (path === '/settings/profile') return <ProfileSettingsScreen />;
   if (path === '/') return <HomeScreen />;
   if (path === '/memory') return <MemoryScreen />;
   if (path === '/applications') return <ApplicationsPage />;

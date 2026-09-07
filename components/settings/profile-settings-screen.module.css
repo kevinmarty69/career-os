@@ -1,0 +1,43 @@
+.preferences {
+  max-width: 720px;
+  padding: 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
+  background: var(--color-card);
+}
+.preferences > header {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.preferences h2 {
+  margin: 0 0 8px;
+  font-size: var(--text-section);
+}
+.preferences p {
+  margin: 8px 0 0;
+  color: var(--color-ink-600);
+  font-size: var(--text-body-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.preferences label {
+  display: block;
+  margin: 24px 0 10px;
+  font-size: var(--text-body);
+}
+.preferences select {
+  width: 100%;
+  max-width: 280px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-ink-200);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+  color: var(--color-ink-900);
+  font: inherit;
+  font-size: var(--text-body);
+}
+.preferences p[role='status'] {
+  color: var(--color-green-strong);
+}

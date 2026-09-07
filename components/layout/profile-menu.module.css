@@ -1,0 +1,105 @@
+.account {
+  position: relative;
+  min-width: 0;
+  color: var(--color-ink-700);
+}
+.account > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--text-body-sm);
+}
+.account > summary::-webkit-details-marker {
+  display: none;
+}
+.account > summary:hover,
+.account[open] > summary {
+  background: var(--color-panel);
+}
+.account > summary > i {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  height: 30px;
+  background: var(--color-ink-900);
+  color: var(--color-card);
+  border-radius: 50%;
+  font-size: var(--text-caption);
+  font-style: normal;
+}
+.account > summary > i :global(.co-icon) {
+  color: inherit;
+  font-size: 18px;
+}
+.account > summary > span:not(:global(.co-icon)) {
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu {
+  position: absolute;
+  z-index: 100;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 240px;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  border: 1px solid var(--color-ink-200);
+  background: var(--color-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-raised);
+}
+.account[data-placement='below'] > .menu {
+  top: calc(100% + 8px);
+  bottom: auto;
+  right: 0;
+  left: auto;
+}
+.menu > a,
+.menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-900);
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  font-size: var(--text-body-sm);
+  cursor: pointer;
+}
+.menu > a:hover,
+.menu > button:hover {
+  background: var(--color-panel);
+}
+.menu > button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.menu > p {
+  margin: 8px 12px;
+  color: var(--color-clay-strong);
+  font-size: var(--text-body-sm);
+  line-height: 1.5;
+}
+.mobile {
+  display: none;
+}
+@media (max-width: 899px) {
+  .mobile {
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 14px 0;
+  }
+}

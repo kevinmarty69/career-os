@@ -4,7 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { LocaleSwitch, useTranslations } from '@/components/i18n/i18n-provider';
+import { useTranslations } from '@/components/i18n/i18n-provider';
+import { ProfileMenu } from '@/components/layout/profile-menu';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
@@ -119,7 +120,7 @@ function AppChrome({
             </ol>
           </section>
           <div className={styles.sidebarFooter}>
-            <LocaleSwitch compact />
+            <ProfileMenu />
             <div className={styles.localNote}>
               <Icon>shield</Icon>
               <span>
@@ -132,7 +133,7 @@ function AppChrome({
         <header className={styles.mobileHeader}>
           <Brand />
           <div>
-            <LocaleSwitch compact />
+            <ProfileMenu placement="below" />
             <Link href="/memory" aria-label={t('memory.close.import')}>
               <Icon>close</Icon>
             </Link>

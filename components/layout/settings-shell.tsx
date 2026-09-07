@@ -5,6 +5,7 @@ import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 
 import { useTranslations } from '@/components/i18n/i18n-provider';
 import { Icon } from '@/components/ui/primitives';
+import { ProfileMenu } from './profile-menu';
 import Link from 'next/link';
 import { type ReactNode } from 'react';
 
@@ -22,7 +23,6 @@ export function SettingsNav({ active }: { active: string }) {
       </Link>
       <p>{t('shell.settings')}</p>
       {[
-        ['person', t('active-routes.profile'), '/settings/profile'],
         ['memory', t('active-routes.models.agents'), '/settings/models'],
         ['shield', t('search-profiles.privacy'), '/settings/privacy'],
         ['hub', t('active-routes.integrations'), '/settings/integrations'],
@@ -71,6 +71,7 @@ export function SettingsShell({
             </span>
             <strong>Career OS</strong>
           </Link>
+          <ProfileMenu placement="below" />
         </header>
         <div className="co-settings-content">{children}</div>
       </section>
