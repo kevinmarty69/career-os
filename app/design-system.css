@@ -249,13 +249,18 @@ pre {
   place-items: center;
 }
 
-.co-brand > span .co-icon {
-  font-size: 18px;
+.co-brand > span img {
+  display: block;
+  width: 18px;
+  height: 18px;
 }
 
 .co-brand strong {
+  color: #16181c;
+  font-family: var(--font-wordmark), sans-serif;
   font-size: 17px;
-  letter-spacing: -0.03em;
+  font-weight: 500;
+  letter-spacing: -0.045em;
 }
 
 .co-sidebar nav {

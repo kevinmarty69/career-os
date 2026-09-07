@@ -20,6 +20,7 @@ import {
   type PublicationSummary,
 } from '@/lib/server/publication-input';
 import Link from 'next/link';
+import Image from 'next/image';
 import { type ReactNode, useEffect, useState } from 'react';
 
 export function AppShell({
@@ -81,9 +82,14 @@ export function AppShell({
       <aside className="co-sidebar" aria-label={t('shell.main.navigation')}>
         <Link aria-label="Career OS" className="co-brand" href="/">
           <span>
-            <Icon>layers</Icon>
+            <Image
+              alt=""
+              height={18}
+              src="/brand/symbol/careeros-symbol-inverse.svg"
+              width={18}
+            />
           </span>
-          <strong>careeros</strong>
+          <strong>Career OS</strong>
         </Link>
         <nav aria-label={t('shell.main.navigation')}>
           {nav.map(([href, icon, label, count]) => (

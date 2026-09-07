@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { Geist_Mono, Instrument_Sans } from 'next/font/google';
+import { Geist_Mono, Instrument_Sans, Space_Grotesk } from 'next/font/google';
 import { I18nProvider } from '@/components/i18n/i18n-provider';
 import { localeCookieName, resolveLocale } from '@/lib/i18n/locale';
 import './globals.css';
@@ -24,6 +24,13 @@ const mono = Geist_Mono({
   display: 'swap',
 });
 
+const wordmark = Space_Grotesk({
+  subsets: ['latin'],
+  weight: ['500'],
+  variable: '--font-wordmark',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'Career OS',
   description: 'Turn your real work into evidence-backed applications.',
@@ -35,7 +42,10 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const locale = resolveLocale((await cookies()).get(localeCookieName)?.value);
   return (
-    <html className={`${sans.variable} ${mono.variable}`} lang={locale}>
+    <html
+      className={`${sans.variable} ${mono.variable} ${wordmark.variable}`}
+      lang={locale}
+    >
       <body>
         <I18nProvider initialLocale={locale}>{children}</I18nProvider>
       </body>
