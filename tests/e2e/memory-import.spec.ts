@@ -122,6 +122,21 @@ test('keeps the file local until review, then saves the edited selection', async
   ).toBeVisible();
   expect(savedBodies).toHaveLength(1);
 
+  const jobSource = page.locator('input[name="source"]');
+  await jobSource.focus();
+  await expect(jobSource).toHaveCSS('outline-style', 'none');
+  const jobForm = page.locator('form').filter({ has: jobSource });
+  await expect(jobForm).toHaveCSS('outline-style', 'solid');
+  await expect(jobForm).toHaveCSS('outline-color', 'rgb(13, 13, 15)');
+  await jobSource.fill('https://example.com/job');
+  await page.keyboard.press('Tab');
+  await expect(jobForm.locator('button')).toBeFocused();
+  await expect(jobForm.locator('button')).toHaveCSS('outline-style', 'solid');
+  await page.keyboard.press('Shift+Tab');
+  await expect(jobSource).toBeFocused();
+  await expect(jobSource).toHaveCSS('outline-style', 'none');
+  await expect(jobForm).toHaveCSS('outline-style', 'solid');
+
   const payload = savedBodies[0] as {
     profile: {
       sources: Array<{ kind: string; title: string }>;

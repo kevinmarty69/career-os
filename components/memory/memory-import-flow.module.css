@@ -1217,6 +1217,10 @@
   background: transparent;
   font-size: var(--text-body);
 }
+.nextStep input:focus-visible {
+  /* The surrounding form already provides the visible focus indicator. */
+  outline: none !important;
+}
 .nextStep small {
   color: var(--color-ink-500);
   font-size: var(--text-caption);
