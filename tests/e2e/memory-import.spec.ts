@@ -10,6 +10,37 @@ Reduced a deployment workflow from eleven minutes to seven minutes.
 Projects
 Created a private portfolio for evidence-backed applications.`;
 
+test('keeps accordion and secondary action hovers on light surfaces', async ({
+  page,
+}) => {
+  await mockProfilePort(page, []);
+  await page.goto('/memory/import');
+  await page.getByLabel('Contenu à analyser').fill(profileText);
+  await page.getByRole('button', { name: 'Lire ce texte' }).click();
+  const summary = page.locator('button[aria-expanded]').first();
+  for (let state = 0; state < 2; state++) {
+    await summary.hover();
+    await expect(summary).toHaveCSS('background-color', 'rgb(244, 244, 247)');
+    await expect(summary.locator('strong')).toHaveCSS(
+      'color',
+      'rgb(38, 41, 50)',
+    );
+    await expect(summary.locator('small')).toHaveCSS(
+      'color',
+      'rgb(92, 94, 104)',
+    );
+    await summary.click();
+  }
+  const secondary = page.locator('button[class*="secondaryButton"]').first();
+  await secondary.hover();
+  await expect(secondary).toHaveCSS('background-color', 'rgb(244, 244, 247)');
+  await expect(secondary).toHaveCSS('color', 'rgb(13, 13, 15)');
+  await page.locator('article > header input[type="checkbox"]').first().focus();
+  await page.keyboard.press('Tab');
+  await expect(summary).toBeFocused();
+  await expect(summary).not.toHaveCSS('outline-style', 'none');
+});
+
 test('keeps the file local until review, then saves the edited selection', async ({
   page,
 }) => {
@@ -106,7 +137,9 @@ test('restores a pasted LinkedIn review without saving it prematurely', async ({
   await expect(
     page.getByRole('heading', { name: 'Relisez ce qui a été extrait' }),
   ).toBeVisible();
-  await expect(page.getByText('Profil LinkedIn collé')).toBeVisible();
+  await expect(
+    page.getByText('Profil LinkedIn collé', { exact: true }),
+  ).toBeVisible();
   expect(savedBodies).toHaveLength(0);
 
   await page

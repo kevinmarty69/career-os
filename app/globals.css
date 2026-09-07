@@ -1247,7 +1247,8 @@ button {
     background-color 160ms ease;
 }
 
-button:hover:not(:disabled) {
+/* Default hover must not override component-specific surfaces and text. */
+:where(button:hover:not(:disabled)) {
   border-color: var(--primary-hover);
   background: var(--primary-hover);
 }
