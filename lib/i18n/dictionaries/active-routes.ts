@@ -641,18 +641,29 @@ export const activeRoutesMessages = {
   'Vos données vous appartiennent, dans un format lisible sans Career OS.':
     'Your data belongs to you, in a format readable without Career OS.',
   'Exporter tout': 'Export everything',
+  'Mémoire et preuves': 'Career memory and evidence',
+  'Documents sources': 'Source documents',
+  'Candidatures et publications': 'Applications and publications',
   'Mémoire · 128 affirmations': 'Career memory · 128 claims',
   'Documents sources · 24': 'Source documents · 24',
   'Candidatures · 14': 'Applications · 14',
   'Runs et journaux d’agents': 'Agent runs and logs',
   'JSON seul': 'JSON only',
   'Générer l’archive': 'Generate archive',
+  'Export téléchargé.': 'Export downloaded.',
+  'L’export a échoué. Reconnectez-vous puis réessayez.':
+    'Export failed. Sign in again, then retry.',
+  'Chaque affirmation exportée conserve ses liens vers ses preuves et sa date d’origine. Le fichier peut être lu sans Career OS.':
+    'Every exported claim keeps its evidence links and original date. The file can be read without Career OS.',
   'Chaque affirmation exportée conserve ses liens vers ses preuves et sa date d’origine. L’archive se réimporte telle quelle dans une autre instance.':
     'Every exported claim keeps its links to evidence and its original date. The archive can be imported unchanged into another instance.',
   'Supprimer mon compte': 'Delete my account',
   'Efface la mémoire, les candidatures, les runs et les liens privés. Les liens deviennent inaccessibles immédiatement, y compris pour un onglet déjà ouvert.':
     'Deletes career memory, applications, runs, and private links. Links become inaccessible immediately, including in an already open tab.',
   'Ce qui sera supprimé': 'What will be deleted',
+  'Mémoire, preuves et documents': 'Career memory, evidence, and documents',
+  'Candidatures et versions': 'Applications and versions',
+  'Liens privés et leurs sessions': 'Private links and their sessions',
   '128 affirmations, 24 documents': '128 claims, 24 documents',
   '14 candidatures et leurs versions': '14 applications and their versions',
   '4 liens privés actifs': '4 active private links',
@@ -660,6 +671,8 @@ export const activeRoutesMessages = {
   'Tapez SUPPRIMER pour confirmer': 'Type DELETE to confirm',
   'tapez SUPPRIMER pour confirmer': 'type DELETE to confirm',
   'Supprimer définitivement': 'Delete permanently',
+  'La suppression a échoué. Reconnectez-vous puis réessayez.':
+    'Deletion failed. Sign in again, then retry.',
   'Aucun délai de grâce, aucune corbeille : la suppression est immédiate. Exportez d’abord si vous voulez garder une copie.':
     'There is no grace period or trash: deletion is immediate. Export first if you want to keep a copy.',
   Rétention: 'Retention',

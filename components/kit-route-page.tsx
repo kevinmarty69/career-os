@@ -46,7 +46,9 @@ import {
 import {
   createApplicationTask,
   createApplicationTimelineEvent,
+  deleteWorkspace,
   decideRunReviewIssue,
+  exportWorkspace,
   readApplication,
   readApplicationInsights,
   readApplicationTimeline,
@@ -5384,6 +5386,52 @@ function IntegrationsScreen() {
 }
 
 function DataScreen() {
+  const router = useRouter();
+  const { locale } = useI18n();
+  const [exportState, setExportState] = useState<
+    'ready' | 'pending' | 'done' | 'error'
+  >('ready');
+  const [deleteState, setDeleteState] = useState<'ready' | 'pending' | 'error'>(
+    'ready',
+  );
+  const [confirmation, setConfirmation] = useState('');
+  const deletionConfirmation = locale === 'fr' ? 'SUPPRIMER' : 'DELETE';
+
+  async function downloadExport() {
+    if (exportState === 'pending') return;
+    setExportState('pending');
+    try {
+      const response = await exportWorkspace();
+      if (!response.ok) throw new Error();
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download =
+        response.headers
+          .get('content-disposition')
+          ?.match(/filename="([^"]+)"/)?.[1] ?? 'careeros-export.ndjson';
+      link.click();
+      URL.revokeObjectURL(url);
+      setExportState('done');
+    } catch {
+      setExportState('error');
+    }
+  }
+
+  async function removeWorkspace() {
+    if (confirmation !== deletionConfirmation || deleteState === 'pending')
+      return;
+    setDeleteState('pending');
+    try {
+      const response = await deleteWorkspace(deletionConfirmation);
+      if (!response.ok) throw new Error();
+      router.replace('/sign-in');
+      router.refresh();
+    } catch {
+      setDeleteState('error');
+    }
+  }
+
   return (
     <SettingsShell active="Export & suppression">
       <PageHeader
@@ -5396,37 +5444,53 @@ function DataScreen() {
             <div>
               <Icon>download</Icon>
               <h2>Exporter tout</h2>
-              <code>≈ 18 Mo</code>
+              <code>NDJSON</code>
             </div>
             <div className="co-export-checks">
               {[
-                'Mémoire · 128 affirmations',
-                'Documents sources · 24',
-                'Candidatures · 14',
+                'Mémoire et preuves',
+                'Documents sources',
+                'Candidatures et publications',
                 'Runs et journaux d’agents',
-              ].map((x) => (
-                <label key={x}>
-                  <input defaultChecked type="checkbox" />
-                  {x}
+              ].map((item) => (
+                <label key={item}>
+                  <Icon>check_circle</Icon>
+                  {item}
                 </label>
               ))}
             </div>
             <footer>
-              <div className="co-segment">
-                <button className="active" type="button">
-                  Markdown + JSON
-                </button>
-                <button type="button">JSON seul</button>
-                <button type="button">PDF</button>
-              </div>
-              <Button>Générer l’archive</Button>
+              <span>
+                {locale === 'fr'
+                  ? 'Export versionné et réimportable'
+                  : 'Versioned, re-importable export'}
+              </span>
+              <Button
+                disabled={exportState === 'pending'}
+                onClick={() => void downloadExport()}
+              >
+                {exportState === 'pending'
+                  ? locale === 'fr'
+                    ? 'Préparation…'
+                    : 'Preparing…'
+                  : 'Générer l’archive'}
+              </Button>
             </footer>
           </section>
-          <pre>{`structure de l'archive\n\ncareeros-export-2026-09-03/\n├── memory/claims.json\n├── memory/claims.md\n├── sources/corvid_postmortem.md\n├── sources/cv_2024.pdf\n├── applications/nimbus-robotics/\n│   ├── page.md\n│   ├── requirements.json\n│   └── runs/8f2c.json\n└── README.md`}</pre>
+          {exportState === 'done' ? (
+            <div className="co-note ok" role="status">
+              <Icon>download_done</Icon>Export téléchargé.
+            </div>
+          ) : exportState === 'error' ? (
+            <div className="co-note crit" role="alert">
+              <Icon>error</Icon>L’export a échoué. Reconnectez-vous puis
+              réessayez.
+            </div>
+          ) : null}
           <div className="co-note">
             <Icon>verified</Icon>Chaque affirmation exportée conserve ses liens
-            vers ses preuves et sa date d’origine. L’archive se réimporte telle
-            quelle dans une autre instance.
+            vers ses preuves et sa date d’origine. Le fichier peut être lu sans
+            Career OS.
           </div>
         </section>
         <aside className="co-data-side">
@@ -5443,44 +5507,41 @@ function DataScreen() {
             <div>
               <strong>Ce qui sera supprimé</strong>
               <ul>
-                <li>128 affirmations, 24 documents</li>
-                <li>14 candidatures et leurs versions</li>
-                <li>4 liens privés actifs</li>
-                <li>2 jetons d’API</li>
+                <li>Mémoire, preuves et documents</li>
+                <li>Candidatures et versions</li>
+                <li>Liens privés et leurs sessions</li>
+                <li>Runs et journaux d’agents</li>
               </ul>
             </div>
             <input
-              aria-label="Tapez SUPPRIMER pour confirmer"
-              placeholder="tapez SUPPRIMER pour confirmer"
+              aria-label={`${locale === 'fr' ? 'Tapez' : 'Type'} ${deletionConfirmation} ${locale === 'fr' ? 'pour confirmer' : 'to confirm'}`}
+              onChange={(event) => setConfirmation(event.target.value)}
+              placeholder={`${locale === 'fr' ? 'tapez' : 'type'} ${deletionConfirmation} ${locale === 'fr' ? 'pour confirmer' : 'to confirm'}`}
+              value={confirmation}
             />
-            <Button danger>Supprimer définitivement</Button>
+            <Button
+              danger
+              disabled={
+                confirmation !== deletionConfirmation ||
+                deleteState === 'pending'
+              }
+              onClick={() => void removeWorkspace()}
+            >
+              {deleteState === 'pending'
+                ? locale === 'fr'
+                  ? 'Suppression…'
+                  : 'Deleting…'
+                : 'Supprimer définitivement'}
+            </Button>
+            {deleteState === 'error' ? (
+              <p role="alert">
+                La suppression a échoué. Reconnectez-vous puis réessayez.
+              </p>
+            ) : null}
             <p>
               Aucun délai de grâce, aucune corbeille : la suppression est
               immédiate. Exportez d’abord si vous voulez garder une copie.
             </p>
-          </section>
-          <section className="co-retention-card">
-            <h2>
-              <Icon>shield</Icon>Rétention
-            </h2>
-            <dl>
-              <div>
-                <dt>Documents et preuves</dt>
-                <dd>jusqu’à suppression</dd>
-              </div>
-              <div>
-                <dt>Journaux d’accès aux liens</dt>
-                <dd>90 jours</dd>
-              </div>
-              <div>
-                <dt>Sauvegardes chiffrées</dt>
-                <dd>7 jours</dd>
-              </div>
-              <div>
-                <dt>Factures (obligation légale)</dt>
-                <dd>10 ans</dd>
-              </div>
-            </dl>
           </section>
         </aside>
       </div>

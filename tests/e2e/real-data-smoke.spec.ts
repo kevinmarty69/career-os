@@ -140,18 +140,13 @@ test('imports a real CV and real offer URLs through the persisted workflow', asy
   expect(exported).toContain('"type":"applications"');
   expect(exported).toContain('"type":"complete"');
 
-  const session = (await (
-    await page.request.get('/api/auth/get-session')
-  ).json()) as {
-    session: { activeOrganizationId: string };
-  };
-  const deletion = await page.evaluate(async (tenantId) => {
+  const deletion = await page.evaluate(async () => {
     const response = await fetch('/api/workspace', {
       method: 'DELETE',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ confirmation: `DELETE ${tenantId}` }),
+      body: JSON.stringify({ confirmation: 'SUPPRIMER' }),
     });
     return response.status;
-  }, session.session.activeOrganizationId);
+  });
   expect(deletion).toBe(204);
 });

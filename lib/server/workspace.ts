@@ -5,7 +5,7 @@ import { isSensitiveSessionFresh } from './auth-config';
 import type { PublicationSession } from './publications';
 
 const deleteWorkspaceSchema = z
-  .object({ confirmation: z.string().min(1).max(64) })
+  .object({ confirmation: z.enum(['DELETE', 'SUPPRIMER']) })
   .strict();
 
 export class WorkspaceDeletionRejectedError extends Error {}
@@ -17,7 +17,7 @@ export async function deleteWorkspace(
 ) {
   if (!isSensitiveSessionFresh(session.sessionCreatedAt))
     throw new WorkspaceSessionNotFreshError();
-  const { confirmation } = deleteWorkspaceSchema.parse(rawInput);
+  deleteWorkspaceSchema.parse(rawInput);
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required.');
   const sql = postgres(url, { max: 1, idle_timeout: 5 });
@@ -28,7 +28,7 @@ export async function deleteWorkspace(
       await tx.unsafe('set local role career_app');
       try {
         await tx`select app.delete_workspace(
-          ${session.tenantId}, ${confirmation}
+          ${session.tenantId}, ${`DELETE ${session.tenantId}`}
         )`;
       } catch (error) {
         if (

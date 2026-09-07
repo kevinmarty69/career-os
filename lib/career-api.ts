@@ -20,6 +20,18 @@ export function readApplicationInsights(signal: AbortSignal) {
   return fetch('/api/insights', { cache: 'no-store', signal });
 }
 
+export function exportWorkspace() {
+  return fetch('/api/workspace/export', { method: 'POST' });
+}
+
+export function deleteWorkspace(confirmation: 'DELETE' | 'SUPPRIMER') {
+  return fetch('/api/workspace', {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ confirmation }),
+  });
+}
+
 export function readApplications(signal: AbortSignal) {
   return fetch('/api/applications', { cache: 'no-store', signal });
 }
