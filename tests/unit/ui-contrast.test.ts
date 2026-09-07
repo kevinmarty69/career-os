@@ -6,6 +6,27 @@ const css = readFileSync(
   new URL('../../app/globals.css', import.meta.url),
   'utf8',
 );
+const designSystem = readFileSync(
+  new URL('../../app/design-system.css', import.meta.url),
+  'utf8',
+);
+
+test('the normative design tokens and ink primary action are installed', () => {
+  for (const declaration of [
+    '--color-ink-900: #0d0d0f',
+    '--color-canvas: #ebebf0',
+    '--color-panel: #f4f4f7',
+    '--color-indigo: #5b6cc4',
+    '--text-body-sm: 13.5px',
+    '--radius-shell: 22px',
+  ])
+    assert.ok(designSystem.includes(declaration), `${declaration} is missing`);
+
+  assert.match(
+    designSystem,
+    /\.co-button\s*\{[\s\S]*?background:\s*var\(--color-ink-900\)/,
+  );
+});
 
 test('shared small-text status colors meet WCAG AA contrast', () => {
   for (const [foreground, background] of [

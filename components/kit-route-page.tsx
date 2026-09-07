@@ -623,7 +623,7 @@ function Stat({
   icon,
   value,
   label,
-  tone = 'accent',
+  tone = 'muted',
 }: {
   icon: string;
   value: ReactNode;
