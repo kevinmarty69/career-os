@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chromium, type BrowserContext, type Page } from '@playwright/test';
+import {
+  chromium,
+  expect,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { Client } from 'pg';
 import { databaseTls } from '../lib/database-tls';
@@ -128,6 +133,49 @@ async function main() {
       404,
       'Another account cannot read persisted application data',
     );
+    if (process.env.CAREER_OS_SMOKE_CV) {
+      await pageA.goto(`${base}/memory/import`);
+      await pageA
+        .locator('input[type="file"]')
+        .setInputFiles(process.env.CAREER_OS_SMOKE_CV);
+      await expect(
+        pageA.getByRole('heading', { name: 'Review what was extracted' }),
+      ).toBeVisible({ timeout: 30_000 });
+      await pageA
+        .getByLabel('I reviewed this selection and authorize the listed uses.')
+        .check();
+      await pageA
+        .getByRole('button', { name: 'Confirm and save', exact: true })
+        .click();
+      await expect(
+        pageA.getByRole('heading', { name: 'Your selection is saved.' }),
+      ).toBeVisible({ timeout: 20_000 });
+      const saved = await api(pageA, '/api/profile');
+      assert.equal(saved.status, 200);
+      const profile = JSON.parse(saved.text).profile;
+      assert.ok(profile.claims.length > 0, 'PDF claims persisted');
+      assert.equal(profile.sources.length, 1, 'PDF source persisted');
+      console.log(
+        `PASS: PDF import, human confirmation and persistence (${profile.claims.length} claims).`,
+      );
+    }
+    for (const offerUrl of process.env.CAREER_OS_SMOKE_OFFERS?.split(
+      ',',
+    ).filter(Boolean) ?? []) {
+      const imported = await api(
+        pageA,
+        '/api/opportunities/import-url',
+        'POST',
+        { url: offerUrl },
+      );
+      assert.ok(
+        [200, 201].includes(imported.status),
+        `Offer import failed (${new URL(offerUrl).hostname}): ${imported.status}`,
+      );
+      const opportunity = JSON.parse(imported.text).opportunity;
+      assert.ok(opportunity.opportunityId, 'Imported opportunity persisted');
+      console.log(`PASS: offer imported from ${new URL(offerUrl).hostname}.`);
+    }
     assert.equal(
       (await api(pageA, '/api/workspace/export', 'POST')).status,
       200,
