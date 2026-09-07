@@ -1,8 +1,10 @@
 'use client';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
+import { Icon } from '@/components/ui/primitives';
 import {
   applicationContactListSchema,
   applicationContactSchema,
@@ -14,15 +16,24 @@ import {
 } from '@/lib/career-api';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { Translator } from '@/lib/i18n/messages';
+import styles from './application-flow.module.css';
 
 export function ApplicationContactsPanel({
   applicationId,
+  company,
 }: {
   applicationId: string;
+  company: string;
 }) {
   const t = useTranslations([dossierMessages]);
+  const { locale } = useI18n();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const dialog = useRef<HTMLDialogElement>(null);
   const [contacts, setContacts] = useState<ApplicationContact[]>();
   const [error, setError] = useState(false);
+  const open = searchParams.get('contacts') === '1';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -43,44 +54,126 @@ export function ApplicationContactsPanel({
     return () => controller.abort();
   }, [applicationId]);
 
+  useEffect(() => {
+    if (open && !dialog.current?.open) dialog.current?.showModal();
+    if (!open && dialog.current?.open) dialog.current.close();
+  }, [open]);
+
+  function setOpen(next: boolean) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set('contacts', '1');
+    else params.delete('contacts');
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }
+
   return (
-    <section className="co-panel co-application-contacts">
-      <header>
+    <>
+      <section className={styles.contactsEntry}>
+        <span>
+          <Icon>group_search</Icon>
+        </span>
         <div>
-          <p>{t('dossier.human.outreach')}</p>
           <h2>{t('dossier.people.to.contact')}</h2>
-          <span>
-            {t(
-              'dossier.up.to.three.ranked.sourced.public.profiles.you.control',
-            )}{' '}
-          </span>
-        </div>
-        <span className="co-badge muted">{contacts?.length ?? 0} / 3</span>
-      </header>
-      {error ? (
-        <p role="alert">{t('dossier.contacts.could.not.be.loaded')}</p>
-      ) : !contacts ? (
-        <p>{t('dossier.loading.contacts')}</p>
-      ) : contacts.length ? (
-        <div className="co-contact-grid">
-          {contacts.map((contact) => (
-            <ContactCard initial={contact} key={contact.contactId} />
-          ))}
-        </div>
-      ) : (
-        <div className="co-contact-empty">
-          <span className="material-symbols-rounded" aria-hidden="true">
-            person_search
-          </span>
-          <h3>{t('dossier.no.suggestions.yet')}</h3>
           <p>
-            {t(
-              'dossier.public.contact.research.will.appear.here.no.private.profile',
-            )}{' '}
+            {contacts?.length
+              ? locale === 'en'
+                ? `${contacts.length} sourced public profile${contacts.length === 1 ? '' : 's'}, ranked for this application.`
+                : `${contacts.length} profil${contacts.length === 1 ? '' : 's'} public${contacts.length === 1 ? '' : 's'} sourcé${contacts.length === 1 ? '' : 's'}, classé${contacts.length === 1 ? '' : 's'} pour cette candidature.`
+              : t(
+                  'dossier.up.to.three.ranked.sourced.public.profiles.you.control',
+                )}
           </p>
         </div>
-      )}
-    </section>
+        <button
+          className="co-button"
+          disabled={error || !contacts}
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          {locale === 'en' ? 'Open contacts' : 'Qui contacter'}
+          <Icon>arrow_forward</Icon>
+        </button>
+      </section>
+
+      <dialog
+        aria-labelledby="contacts-drawer-title"
+        className={styles.contactsDrawer}
+        onCancel={(event) => {
+          event.preventDefault();
+          setOpen(false);
+        }}
+        ref={dialog}
+      >
+        <header>
+          <div>
+            <Icon>group_search</Icon>
+            <span>
+              <h2 id="contacts-drawer-title">
+                {locale === 'en'
+                  ? `People to contact at ${company}`
+                  : `Qui contacter chez ${company}`}
+              </h2>
+              <p>
+                {contacts?.length ?? 0}{' '}
+                {locale === 'en'
+                  ? 'public profiles · ranked for this application'
+                  : 'profils publics · classés pour cette candidature'}
+              </p>
+            </span>
+          </div>
+          <button
+            aria-label={
+              locale === 'en' ? 'Close contacts' : 'Fermer les contacts'
+            }
+            onClick={() => setOpen(false)}
+            type="button"
+          >
+            <Icon>close</Icon>
+          </button>
+          <aside>
+            <Icon>shield</Icon>
+            <span>
+              {locale === 'en'
+                ? 'Career OS finds public profiles; you decide. No connection request or message is ever sent automatically.'
+                : 'Career OS trouve les profils publics ; vous décidez. Aucune demande de connexion ni aucun message ne sont envoyés automatiquement.'}
+            </span>
+          </aside>
+        </header>
+
+        <div className={styles.contactsDrawerBody}>
+          {error ? (
+            <p role="alert">{t('dossier.contacts.could.not.be.loaded')}</p>
+          ) : !contacts ? (
+            <p>{t('dossier.loading.contacts')}</p>
+          ) : contacts.length ? (
+            contacts.map((contact) => (
+              <ContactCard initial={contact} key={contact.contactId} />
+            ))
+          ) : (
+            <div className="co-contact-empty">
+              <Icon>person_search</Icon>
+              <h3>{t('dossier.no.suggestions.yet')}</h3>
+              <p>
+                {t(
+                  'dossier.public.contact.research.will.appear.here.no.private.profile',
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+        <footer>
+          <Icon>info</Icon>
+          <span>
+            {locale === 'en'
+              ? 'These profiles belong to this application, not to your career memory.'
+              : 'Ces profils appartiennent à cette candidature, pas à votre mémoire professionnelle.'}
+          </span>
+        </footer>
+      </dialog>
+    </>
   );
 }
 

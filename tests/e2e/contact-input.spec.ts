@@ -48,11 +48,25 @@ test('contact input limits and stored messages stay unchanged across locales', a
     );
   }
   await page.goto(`/applications/${applicationId}/timeline`);
-  for (const [locale, note, message] of [
-    ['FR', 'Note de connexion', 'Message après acceptation'],
-    ['EN', 'Connection note', 'Message after acceptance'],
+  for (const [locale, open, close, note, message] of [
+    [
+      'FR',
+      'Qui contacter',
+      'Fermer les contacts',
+      'Note de connexion',
+      'Message après acceptation',
+    ],
+    [
+      'EN',
+      'Open contacts',
+      'Close contacts',
+      'Connection note',
+      'Message after acceptance',
+    ],
   ] as const) {
     await page.getByRole('button', { name: locale, exact: true }).click();
+    await page.getByRole('button', { name: open, exact: true }).click();
+    await expect(page).toHaveURL(/\?contacts=1$/);
     const noteInput = page.getByRole('textbox', { name: note, exact: true });
     const messageInput = page.getByRole('textbox', {
       name: message,
@@ -62,5 +76,13 @@ test('contact input limits and stored messages stay unchanged across locales', a
     await expect(messageInput).toHaveAttribute('maxlength', '2000');
     await expect(noteInput).toHaveValue(contact.connectionNote);
     await expect(messageInput).toHaveValue(contact.acceptedMessage);
+    if (locale === 'EN' && process.env.CAREER_OS_CONTACTS_SCREENSHOT) {
+      await page.waitForTimeout(300);
+      await page.screenshot({
+        path: process.env.CAREER_OS_CONTACTS_SCREENSHOT,
+        fullPage: true,
+      });
+    }
+    await page.getByRole('button', { name: close, exact: true }).click();
   }
 });

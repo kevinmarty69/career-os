@@ -227,6 +227,179 @@
   margin: 0;
 }
 
+.contactsEntry {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 20px 22px;
+  border: 1.5px solid var(--color-ink-900);
+  border-radius: var(--radius-card-lg);
+  background: var(--color-card);
+  box-shadow: var(--shadow-raised);
+}
+
+.contactsEntry > span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: var(--radius-tile);
+  background: var(--color-panel);
+}
+
+.contactsEntry h2,
+.contactsEntry p {
+  margin: 0;
+}
+
+.contactsEntry h2 {
+  font-size: var(--text-body-lg);
+  letter-spacing: -0.025em;
+}
+
+.contactsEntry p {
+  margin-top: 5px;
+  color: var(--color-ink-600);
+  font-size: var(--text-ui);
+  line-height: 1.55;
+}
+
+.contactsDrawer {
+  width: min(100%, var(--spacing-drawer));
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-shell) 0 0 var(--radius-shell);
+  background: var(--color-card);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-ink-900);
+  animation: drawer-in 240ms var(--ease-out-quart) both;
+}
+
+.contactsDrawer::backdrop {
+  background: rgb(13 13 15 / 32%);
+}
+
+.contactsDrawer > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 14px;
+  padding: 24px 24px 18px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.contactsDrawer > header > div {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+
+.contactsDrawer > header > div > :global(.co-icon) {
+  margin-top: 2px;
+  font-size: 19px;
+}
+
+.contactsDrawer > header span {
+  display: grid;
+  gap: 6px;
+}
+
+.contactsDrawer h2,
+.contactsDrawer p {
+  margin: 0;
+}
+
+.contactsDrawer h2 {
+  font-size: var(--text-drawer);
+  line-height: 1.35;
+  letter-spacing: -0.03em;
+}
+
+.contactsDrawer header p {
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+}
+
+.contactsDrawer > header > button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-ink-800);
+}
+
+.contactsDrawer > header > aside {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 12px;
+  padding: 13px 15px;
+  border-radius: var(--radius-chip-lg);
+  background: var(--color-panel);
+  color: var(--color-ink-600);
+  font-size: var(--text-caption);
+  line-height: 1.55;
+}
+
+.contactsDrawer > header > aside :global(.co-icon) {
+  flex: 0 0 auto;
+  font-size: 18px;
+}
+
+.contactsDrawerBody {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  overflow-y: auto;
+  padding: 18px 24px;
+}
+
+.contactsDrawerBody :global(.co-contact-grid) {
+  display: contents;
+}
+
+.contactsDrawerBody :global(.co-contact-card) {
+  padding: 18px;
+  border-color: var(--color-hairline);
+  border-radius: var(--radius-card-lg);
+  box-shadow: none;
+}
+
+.contactsDrawerBody :global(.co-contact-card:first-child) {
+  border: 1.5px solid var(--color-ink-900);
+  box-shadow: var(--shadow-raised);
+}
+
+.contactsDrawer > footer {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  padding: 18px 24px 24px;
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink-500);
+  font-size: var(--text-caption);
+  line-height: 1.55;
+}
+
+.contactsDrawer > footer :global(.co-icon) {
+  flex: 0 0 auto;
+  font-size: 18px;
+}
+
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
 .reviewIntro h1 {
   max-width: 26ch;
   font-size: var(--text-decision);
@@ -534,10 +707,28 @@
     margin-left: 0;
     flex-wrap: wrap;
   }
+
+  .contactsEntry {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .contactsEntry > button {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .contactsDrawer {
+    width: 100%;
+    border-radius: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .reviewDecision {
+    animation: none;
+  }
+
+  .contactsDrawer {
     animation: none;
   }
 }

@@ -155,7 +155,10 @@ export function ApplicationTimelineScreen({
                 )}{' '}
               </span>
             </section>
-            <ApplicationContactsPanel applicationId={applicationId} />
+            <ApplicationContactsPanel
+              applicationId={applicationId}
+              company={application.company}
+            />
             <section className="co-panel co-timeline-form">
               <h2>{t('dossier.add.an.event')}</h2>
               <form onSubmit={addEvent}>
