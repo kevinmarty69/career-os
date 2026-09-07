@@ -1,18 +1,15 @@
 'use client';
 
-import { useTranslations } from '@/components/i18n/i18n-provider';
-import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
-
-import { useI18n } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { SettingsShell } from '@/components/layout/settings-shell';
 import { Button, Icon, PageHeader } from '@/components/ui/primitives';
 import { deleteWorkspace, exportWorkspace } from '@/lib/career-api';
+import { operationalMessages } from '@/lib/i18n/dictionaries/operational';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export function DataScreen() {
-  const t = useTranslations([activeRoutesMessages]);
-
+  const t = useTranslations([operationalMessages]);
   const router = useRouter();
   const { locale } = useI18n();
   const [exportState, setExportState] = useState<
@@ -29,14 +26,14 @@ export function DataScreen() {
     setExportState('pending');
     try {
       const response = await exportWorkspace();
-      if (!response.ok) throw new Error();
+      if (!response.ok) throw new Error('Export failed.');
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = url;
       link.download =
         response.headers
           .get('content-disposition')
-          ?.match(/filename="([^"]+)"/)?.[1] ?? 'careeros-export.ndjson';
+          ?.match(/filename="([^"]+)"/)?.[1] ?? 'career-os-export.ndjson';
       link.click();
       URL.revokeObjectURL(url);
       setExportState('done');
@@ -51,7 +48,7 @@ export function DataScreen() {
     setDeleteState('pending');
     try {
       const response = await deleteWorkspace(deletionConfirmation);
-      if (!response.ok) throw new Error();
+      if (!response.ok) throw new Error('Deletion failed.');
       router.replace('/sign-in');
       router.refresh();
     } catch {
@@ -59,125 +56,136 @@ export function DataScreen() {
     }
   }
 
+  const exportRows = [
+    ['fact_check', t('operations.data.export.claims')],
+    ['folder_open', t('operations.data.export.sources')],
+    ['work', t('operations.data.export.applications')],
+    ['history', t('operations.data.export.runs')],
+  ] as const;
+
   return (
     <SettingsShell active="/settings/data">
-      <PageHeader
-        title={t('active-routes.export.deletion')}
-        copy={t('active-routes.your.data.belongs.to.you.in.a.format.readable')}
-      />
-      <div className="co-data-layout">
-        <section className="co-data-main">
-          <section className="co-export-card">
-            <div>
-              <Icon>download</Icon>
-              <h2>{t('active-routes.export.everything')}</h2>
-              <code>NDJSON</code>
-            </div>
-            <div className="co-export-checks">
-              {[
-                t('active-routes.career.memory.and.evidence'),
-                t('active-routes.source.documents'),
-                t('active-routes.applications.and.publications'),
-                t('active-routes.agent.runs.and.logs'),
-              ].map((item) => (
-                <label key={item}>
-                  <Icon>check_circle</Icon>
-                  {item}
-                </label>
-              ))}
-            </div>
-            <footer>
-              <span>
-                {locale === 'fr'
-                  ? 'Export versionné et réimportable'
-                  : 'Versioned, re-importable export'}
-              </span>
-              <Button
-                disabled={exportState === 'pending'}
-                onClick={() => void downloadExport()}
+      <div className="co-data-screen">
+        <PageHeader
+          title={t('operations.data.title')}
+          copy={t('operations.data.description')}
+        />
+        <section className="co-data-layout">
+          <div className="co-data-main">
+            <section className="co-export-card">
+              <header>
+                <span>
+                  <Icon>archive</Icon>
+                </span>
+                <div>
+                  <p>{t('operations.data.export.format')}</p>
+                  <h2>{t('operations.data.export.title')}</h2>
+                  <span>{t('operations.data.export.description')}</span>
+                </div>
+              </header>
+              <div
+                className="co-export-tree"
+                aria-label={t('operations.data.inventory.title')}
               >
-                {exportState === 'pending'
-                  ? locale === 'fr'
-                    ? 'Préparation…'
-                    : 'Preparing…'
-                  : t('active-routes.generate.archive')}
-              </Button>
-            </footer>
-          </section>
-          {exportState === 'done' ? (
-            <div className="co-note ok" role="status">
-              <Icon>download_done</Icon>
-              {t('active-routes.export.downloaded')}{' '}
-            </div>
-          ) : exportState === 'error' ? (
-            <div className="co-note crit" role="alert">
-              <Icon>error</Icon>
-              {t('active-routes.export.failed.sign.in.again.then.retry')}{' '}
-            </div>
-          ) : null}
-          <div className="co-note">
-            <Icon>verified</Icon>
-            {t(
-              'active-routes.every.exported.claim.keeps.its.evidence.links.and.original',
-            )}{' '}
+                {exportRows.map(([icon, label]) => (
+                  <div key={label}>
+                    <Icon>{icon}</Icon>
+                    <span>{label}</span>
+                    <Icon>check_circle</Icon>
+                  </div>
+                ))}
+              </div>
+              <div className="co-export-integrity">
+                <Icon>verified_user</Icon>
+                <div>
+                  <strong>{t('operations.data.inventory.title')}</strong>
+                  <p>{t('operations.data.inventory.note')}</p>
+                </div>
+              </div>
+              <footer>
+                <Button
+                  disabled={exportState === 'pending'}
+                  onClick={() => void downloadExport()}
+                >
+                  <Icon>download</Icon>
+                  {exportState === 'pending'
+                    ? t('operations.data.export.preparing')
+                    : t('operations.data.export.download')}
+                </Button>
+                {exportState === 'done' ? (
+                  <span className="is-success" role="status">
+                    <Icon>check_circle</Icon>
+                    {t('operations.data.export.done')}
+                  </span>
+                ) : null}
+                {exportState === 'error' ? (
+                  <span className="is-error" role="alert">
+                    <Icon>error</Icon>
+                    {t('operations.data.export.error')}
+                  </span>
+                ) : null}
+              </footer>
+            </section>
           </div>
-        </section>
-        <aside className="co-data-side">
-          <section className="co-delete-card">
-            <header>
-              <Icon>delete_forever</Icon>
-              <h2>{t('active-routes.delete.my.account')}</h2>
-            </header>
-            <p>
-              {t(
-                'active-routes.deletes.career.memory.applications.runs.and.private.links.links',
-              )}{' '}
-            </p>
-            <div>
-              <strong>{t('active-routes.what.will.be.deleted')}</strong>
+          <aside className="co-data-side">
+            <section className="co-delete-card">
+              <header>
+                <span>
+                  <Icon>delete_forever</Icon>
+                </span>
+                <div>
+                  <p>{t('operations.data.delete.warning.label')}</p>
+                  <h2>{t('operations.data.delete.title')}</h2>
+                </div>
+              </header>
+              <p>{t('operations.data.delete.description')}</p>
               <ul>
-                <li>
-                  {t('active-routes.career.memory.evidence.and.documents')}
-                </li>
-                <li>{t('active-routes.applications.and.versions')}</li>
-                <li>{t('active-routes.private.links.and.their.sessions')}</li>
-                <li>{t('active-routes.agent.runs.and.logs')}</li>
+                {[
+                  t('operations.data.delete.list.memory'),
+                  t('operations.data.delete.list.applications'),
+                  t('operations.data.delete.list.links'),
+                  t('operations.data.delete.list.runs'),
+                ].map((label) => (
+                  <li key={label}>
+                    <Icon>close</Icon>
+                    {label}
+                  </li>
+                ))}
               </ul>
-            </div>
-            <input
-              aria-label={`${locale === 'fr' ? 'Tapez' : 'Type'} ${deletionConfirmation} ${locale === 'fr' ? 'pour confirmer' : 'to confirm'}`}
-              onChange={(event) => setConfirmation(event.target.value)}
-              placeholder={`${locale === 'fr' ? 'tapez' : 'type'} ${deletionConfirmation} ${locale === 'fr' ? 'pour confirmer' : 'to confirm'}`}
-              value={confirmation}
-            />
-            <Button
-              danger
-              disabled={
-                confirmation !== deletionConfirmation ||
-                deleteState === 'pending'
-              }
-              onClick={() => void removeWorkspace()}
-            >
-              {deleteState === 'pending'
-                ? locale === 'fr'
-                  ? 'Suppression…'
-                  : 'Deleting…'
-                : t('active-routes.delete.permanently')}
-            </Button>
-            {deleteState === 'error' ? (
-              <p role="alert">
-                {t(
-                  'active-routes.deletion.failed.sign.in.again.then.retry',
-                )}{' '}
-              </p>
-            ) : null}
-            <p>
-              {t(
-                'active-routes.there.is.no.grace.period.or.trash.deletion.is',
-              )}{' '}
-            </p>
-          </section>
-        </aside>
+              <div className="co-delete-warning">
+                <Icon>warning</Icon>
+                <p>{t('operations.data.delete.warning')}</p>
+              </div>
+              <label>
+                {t('operations.data.delete.confirm', {
+                  confirmation: deletionConfirmation,
+                })}
+                <input
+                  autoComplete="off"
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  value={confirmation}
+                />
+              </label>
+              <Button
+                danger
+                disabled={
+                  confirmation !== deletionConfirmation ||
+                  deleteState === 'pending'
+                }
+                onClick={() => void removeWorkspace()}
+              >
+                {deleteState === 'pending'
+                  ? t('operations.data.delete.pending')
+                  : t('operations.data.delete.action')}
+              </Button>
+              {deleteState === 'error' ? (
+                <p className="co-data-error" role="alert">
+                  {t('operations.data.delete.error')}
+                </p>
+              ) : null}
+            </section>
+          </aside>
+        </section>
       </div>
     </SettingsShell>
   );

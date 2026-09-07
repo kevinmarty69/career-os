@@ -1,7 +1,6 @@
 'use client';
 
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
-import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 
 import {
   runStageLabel,
@@ -16,6 +15,7 @@ import {
   type DashboardAction,
 } from '@/lib/dashboard-priority';
 import { homeMessages } from '@/lib/i18n/dictionaries/home';
+import { operationalMessages } from '@/lib/i18n/dictionaries/operational';
 import { type PublicationSummary } from '@/lib/server/publication-input';
 import Link from 'next/link';
 
@@ -61,9 +61,9 @@ export function HomeAside({
         {!loading && !active.length ? <p>{t('home.no.active.link')}</p> : null}
       </section>
       <section className="co-home-aside-note">
-        <Icon>rule</Icon>
+        <Icon>privacy_tip</Icon>
         <h2>{t('home.explainable.priorities')}</h2>
-        <p>{t('home.the.next.action.comes.only.from.the.recorded.state')} </p>
+        <p>{t('home.the.next.action.comes.only.from.the.recorded.state')}</p>
       </section>
     </div>
   );
@@ -73,7 +73,7 @@ export function HomeScreen() {
   const t = useTranslations([
     activeRoutesMessages,
     homeMessages,
-    applicationsMessages,
+    operationalMessages,
   ]);
 
   const { locale } = useI18n();
@@ -85,6 +85,14 @@ export function HomeScreen() {
     dashboard?.publications.filter((item) => item.status === 'active').length ??
     0;
   const copy = homePriorityCopy(priority, locale, dashboardError);
+  const latestSignal = [...(dashboard?.publications ?? [])]
+    .filter((item) => item.status === 'active' && item.lastOpenedAt)
+    .sort((left, right) =>
+      (right.lastOpenedAt ?? '').localeCompare(left.lastOpenedAt ?? ''),
+    )[0];
+  const activeApplications =
+    dashboard?.applications.filter((item) => item.stage !== 'closed').length ??
+    0;
 
   return (
     <AppShell
@@ -103,83 +111,145 @@ export function HomeScreen() {
         </div>
       }
     >
-      <section className="co-home-hero">
-        <p>{copy.eyebrow}</p>
-        <h1>{copy.title}</h1>
-        <span>{copy.detail}</span>
-        <div>
-          <Link
-            className="co-button dark"
-            href={
-              priority
-                ? `/applications/${priority.application.applicationId}`
-                : dashboardError === 'auth'
-                  ? '/sign-in'
-                  : '/applications'
-            }
-          >
-            {copy.action} <Icon>arrow_forward</Icon>
-          </Link>
-          <Link className="co-button transparent" href="/runs">
-            {t('home.view.activity.log')}{' '}
-          </Link>
-        </div>
-      </section>
-
-      <section className="co-home-stats" aria-label={t('home.key.metrics')}>
-        <Stat
-          icon="work_history"
-          value={String(dashboard?.applications.length ?? 0)}
-          label={t('applications.applications')}
-        />
-        <Stat
-          icon="verified"
-          tone="ok"
-          value={String(actions.length)}
-          label={t('home.priority.actions')}
-        />
-        <Stat
-          icon="link"
-          tone="warn"
-          value={String(activeLinks)}
-          label={t('home.active.private.links')}
-        />
-      </section>
-
-      <section className="co-home-review-queue">
-        <header>
-          <h2>{t('home.do.now')}</h2>
+      <div className="co-home-screen">
+        <header className="co-followup-heading">
+          <p>{t('operations.home.welcome')}</p>
+          <h1>{copy.title}</h1>
+          <span>{copy.detail}</span>
         </header>
-        {actions.slice(0, 3).map((action) => (
-          <article
-            className="co-home-review-card compact"
-            key={action.application.applicationId}
-          >
-            <Icon>{homePriorityIcon(action.kind)}</Icon>
+
+        <section
+          className={`co-access-signal${latestSignal ? '' : ' is-empty'}`}
+        >
+          <div className="co-access-signal-copy">
+            <span className="co-signal-icon">
+              <Icon>{latestSignal ? 'visibility' : 'visibility_off'}</Icon>
+            </span>
             <div>
-              <h3>
-                {action.application.company} · {action.application.role}
-              </h3>
-              <p>{homePriorityRow(action, locale)}</p>
+              <p>{t('operations.home.signal')}</p>
+              <h2>
+                {latestSignal
+                  ? t('operations.home.signal.title', {
+                      company: latestSignal.company,
+                      count: latestSignal.opens,
+                    })
+                  : t('operations.home.signal.empty.title')}
+              </h2>
+              <span>
+                {latestSignal
+                  ? t('operations.home.signal.detail', {
+                      sections: latestSignal.sections,
+                      actions: latestSignal.actions,
+                      downloads: latestSignal.downloads,
+                    })
+                  : t('operations.home.signal.empty.detail')}
+              </span>
+              <small>
+                {latestSignal ? t('operations.home.signal.caveat') : null}
+              </small>
             </div>
-            <Link href={`/applications/${action.application.applicationId}`}>
-              {t('active-routes.open')}{' '}
-            </Link>
-          </article>
-        ))}
-        {!actions.length ? (
-          <div className="co-note">
-            <Icon>{dashboardError ? 'cloud_off' : 'check_circle'}</Icon>
-            {dashboardError
-              ? locale === 'fr'
-                ? 'Les priorités ne sont pas disponibles.'
-                : 'Priorities are unavailable.'
-              : locale === 'fr'
-                ? 'Aucune candidature ne demande votre attention.'
-                : 'No application needs your attention.'}
           </div>
-        ) : null}
-      </section>
+          {latestSignal ? (
+            <dl className="co-signal-metrics">
+              {[
+                [t('operations.home.openings'), latestSignal.opens],
+                [t('operations.home.sections'), latestSignal.sections],
+                [t('operations.home.actions'), latestSignal.actions],
+                [t('operations.home.downloads'), latestSignal.downloads],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          <div className="co-access-signal-actions">
+            <Link
+              className="co-button dark"
+              href={
+                latestSignal
+                  ? `/applications/${latestSignal.applicationId}`
+                  : priority
+                    ? `/applications/${priority.application.applicationId}`
+                    : dashboardError === 'auth'
+                      ? '/sign-in'
+                      : '/applications'
+              }
+            >
+              {latestSignal
+                ? t('operations.home.open.application')
+                : copy.action}
+              <Icon>arrow_forward</Icon>
+            </Link>
+            <Link className="co-button secondary" href="/links">
+              {t('home.view.activity.log')}
+            </Link>
+          </div>
+        </section>
+
+        <section className="co-home-stats" aria-label={t('home.key.metrics')}>
+          <Stat
+            icon="work_history"
+            value={String(activeApplications)}
+            label={t('operations.home.active.applications')}
+          />
+          <Stat
+            icon="rule"
+            tone="warn"
+            value={String(actions.length)}
+            label={t('home.priority.actions')}
+          />
+          <Stat
+            icon="lock"
+            tone="ok"
+            value={String(activeLinks)}
+            label={t('home.active.private.links')}
+          />
+        </section>
+
+        <section className="co-home-review-queue">
+          <header>
+            <div>
+              <h2>{t('home.do.now')}</h2>
+              <span>
+                {t('operations.home.active.count', {
+                  count: activeApplications,
+                })}
+              </span>
+            </div>
+          </header>
+          {actions.slice(0, 3).map((action) => (
+            <article
+              className="co-home-review-card compact"
+              key={action.application.applicationId}
+            >
+              <Icon>{homePriorityIcon(action.kind)}</Icon>
+              <div>
+                <h3>
+                  {action.application.company} · {action.application.role}
+                </h3>
+                <p>{homePriorityRow(action, locale)}</p>
+              </div>
+              <Link href={`/applications/${action.application.applicationId}`}>
+                {t('active-routes.open')}
+              </Link>
+            </article>
+          ))}
+          {!actions.length ? (
+            <div className="co-note">
+              <Icon>{dashboardError ? 'cloud_off' : 'check_circle'}</Icon>
+              {dashboardError
+                ? locale === 'fr'
+                  ? 'Les priorités ne sont pas disponibles.'
+                  : 'Priorities are unavailable.'
+                : locale === 'fr'
+                  ? 'Aucune candidature ne demande votre attention.'
+                  : 'No application needs your attention.'}
+            </div>
+          ) : null}
+        </section>
+      </div>
     </AppShell>
   );
 }

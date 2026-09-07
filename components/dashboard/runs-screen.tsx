@@ -11,185 +11,107 @@ import {
   stepStatusLabel,
 } from '@/components/applications/workflow-labels';
 import { useWorkflowDashboard } from '@/components/dashboard/use-workflow-dashboard';
-import { useI18n } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { Badge, Company, Icon, PageHeader } from '@/components/ui/primitives';
+import { operationalMessages } from '@/lib/i18n/dictionaries/operational';
 import { initials } from '@/lib/initials';
 import Link from 'next/link';
 
+const FAILED_STATUSES = new Set(['blocked', 'budget_exhausted', 'failed']);
+
 export function RunsScreen() {
   const { locale } = useI18n();
+  const t = useTranslations([operationalMessages]);
   const { dashboard, error } = useWorkflowDashboard();
   const items = dashboard?.items.filter(({ run }) => run) ?? [];
-  const failed = items.filter(({ run }) =>
-    ['blocked', 'budget_exhausted', 'failed'].includes(run!.status),
-  ).length;
-  const copy =
-    locale === 'fr'
-      ? {
-          title: 'Journal des agents',
-          intro: dashboard
-            ? `${items.length} run${items.length > 1 ? 's' : ''} persisté${items.length > 1 ? 's' : ''}, ${failed} en erreur ou bloqué${failed > 1 ? 's' : ''}.`
-            : 'Chargement des runs persistés…',
-          empty:
-            'Aucun run enregistré. Lancez une candidature pour créer le premier journal.',
-          unavailable: 'Le journal est momentanément indisponible.',
-          signIn: 'Connectez-vous pour consulter les runs de votre workspace.',
-          stage: 'Étape active',
-          cost: 'Coût enregistré',
-          tokens: 'Tokens utilisés',
-          sources: 'Sources',
-          steps: 'Étapes',
-          events: 'Décisions et événements',
-          errors: 'Erreurs',
-          noSteps: 'Aucune étape enregistrée.',
-          noEvents: 'Aucun événement enregistré.',
-          noSources: 'Aucune source externe enregistrée.',
-          noErrors: 'Aucune erreur enregistrée.',
-          humanDecision: 'décision humaine',
-          humanDecisions: 'décisions humaines',
-          open: 'Ouvrir la candidature',
-        }
-      : {
-          title: 'Agent run journal',
-          intro: dashboard
-            ? `${items.length} persisted ${items.length === 1 ? 'run' : 'runs'}, ${failed} failed or blocked.`
-            : 'Loading persisted runs…',
-          empty:
-            'No run recorded. Start an application to create the first journal.',
-          unavailable: 'The run journal is temporarily unavailable.',
-          signIn: 'Sign in to review the runs in your workspace.',
-          stage: 'Active stage',
-          cost: 'Recorded cost',
-          tokens: 'Tokens used',
-          sources: 'Sources',
-          steps: 'Steps',
-          events: 'Decisions and events',
-          errors: 'Errors',
-          noSteps: 'No step recorded.',
-          noEvents: 'No event recorded.',
-          noSources: 'No external source recorded.',
-          noErrors: 'No error recorded.',
-          humanDecision: 'human decision',
-          humanDecisions: 'human decisions',
-          open: 'Open application',
-        };
+  const failedItems = items.filter(({ run }) =>
+    FAILED_STATUSES.has(run!.status),
+  );
+  const highlighted = failedItems[0];
+
   return (
     <AppShell path="/runs">
-      <PageHeader title={copy.title} copy={copy.intro} />
-      {error ? (
-        <div className="co-note" role="alert">
-          <Icon>cloud_off</Icon>
-          {error === 'auth' ? copy.signIn : copy.unavailable}
-        </div>
-      ) : null}
-      {dashboard && !error && !items.length ? (
-        <div className="co-note">
-          <Icon>history</Icon>
-          {copy.empty}
-        </div>
-      ) : null}
-      <div className="co-run-ledger">
-        {items.map(({ application, run }) => {
-          const sources = runSources(application, run!);
-          const failures = run!.steps.filter(
-            ({ status }) => status === 'failed',
-          );
-          return (
-            <article className="co-panel" key={run!.runId}>
+      <div className="co-runs-screen">
+        <PageHeader
+          title={t('operations.runs.title')}
+          copy={
+            dashboard
+              ? t('operations.runs.summary', {
+                  count: items.length,
+                  failed: failedItems.length,
+                })
+              : t('operations.runs.loading')
+          }
+        />
+
+        {error ? (
+          <div className="co-note" role="alert">
+            <Icon>cloud_off</Icon>
+            {error === 'auth'
+              ? t('operations.runs.sign.in')
+              : t('operations.runs.unavailable')}
+          </div>
+        ) : null}
+
+        {dashboard && !error && !items.length ? (
+          <section className="co-operational-empty">
+            <span>
+              <Icon>history</Icon>
+            </span>
+            <h2>{t('operations.runs.title')}</h2>
+            <p>{t('operations.runs.empty')}</p>
+            <Link className="co-button" href="/applications">
+              {t('operations.runs.open')}
+              <Icon>arrow_forward</Icon>
+            </Link>
+          </section>
+        ) : null}
+
+        {highlighted?.run ? (
+          <section className="co-run-failure-panel" role="alert">
+            <div className="co-run-failure-main">
               <header>
-                <Company
-                  initials={initials(application.company)}
-                  name={`${application.company} · ${application.role}`}
-                  sub={`run ${run!.runId.slice(0, 8)}`}
-                />
-                <Badge tone={runStatusTone(run!.status)}>
-                  {runStatusLabel(run!.status, locale)}
-                </Badge>
+                <span className="co-run-failure-icon">
+                  <Icon>error</Icon>
+                </span>
+                <div>
+                  <p>
+                    {t('operations.runs.interrupted')} ·{' '}
+                    {runStageLabel(highlighted.run.stage, locale)}
+                  </p>
+                  <h2>
+                    {highlighted.application.company} ·{' '}
+                    {highlighted.application.role}
+                  </h2>
+                  <code>run {highlighted.run.runId.slice(0, 8)}</code>
+                </div>
               </header>
-              <dl className="co-run-facts">
-                <div>
-                  <dt>{copy.stage}</dt>
-                  <dd>{runStageLabel(run!.stage, locale)}</dd>
-                </div>
-                <div>
-                  <dt>{copy.cost}</dt>
-                  <dd>€{(run!.usedCostMicros / 1_000_000).toFixed(2)}</dd>
-                </div>
-                <div>
-                  <dt>{copy.tokens}</dt>
-                  <dd>{run!.usedTokens.toLocaleString(locale)}</dd>
-                </div>
-                <div>
-                  <dt>{copy.sources}</dt>
-                  <dd>{sources.length}</dd>
-                </div>
-              </dl>
-              <div className="co-run-journal">
+              <p>{t('operations.runs.interrupted.detail')}</p>
+              <div className="co-run-recovery-grid">
                 <section>
-                  <h3>{copy.steps}</h3>
-                  {run!.steps.length ? (
-                    run!.steps.map((step) => (
-                      <article key={`${step.stage}-${step.attempt}`}>
-                        <Icon>{stepIcon(step.status)}</Icon>
+                  <h3>{t('operations.runs.saved.steps')}</h3>
+                  {highlighted.run.steps
+                    .filter(({ status }) => status === 'completed')
+                    .map((step) => (
+                      <div key={`${step.stage}-${step.attempt}`}>
+                        <Icon>check_circle</Icon>
                         <span>
                           <strong>{runStageLabel(step.stage, locale)}</strong>
-                          <small>
-                            {stepStatusLabel(step.status, locale)} ·{' '}
-                            {attemptLabel(step.attempt, locale)}
-                          </small>
+                          <small>{stepStatusLabel(step.status, locale)}</small>
                         </span>
-                      </article>
-                    ))
-                  ) : (
-                    <p>{copy.noSteps}</p>
-                  )}
+                      </div>
+                    ))}
                 </section>
                 <section>
-                  <h3>{copy.events}</h3>
-                  {run!.events.length ? (
-                    run!.events.slice(-6).map((event, index) => (
-                      <article key={`${event.type}-${index}`}>
-                        <Icon>notes</Icon>
-                        <span>
-                          <strong>{actorLabel(event.actor, locale)}</strong>
-                          <small>{event.summary}</small>
-                        </span>
-                      </article>
-                    ))
-                  ) : (
-                    <p>{copy.noEvents}</p>
-                  )}
-                  {run!.reviewDecisions.length ? (
-                    <p>
-                      {run!.reviewDecisions.length}{' '}
-                      {run!.reviewDecisions.length === 1
-                        ? copy.humanDecision
-                        : copy.humanDecisions}
-                    </p>
-                  ) : null}
-                </section>
-                <section>
-                  <h3>{copy.sources}</h3>
-                  {sources.length ? (
-                    sources.map((source) => (
-                      <article key={source}>
-                        <Icon>link</Icon>
-                        <span>
-                          <strong>{new URL(source).hostname}</strong>
-                          <small>{source}</small>
-                        </span>
-                      </article>
-                    ))
-                  ) : (
-                    <p>{copy.noSources}</p>
-                  )}
-                </section>
-                <section>
-                  <h3>{copy.errors}</h3>
-                  {failures.length ? (
-                    failures.map((step) => (
-                      <article key={`${step.stage}-${step.attempt}`}>
+                  <h3>{t('operations.runs.failed.step')}</h3>
+                  {highlighted.run.steps
+                    .filter(({ status }) => status === 'failed')
+                    .map((step) => (
+                      <div
+                        className="is-failed"
+                        key={`${step.stage}-${step.attempt}`}
+                      >
                         <Icon>error</Icon>
                         <span>
                           <strong>{runStageLabel(step.stage, locale)}</strong>
@@ -198,24 +120,204 @@ export function RunsScreen() {
                               stepStatusLabel(step.status, locale)}
                           </small>
                         </span>
-                      </article>
-                    ))
-                  ) : (
-                    <p>{copy.noErrors}</p>
-                  )}
+                      </div>
+                    ))}
+                  {!highlighted.run.steps.some(
+                    ({ status }) => status === 'failed',
+                  ) ? (
+                    <p>{t('operations.runs.no.failed.step')}</p>
+                  ) : null}
                 </section>
               </div>
               <footer>
                 <Link
-                  className="co-button quiet"
-                  href={`/applications/${application.applicationId}`}
+                  className="co-button"
+                  href={`/applications/${highlighted.application.applicationId}`}
                 >
-                  {copy.open}
+                  {t('operations.runs.open')}
+                  <Icon>arrow_forward</Icon>
                 </Link>
               </footer>
-            </article>
-          );
-        })}
+            </div>
+            <aside>
+              <h3>{t('operations.runs.recorded.usage')}</h3>
+              <dl>
+                <div>
+                  <dt>{t('operations.runs.cost')}</dt>
+                  <dd>
+                    {(
+                      highlighted.run.usedCostMicros / 1_000_000
+                    ).toLocaleString(locale, {
+                      style: 'currency',
+                      currency: 'EUR',
+                    })}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{t('operations.runs.tokens')}</dt>
+                  <dd>{highlighted.run.usedTokens.toLocaleString(locale)}</dd>
+                </div>
+                <div>
+                  <dt>{t('operations.runs.sources')}</dt>
+                  <dd>
+                    {
+                      runSources(highlighted.application, highlighted.run)
+                        .length
+                    }
+                  </dd>
+                </div>
+              </dl>
+            </aside>
+          </section>
+        ) : null}
+
+        {items.length ? (
+          <section className="co-run-history">
+            <header>
+              <h2>{t('operations.runs.other')}</h2>
+              <span>{items.length}</span>
+            </header>
+            <div className="co-run-ledger">
+              {items.map(({ application, run }) => {
+                const sources = runSources(application, run!);
+                const failures = run!.steps.filter(
+                  ({ status }) => status === 'failed',
+                );
+                return (
+                  <article className="co-panel" key={run!.runId}>
+                    <header>
+                      <Company
+                        initials={initials(application.company)}
+                        name={`${application.company} · ${application.role}`}
+                        sub={`run ${run!.runId.slice(0, 8)}`}
+                      />
+                      <Badge tone={runStatusTone(run!.status)}>
+                        {runStatusLabel(run!.status, locale)}
+                      </Badge>
+                    </header>
+                    <dl className="co-run-facts">
+                      <div>
+                        <dt>{t('operations.runs.stage')}</dt>
+                        <dd>{runStageLabel(run!.stage, locale)}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('operations.runs.cost')}</dt>
+                        <dd>
+                          {(run!.usedCostMicros / 1_000_000).toLocaleString(
+                            locale,
+                            { style: 'currency', currency: 'EUR' },
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t('operations.runs.tokens')}</dt>
+                        <dd>{run!.usedTokens.toLocaleString(locale)}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('operations.runs.sources')}</dt>
+                        <dd>{sources.length}</dd>
+                      </div>
+                    </dl>
+                    <div className="co-run-journal">
+                      <section>
+                        <h3>{t('operations.runs.steps')}</h3>
+                        {run!.steps.length ? (
+                          run!.steps.map((step) => (
+                            <article key={`${step.stage}-${step.attempt}`}>
+                              <Icon>{stepIcon(step.status)}</Icon>
+                              <span>
+                                <strong>
+                                  {runStageLabel(step.stage, locale)}
+                                </strong>
+                                <small>
+                                  {stepStatusLabel(step.status, locale)} ·{' '}
+                                  {attemptLabel(step.attempt, locale)}
+                                </small>
+                              </span>
+                            </article>
+                          ))
+                        ) : (
+                          <p>{t('operations.runs.no.steps')}</p>
+                        )}
+                      </section>
+                      <section>
+                        <h3>{t('operations.runs.events')}</h3>
+                        {run!.events.length ? (
+                          run!.events.slice(-6).map((event, index) => (
+                            <article key={`${event.type}-${index}`}>
+                              <Icon>notes</Icon>
+                              <span>
+                                <strong>
+                                  {actorLabel(event.actor, locale)}
+                                </strong>
+                                <small>{event.summary}</small>
+                              </span>
+                            </article>
+                          ))
+                        ) : (
+                          <p>{t('operations.runs.no.events')}</p>
+                        )}
+                        {run!.reviewDecisions.length ? (
+                          <p>
+                            {run!.reviewDecisions.length}{' '}
+                            {run!.reviewDecisions.length === 1
+                              ? t('operations.runs.human.decision')
+                              : t('operations.runs.human.decisions')}
+                          </p>
+                        ) : null}
+                      </section>
+                      <section>
+                        <h3>{t('operations.runs.sources')}</h3>
+                        {sources.length ? (
+                          sources.map((source) => (
+                            <article key={source}>
+                              <Icon>link</Icon>
+                              <span>
+                                <strong>{new URL(source).hostname}</strong>
+                                <small>{source}</small>
+                              </span>
+                            </article>
+                          ))
+                        ) : (
+                          <p>{t('operations.runs.no.sources')}</p>
+                        )}
+                      </section>
+                      <section>
+                        <h3>{t('operations.runs.errors')}</h3>
+                        {failures.length ? (
+                          failures.map((step) => (
+                            <article key={`${step.stage}-${step.attempt}`}>
+                              <Icon>error</Icon>
+                              <span>
+                                <strong>
+                                  {runStageLabel(step.stage, locale)}
+                                </strong>
+                                <small>
+                                  {step.failureCode ??
+                                    stepStatusLabel(step.status, locale)}
+                                </small>
+                              </span>
+                            </article>
+                          ))
+                        ) : (
+                          <p>{t('operations.runs.no.errors')}</p>
+                        )}
+                      </section>
+                    </div>
+                    <footer>
+                      <Link
+                        className="co-button quiet"
+                        href={`/applications/${application.applicationId}`}
+                      >
+                        {t('operations.runs.open')}
+                      </Link>
+                    </footer>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
       </div>
     </AppShell>
   );
