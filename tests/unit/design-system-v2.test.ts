@@ -17,8 +17,12 @@ test('design system v2 remains the final active visual contract', () => {
   assert.equal(lastValue('--color-ink-900'), '#0d0d0f');
   assert.equal(lastValue('--color-canvas'), '#ebebf0');
   assert.match(css, /--primary:\s*var\(--color-ink-900\)/);
-  assert.match(css, /--color-pub-deep:\s*#0e2a2e/);
-  assert.match(css, /--color-pub-accent:\s*#0e7c86/);
+  assert.match(css, /--color-green-text:\s*#2a7a55/);
+  assert.match(css, /--color-amber-text:\s*#8a6a1f/);
+  assert.match(css, /--color-clay-text:\s*#a85643/);
+  assert.match(css, /--color-pub-deep:\s*#16211f/);
+  assert.match(css, /--color-pub-accent:\s*#2f6b5e/);
+  assert.match(css, /--spacing-sidebar:\s*212px/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(
     baseCss,

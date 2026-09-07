@@ -14,19 +14,20 @@
   --color-track: #e0e1e6;
   --color-canvas: #ebebf0;
   --color-hairline: #edeef1;
+  --color-divider: #f0f0f3;
   --color-panel: #f4f4f7;
   --color-card: #ffffff;
 
   --color-green: #22a06b;
-  --color-green-text: #28744f;
+  --color-green-text: #2a7a55;
   --color-green-strong: #1b6b4a;
   --color-green-tint: #dff0e7;
   --color-amber: #d9a62a;
-  --color-amber-text: #80601b;
+  --color-amber-text: #8a6a1f;
   --color-amber-strong: #7a5c18;
   --color-amber-tint: #f7f0dc;
   --color-clay: #e05a63;
-  --color-clay-text: #a14d3b;
+  --color-clay-text: #a85643;
   --color-clay-strong: #a8402c;
   --color-clay-tint: #f7e6e3;
   --color-clay-hover: #8e3524;
@@ -35,11 +36,12 @@
   --color-indigo-deep: #22305c;
   --color-indigo-tint: #e9ecf9;
 
-  --color-pub-deep: #0e2a2e;
-  --color-pub-accent: #0e7c86;
+  --color-pub-deep: #16211f;
+  --color-pub-accent: #2f6b5e;
   --color-pub-light: #7fd4db;
   --color-pub-body: #3d4a4d;
   --color-pub-line: #e5e9ea;
+  --color-pub-subtle: #fafbfb;
   --color-pub-bg: #f4f4f2;
 
   --radius-shell: 22px;
@@ -47,8 +49,11 @@
   --radius-card-lg: 18px;
   --radius-card: 16px;
   --radius-tile: 14px;
+  --radius-chip-lg: 13px;
   --radius-control: 12px;
   --radius-nav: 12px;
+  --radius-nav-sm: 11px;
+  --radius-logo: 9px;
   --radius-badge: 8px;
   --radius-pill: 999px;
 
@@ -64,17 +69,43 @@
   --dur-slow: 320ms;
 
   --text-display: 32px;
+  --text-display-line-height: 1.15;
+  --text-display-letter-spacing: -0.036em;
   --text-h1: 30px;
+  --text-h1-line-height: 1.2;
+  --text-h1-letter-spacing: -0.035em;
   --text-hero: 28px;
+  --text-hero-line-height: 1.24;
+  --text-hero-letter-spacing: -0.033em;
+  --text-h2: 26px;
+  --text-h3: 19px;
+  --text-drawer: 18px;
+  --text-wordmark: 17px;
   --text-decision: 36px;
   --text-section: 16px;
   --text-body-lg: 15.5px;
+  --text-nav: 14.5px;
   --text-body: 14.5px;
+  --text-btn: 14px;
   --text-body-sm: 13.5px;
   --text-ui: 13px;
   --text-label: 12.5px;
   --text-caption: 11.5px;
   --text-overline: 11.5px;
+  --text-mono-xs: 10.5px;
+  --text-mono-sm: 11px;
+  --text-mono: 12px;
+  --text-mono-lg: 14px;
+
+  --spacing-sidebar: 212px;
+  --spacing-rail-sm: 340px;
+  --spacing-rail: 372px;
+  --spacing-rail-lg: 452px;
+  --spacing-wizard: 1080px;
+  --spacing-drawer: 480px;
+  --spacing-modal: 560px;
+  --spacing-command: 680px;
+  --spacing-public: 820px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -212,7 +243,7 @@ pre {
 .co-shell {
   width: min(100%, 1680px);
   min-height: 100vh;
-  grid-template-columns: 212px minmax(0, 1fr);
+  grid-template-columns: var(--spacing-sidebar) minmax(0, 1fr);
   gap: 0;
   margin: 0 auto;
   padding: 0;
@@ -222,7 +253,9 @@ pre {
 }
 
 .co-shell.has-aside {
-  grid-template-columns: 212px minmax(0, 1fr) 372px;
+  grid-template-columns: var(--spacing-sidebar) minmax(0, 1fr) var(
+      --spacing-rail
+    );
   gap: 18px;
 }
 
@@ -243,7 +276,7 @@ pre {
   width: 30px;
   height: 30px;
   color: var(--color-card);
-  border-radius: 9px;
+  border-radius: var(--radius-logo);
   background: var(--color-ink-900);
   box-shadow: none;
   place-items: center;
@@ -258,7 +291,7 @@ pre {
 .co-brand strong {
   color: #16181c;
   font-family: var(--font-wordmark), sans-serif;
-  font-size: 17px;
+  font-size: var(--text-wordmark);
   font-weight: 500;
   letter-spacing: -0.045em;
 }
@@ -943,7 +976,7 @@ pre {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: minmax(0, 1fr) 372px;
+  grid-template-columns: minmax(0, 1fr) var(--spacing-rail);
   gap: 18px;
 }
 
