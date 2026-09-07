@@ -692,5 +692,317 @@ export const memoryMessages = {
     fr: 'Non soutenu',
     en: 'Unsupported',
   },
+  'memory.account.created': {
+    fr: 'Compte créé',
+    en: 'Account created',
+  },
+  'memory.import.a.resume': {
+    fr: 'Importer un CV',
+    en: 'Import a resume',
+  },
+  'memory.paste.a.job': {
+    fr: 'Coller une offre',
+    en: 'Paste a job',
+  },
+  'memory.publish.a.page': {
+    fr: 'Publier une page',
+    en: 'Publish a page',
+  },
+  'memory.import.resume.intro': {
+    fr: 'Déposez votre CV. Vous verrez ce que Career OS en extrait avant que quoi que ce soit soit enregistré.',
+    en: 'Drop your resume. You will see what Career OS extracts before anything is saved.',
+  },
+  'memory.step.1.of.3': {
+    fr: 'Étape 1 sur 3',
+    en: 'Step 1 of 3',
+  },
+  'memory.import.your.resume': {
+    fr: 'Importez votre CV',
+    en: 'Import your resume',
+  },
+  'memory.nothing.is.saved.without.your.approval': {
+    fr: 'Rien n’entre dans votre mémoire sans votre accord.',
+    en: 'Nothing enters your career memory without your approval.',
+  },
+  'memory.you.will.review.everything.before.saving': {
+    fr: 'Vous relirez tout avant validation.',
+    en: 'You will review everything before saving.',
+  },
+  'memory.reading.resume.intro': {
+    fr: 'Le découpage en cours remplace un indicateur de chargement générique : vous voyez ce que le produit fait.',
+    en: 'The live breakdown replaces a generic loading indicator: you can see what the product is doing.',
+  },
+  'memory.reading.your.resume': {
+    fr: 'Lecture de votre CV',
+    en: 'Reading your resume',
+  },
+  'memory.cancel.import': {
+    fr: 'Annuler l’import',
+    en: 'Cancel import',
+  },
+  'memory.local.source.processed.in.browser': {
+    fr: 'Source locale · traitée dans ce navigateur',
+    en: 'Local source · processed in this browser',
+  },
+  'memory.processing': {
+    fr: 'Traitement en cours',
+    en: 'Processing',
+  },
+  'memory.duration.depends.on.your.device': {
+    fr: 'La durée dépend de votre appareil',
+    en: 'Duration depends on your device',
+  },
+  'memory.text.extracted.and.structured': {
+    fr: 'Texte extrait et structuré',
+    en: 'Text extracted and structured',
+  },
+  'memory.reading.the.document': {
+    fr: 'Lecture du document…',
+    en: 'Reading the document…',
+  },
+  'memory.splitting.into.claims': {
+    fr: 'Découpage en affirmations',
+    en: 'Splitting into claims',
+  },
+  'memory.queued': {
+    fr: 'En attente',
+    en: 'Queued',
+  },
+  'memory.linking.to.the.original.location': {
+    fr: 'Rattachement à la page d’origine',
+    en: 'Linking to the original location',
+  },
+  'memory.grouping.by.skill': {
+    fr: 'Regroupement par compétence',
+    en: 'Grouping by skill',
+  },
+  'memory.you.will.review.everything': {
+    fr: 'Vous relirez tout avant validation',
+    en: 'You will review everything before saving',
+  },
+  'memory.reading.review.promise': {
+    fr: 'Les affirmations mal découpées pourront être corrigées ou écartées à l’écran suivant.',
+    en: 'Poorly split claims can be corrected or removed on the next screen.',
+  },
+  'memory.live.extraction': {
+    fr: 'Extraction en direct',
+    en: 'Live extraction',
+  },
+  'memory.building.the.first.claims': {
+    fr: 'Construction des premières affirmations',
+    en: 'Building the first claims',
+  },
+  'memory.claims.will.appear.after.local.parsing': {
+    fr: 'Les affirmations apparaîtront dès que la lecture locale aura produit des résultats vérifiables.',
+    en: 'Claims will appear as soon as local parsing produces verifiable results.',
+  },
+  'memory.no.result.is.invented.while.reading': {
+    fr: 'Aucun résultat n’est simulé pendant la lecture.',
+    en: 'No result is simulated while the document is being read.',
+  },
+  'memory.local': {
+    fr: 'LOCAL',
+    en: 'LOCAL',
+  },
+  'memory.direct.quote': {
+    fr: 'citation directe',
+    en: 'direct quote',
+  },
+  'memory.to.confirm': {
+    fr: 'à confirmer',
+    en: 'to confirm',
+  },
+  'memory.step.2.of.3': {
+    fr: 'Étape 2 sur 3',
+    en: 'Step 2 of 3',
+  },
+  'memory.review.extraction.intro': {
+    fr: 'Acceptez, corrigez ou écartez la matière première avant qu’elle entre dans votre mémoire.',
+    en: 'Accept, correct, or remove the raw material before it enters your career memory.',
+  },
+  'memory.claims.extracted': {
+    fr: 'affirmations extraites',
+    en: 'claims extracted',
+  },
+  'memory.start.over': {
+    fr: 'Recommencer',
+    en: 'Start over',
+  },
+  'memory.review.estimated.time': {
+    fr: 'Sélection actuelle · environ 2 min de relecture',
+    en: 'Current selection · about 2 min to review',
+  },
+  'memory.check.your.identity': {
+    fr: 'Vérifiez votre identité',
+    en: 'Check your identity',
+  },
+  'memory.full.name': {
+    fr: 'Nom complet',
+    en: 'Full name',
+  },
+  'memory.these.need.your.review': {
+    fr: 'Ces éléments demandent votre avis',
+    en: 'These items need your review',
+  },
+  'memory.review.wording.and.permissions': {
+    fr: 'Formulations et permissions',
+    en: 'Wording and permissions',
+  },
+  'memory.source.linked': {
+    fr: 'Source rattachée',
+    en: 'Source linked',
+  },
+  'memory.claims.ready.to.save': {
+    fr: 'affirmations prêtes à enregistrer',
+    en: 'claims ready to save',
+  },
+  'memory.and.more.claims': {
+    fr: 'Et {count} autres affirmations sélectionnées.',
+    en: 'And {count} more selected claims.',
+  },
+  'memory.review.later.explanation': {
+    fr: 'Vous pouvez quitter et reprendre cette relecture dans les 30 prochaines minutes. Rien ne sera enregistré sans votre validation.',
+    en: 'You can leave and resume this review for the next 30 minutes. Nothing will be saved without your approval.',
+  },
+  'memory.review.later': {
+    fr: 'Régler plus tard',
+    en: 'Review later',
+  },
+  'memory.validate.my.memory': {
+    fr: 'Valider ma mémoire',
+    en: 'Validate my career memory',
+  },
+  'memory.wording': {
+    fr: 'Formulation',
+    en: 'Wording',
+  },
+  'memory.type': {
+    fr: 'Type',
+    en: 'Type',
+  },
+  'memory.interviews': {
+    fr: 'Entretiens',
+    en: 'Interviews',
+  },
+  'memory.memory.created': {
+    fr: 'Mémoire créée',
+    en: 'Career memory created',
+  },
+  'memory.skill.groups': {
+    fr: 'Catégories',
+    en: 'Categories',
+  },
+  'memory.sources': {
+    fr: 'Sources',
+    en: 'Sources',
+  },
+  'memory.next.step': {
+    fr: 'Prochaine étape',
+    en: 'Next step',
+  },
+  'memory.paste.a.job.you.are.interested.in': {
+    fr: 'Collez l’URL d’une offre qui vous intéresse.',
+    en: 'Paste the URL of a job you are interested in.',
+  },
+  'memory.saved.job.intro': {
+    fr: 'Les agents la confronteront à vos affirmations et vous diront honnêtement où vous correspondez — et où vous ne correspondez pas.',
+    en: 'The agents will compare it with your claims and tell you honestly where you match — and where you do not.',
+  },
+  'memory.public.job.url.or.text': {
+    fr: 'URL publique ou texte de l’offre',
+    en: 'Public job URL or job text',
+  },
+  'memory.url.placeholder': {
+    fr: 'https://…',
+    en: 'https://…',
+  },
+  'memory.continue.with.this.job': {
+    fr: 'Continuer avec cette offre',
+    en: 'Continue with this job',
+  },
+  'memory.or.paste.job.text.or.import.pdf': {
+    fr: 'Ou : coller le texte · importer un PDF',
+    en: 'Or: paste the text · import a PDF',
+  },
+  'memory.what.is.missing': {
+    fr: 'Ce qui vous manque',
+    en: 'What is missing',
+  },
+  'memory.a.resume.covers.facts.rarely.evidence': {
+    fr: 'Un CV couvre les faits, rarement les preuves.',
+    en: 'A resume covers facts, but rarely the evidence.',
+  },
+  'memory.adding.sources.will.expand.what.career.os.can.claim': {
+    fr: 'Ajouter ces sources augmentera nettement ce que Career OS peut affirmer.',
+    en: 'Adding these sources will significantly expand what Career OS can claim.',
+  },
+  'memory.connect': {
+    fr: 'Connecter',
+    en: 'Connect',
+  },
+  'memory.public.repositories': {
+    fr: 'Dépôts publics',
+    en: 'Public repositories',
+  },
+  'memory.postmortems.specs.recommendations': {
+    fr: 'Post-mortems, specs, recos',
+    en: 'Post-mortems, specs, recommendations',
+  },
+  'memory.import': {
+    fr: 'Importer',
+    en: 'Import',
+  },
+  'memory.your.evidence.map': {
+    fr: 'Vos preuves',
+    en: 'Your evidence map',
+  },
+  'memory.derived.from.your.claims': {
+    fr: 'Déduites de vos affirmations',
+    en: 'Derived from your claims',
+  },
+  'memory.claim.singular': {
+    fr: 'affirmation',
+    en: 'claim',
+  },
+  'memory.your.saved.claims.will.appear.here': {
+    fr: 'Vos affirmations enregistrées apparaîtront ici.',
+    en: 'Your saved claims will appear here.',
+  },
+  'memory.how.it.will.work': {
+    fr: 'Comment ça marchera',
+    en: 'How it will work',
+  },
+  'memory.for.every.job': {
+    fr: 'À chaque offre',
+    en: 'For every job',
+  },
+  'memory.agents.match': {
+    fr: 'Les agents apparient',
+    en: 'The agents match',
+  },
+  'memory.agents.match.body': {
+    fr: 'Chaque exigence de l’offre est confrontée à vos preuves.',
+    en: 'Every job requirement is compared with your evidence.',
+  },
+  'memory.you.decide': {
+    fr: 'Vous tranchez',
+    en: 'You decide',
+  },
+  'memory.you.decide.body': {
+    fr: 'Chaque chiffre qui dépasse sa preuve vous est soumis.',
+    en: 'Every number that exceeds its evidence is submitted to you.',
+  },
+  'memory.you.send': {
+    fr: 'Vous envoyez',
+    en: 'You send',
+  },
+  'memory.you.send.body': {
+    fr: 'Page privée aux couleurs de l’entreprise, CV adapté, lien révocable.',
+    en: 'A company-themed private page, tailored resume, and revocable link.',
+  },
+  'memory.no.automatic.publication.or.email': {
+    fr: 'Aucune publication automatique. Aucun envoi d’email par l’app.',
+    en: 'No automatic publication. No email is sent by the app.',
+  },
   'memory.manual.entry': { fr: 'Saisie manuelle', en: 'Manual entry' },
 } as const satisfies MessageDictionary;
