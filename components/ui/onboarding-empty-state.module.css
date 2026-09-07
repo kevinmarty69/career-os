@@ -1,0 +1,222 @@
+.empty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
+  background: var(--color-card);
+  color: var(--color-ink-900);
+}
+.intro {
+  min-width: 0;
+}
+.mark {
+  display: inline-flex;
+  padding: 12px;
+  background: var(--color-panel);
+  border-radius: var(--radius-control);
+  margin-bottom: 24px;
+}
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+}
+.intro h2 {
+  margin: 0;
+  max-width: 24ch;
+  font-size: var(--text-h2);
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+.copy {
+  margin: 16px 0 0;
+  max-width: 48ch;
+  color: var(--color-ink-600);
+  font-size: var(--text-body-lg);
+  line-height: 1.6;
+}
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0;
+  display: grid;
+  gap: 14px;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--text-body-sm);
+  line-height: 1.5;
+}
+.steps li > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  height: 24px;
+  border: 1px solid var(--color-ink-200);
+  border-radius: 50%;
+  font-size: var(--text-caption);
+  color: var(--color-ink-600);
+}
+.alternative {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 18px;
+  color: var(--color-ink-600);
+  font-size: var(--text-body-sm);
+  text-underline-offset: 4px;
+}
+.alternative:hover {
+  color: var(--color-ink-900);
+  text-decoration: underline;
+}
+.example {
+  min-width: 0;
+  margin: 0;
+  padding: 24px;
+  background: var(--color-panel);
+  border-radius: var(--radius-card-lg);
+}
+.example figcaption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+  margin-bottom: 24px;
+}
+.preview {
+  display: grid;
+  gap: 16px;
+}
+.document {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-card);
+}
+.document span {
+  min-width: 0;
+}
+.document strong,
+.document small {
+  display: block;
+}
+.document strong {
+  font-size: var(--text-body);
+}
+.document small {
+  margin-top: 4px;
+  font-size: var(--text-body-sm);
+  color: var(--color-ink-600);
+}
+.connector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 18px;
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+}
+.card {
+  padding: 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+}
+.card h3 {
+  margin: 16px 0 12px;
+  font-size: var(--text-section);
+  line-height: 1.5;
+}
+.card p,
+.card ul {
+  color: var(--color-ink-600);
+  font-size: var(--text-body-sm);
+  line-height: 1.6;
+  margin: 12px 0 0;
+}
+.card ul {
+  padding-left: 18px;
+}
+.card li + li {
+  margin-top: 8px;
+}
+.card footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+}
+.explanation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--color-ink-600);
+}
+.explanation p {
+  margin: 0;
+  font-size: var(--text-body-sm);
+  line-height: 1.6;
+}
+.caption {
+  margin: 24px 0 0;
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+  line-height: 1.6;
+}
+.workflow {
+  display: grid;
+  list-style: none;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+}
+.workflow li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-ink-200);
+  font-size: var(--text-body-sm);
+}
+.workflow li:last-child {
+  border-bottom: 0;
+}
+@media (max-width: 1000px) {
+  .empty {
+    gap: 24px;
+    padding: 24px;
+  }
+  .example {
+    padding: 18px;
+  }
+}
+@media (max-width: 720px) {
+  .empty {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 20px;
+  }
+  .intro h2 {
+    font-size: 24px;
+  }
+  .mark {
+    margin-bottom: 18px;
+  }
+  .card {
+    padding: 18px;
+  }
+}

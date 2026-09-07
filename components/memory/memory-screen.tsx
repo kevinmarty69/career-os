@@ -30,10 +30,6 @@ export function MemoryScreen() {
               <Icon>upload_file</Icon>
               <span>{t('memory.import.a.source')}</span>
             </Link>
-            <Link href="/memory/interview">
-              <Icon>record_voice_over</Icon>
-              <span>{t('active-routes.guided.interview')}</span>
-            </Link>
             <Link href="/memory/audit">
               <Icon>fact_check</Icon>
               <span>{t('memory.positioning.audit')}</span>
@@ -49,9 +45,6 @@ export function MemoryScreen() {
               'memory.every.claim.keeps.its.source.sensitivity.and.allowed.uses',
             )}{' '}
           </span>
-          <Link className="co-button" href="/memory/import">
-            {t('active-routes.add.source')}{' '}
-          </Link>
         </div>
       }
     >
@@ -59,7 +52,7 @@ export function MemoryScreen() {
         title={t('demo.career.memory')}
         copy={t('memory.overview.copy')}
         actions={
-          <Link className="co-button" href="/memory/import">
+          <Link className="co-button quiet" href="/memory/import">
             <Icon>upload_file</Icon>
             {t('memory.overview.import')}
           </Link>

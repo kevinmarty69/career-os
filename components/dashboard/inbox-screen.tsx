@@ -9,6 +9,7 @@ import {
 } from '@/components/applications/application-review-checkpoint';
 import { reviewerLabel } from '@/components/applications/application-versions-screen';
 import { homePriorityRow } from '@/components/dashboard/home-screen';
+import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
 import { useWorkflowDashboard } from '@/components/dashboard/use-workflow-dashboard';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
@@ -88,25 +89,30 @@ export function InboxScreen() {
     <AppShell
       path="/inbox"
       aside={
-        <section className="co-stack">
-          <h2>
-            {locale === 'fr' ? 'Ce qui apparaît ici' : 'What appears here'}
-          </h2>
-          <p>
-            {locale === 'fr'
-              ? 'Uniquement les retours de review non tranchés et les workflows explicitement mis en pause pour votre décision.'
-              : 'Only unresolved review feedback and workflows explicitly paused for your decision.'}
-          </p>
-          <div className="co-note">
-            <Icon>shield</Icon>
-            {locale === 'fr'
-              ? 'Aucun agent ne peut valider sa propre affirmation ni publier à votre place.'
-              : 'No agent can approve its own claim or publish on your behalf.'}
-          </div>
-        </section>
+        dashboard?.applications.length ? (
+          <section className="co-stack">
+            <h2>
+              {locale === 'fr' ? 'Ce qui apparaît ici' : 'What appears here'}
+            </h2>
+            <p>
+              {locale === 'fr'
+                ? 'Uniquement les retours de review non tranchés et les workflows explicitement mis en pause pour votre décision.'
+                : 'Only unresolved review feedback and workflows explicitly paused for your decision.'}
+            </p>
+            <div className="co-note">
+              <Icon>shield</Icon>
+              {locale === 'fr'
+                ? 'Aucun agent ne peut valider sa propre affirmation ni publier à votre place.'
+                : 'No agent can approve its own claim or publish on your behalf.'}
+            </div>
+          </section>
+        ) : undefined
       }
     >
       <PageHeader title={t('inbox.needs.review')} copy={copy} />
+      {dashboard && !error && !dashboard.applications.length ? (
+        <OnboardingEmptyState kind="review" />
+      ) : null}
       <div className="co-inbox-list">
         {reviewIssues.map(({ decision, issue, issueIndex, review }) => (
           <article key={`${review.reviewId}:${issueIndex}`}>
@@ -186,12 +192,15 @@ export function InboxScreen() {
                 : 'The decision queue is temporarily unavailable.'}
           </div>
         ) : null}
-        {dashboard && !error && !decisionCount ? (
+        {dashboard &&
+        !error &&
+        dashboard.applications.length > 0 &&
+        !decisionCount ? (
           <div className="co-note">
             <Icon>check_circle</Icon>
             {locale === 'fr'
-              ? 'Tout est tranché pour le moment.'
-              : 'Everything is decided for now.'}
+              ? 'Aucune décision en attente. Les points à vérifier apparaîtront ici après une revue.'
+              : 'No pending decisions. Items to check will appear here after a review.'}
           </div>
         ) : null}
       </div>

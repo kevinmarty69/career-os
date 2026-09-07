@@ -13,6 +13,7 @@ import {
 import { useWorkflowDashboard } from '@/components/dashboard/use-workflow-dashboard';
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
+import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
 import { Badge, Company, Icon, PageHeader } from '@/components/ui/primitives';
 import { operationalMessages } from '@/lib/i18n/dictionaries/operational';
 import { initials } from '@/lib/initials';
@@ -55,17 +56,7 @@ export function RunsScreen() {
         ) : null}
 
         {dashboard && !error && !items.length ? (
-          <section className="co-operational-empty">
-            <span>
-              <Icon>history</Icon>
-            </span>
-            <h2>{t('operations.runs.title')}</h2>
-            <p>{t('operations.runs.empty')}</p>
-            <Link className="co-button" href="/applications">
-              {t('operations.runs.open')}
-              <Icon>arrow_forward</Icon>
-            </Link>
-          </section>
+          <OnboardingEmptyState kind="runs" />
         ) : null}
 
         {highlighted?.run ? (

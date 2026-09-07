@@ -262,22 +262,32 @@ function SidebarProfile({ profile }: { profile?: Profile }) {
     <div className="co-sidebar-profile">
       <Link className="co-sidebar-memory" href="/memory">
         <span>
-          <Icon>verified</Icon>
+          <Icon>{total ? 'verified' : 'description'}</Icon>
           <strong>
-            {coverage}% {locale === 'fr' ? 'sourcé' : 'sourced'}
+            {total
+              ? `${coverage}% ${locale === 'fr' ? 'sourcé' : 'sourced'}`
+              : locale === 'fr'
+                ? 'Votre mémoire pro'
+                : 'Your career memory'}
           </strong>
         </span>
-        <i aria-hidden="true">
-          <b style={{ width: `${coverage}%` }} />
-        </i>
+        {total ? (
+          <i aria-hidden="true">
+            <b style={{ width: `${coverage}%` }} />
+          </i>
+        ) : null}
         <small>
-          {missing
+          {!total
             ? locale === 'fr'
-              ? `${missing} affirmation${missing > 1 ? 's' : ''} à documenter`
-              : `${missing} claim${missing > 1 ? 's' : ''} to document`
-            : locale === 'fr'
-              ? 'Mémoire entièrement sourcée'
-              : 'Career memory fully sourced'}
+              ? 'Ajoutez vos expériences et leurs sources'
+              : 'Add your experience and sources'
+            : missing
+              ? locale === 'fr'
+                ? `${missing} affirmation${missing > 1 ? 's' : ''} à documenter`
+                : `${missing} claim${missing > 1 ? 's' : ''} to document`
+              : locale === 'fr'
+                ? 'Mémoire entièrement sourcée'
+                : 'Career memory fully sourced'}
         </small>
       </Link>
       <Link className="co-sidebar-user" href="/settings/profile">

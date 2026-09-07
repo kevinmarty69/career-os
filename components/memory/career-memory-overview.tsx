@@ -1,9 +1,11 @@
 'use client';
 
-import { useTranslations } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
+import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
 import { Badge, Icon } from '@/components/ui/primitives';
 import { memoryOverviewMessages } from '@/lib/i18n/dictionaries/memory-overview';
 import { type Profile } from '@/lib/schemas';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useCareerMemory } from './use-career-memory';
 import styles from './career-memory-overview.module.css';
@@ -11,6 +13,7 @@ import styles from './career-memory-overview.module.css';
 type View = 'graph' | 'claims' | 'documents' | 'skills' | 'privacy';
 
 export function CareerMemoryOverview() {
+  const { locale } = useI18n();
   const t = useTranslations([memoryOverviewMessages]);
   const memory = useCareerMemory();
   const [view, setView] = useState<View>('graph');
@@ -36,6 +39,37 @@ export function CareerMemoryOverview() {
     ['skills', t('memory.overview.skills')],
     ['privacy', t('memory.overview.privacy')],
   ];
+
+  if (memory.state === 'loading')
+    return (
+      <p className="co-note" role="status">
+        {locale === 'fr'
+          ? 'Chargement de votre mémoire…'
+          : 'Loading your memory…'}
+      </p>
+    );
+  if (memory.loadError)
+    return (
+      <div className="co-note" role="alert">
+        <Icon>cloud_off</Icon>
+        {memory.message}
+        {memory.loadError === 'auth' ? (
+          <Link href="/sign-in">
+            {locale === 'fr' ? 'Se connecter' : 'Sign in'}
+          </Link>
+        ) : (
+          <button
+            className="co-button quiet"
+            type="button"
+            onClick={() => window.location.reload()}
+          >
+            {locale === 'fr' ? 'Réessayer' : 'Try again'}
+          </button>
+        )}
+      </div>
+    );
+  if (!memory.profile.sources.length && !memory.profile.claims.length)
+    return <OnboardingEmptyState kind="memory" />;
 
   return (
     <section className={styles.workspace}>

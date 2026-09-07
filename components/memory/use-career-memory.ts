@@ -23,6 +23,7 @@ export function useCareerMemory() {
   const [history, setHistory] = useState<ProfileRevisionSummary[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'saving'>('loading');
   const [message, setMessage] = useState('');
+  const [loadError, setLoadError] = useState<'auth' | 'unavailable'>();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -32,6 +33,7 @@ export function useCareerMemory() {
     ])
       .then(async ([profileResponse, historyResponse]) => {
         if (profileResponse.status === 401) {
+          setLoadError('auth');
           setMessage(
             locale === 'fr'
               ? 'Connectez-vous pour consulter votre mémoire professionnelle.'
@@ -48,6 +50,7 @@ export function useCareerMemory() {
         if (!parsed.success || !Number.isInteger(payload.revision))
           throw new Error();
         setProfile(parsed.data ?? emptyProfile);
+        setLoadError(undefined);
         setRevision(payload.revision);
         if (historyResponse.ok)
           setHistory(
@@ -55,12 +58,14 @@ export function useCareerMemory() {
           );
       })
       .catch(() => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
+          setLoadError('unavailable');
           setMessage(
             locale === 'fr'
               ? 'La mémoire professionnelle est momentanément indisponible.'
               : 'Career memory is temporarily unavailable.',
           );
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setState('ready');
@@ -143,6 +148,7 @@ export function useCareerMemory() {
 
   return {
     coverage,
+    loadError,
     history,
     message,
     profile,

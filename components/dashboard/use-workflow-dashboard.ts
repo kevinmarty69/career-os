@@ -51,10 +51,10 @@ export function useWorkflowDashboard() {
         };
         const applications = applicationSchema
           .array()
-          .parse(applicationPayload.applications ?? []);
+          .parse(applicationPayload.applications);
         const publications = publicationSummarySchema
           .array()
-          .parse(publicationPayload.publications ?? []);
+          .parse(publicationPayload.publications);
         // ponytail: eight recent runs avoid an aggregate endpoint until dashboard latency warrants one.
         const items = await Promise.all(
           applications.slice(0, 8).map(async (application) => {
@@ -71,6 +71,7 @@ export function useWorkflowDashboard() {
           }),
         );
         setDashboard({ applications, items, publications });
+        setError(undefined);
       })
       .catch((caught: unknown) => {
         if (!(caught instanceof DOMException) || caught.name !== 'AbortError')

@@ -1,6 +1,7 @@
 'use client';
 
 import { AppShell } from '@/components/layout/app-shell';
+import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
 import {
   Badge,
   Button,
@@ -119,11 +120,13 @@ export function LinksScreen() {
     <AppShell
       path="/links"
       aside={
-        <section className="co-links-privacy">
-          <Icon>privacy_tip</Icon>
-          <h2>{t('operations.links.privacy.title')}</h2>
-          <p>{t('operations.links.privacy')}</p>
-        </section>
+        publications.length ? (
+          <section className="co-links-privacy">
+            <Icon>privacy_tip</Icon>
+            <h2>{t('operations.links.privacy.title')}</h2>
+            <p>{t('operations.links.privacy')}</p>
+          </section>
+        ) : undefined
       }
     >
       <div className="co-links-screen">
@@ -131,38 +134,42 @@ export function LinksScreen() {
           title={t('operations.links.title')}
           copy={t('operations.links.description')}
           actions={
-            <Link className="co-button" href="/applications">
-              <Icon>add_link</Icon>
-              {t('operations.links.create')}
-            </Link>
+            publications.length ? (
+              <Link className="co-button" href="/applications">
+                <Icon>add_link</Icon>
+                {t('operations.links.create')}
+              </Link>
+            ) : null
           }
         />
 
-        <section
-          className="co-links-stats"
-          aria-label={t('operations.links.activity')}
-        >
-          <Stat
-            icon="link"
-            value={String(active.length)}
-            label={t('operations.links.active')}
-          />
-          <Stat
-            icon="visibility"
-            value={String(totals.opens)}
-            label={t('operations.home.openings')}
-          />
-          <Stat
-            icon="touch_app"
-            value={String(totals.actions)}
-            label={t('operations.home.actions')}
-          />
-          <Stat
-            icon="download"
-            value={String(totals.downloads)}
-            label={t('operations.home.downloads')}
-          />
-        </section>
+        {!loading && !loadError && publications.length ? (
+          <section
+            className="co-links-stats"
+            aria-label={t('operations.links.activity')}
+          >
+            <Stat
+              icon="link"
+              value={String(active.length)}
+              label={t('operations.links.active')}
+            />
+            <Stat
+              icon="visibility"
+              value={String(totals.opens)}
+              label={t('operations.home.openings')}
+            />
+            <Stat
+              icon="touch_app"
+              value={String(totals.actions)}
+              label={t('operations.home.actions')}
+            />
+            <Stat
+              icon="download"
+              value={String(totals.downloads)}
+              label={t('operations.home.downloads')}
+            />
+          </section>
+        ) : null}
 
         {loading ? (
           <div className="co-note" role="status">
@@ -175,17 +182,7 @@ export function LinksScreen() {
             {t('operations.links.unavailable')}
           </div>
         ) : !publications.length ? (
-          <section className="co-operational-empty">
-            <span>
-              <Icon>link_off</Icon>
-            </span>
-            <h2>{t('operations.links.empty.title')}</h2>
-            <p>{t('operations.links.empty.detail')}</p>
-            <Link className="co-button" href="/applications">
-              {t('operations.links.create')}
-              <Icon>arrow_forward</Icon>
-            </Link>
-          </section>
+          <OnboardingEmptyState kind="links" />
         ) : (
           <section className="co-links-list">
             {publications.map((publication) => (
