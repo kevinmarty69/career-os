@@ -333,6 +333,29 @@ test('renders the persisted application instead of the Nimbus fixture', async ({
   ).toBeVisible();
 });
 
+test('renders persisted company research for the selected application', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockApplication(page, researchRun());
+  await page.goto(`/applications/${applicationId}/company`);
+
+  await expect(
+    page.getByRole('heading', { name: 'Company brief' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('#main-content').getByText('Signal Forge', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Own platform reliability end to end.',
+    }),
+  ).toBeVisible();
+  await expect(page.getByText(application.url).first()).toBeVisible();
+  await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
+});
+
 test('starts and restores the persisted workflow for this application', async ({
   context,
   page,
