@@ -239,11 +239,18 @@ pre {
 }
 
 .co-brand > span {
+  display: grid;
   width: 30px;
   height: 30px;
+  color: var(--color-card);
   border-radius: 9px;
   background: var(--color-ink-900);
   box-shadow: none;
+  place-items: center;
+}
+
+.co-brand > span .co-icon {
+  font-size: 18px;
 }
 
 .co-brand strong {

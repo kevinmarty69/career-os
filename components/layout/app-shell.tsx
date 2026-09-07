@@ -60,7 +60,7 @@ export function AppShell({
       <aside className="co-sidebar" aria-label={t('shell.main.navigation')}>
         <Link className="co-brand" href="/">
           <span>
-            <i />
+            <Icon>layers</Icon>
           </span>
           <strong>careeros</strong>
           <Icon>unfold_more</Icon>
@@ -178,7 +178,7 @@ export function CurrentApplications() {
           </Link>
         ))}
         {applications && !applications.length ? (
-          <Link href="/applications#new">
+          <Link href="/applications/new">
             <i>+</i>
             <span>
               {locale === 'fr' ? 'Nouvelle candidature' : 'New application'}
