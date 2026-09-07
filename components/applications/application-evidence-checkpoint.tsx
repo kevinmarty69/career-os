@@ -1,6 +1,6 @@
 'use client';
 
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
 
@@ -23,7 +23,7 @@ export function ApplicationEvidenceCheckpoint({
   research: Research;
 }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages]);
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
   const evidence = new Map(profile.evidence.map((item) => [item.id, item]));
   const signals = new Map(
@@ -31,12 +31,14 @@ export function ApplicationEvidenceCheckpoint({
   );
   const matched = archive.signals.filter((signal) => signal.matches.length);
 
-  return localize(
+  return (
     <section className="co-panel co-research-checkpoint co-evidence-checkpoint">
       <header>
         <div>
-          <p>Preuves candidates</p>
-          <h2>Ce que votre parcours démontre pour ce poste</h2>
+          <p>{t('dossier.candidate.evidence')}</p>
+          <h2>
+            {t('dossier.what.your.experience.demonstrates.for.this.role')}
+          </h2>
         </div>
         <span>
           {locale === 'en'
@@ -45,8 +47,9 @@ export function ApplicationEvidenceCheckpoint({
         </span>
       </header>
       <p>
-        Le matching est limité aux affirmations autorisées pour une candidature.
-        Vérifiez la sélection avant de lancer la stratégie.
+        {t(
+          'dossier.matching.is.limited.to.claims.authorized.for.applications.review',
+        )}{' '}
       </p>
       <div className="co-evidence-groups">
         {archive.signals.map((signal) => {
@@ -77,7 +80,9 @@ export function ApplicationEvidenceCheckpoint({
                 </ul>
               ) : (
                 <p>
-                  Aucune preuve éligible trouvée. Cet écart restera visible.
+                  {t(
+                    'dossier.no.eligible.evidence.found.this.gap.will.remain.visible',
+                  )}{' '}
                 </p>
               )}
             </article>
@@ -86,12 +91,15 @@ export function ApplicationEvidenceCheckpoint({
       </div>
       {error ? (
         <p role="alert">
-          La stratégie n’a pas démarré. Vous pouvez réessayer sans risque de
-          doublon.
+          {t(
+            'dossier.strategy.did.not.start.you.can.retry.without.creating',
+          )}{' '}
         </p>
       ) : null}
       <footer>
-        <span>Vos faits restent inchangés. Seul leur ordre sera proposé.</span>
+        <span>
+          {t('dossier.your.facts.stay.unchanged.only.their.ordering.will.be')}
+        </span>
         <button
           className="co-button"
           disabled={pending}
@@ -107,7 +115,7 @@ export function ApplicationEvidenceCheckpoint({
               : 'Lancer la stratégie de candidature'}
         </button>
       </footer>
-    </section>,
+    </section>
   );
 }
 

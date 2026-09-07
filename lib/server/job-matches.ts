@@ -1,5 +1,6 @@
 import 'server-only';
-import postgres from 'postgres';
+import type postgres from 'postgres';
+import { database, authorize } from './database';
 import { z } from 'zod';
 import {
   evaluateHardMatch,
@@ -61,12 +62,6 @@ type MatchRow = {
   updated_at: Date;
 };
 
-function database() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required.');
-  return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
 export async function createJobMatch(
   session: PublicationSession,
   rawJobId: string,
@@ -75,19 +70,19 @@ export async function createJobMatch(
   const jobId = z.string().uuid().parse(rawJobId);
   const { searchProfileId } = jobMatchRequestSchema.parse(rawInput);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const [jobRow] = await tx<JobRow[]>`select ${jobColumns(tx)}
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [jobRow] = await tx<JobRow[]>`select ${jobColumns(tx)}
         from app.discovered_jobs where tenant_id = ${session.tenantId}
           and id = ${jobId} for share`;
-      if (!jobRow) throw new DiscoveredJobNotFoundError();
-      const [searchRow] = await tx<SearchProfileRow[]>`
+    if (!jobRow) throw new DiscoveredJobNotFoundError();
+    const [searchRow] = await tx<SearchProfileRow[]>`
         select ${searchColumns(tx)} from app.search_profiles
         where tenant_id = ${session.tenantId} and id = ${searchProfileId}
         for share`;
-      if (!searchRow) throw new MatchSearchProfileNotFoundError();
-      const [living] = await tx<{ id: string; revision: string }[]>`
+    if (!searchRow) throw new MatchSearchProfileNotFoundError();
+    const [living] = await tx<{ id: string; revision: string }[]>`
         select profile.id, profile.revision from app.profiles profile
         join app.profile_revisions history
           on history.tenant_id = profile.tenant_id
@@ -96,22 +91,22 @@ export async function createJobMatch(
         where profile.tenant_id = ${session.tenantId}
           and profile.profile_kind = 'living'
         for share of profile`;
-      const job = jobProjection(jobRow);
-      const searchProfile = searchProjection(searchRow);
-      const evaluation = evaluateHardMatch(job, searchProfile);
-      const identity = [
-        session.tenantId,
-        job.opportunityId,
-        job.revision,
-        searchProfile.searchProfileId,
-        searchProfile.revision,
-        living?.id ?? 'none',
-        living ? Number(living.revision) : 'none',
-      ].join(':');
-      await tx`select pg_advisory_xact_lock(hashtextextended(
+    const job = jobProjection(jobRow);
+    const searchProfile = searchProjection(searchRow);
+    const evaluation = evaluateHardMatch(job, searchProfile);
+    const identity = [
+      session.tenantId,
+      job.opportunityId,
+      job.revision,
+      searchProfile.searchProfileId,
+      searchProfile.revision,
+      living?.id ?? 'none',
+      living ? Number(living.revision) : 'none',
+    ].join(':');
+    await tx`select pg_advisory_xact_lock(hashtextextended(
         ${`job-match:${identity}`}, 0
       ))`;
-      const inserted = await tx<MatchRow[]>`insert into app.job_matches (
+    const inserted = await tx<MatchRow[]>`insert into app.job_matches (
         tenant_id, discovered_job_id, job_revision, search_profile_id,
         search_profile_revision, living_profile_id, living_profile_revision,
         decision, job_snapshot, search_profile_snapshot, criteria
@@ -122,21 +117,12 @@ export async function createJobMatch(
         ${evaluation.decision}, ${tx.json(job)}, ${tx.json(searchProfile)},
         ${tx.json(evaluation.criteria)}
       ) on conflict do nothing returning ${matchColumns(tx)}`;
-      const row =
-        inserted[0] ??
-        (await readExactMatch(
-          tx,
-          session.tenantId,
-          job,
-          searchProfile,
-          living,
-        ));
-      if (!row) throw new Error('The persisted hard match could not be read.');
-      return matchProjection(row);
-    });
-  } finally {
-    await sql.end();
-  }
+    const row =
+      inserted[0] ??
+      (await readExactMatch(tx, session.tenantId, job, searchProfile, living));
+    if (!row) throw new Error('The persisted hard match could not be read.');
+    return matchProjection(row);
+  });
 }
 
 export async function readLatestJobMatch(
@@ -147,19 +133,16 @@ export async function readLatestJobMatch(
   const jobId = z.string().uuid().parse(rawJobId);
   const searchProfileId = z.string().uuid().parse(rawSearchProfileId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const [row] = await tx<MatchRow[]>`select ${matchColumns(tx)}
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [row] = await tx<MatchRow[]>`select ${matchColumns(tx)}
         from app.job_matches where tenant_id = ${session.tenantId}
           and discovered_job_id = ${jobId}
           and search_profile_id = ${searchProfileId}
         order by created_at desc, id desc limit 1`;
-      return row ? matchProjection(row) : undefined;
-    });
-  } finally {
-    await sql.end();
-  }
+    return row ? matchProjection(row) : undefined;
+  });
 }
 
 async function readExactMatch(
@@ -266,13 +249,4 @@ function matchColumns(tx: postgres.TransactionSql) {
   return tx`id, discovered_job_id, job_revision, search_profile_id,
     search_profile_revision, living_profile_id, living_profile_revision,
     decision, criteria, created_at, updated_at`;
-}
-
-async function authorize(
-  tx: postgres.TransactionSql,
-  session: PublicationSession,
-) {
-  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
-    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-  await tx.unsafe('set local role career_app');
 }

@@ -352,7 +352,10 @@ test('renders persisted company research for the selected application', async ({
       name: 'Own platform reliability end to end.',
     }),
   ).toBeVisible();
-  await expect(page.getByText(application.url).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: application.url })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: application.url }),
+  ).toHaveAttribute('href', application.url);
   await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
 });
 
@@ -677,7 +680,7 @@ test('shows the structured draft and starts all reviews only after confirmation'
     });
   });
 
-  await page.goto(`/applications/${applicationId}`);
+  await page.goto(`/applications/${applicationId}/page`);
   await expect(
     page.getByRole('heading', { name: 'Review the draft before the checks' }),
   ).toBeVisible();
@@ -725,7 +728,7 @@ test('keeps review objections visible until the human decides', async ({
     },
   );
 
-  await page.goto(`/applications/${applicationId}`);
+  await page.goto(`/applications/${applicationId}/review`);
   await expect(
     page.getByRole('heading', { name: 'Three perspectives before publishing' }),
   ).toBeVisible();
@@ -771,7 +774,7 @@ test('publishes the approved snapshot and can revoke its private link', async ({
     await route.fulfill({ status: 204 });
   });
 
-  await page.goto(`/applications/${applicationId}`);
+  await page.goto(`/applications/${applicationId}/published`);
   await expect(
     page.getByRole('heading', { name: 'Publish only what you approved' }),
   ).toBeVisible();

@@ -4,6 +4,10 @@ import { Geist_Mono, Instrument_Sans } from 'next/font/google';
 import { I18nProvider } from '@/components/i18n/i18n-provider';
 import { localeCookieName, resolveLocale } from '@/lib/i18n/locale';
 import './globals.css';
+import './styles/layout.css';
+import './styles/workspace.css';
+import './styles/publication.css';
+import './styles/auth.css';
 import './design-system.css';
 
 const sans = Instrument_Sans({

@@ -20,7 +20,8 @@ Le produit :
 6. prépare une stratégie de candidature et une page privée fortement personnalisée ;
 7. fait relire le résultat par plusieurs agents spécialisés ;
 8. laisse au candidat le contrôle de chaque affirmation et de la publication ;
-9. suit les candidatures, les liens partagés et les retours afin d'améliorer les recommandations suivantes.
+9. identifie les personnes les plus pertinentes à contacter et prépare une approche personnalisée sans agir à la place du candidat ;
+10. suit les candidatures, les contacts, les liens partagés et les retours afin d'améliorer les recommandations suivantes.
 
 > Career OS trouve les opportunités qui correspondent réellement à votre profil, comprend ce que chaque entreprise recherche et transforme votre expérience vérifiable en une candidature personnalisée, crédible et prête à être envoyée.
 
@@ -71,7 +72,8 @@ Un utilisateur doit pouvoir :
 6. lancer une candidature à partir d'une offre sélectionnée ;
 7. contrôler les preuves et les formulations utilisées ;
 8. publier une page privée personnalisée en quelques décisions ;
-9. suivre les résultats et améliorer le système par ses retours.
+9. trouver les bonnes personnes à contacter et préparer son approche ;
+10. suivre les résultats et améliorer le système par ses retours.
 
 Le produit est réussi lorsque l'utilisateur consacre son temps aux décisions à forte valeur plutôt qu'à la collecte, au copier-coller et à la reformulation.
 
@@ -160,6 +162,10 @@ Reviews recruteur, hiring manager et factuelle
 Arbitrages et validation humaine
                  ↓
 Publication d'un lien privé révocable
+                 ↓
+Identification des personnes à contacter
+                 ↓
+Validation et prise de contact manuelle
                  ↓
 Suivi de la candidature et apprentissage
 ```
@@ -378,7 +384,29 @@ Partage :
 - nouvelle version sans casser l'historique ;
 - téléchargement du CV autorisé ou non par le candidat.
 
-### 7.10 Suivi des candidatures
+### 7.10 Personnes à contacter
+
+Pour chaque candidature, Career OS peut rechercher les personnes susceptibles d'influencer directement le recrutement. Le produit réduit le travail de recherche et prépare l'approche, mais n'ajoute personne et n'envoie aucun message à la place du candidat.
+
+Le système propose trois contacts au maximum, classés dans cet ordre lorsque les informations publiques le permettent :
+
+1. hiring manager direct ;
+2. fondateur ou responsable technique dans une petite entreprise ;
+3. recruteur interne, auteur de l'annonce ou responsable proche de l'équipe.
+
+Chaque proposition comprend :
+
+- nom, rôle actuel et profil public ;
+- raison précise de la prise de contact ;
+- sources utilisées et date de collecte ;
+- niveau de confiance : `verified`, `likely` ou `uncertain` ;
+- courte note de connexion ;
+- message à envoyer après acceptation ;
+- éventuelle relance, distincte et non automatique.
+
+L'utilisateur peut ouvrir le profil, copier ou modifier un message, marquer la personne comme contactée et planifier une relance. Toute action externe reste manuelle. Une personne ne doit jamais être présentée comme responsable du recrutement à partir d'une seule correspondance faible.
+
+### 7.11 Suivi des candidatures
 
 Le tableau de bord présente :
 
@@ -391,11 +419,12 @@ Le tableau de bord présente :
 - candidatures envoyées ;
 - entretiens, réponses et résultats ;
 - tâches et relances ;
+- personnes suggérées, contactées ou à relancer ;
 - historique des versions.
 
 Les vues peuvent être filtrées par statut, priorité, entreprise, rôle, date ou source.
 
-### 7.11 Analytics utiles et respectueux
+### 7.12 Analytics utiles et respectueux
 
 Pour une page privée, l'utilisateur peut voir :
 
@@ -409,7 +438,7 @@ Le produit évite le fingerprinting intrusif. Il affiche clairement les limites 
 
 Les résultats de candidature alimentent des tendances personnelles : sources efficaces, types de rôles répondant le mieux et performances par angle de candidature. Ils ne servent pas à inventer une causalité.
 
-### 7.12 Coaching CV, LinkedIn et positionnement
+### 7.13 Coaching CV, LinkedIn et positionnement
 
 À partir de la même mémoire, Career OS peut :
 
@@ -422,7 +451,7 @@ Les résultats de candidature alimentent des tendances personnelles : sources ef
 
 Le produit conseille et prépare les changements. Il ne modifie pas automatiquement un profil public dans le MVP.
 
-### 7.13 Notifications et recherche continue
+### 7.14 Notifications et recherche continue
 
 L'utilisateur choisit :
 
@@ -441,7 +470,7 @@ Les notifications utiles comprennent :
 - lien privé ouvert pour la première fois ;
 - relance arrivée à échéance.
 
-### 7.14 Portabilité et contrôle des données
+### 7.15 Portabilité et contrôle des données
 
 L'utilisateur peut :
 
@@ -525,8 +554,9 @@ Le MVP est atteint lorsqu'un nouvel utilisateur peut, sans intervention de l'éq
 8. valider une stratégie de candidature ;
 9. résoudre les objections des reviewers ;
 10. publier et révoquer une page privée personnalisée ;
-11. suivre l'envoi et le résultat de sa candidature ;
-12. exporter ou supprimer ses données.
+11. identifier et valider une personne pertinente à contacter ;
+12. suivre l'envoi et le résultat de sa candidature ;
+13. exporter ou supprimer ses données.
 
 ### Lot 0 - Fondation de confiance
 
@@ -613,6 +643,9 @@ Critères d'acceptation :
 - [x] Identification honnête des écarts et objections.
 - [x] Questions d'entretien recommandées.
 - [x] Messages courts pour prise de contact et candidature.
+- [ ] Recherche sourcée de trois contacts pertinents au maximum.
+- [ ] Classement explicable avec rôle, raison et niveau de confiance.
+- [ ] Notes de connexion et messages soumis à validation humaine.
 - [x] Suggestion facultative d'une preuve de travail proportionnée.
 - [x] Versionnement de la stratégie validée.
 
@@ -620,7 +653,9 @@ Critères d'acceptation :
 
 - chaque fait sur l'entreprise renvoie à une source datée ;
 - aucune donnée non confirmée ne devient silencieusement un argument central ;
-- la stratégie n'utilise que des affirmations autorisées.
+- la stratégie n'utilise que des affirmations autorisées ;
+- aucun contact n'est présenté comme hiring manager sans preuve suffisante ;
+- aucune connexion ni aucun message n'est envoyé automatiquement.
 
 ### Lot 5 - Orchestration et review agentiques
 
@@ -672,6 +707,7 @@ Critères d'acceptation :
 - [x] File des arbitrages humains.
 - [x] Gestion des liens privés actifs.
 - [x] Ajout des contacts, entretiens, réponses et résultats.
+- [ ] Suivi des personnes suggérées, contactées, acceptées et à relancer.
 - [x] Tâches et relances datées.
 - [x] Recherche et filtres globaux.
 - [x] Historique des versions et décisions.
@@ -777,6 +813,7 @@ Critères d'acceptation :
 - audit CV et LinkedIn ;
 - feedback améliorant le classement ;
 - variantes de messages ;
+- recherche et qualification des personnes à contacter ;
 - historique et versions ;
 - quotas, facturation et supervision cloud.
 
@@ -815,7 +852,8 @@ Ces éléments ne doivent pas retarder la preuve du parcours principal.
 - nombre d'objections factuelles avant publication ;
 - proportion d'affirmations reliées à une preuve ;
 - corrections humaines nécessaires par candidature ;
-- taux de candidatures atteignant un échange ou un entretien.
+- taux de candidatures atteignant un échange ou un entretien ;
+- taux de prises de contact obtenant une réponse, sans attribuer abusivement la causalité au message.
 
 ### Valeur utilisateur
 
@@ -840,7 +878,8 @@ Career OS ne doit pas :
 
 - inventer une expérience, une métrique ou une compétence ;
 - postuler automatiquement sans accord explicite ;
-- contacter une entreprise, une référence ou un employeur sans autorisation ;
+- ajouter un contact, envoyer un message ou relancer automatiquement ;
+- contacter une entreprise, une référence ou un employeur sans action explicite de l'utilisateur ;
 - contourner les règles d'accès ou les conditions d'une source ;
 - promettre qu'un score prédit une embauche ;
 - révéler une candidature à une autre entreprise ;

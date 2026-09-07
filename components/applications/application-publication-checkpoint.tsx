@@ -1,11 +1,12 @@
 'use client';
 
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { CreatedPublication } from '@/lib/schemas';
 import type { PublicationActionError } from './use-application-workflow';
 
 export function ApplicationPublicationCheckpoint({
+  busy = false,
   error,
   onCopy,
   onNewVersion,
@@ -15,6 +16,7 @@ export function ApplicationPublicationCheckpoint({
   publication,
   revoked,
 }: {
+  busy?: boolean;
   error?: PublicationActionError;
   onCopy: () => void;
   onNewVersion: () => void;
@@ -25,43 +27,48 @@ export function ApplicationPublicationCheckpoint({
   revoked: boolean;
 }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages]);
   const href = publication
     ? `/p/${publication.publicationId}#${publication.rawToken}`
     : undefined;
 
-  return localize(
+  return (
     <section className="co-panel co-research-checkpoint co-publication-checkpoint">
       <header>
         <div>
-          <p>Validation humaine finale</p>
+          <p>{t('dossier.final.human.approval')}</p>
           <h2>
             {publication
-              ? 'Le lien privé est prêt'
+              ? t('dossier.the.private.link.is.ready')
               : revoked
-                ? 'Le lien privé a été révoqué'
-                : 'Publiez uniquement ce que vous avez validé'}
+                ? t('dossier.the.private.link.has.been.revoked')
+                : t('dossier.publish.only.what.you.approved')}
           </h2>
         </div>
         <span>
-          {publication ? 'Publié' : revoked ? 'Révoqué' : 'Non publié'}
+          {publication
+            ? t('dossier.published')
+            : revoked
+              ? t('dossier.revoked')
+              : t('dossier.unpublished')}
         </span>
       </header>
 
       {publication ? (
         <>
           <p>
-            Le snapshot est immuable, non indexable et accessible pendant sept
-            jours. Vous pouvez couper l’accès immédiatement.
+            {t(
+              'dossier.the.snapshot.is.immutable.non.indexable.and.available.for',
+            )}{' '}
           </p>
           <div className="co-private-link">
             <span>
-              <small>Lien privé</small>
+              <small>{t('dossier.private.link')}</small>
               <strong>/p/{publication.publicationId}</strong>
             </span>
             <div>
               <button onClick={onCopy} type="button">
-                Copier
+                {t('dossier.copy')}{' '}
               </button>
               <a
                 className="co-button"
@@ -69,7 +76,7 @@ export function ApplicationPublicationCheckpoint({
                 rel="noreferrer"
                 target="_blank"
               >
-                Ouvrir
+                {t('dossier.open')}{' '}
               </a>
             </div>
           </div>
@@ -83,14 +90,14 @@ export function ApplicationPublicationCheckpoint({
             </span>
             <div>
               <button
-                disabled={Boolean(pending)}
+                disabled={Boolean(pending) || busy}
                 onClick={onNewVersion}
                 type="button"
               >
-                Préparer une nouvelle version
+                {t('dossier.prepare.a.new.version')}{' '}
               </button>
               <button
-                disabled={Boolean(pending)}
+                disabled={Boolean(pending) || busy}
                 onClick={() => {
                   if (
                     window.confirm(
@@ -103,60 +110,81 @@ export function ApplicationPublicationCheckpoint({
                 }}
                 type="button"
               >
-                {pending === 'revoke' ? 'Révocation…' : 'Révoquer le lien'}
+                {pending === 'revoke'
+                  ? t('dossier.revoking')
+                  : t('dossier.revoke.link')}
               </button>
             </div>
           </footer>
         </>
       ) : revoked ? (
         <p>
-          L’accès est coupé immédiatement, y compris pour un onglet déjà ouvert.
+          {t(
+            'dossier.access.is.revoked.immediately.including.in.a.tab.that',
+          )}{' '}
         </p>
       ) : (
         <>
           <p>
-            Les trois reviews sont résolues. Cette action fige la page actuelle
-            dans un snapshot privé ; aucune modification ultérieure de votre
-            mémoire ne changera ce qui est partagé.
+            {t(
+              'dossier.all.three.reviews.are.resolved.this.action.freezes.the',
+            )}{' '}
           </p>
           <ul>
-            <li>Snapshot immuable</li>
-            <li>Expiration automatique sous sept jours</li>
-            <li>Révocation immédiate</li>
+            <li>{t('dossier.immutable.snapshot')}</li>
+            <li>{t('dossier.automatic.expiration.after.seven.days')}</li>
+            <li>{t('dossier.immediate.revocation')}</li>
           </ul>
           <footer>
-            <span>Aucun lien n’est créé sans cette action.</span>
+            <span>{t('dossier.no.link.is.created.without.this.action')}</span>
             <button
               className="co-button"
-              disabled={Boolean(pending)}
+              disabled={Boolean(pending) || busy}
               onClick={onPublish}
               type="button"
             >
               {pending === 'publish'
-                ? 'Création du lien…'
-                : 'Valider et créer le lien privé'}
+                ? t('dossier.creating.link')
+                : t('dossier.approve.and.create.private.link')}
             </button>
           </footer>
         </>
       )}
-      {error ? <p role="alert">{publicationErrorMessage(error)}</p> : null}
-    </section>,
+      {error ? <p role="alert">{publicationErrorMessage(t, error)}</p> : null}
+    </section>
   );
 }
 
-function publicationErrorMessage(error: PublicationActionError) {
+function publicationErrorMessage(
+  t: Translator<typeof dossierMessages>,
+  error: PublicationActionError,
+) {
   switch (error) {
+    case 'clipboard-unavailable':
+      return t('dossier.clipboard.unavailable');
     case 'auth':
-      return 'Votre session a expiré. Reconnectez-vous, puis réessayez.';
+      return t('dossier.your.session.has.expired.sign.in.again.then.retry');
     case 'review-rejected':
-      return 'La page ne passe plus les contrôles de publication. Rouvrez la revue et résolvez le point restant.';
+      return t(
+        'dossier.the.page.no.longer.passes.the.publication.checks.reopen',
+      );
     case 'conflict':
-      return 'La candidature a changé pendant la publication. Rechargez-la avant de réessayer.';
+      return t(
+        'dossier.the.application.changed.while.publishing.reload.it.before.retrying',
+      );
     case 'rate-limited':
-      return 'Trop de tentatives de publication. Attendez une minute avant de réessayer.';
+      return t(
+        'dossier.too.many.publication.attempts.wait.one.minute.before.retrying',
+      );
     case 'revocation-rejected':
-      return 'Ce lien ne peut pas être révoqué depuis cet espace. Rechargez la candidature puis réessayez.';
+      return t(
+        'dossier.this.link.cannot.be.revoked.from.this.workspace.reload',
+      );
     case 'unavailable':
-      return 'Le service de publication est momentanément indisponible. La page validée n’a pas été publiée ; réessayez plus tard.';
+      return t(
+        'dossier.the.publication.service.is.temporarily.unavailable.the.approved.page',
+      );
   }
 }
+
+import type { Translator } from '@/lib/i18n/messages';

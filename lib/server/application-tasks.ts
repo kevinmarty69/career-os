@@ -1,5 +1,6 @@
 import 'server-only';
-import postgres from 'postgres';
+import type postgres from 'postgres';
+import { database, authorize } from './database';
 import { z } from 'zod';
 import {
   applicationTaskInputSchema,
@@ -24,23 +25,17 @@ type TaskRow = {
   updated_at: Date;
 };
 
-function database() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required.');
-  return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
 export async function listApplicationTasks(
   session: PublicationSession,
   rawApplicationId: string,
 ) {
   const applicationId = z.string().uuid().parse(rawApplicationId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      await requireApplication(tx, session.tenantId, applicationId);
-      const rows = await tx<TaskRow[]>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    await requireApplication(tx, session.tenantId, applicationId);
+    const rows = await tx<TaskRow[]>`
         select id, application_id, kind, title, due_at, completed_at, revision,
           created_at, updated_at
         from app.application_tasks
@@ -48,11 +43,8 @@ export async function listApplicationTasks(
           and application_id = ${applicationId}
         order by (completed_at is not null), due_at, created_at, id
         limit 100`;
-      return rows.map(project);
-    });
-  } finally {
-    await sql.end();
-  }
+    return rows.map(project);
+  });
 }
 
 export async function createApplicationTask(
@@ -63,11 +55,11 @@ export async function createApplicationTask(
   const applicationId = z.string().uuid().parse(rawApplicationId);
   const input = applicationTaskInputSchema.parse(rawInput);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      await requireApplication(tx, session.tenantId, applicationId);
-      const [row] = await tx<TaskRow[]>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    await requireApplication(tx, session.tenantId, applicationId);
+    const [row] = await tx<TaskRow[]>`
         insert into app.application_tasks (
           tenant_id, application_id, kind, title, due_at, actor_id
         ) values (
@@ -75,19 +67,16 @@ export async function createApplicationTask(
           ${input.dueAt}, ${session.userId}
         ) returning id, application_id, kind, title, due_at, completed_at,
           revision, created_at, updated_at`;
-      await audit(
-        tx,
-        session.tenantId,
-        applicationId,
-        row.id,
-        row.kind,
-        'created',
-      );
-      return project(row);
-    });
-  } finally {
-    await sql.end();
-  }
+    await audit(
+      tx,
+      session.tenantId,
+      applicationId,
+      row.id,
+      row.kind,
+      'created',
+    );
+    return project(row);
+  });
 }
 
 export async function updateApplicationTask(
@@ -100,44 +89,41 @@ export async function updateApplicationTask(
   const taskId = z.string().uuid().parse(rawTaskId);
   const input = updateApplicationTaskInputSchema.parse(rawInput);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      await requireApplication(tx, session.tenantId, applicationId);
-      const [current] = await tx<TaskRow[]>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    await requireApplication(tx, session.tenantId, applicationId);
+    const [current] = await tx<TaskRow[]>`
         select id, application_id, kind, title, due_at, completed_at, revision,
           created_at, updated_at
         from app.application_tasks
         where tenant_id = ${session.tenantId} and application_id = ${applicationId}
           and id = ${taskId}
         for update`;
-      if (!current) throw new ApplicationTaskNotFoundError();
-      const completed = current.completed_at !== null;
-      if (Number(current.revision) !== input.expectedRevision) {
-        if (completed === input.completed) return project(current);
-        throw new ApplicationTaskConflictError();
-      }
+    if (!current) throw new ApplicationTaskNotFoundError();
+    const completed = current.completed_at !== null;
+    if (Number(current.revision) !== input.expectedRevision) {
       if (completed === input.completed) return project(current);
-      const [updated] = await tx<TaskRow[]>`
+      throw new ApplicationTaskConflictError();
+    }
+    if (completed === input.completed) return project(current);
+    const [updated] = await tx<TaskRow[]>`
         update app.application_tasks
         set completed_at = ${input.completed ? new Date() : null},
           revision = revision + 1
         where tenant_id = ${session.tenantId} and id = ${taskId}
         returning id, application_id, kind, title, due_at, completed_at,
           revision, created_at, updated_at`;
-      await audit(
-        tx,
-        session.tenantId,
-        applicationId,
-        updated.id,
-        updated.kind,
-        input.completed ? 'completed' : 'reopened',
-      );
-      return project(updated);
-    });
-  } finally {
-    await sql.end();
-  }
+    await audit(
+      tx,
+      session.tenantId,
+      applicationId,
+      updated.id,
+      updated.kind,
+      input.completed ? 'completed' : 'reopened',
+    );
+    return project(updated);
+  });
 }
 
 async function requireApplication(
@@ -181,13 +167,4 @@ function project(row: TaskRow) {
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   });
-}
-
-async function authorize(
-  tx: postgres.TransactionSql,
-  session: PublicationSession,
-) {
-  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
-    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-  await tx.unsafe('set local role career_app');
 }

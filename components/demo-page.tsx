@@ -1,57 +1,56 @@
 'use client';
 
-import { LocaleSwitch, useLocalizer } from '@/components/i18n/i18n-provider';
+import { LocaleSwitch, useTranslations } from '@/components/i18n/i18n-provider';
 import { demoMessages } from '@/lib/i18n/dictionaries/demo';
 import styles from './demo-page.module.css';
 
-const steps = [
-  {
-    title: 'Mémoire professionnelle',
-    copy: 'Une affirmation datée, reliée à sa source.',
-    proof: 'Temps de build p50 ramené de 11 à 7 minutes.',
-    meta: 'platform_postmortem.md · §4',
-  },
-  {
-    title: 'Appariement avec l’offre',
-    copy: 'Les agents retiennent les preuves utiles et rendent les inconnues visibles.',
-    proof: 'Staff Platform Engineer',
-    meta: '2 forces vérifiées · 1 inconnue explicite',
-  },
-  {
-    title: 'Revue humaine',
-    copy: 'La formulation dépasse la preuve disponible.',
-    proof:
-      'L’agent propose « 42 % plus rapide ». La source démontre 11 → 7 minutes.',
-    meta: 'Correction retenue',
-    warning: true,
-  },
-  {
-    title: 'Page privée',
-    copy: 'Une synthèse personnalisée, traçable et prête à partager après validation.',
-    proof:
-      'Je construis des plateformes qu’une petite équipe peut exploiter sereinement.',
-    meta: 'Aperçu fictif · Non publié',
-  },
-] as const;
-
-const principles = [
-  {
-    title: 'Des preuves sourcées',
-    copy: 'Les affirmations restent reliées à des documents datés.',
-  },
-  {
-    title: 'Des agents sous contrôle',
-    copy: 'Les agents proposent. La personne tranche les formulations sensibles.',
-  },
-  {
-    title: 'Aucune action réelle',
-    copy: 'Ce parcours est statique, sans import, publication ni contact externe.',
-  },
-] as const;
-
 export function DemoPage() {
-  const localize = useLocalizer([demoMessages]);
-  return localize(
+  const t = useTranslations([demoMessages]);
+
+  const steps = [
+    {
+      title: t('demo.career.memory'),
+      copy: t('demo.a.dated.claim.connected.to.its.source'),
+      proof: t('demo.reduced.build.p50.from.11.to.7.minutes'),
+      meta: 'platform_postmortem.md · §4',
+    },
+    {
+      title: t('demo.opportunity.match'),
+      copy: t('demo.agents.select.relevant.evidence.and.keep.unknowns.visible'),
+      proof: t('demo.staff.platform.engineer'),
+      meta: t('demo.2.verified.strengths.1.explicit.unknown'),
+    },
+    {
+      title: t('demo.human.review'),
+      copy: t('demo.the.wording.exceeds.the.available.evidence'),
+      proof: t('demo.the.agent.proposes.42.faster.the.source.supports.11'),
+      meta: t('demo.accepted.correction'),
+      warning: true,
+    },
+    {
+      title: t('demo.private.page'),
+      copy: t(
+        'demo.a.tailored.traceable.summary.ready.to.share.after.approval',
+      ),
+      proof: t('demo.i.build.platforms.a.small.team.can.operate.with'),
+      meta: t('demo.synthetic.preview.not.published'),
+    },
+  ] as const;
+  const principles = [
+    {
+      title: t('demo.sourced.evidence'),
+      copy: t('demo.claims.stay.connected.to.dated.documents'),
+    },
+    {
+      title: t('demo.agents.under.control'),
+      copy: t('demo.agents.propose.the.person.decides.sensitive.wording'),
+    },
+    {
+      title: t('demo.no.real.world.action'),
+      copy: t('demo.this.journey.is.static.with.no.import.publication.or'),
+    },
+  ] as const;
+  return (
     <main className={styles.page}>
       <div className={styles.shell}>
         <header className={styles.topbar}>
@@ -63,16 +62,17 @@ export function DemoPage() {
         </header>
 
         <section className={styles.hero}>
-          <p className={styles.eyebrow}>Démo fictive · Lecture seule</p>
-          <h1>Voir comment les preuves deviennent une candidature.</h1>
+          <p className={styles.eyebrow}>{t('demo.synthetic.demo.read.only')}</p>
+          <h1>{t('demo.see.how.evidence.becomes.an.application')}</h1>
           <p className={styles.intro}>
-            Alex Morgan, Signal Forge et chaque donnée affichée ici sont
-            fictifs. Cette démo ne modifie aucune donnée et ne contacte
-            personne.
+            {t('demo.alex.morgan.signal.forge.and.every.data.point.shown')}{' '}
           </p>
         </section>
 
-        <section aria-label="Ce que la démo montre" className={styles.flow}>
+        <section
+          aria-label={t('demo.what.this.demo.shows')}
+          className={styles.flow}
+        >
           {steps.map((step, index) => (
             <article className={styles.step} key={step.title}>
               <span className={styles.number}>{index + 1}</span>
@@ -93,7 +93,7 @@ export function DemoPage() {
           className={styles.principles}
         >
           <h2 id="demo-principles" hidden>
-            Ce que la démo montre
+            {t('demo.what.this.demo.shows')}{' '}
           </h2>
           {principles.map((principle) => (
             <article className={styles.principle} key={principle.title}>
@@ -104,13 +104,14 @@ export function DemoPage() {
         </section>
 
         <footer className={styles.footer}>
-          <strong>Produit open source</strong>
+          <strong>{t('demo.open.source.product')}</strong>
           <p>
-            Career OS transforme une mémoire professionnelle sourcée en
-            candidatures personnalisées et vérifiables.
+            {t(
+              'demo.career.os.turns.a.sourced.career.memory.into.tailored',
+            )}{' '}
           </p>
         </footer>
       </div>
-    </main>,
+    </main>
   );
 }

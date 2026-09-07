@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type CSSProperties } from 'react';
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
 
@@ -23,16 +23,16 @@ export function ApplicationPageDraftCheckpoint({
   logoUrl?: string;
 }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages]);
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
   const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop');
 
-  return localize(
+  return (
     <section className="co-panel co-research-checkpoint co-page-draft-checkpoint">
       <header>
         <div>
-          <p>Page structurée</p>
-          <h2>Relisez le brouillon avant les reviews</h2>
+          <p>{t('dossier.structured.page')}</p>
+          <h2>{t('dossier.review.the.draft.before.the.checks')}</h2>
         </div>
         <span>
           {locale === 'en'
@@ -100,17 +100,19 @@ export function ApplicationPageDraftCheckpoint({
         </div>
       </section>
       <p>
-        Les trois reviewers vérifieront maintenant la lisibilité recruteur, la
-        pertinence hiring manager et chaque affirmation factuelle.
+        {t(
+          'dossier.three.reviewers.will.now.check.recruiter.readability.hiring.manager',
+        )}{' '}
       </p>
       {error ? (
         <p role="alert">
-          Les reviews n’ont pas démarré. Vous pouvez réessayer sans créer de
-          doublon.
+          {t(
+            'dossier.reviews.did.not.start.you.can.retry.without.creating',
+          )}{' '}
         </p>
       ) : null}
       <footer>
-        <span>La publication reste bloquée pendant les contrôles.</span>
+        <span>{t('dossier.publishing.remains.blocked.during.the.checks')}</span>
         <button
           className="co-button"
           disabled={pending}
@@ -126,7 +128,7 @@ export function ApplicationPageDraftCheckpoint({
               : 'Lancer les trois reviews'}
         </button>
       </footer>
-    </section>,
+    </section>
   );
 }
 

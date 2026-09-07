@@ -40,6 +40,7 @@ test('workspace export contract covers every tenant table and field', async () =
     const intentionalExclusions: Record<string, string[]> = {
       search_profiles: ['discovery_lease_token', 'discovery_lease_expires_at'],
       workflow_steps: ['lease_owner'],
+      semantic_analysis_leases: ['lease_token'],
       run_budget_reservations: ['owner_id'],
       share_links: ['token_hash'],
     };
@@ -81,6 +82,7 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const opportunityDecisionEventId = randomUUID();
   const profileId = randomUUID();
   const semanticAnalysisId = randomUUID();
+  const semanticLeaseToken = randomUUID();
   const opportunityId = randomUUID();
   const runId = randomUUID();
   const stepId = randomUUID();
@@ -262,6 +264,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         search_profile_id, disposition, qualification, reason, note, revision,
         actor_id, ${randomUUID()}, ${'d'.repeat(64)}, created_at
       from app.opportunity_decisions where id = ${opportunityDecisionId}`;
+      await transaction`insert into app.semantic_analysis_leases (tenant_id, input_hash, job_match_id, lease_token, status, expires_at)
+        values (${tenantId}, ${'e'.repeat(64)}, ${matchId}, ${semanticLeaseToken}, 'outcome_unknown', now())`;
       await transaction`insert into app.semantic_analyses (
         id, tenant_id, version, schema_version, job_match_id,
         discovered_job_id, job_revision, search_profile_id,
@@ -359,9 +363,18 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
     assert.equal(text.includes(workerOwnerSecret), false);
     assert.equal(text.includes('token_hash'), false);
     assert.equal(text.includes('lease_owner'), false);
+    assert.equal(text.includes(semanticLeaseToken), false);
     assert.equal(text.includes('owner_id\":\"must-not-export'), false);
     const lines = text.trimEnd().split('\n');
     const records = lines.map((line) => JSON.parse(line));
+    assert.ok(
+      records.some(
+        (record) =>
+          record.type === 'semantic_analysis_leases' &&
+          record.data.status === 'outcome_unknown' &&
+          !('lease_token' in record.data),
+      ),
+    );
     assert.equal(records[0].type, 'manifest');
     assert.equal(records[0].data.format, workspaceExportFormat);
     assert.equal(records[0].data.version, workspaceExportVersion);

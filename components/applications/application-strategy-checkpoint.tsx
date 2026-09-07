@@ -1,6 +1,6 @@
 'use client';
 
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
 
@@ -23,31 +23,32 @@ export function ApplicationStrategyCheckpoint({
   strategy: Strategy;
 }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages]);
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
   const signals = new Map(
     research.signals.map((signal) => [signal.signalId, signal]),
   );
   const proofs = [strategy.lead, ...strategy.supports];
 
-  return localize(
+  return (
     <section className="co-panel co-research-checkpoint co-strategy-checkpoint">
       <header>
         <div>
-          <p>Direction éditoriale interne</p>
-          <h2>Validez l’angle avant la rédaction</h2>
+          <p>{t('dossier.internal.editorial.direction')}</p>
+          <h2>{t('dossier.approve.the.angle.before.drafting')}</h2>
         </div>
         <span>{locale === 'en' ? 'Human approval' : 'Validation humaine'}</span>
       </header>
       <blockquote>{strategy.positioning.message}</blockquote>
-      <p>
-        Cet angle guide la future page. Il ne crée aucun nouveau fait et reste
-        ancré aux preuves ci-dessous.
-      </p>
+      <p>{t('dossier.this.angle.guides.the.future.page.it.creates.no')} </p>
       <div className="co-strategy-proof-grid">
         {proofs.map((proof, index) => (
           <article key={`${proof.signalId}:${proof.claimId}`}>
-            <small>{index === 0 ? 'Preuve principale' : 'Appui'}</small>
+            <small>
+              {index === 0
+                ? t('dossier.lead.evidence')
+                : t('dossier.supporting.evidence')}
+            </small>
             <strong>
               {claims.get(proof.claimId)?.statement ?? proof.claimId}
             </strong>
@@ -58,7 +59,7 @@ export function ApplicationStrategyCheckpoint({
       </div>
       {strategy.gaps.length ? (
         <section className="co-strategy-gaps">
-          <strong>Sujets à traiter honnêtement</strong>
+          <strong>{t('dossier.topics.to.address.honestly')}</strong>
           {strategy.gaps.map((gap) => (
             <article key={gap.signalId}>
               <span>{signals.get(gap.signalId)?.statement}</span>
@@ -74,12 +75,13 @@ export function ApplicationStrategyCheckpoint({
       </p>
       {error ? (
         <p role="alert">
-          La validation n’a pas été enregistrée. Vous pouvez réessayer sans
-          risque de doublon.
+          {t(
+            'dossier.approval.was.not.saved.you.can.retry.without.creating',
+          )}{' '}
         </p>
       ) : null}
       <footer>
-        <span>La rédaction ne démarrera qu’après votre décision.</span>
+        <span>{t('dossier.drafting.will.only.start.after.your.decision')}</span>
         <button
           className="co-button"
           disabled={pending}
@@ -95,6 +97,6 @@ export function ApplicationStrategyCheckpoint({
               : 'Valider la stratégie de candidature'}
         </button>
       </footer>
-    </section>,
+    </section>
   );
 }

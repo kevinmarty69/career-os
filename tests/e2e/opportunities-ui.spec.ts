@@ -871,3 +871,34 @@ function unknownOpportunity() {
     ],
   };
 }
+
+test('an unknown model outcome blocks redispatch and keeps its explanation visible', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const semantic: SemanticMock = {
+    postCalls: 0,
+    postResponses: [
+      { status: 409, body: { code: 'SEMANTIC_ANALYSIS_OUTCOME_UNKNOWN' } },
+    ],
+  };
+  await mockWorkspace(page, [opportunity()], [], [], semantic);
+  await page.goto('/applications');
+  await page.getByRole('button', { name: 'Analyze fit' }).click();
+  await page
+    .getByLabel('Search profile')
+    .selectOption(searchProfile.searchProfileId);
+  const run = page.getByRole('button', { name: 'Run analysis' });
+  await run.click();
+  await expect(
+    page.getByText('Analysis outcome unknown', { exact: true }),
+  ).toBeVisible();
+  await expect(run).toBeDisabled();
+  await page.getByRole('button', { name: 'View latest analysis' }).click();
+  await expect(
+    page.getByText('Analysis outcome unknown', { exact: true }),
+  ).toBeVisible();
+  await expect(run).toBeDisabled();
+  expect(semantic.postCalls).toBe(1);
+});

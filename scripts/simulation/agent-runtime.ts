@@ -1,3 +1,5 @@
+// In-process benchmark simulator. Production workflows use lib/server/runs.ts
+// and the durable SQL workers; these simulations do not prove crash recovery.
 import { z } from 'zod';
 import {
   pageSpecSchema,
@@ -5,13 +7,13 @@ import {
   type PageSpec,
   type Profile,
   type Review,
-} from './schemas';
+} from '../../lib/schemas';
 import {
   buildPageSpec,
   buildStrategy,
   type Opportunity,
   type Strategy,
-} from './workflow';
+} from '../../lib/workflow';
 
 const roleSchema = z.enum([
   'company-researcher',

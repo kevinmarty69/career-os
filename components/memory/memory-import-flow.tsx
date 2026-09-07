@@ -1,16 +1,14 @@
 'use client';
+import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
+import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRef, useState, type DragEvent } from 'react';
-import { LocaleSwitch, useLocalizer } from '@/components/i18n/i18n-provider';
+import { LocaleSwitch, useTranslations } from '@/components/i18n/i18n-provider';
 import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
 import styles from './memory-import-flow.module.css';
 import {
-  allowedUseLabels,
-  importCandidateGroupLabels,
-  provenanceLabels,
-  sensitivityLabels,
   useMemoryImport,
   type AllowedUse,
   type CandidateGroup,
@@ -18,21 +16,6 @@ import {
   type ReviewCandidate,
   type Sensitivity,
 } from './use-memory-import';
-
-const navigation = [
-  ['grid_view', 'Accueil', '/'],
-  ['account_tree', 'Candidatures', '/applications'],
-  ['database', 'Mémoire', '/memory'],
-  ['send', 'Liens privés', '/links'],
-  ['settings', 'Réglages', '/settings/models'],
-] as const;
-
-const mobileNavigation = [
-  ['grid_view', 'Accueil', '/'],
-  ['database', 'Mémoire', '/memory'],
-  ['account_tree', 'Candidatures', '/applications'],
-  ['settings', 'Réglages', '/settings/models'],
-] as const;
 
 function Icon({ children }: { children: string }) {
   return (
@@ -43,8 +26,14 @@ function Icon({ children }: { children: string }) {
 }
 
 function Brand() {
+  const t = useTranslations([memoryMessages]);
+
   return (
-    <Link aria-label="Career OS, accueil" className={styles.brand} href="/">
+    <Link
+      aria-label={t('memory.career.os.home')}
+      className={styles.brand}
+      href="/"
+    >
       <Image
         alt=""
         height={30}
@@ -58,16 +47,38 @@ function Brand() {
 }
 
 function AppChrome({ children }: { children: React.ReactNode }) {
-  const localize = useLocalizer([memoryMessages]);
-  return localize(
+  const t = useTranslations([memoryMessages]);
+  const navigation = [
+    ['grid_view', t('memory.home'), '/'],
+    ['account_tree', t('memory.applications'), '/applications'],
+    ['database', t('memory.career.memory'), '/memory'],
+    ['send', t('memory.private.links'), '/links'],
+    ['settings', t('memory.settings'), '/settings/models'],
+  ] as const;
+  const mobileNavigation = [
+    ['grid_view', t('memory.home'), '/'],
+    ['database', t('memory.career.memory'), '/memory'],
+    ['account_tree', t('memory.applications'), '/applications'],
+    ['settings', t('memory.settings'), '/settings/models'],
+  ] as const;
+  return (
     <main className={styles.canvas}>
       <a className={styles.skipLink} href="#memory-import-content">
-        Aller à l’import
+        {t('memory.skip.to.import')}{' '}
       </a>
-      <section className={styles.screen} aria-label="Import de la mémoire">
-        <aside className={styles.sidebar} aria-label="Navigation Career OS">
+      <section
+        className={styles.screen}
+        aria-label={t('memory.career.memory.import')}
+      >
+        <aside
+          className={styles.sidebar}
+          aria-label={t('memory.career.os.navigation')}
+        >
           <Brand />
-          <nav className={styles.navigation} aria-label="Navigation principale">
+          <nav
+            className={styles.navigation}
+            aria-label={t('memory.main.navigation')}
+          >
             {navigation.map(([icon, label, href]) => (
               <Link
                 aria-current={href === '/memory' ? 'page' : undefined}
@@ -81,19 +92,19 @@ function AppChrome({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <section className={styles.setup} aria-labelledby="setup-title">
-            <h2 id="setup-title">Mise en route</h2>
+            <h2 id="setup-title">{t('memory.setup')}</h2>
             <ol>
               <li className={styles.current}>
                 <Icon>upload_file</Icon>
-                <span>Choisir une source</span>
+                <span>{t('memory.choose.a.source')}</span>
               </li>
               <li>
                 <Icon>fact_check</Icon>
-                <span>Relire les informations</span>
+                <span>{t('memory.review.information')}</span>
               </li>
               <li>
                 <Icon>verified_user</Icon>
-                <span>Valider la mémoire</span>
+                <span>{t('memory.confirm.career.memory')}</span>
               </li>
             </ol>
           </section>
@@ -103,8 +114,8 @@ function AppChrome({ children }: { children: React.ReactNode }) {
           <div className={styles.localNote}>
             <Icon>lock</Icon>
             <span>
-              <strong>Lecture locale</strong>
-              <small>Le fichier reste dans ce navigateur.</small>
+              <strong>{t('memory.local.processing')}</strong>
+              <small>{t('memory.the.file.stays.in.this.browser')}</small>
             </span>
           </div>
         </aside>
@@ -112,7 +123,7 @@ function AppChrome({ children }: { children: React.ReactNode }) {
         <header className={styles.mobileHeader}>
           <Brand />
           <LocaleSwitch compact />
-          <Link href="/memory" aria-label="Fermer l’import">
+          <Link href="/memory" aria-label={t('memory.close.import')}>
             <Icon>close</Icon>
           </Link>
         </header>
@@ -121,7 +132,10 @@ function AppChrome({ children }: { children: React.ReactNode }) {
           {children}
         </section>
 
-        <nav className={styles.mobileNavigation} aria-label="Navigation mobile">
+        <nav
+          className={styles.mobileNavigation}
+          aria-label={t('memory.mobile.navigation')}
+        >
           {mobileNavigation.map(([icon, label, href]) => (
             <Link
               aria-current={href === '/memory' ? 'page' : undefined}
@@ -134,7 +148,7 @@ function AppChrome({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
       </section>
-    </main>,
+    </main>
   );
 }
 
@@ -182,18 +196,23 @@ function PageHeading({
   );
 }
 
-function ErrorBanner({ message }: { message: string }) {
+function ErrorBanner({
+  message,
+}: {
+  message: keyof typeof memoryMessages | '';
+}) {
+  const t = useTranslations([memoryMessages]);
   if (!message) return null;
   return (
     <div className={styles.error} role="alert">
       <Icon>error</Icon>
-      <span>{message}</span>
+      <span>{t(message)}</span>
     </div>
   );
 }
 
 function SourceStep({ controller }: { controller: Controller }) {
-  const localize = useLocalizer([memoryMessages]);
+  const t = useTranslations([memoryMessages]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const canReadPaste = controller.pasteText.trim().length > 0;
@@ -209,15 +228,15 @@ function SourceStep({ controller }: { controller: Controller }) {
     chooseFile(event.dataTransfer.files);
   }
 
-  return localize(
+  return (
     <>
       <PageHeading
-        copy="Importez une source. Vous déciderez ensuite ce qui entre réellement dans votre mémoire."
-        eyebrow="Mémoire professionnelle · 1 sur 3"
-        title="Ajoutez votre parcours"
+        copy={t('memory.import.a.source.you.will.then.decide.what.actually')}
+        eyebrow={t('memory.career.memory.1.of.3')}
+        title={t('memory.add.your.background')}
         action={
           <Link className={styles.secondaryButton} href="/memory">
-            Annuler
+            {t('memory.cancel')}{' '}
           </Link>
         }
       />
@@ -237,14 +256,14 @@ function SourceStep({ controller }: { controller: Controller }) {
             <div className={styles.dropIcon}>
               <Icon>upload_file</Icon>
             </div>
-            <h2 id="file-title">Déposez votre CV ici</h2>
-            <p>PDF, DOCX ou TXT · 4 Mo maximum</p>
+            <h2 id="file-title">{t('memory.drop.your.resume.here')}</h2>
+            <p>{t('memory.pdf.docx.or.txt.4.mb.maximum')}</p>
             <button
               className={styles.primaryButton}
               onClick={() => inputRef.current?.click()}
               type="button"
             >
-              Choisir un fichier
+              {t('memory.choose.a.file')}{' '}
             </button>
             <input
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
@@ -262,11 +281,13 @@ function SourceStep({ controller }: { controller: Controller }) {
               <Icon>content_paste</Icon>
             </span>
             <div>
-              <h2 id="paste-title">Ou collez du texte</h2>
-              <p>CV, export LinkedIn ou notes de parcours.</p>
+              <h2 id="paste-title">{t('memory.or.paste.text')}</h2>
+              <p>{t('memory.resume.linkedin.export.or.career.notes')}</p>
             </div>
           </div>
-          <label htmlFor="pasted-source-kind">Nature de la source</label>
+          <label htmlFor="pasted-source-kind">
+            {t('memory.source.type.2')}
+          </label>
           <select
             id="pasted-source-kind"
             onChange={(event) =>
@@ -276,15 +297,15 @@ function SourceStep({ controller }: { controller: Controller }) {
             }
             value={controller.pasteSourceKind}
           >
-            <option value="linkedin">Profil LinkedIn</option>
-            <option value="document">CV en texte</option>
-            <option value="manual">Notes de parcours</option>
+            <option value="linkedin">{t('memory.linkedin.profile')}</option>
+            <option value="document">{t('memory.resume.as.text')}</option>
+            <option value="manual">{t('memory.career.notes')}</option>
           </select>
-          <label htmlFor="profile-text">Contenu à analyser</label>
+          <label htmlFor="profile-text">{t('memory.content.to.analyze')}</label>
           <textarea
             id="profile-text"
             onChange={(event) => controller.setPasteText(event.target.value)}
-            placeholder="Collez ici le texte de votre profil…"
+            placeholder={t('memory.paste.your.profile.text.here')}
             value={controller.pasteText}
           />
           <button
@@ -293,7 +314,7 @@ function SourceStep({ controller }: { controller: Controller }) {
             onClick={() => void controller.importPastedText()}
             type="button"
           >
-            Lire ce texte <Icon>arrow_forward</Icon>
+            {t('memory.read.this.text')} <Icon>arrow_forward</Icon>
           </button>
         </section>
 
@@ -303,51 +324,57 @@ function SourceStep({ controller }: { controller: Controller }) {
               <Icon>shield_lock</Icon>
             </span>
             <div>
-              <h2>Avant de commencer</h2>
-              <p>La confidentialité ne dépend pas d’une promesse floue.</p>
+              <h2>{t('memory.before.you.begin')}</h2>
+              <p>{t('memory.privacy.does.not.rely.on.a.vague.promise')}</p>
             </div>
           </div>
           <ul>
             <li>
               <Icon>check</Icon>
               <span>
-                <strong>Extraction dans votre navigateur</strong>
-                <small>Le fichier brut n’est pas envoyé au serveur.</small>
-              </span>
-            </li>
-            <li>
-              <Icon>check</Icon>
-              <span>
-                <strong>Revue obligatoire</strong>
+                <strong>{t('memory.extraction.in.your.browser')}</strong>
                 <small>
-                  Chaque affirmation reste modifiable ou supprimable.
+                  {t('memory.the.raw.file.is.not.sent.to.the.server')}
                 </small>
               </span>
             </li>
             <li>
               <Icon>check</Icon>
               <span>
-                <strong>Enregistrement explicite</strong>
+                <strong>{t('memory.review.required')}</strong>
                 <small>
-                  Seule votre sélection est sauvegardée après validation.
+                  {t('memory.every.claim.remains.editable.or.removable')}{' '}
+                </small>
+              </span>
+            </li>
+            <li>
+              <Icon>check</Icon>
+              <span>
+                <strong>{t('memory.explicit.save')}</strong>
+                <small>
+                  {t(
+                    'memory.only.your.selection.is.saved.after.confirmation',
+                  )}{' '}
                 </small>
               </span>
             </li>
           </ul>
         </aside>
       </div>
-    </>,
+    </>
   );
 }
 
 function ReadingStep({ controller }: { controller: Controller }) {
-  const localize = useLocalizer([memoryMessages]);
-  return localize(
+  const t = useTranslations([memoryMessages]);
+  return (
     <>
       <PageHeading
-        copy="L’extraction s’exécute localement. La durée dépend du document et de votre appareil."
-        eyebrow="Mémoire professionnelle · Lecture locale"
-        title="Lecture de votre source"
+        copy={t(
+          'memory.extraction.runs.locally.duration.depends.on.the.document.and',
+        )}
+        eyebrow={t('memory.career.memory.local.processing')}
+        title={t('memory.reading.your.source')}
       />
       <section className={styles.readingPanel} aria-busy="true">
         <div className={styles.fileGlyph}>
@@ -355,7 +382,7 @@ function ReadingStep({ controller }: { controller: Controller }) {
         </div>
         <div>
           <h2>{controller.sourceName}</h2>
-          <p role="status">Extraction et structuration en cours…</p>
+          <p role="status">{t('memory.extracting.and.structuring.content')}</p>
         </div>
         <span className={styles.indeterminate} aria-hidden="true">
           <i />
@@ -365,22 +392,23 @@ function ReadingStep({ controller }: { controller: Controller }) {
           onClick={controller.cancelReading}
           type="button"
         >
-          Annuler la lecture
+          {t('memory.cancel.reading')}{' '}
         </button>
       </section>
       <aside className={styles.readingNote}>
         <Icon>info</Icon>
         <p>
-          Aucun pourcentage ni temps restant n’est affiché : ces informations ne
-          sont pas mesurables de façon fiable pendant la lecture locale.
+          {t(
+            'memory.no.percentage.or.time.remaining.is.shown.because.neither',
+          )}{' '}
         </p>
       </aside>
-    </>,
+    </>
   );
 }
 
 function ReviewStep({ controller }: { controller: Controller }) {
-  const localize = useLocalizer([memoryMessages]);
+  const t = useTranslations([memoryMessages, applicationsMessages]);
   const review = controller.review;
   if (!review) return null;
   const selectedCount = review.candidates.filter(
@@ -388,12 +416,14 @@ function ReviewStep({ controller }: { controller: Controller }) {
   ).length;
   const saving = controller.stage === 'saving';
 
-  return localize(
+  return (
     <>
       <PageHeading
-        copy="Corrigez les formulations, la catégorie, la confidentialité et les usages avant l’enregistrement."
-        eyebrow="Mémoire professionnelle · 2 sur 3"
-        title="Relisez ce qui a été extrait"
+        copy={t(
+          'memory.review.the.wording.category.privacy.and.uses.before.saving',
+        )}
+        eyebrow={t('memory.career.memory.2.of.3')}
+        title={t('memory.review.what.was.extracted')}
         action={
           <button
             className={styles.secondaryButton}
@@ -415,9 +445,11 @@ function ReviewStep({ controller }: { controller: Controller }) {
                 <Icon>person</Icon>
               </span>
               <div>
-                <h2>Identité professionnelle</h2>
+                <h2>{t('memory.professional.identity')}</h2>
                 <p>
-                  Préremplie depuis la source, jamais validée à votre place.
+                  {t(
+                    'memory.pre.filled.from.the.source.never.approved.on.your',
+                  )}{' '}
                 </p>
               </div>
             </div>
@@ -435,7 +467,7 @@ function ReviewStep({ controller }: { controller: Controller }) {
                 />
               </label>
               <label>
-                Positionnement
+                {t('memory.positioning')}{' '}
                 <input
                   onChange={(event) =>
                     controller.updateReview((current) => ({
@@ -452,10 +484,10 @@ function ReviewStep({ controller }: { controller: Controller }) {
           <section className={styles.candidates} aria-labelledby="claims-title">
             <header>
               <div>
-                <h2 id="claims-title">Affirmations proposées</h2>
+                <h2 id="claims-title">{t('memory.suggested.claims')}</h2>
                 <p>
-                  {selectedCount} sur {review.candidates.length} sélectionnée
-                  {selectedCount > 1 ? 's' : ''}
+                  {selectedCount} {t('memory.of')} {review.candidates.length}{' '}
+                  {t('memory.selected')} {selectedCount > 1 ? 's' : ''}
                 </p>
               </div>
               <button
@@ -471,7 +503,7 @@ function ReviewStep({ controller }: { controller: Controller }) {
                 }
                 type="button"
               >
-                Tout sélectionner
+                {t('memory.select.all')}{' '}
               </button>
             </header>
             {review.candidates.length ? (
@@ -490,10 +522,11 @@ function ReviewStep({ controller }: { controller: Controller }) {
             ) : (
               <div className={styles.emptyCandidates}>
                 <Icon>search_off</Icon>
-                <h3>Aucune affirmation exploitable</h3>
+                <h3>{t('memory.no.usable.claim')}</h3>
                 <p>
-                  Cette source ne contient pas assez de texte structuré. Essayez
-                  un autre fichier ou collez le contenu directement.
+                  {t(
+                    'memory.this.source.does.not.contain.enough.structured.text.try',
+                  )}{' '}
                 </p>
               </div>
             )}
@@ -506,18 +539,19 @@ function ReviewStep({ controller }: { controller: Controller }) {
               <Icon>description</Icon>
             </span>
             <div>
-              <p>Source locale</p>
+              <p>{t('memory.local.source')}</p>
               <strong>{review.source.displayName}</strong>
               <small>{review.source.type.toUpperCase()}</small>
             </div>
           </section>
           <section className={styles.validationPanel}>
-            <p>Étape 3</p>
-            <h2>Votre validation</h2>
+            <p>{t('memory.step.3')}</p>
+            <h2>{t('memory.your.confirmation')}</h2>
             <span>
-              Seules les {selectedCount} affirmations sélectionnées seront
-              enregistrées. Chacune conserve le statut choisi ; les statuts non
-              publiables restent bloqués.
+              {t('memory.only.the')} {selectedCount}{' '}
+              {t(
+                'memory.selected.claims.will.be.saved.each.keeps.the.chosen',
+              )}{' '}
             </span>
             <label className={styles.confirmation}>
               <input
@@ -531,7 +565,9 @@ function ReviewStep({ controller }: { controller: Controller }) {
                 type="checkbox"
               />
               <span>
-                J’ai relu cette sélection et j’autorise les usages indiqués.
+                {t(
+                  'memory.i.reviewed.this.selection.and.authorize.the.listed.uses',
+                )}{' '}
               </span>
             </label>
             <button
@@ -542,22 +578,23 @@ function ReviewStep({ controller }: { controller: Controller }) {
             >
               {saving ? (
                 <>
-                  <Icon>progress_activity</Icon> Enregistrement…
+                  <Icon>progress_activity</Icon> {t('applications.saving')}{' '}
                 </>
               ) : (
                 <>
-                  Valider et enregistrer <Icon>arrow_forward</Icon>
+                  {t('memory.confirm.and.save')} <Icon>arrow_forward</Icon>
                 </>
               )}
             </button>
             <small>
-              C’est à ce clic, et seulement à ce clic, que la sélection quitte
-              votre navigateur.
+              {t(
+                'memory.only.when.you.click.here.does.the.selection.leave',
+              )}{' '}
             </small>
           </section>
         </aside>
       </div>
-    </>,
+    </>
   );
 }
 
@@ -583,7 +620,13 @@ function CandidateEditor({
   ) => void;
 }) {
   const [open, setOpen] = useState(index === 0);
-  const localize = useLocalizer([memoryMessages]);
+  const t = useTranslations([memoryMessages, activeRoutesMessages]);
+  const {
+    importCandidateGroupLabels,
+    allowedUseLabels,
+    sensitivityLabels,
+    provenanceLabels,
+  } = importLabels(t);
   const statementId = `statement-${candidate.id}`;
 
   function toggleUse(use: AllowedUse) {
@@ -593,7 +636,7 @@ function CandidateEditor({
     onChange({ allowedUses: uses });
   }
 
-  return localize(
+  return (
     <article
       className={`${styles.candidate} ${candidate.selected ? '' : styles.unselected}`}
     >
@@ -605,7 +648,7 @@ function CandidateEditor({
             type="checkbox"
           />
           <span className={styles.srOnly}>
-            Sélectionner l’affirmation {index + 1}
+            {t('memory.select.claim')} {index + 1}
           </span>
         </label>
         <button
@@ -655,7 +698,7 @@ function CandidateEditor({
               </select>
             </label>
             <label>
-              Sensibilité
+              {t('memory.sensitivity')}{' '}
               <select
                 onChange={(event) =>
                   onChange({ sensitivity: event.target.value as Sensitivity })
@@ -670,7 +713,7 @@ function CandidateEditor({
               </select>
             </label>
             <label>
-              Statut
+              {t('active-routes.status')}{' '}
               <select
                 onChange={(event) =>
                   onChange({ level: event.target.value as ProvenanceLevel })
@@ -686,7 +729,7 @@ function CandidateEditor({
             </label>
           </div>
           <fieldset>
-            <legend>Usages autorisés</legend>
+            <legend>{t('memory.allowed.uses')}</legend>
             <div className={styles.usageOptions}>
               {Object.entries(allowedUseLabels).map(([value, label]) => (
                 <label key={value}>
@@ -703,42 +746,82 @@ function CandidateEditor({
             </div>
             {candidate.allowedUses.length === 0 ? (
               <small className={styles.fieldError} role="alert">
-                Choisissez au moins un usage ou retirez cette affirmation.
+                {t('memory.choose.at.least.one.use.or.remove.this.claim')}{' '}
               </small>
             ) : null}
           </fieldset>
           <details className={styles.sourceDetail}>
-            <summary>Voir l’extrait source</summary>
+            <summary>{t('memory.view.source.excerpt')}</summary>
             <blockquote>{candidate.excerpt}</blockquote>
             <small>{candidate.locator}</small>
           </details>
         </div>
       ) : null}
-    </article>,
+    </article>
   );
 }
 
 function SavedStep() {
-  const localize = useLocalizer([memoryMessages]);
-  return localize(
+  const t = useTranslations([memoryMessages]);
+  return (
     <section className={styles.savedPanel}>
       <span className={styles.savedIcon}>
         <Icon>check</Icon>
       </span>
-      <p>Mémoire professionnelle · terminée</p>
-      <h1>Votre sélection est enregistrée.</h1>
+      <p>{t('memory.career.memory.complete')}</p>
+      <h1>{t('memory.your.selection.is.saved')}</h1>
       <span>
-        Les informations retenues sont maintenant disponibles dans votre
-        mémoire, avec leur source, leur sensibilité et leurs usages.
+        {t(
+          'memory.the.selected.information.is.now.available.in.your.career',
+        )}{' '}
       </span>
       <div>
         <Link className={styles.primaryButton} href="/memory">
-          Ouvrir ma mémoire <Icon>arrow_forward</Icon>
+          {t('memory.open.my.career.memory')} <Icon>arrow_forward</Icon>
         </Link>
         <Link className={styles.secondaryButton} href="/memory/import">
-          Ajouter une autre source
+          {t('memory.add.another.source')}{' '}
         </Link>
       </div>
-    </section>,
+    </section>
   );
 }
+
+function importLabels(t: Translator<typeof memoryMessages>) {
+  const importCandidateGroupLabels = {
+    summary: t('memory.profile.and.summary'),
+    experience: t('memory.experience'),
+    project: t('memory.project'),
+    skill: t('memory.skill'),
+    education: t('memory.education'),
+    result: t('memory.result'),
+    other: t('memory.other.information'),
+  } as const;
+
+  const allowedUseLabels = {
+    application: t('memory.applications'),
+    resume: t('memory.resume'),
+    linkedin: t('memory.linkedin'),
+    interview: 'Entretiens',
+  } as const;
+
+  const sensitivityLabels = {
+    public: t('memory.public.2'),
+    private: t('memory.private'),
+    restricted: t('memory.restricted'),
+  } as const;
+
+  const provenanceLabels = {
+    declared: t('memory.declared.by.you'),
+    inferred: t('memory.inferred.needs.confirmation'),
+    unsupported: t('memory.unsupported.2'),
+  } as const;
+
+  return {
+    importCandidateGroupLabels,
+    allowedUseLabels,
+    sensitivityLabels,
+    provenanceLabels,
+  };
+}
+import type { Translator } from '@/lib/i18n/messages';

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
-import { FakeAgentProvider, runAgentTeam } from '../lib/agent-runtime';
+import { FakeAgentProvider, runAgentTeam } from './simulation/agent-runtime';
 import { syntheticProfile } from '../lib/fixture';
 import { evaluateHardMatch, type HardMatchJob } from '../lib/hard-match';
 import {

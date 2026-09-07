@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { AppShell, Icon } from '@/components/kit-route-page';
+import { AppShell } from '@/components/layout/app-shell';
+import { Icon } from '@/components/ui/primitives';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import {
   applicationSchema,

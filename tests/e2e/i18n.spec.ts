@@ -17,27 +17,24 @@ const englishScreens = [
   [`/applications/${applicationId}/page`, 'Staff Platform Engineer'],
   ['/links', 'Private links'],
   ['/insights', 'Insights'],
-  [
-    '/memory/interview',
-    'On the monorepo migration, what did not go as planned?',
-  ],
-  ['/interviews/demo', 'Technical interview · Vantage Labs'],
+  ['/memory/interview', 'Guided interview'],
+  ['/interviews/demo', 'Interviews'],
   ['/assets', 'Assets'],
   ['/settings/models', 'Models & agents'],
   [`/applications/${applicationId}?state=running`, 'Staff Platform Engineer'],
   ['/memory/conflicts', 'Source conflicts'],
   ['/settings/privacy', 'Evidence privacy'],
   [`/applications/${applicationId}/published`, 'Staff Platform Engineer'],
-  ['/interviews/demo/debrief', 'Interview debrief'],
+  ['/interviews/demo/debrief', 'Interviews'],
   [`/applications/${applicationId}/versions`, 'Version and decision history'],
   ['/runs', 'Agent run journal'],
   [`/applications/${applicationId}/company`, 'Company brief'],
   ['/messages', 'Messages'],
   ['/memory/skills', 'Skills'],
-  ['/onboarding/hosting', 'Choose your hosting mode'],
+  ['/onboarding/hosting', 'Hosting'],
   ['/inbox', 'Needs review'],
   ['/settings/billing', 'Subscription'],
-  ['/settings/integrations', 'Integrations & API'],
+  ['/settings/integrations', 'Integrations'],
   ['/settings/data', 'Export & deletion'],
 ] as const;
 
@@ -403,4 +400,47 @@ test('localizes authentication and private recipient surfaces', async ({
   await expect(
     page.getByRole('heading', { name: 'This link is no longer active.' }),
   ).toBeVisible();
+});
+
+test('locale changes translate labels without translating saved application data', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page);
+  await page.route(`**/api/applications/${applicationId}`, (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        applicationId,
+        company: 'Accueil',
+        role: 'Candidatures',
+        description: 'Conserver cette formulation utilisateur.',
+        accent: '#5847e8',
+        stage: 'draft',
+        revision: 1,
+        createdAt: '2026-09-04T12:00:00.000Z',
+        updatedAt: '2026-09-04T12:00:00.000Z',
+      }),
+    }),
+  );
+  await page.goto(`/applications/${applicationId}`);
+  for (const language of ['FR', 'EN']) {
+    await page.getByRole('button', { name: language, exact: true }).click();
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: 'Candidatures',
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Accueil', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Conserver cette formulation utilisateur.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+  }
 });

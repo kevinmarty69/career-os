@@ -1,6 +1,8 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
-import postgres from 'postgres';
+import { createHash, randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+import type postgres from 'postgres';
+import { database, authorize } from './database';
 import { z } from 'zod';
 import type { JobMatch } from '../hard-match';
 import {
@@ -25,6 +27,7 @@ import type { PublicationSession } from './publications';
 
 export class SemanticAnalysisModelNotConfiguredError extends Error {}
 export class SemanticAnalysisInputUnavailableError extends Error {}
+export class SemanticAnalysisOutcomeUnknownError extends Error {}
 
 type SemanticClient = Pick<LocalOpenAISemanticMatchClient, 'generate'>;
 
@@ -72,12 +75,6 @@ type AnalysisRow = {
   created_at: Date;
 };
 
-function database() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required.');
-  return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
 export async function runSemanticAnalysis(
   session: PublicationSession,
   rawJobId: string,
@@ -115,24 +112,21 @@ export async function readLatestSemanticAnalysis(
   const jobId = z.string().uuid().parse(rawJobId);
   const searchProfileId = z.string().uuid().parse(rawSearchProfileId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const [row] = await tx<AnalysisRow[]>`select ${analysisColumns(tx)}
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [row] = await tx<AnalysisRow[]>`select ${analysisColumns(tx)}
         from app.semantic_analyses where tenant_id = ${session.tenantId}
           and discovered_job_id = ${jobId}
           and search_profile_id = ${searchProfileId}
         order by created_at desc, id desc limit 1`;
-      return row
-        ? semanticAnalysisResultSchema.parse({
-            status: 'completed',
-            analysis: projection(row),
-          })
-        : undefined;
-    });
-  } finally {
-    await sql.end();
-  }
+    return row
+      ? semanticAnalysisResultSchema.parse({
+          status: 'completed',
+          analysis: projection(row),
+        })
+      : undefined;
+  });
 }
 
 async function persistSemanticAnalysis(
@@ -141,10 +135,10 @@ async function persistSemanticAnalysis(
   client?: SemanticClient,
 ) {
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const [row] = await tx<PreparationRow[]>`
+  const leaseToken = randomUUID();
+  const prepared = await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [row] = await tx<PreparationRow[]>`
         select matched.id match_id, matched.discovered_job_id,
           matched.job_revision, job.company, job.role, job.description,
           matched.search_profile_id, matched.search_profile_revision,
@@ -184,20 +178,76 @@ async function persistSemanticAnalysis(
           and matched.living_profile_id = ${match.livingProfile.profileId}
           and matched.living_profile_revision = ${match.livingProfile.revision}
         for share of job`;
-      const input = preparation(row);
-      const inputHash = createHash('sha256')
-        .update(JSON.stringify({ jobMatchId: match.matchId, input }))
-        .digest('hex');
-      await tx`select pg_advisory_xact_lock(hashtextextended(
-        ${`semantic-analysis:${session.tenantId}:${inputHash}`}, 0
-      ))`;
-      const [existing] = await tx<AnalysisRow[]>`select ${analysisColumns(tx)}
-        from app.semantic_analyses where tenant_id = ${session.tenantId}
-          and input_hash = ${inputHash}`;
-      if (existing) return projection(existing);
+    const input = preparation(row);
+    const inputHash = createHash('sha256')
+      .update(JSON.stringify({ jobMatchId: match.matchId, input }))
+      .digest('hex');
+    return {
+      input,
+      inputHash,
+      reservation: await reserve(
+        tx,
+        session.tenantId,
+        match.matchId,
+        inputHash,
+        leaseToken,
+      ),
+    };
+  });
+  const { input, inputHash } = prepared;
+  let reservation = prepared.reservation;
+  const deadline = Date.now() + 150_000;
+  while (reservation.status === 'pending') {
+    if (Date.now() >= deadline) throw new LocalModelClientError('TIMEOUT');
+    await delay(500);
+    reservation = await sql.begin(async (tx) => {
+      await authorize(tx, session);
+      return reserve(
+        tx,
+        session.tenantId,
+        match.matchId,
+        inputHash,
+        leaseToken,
+      );
+    });
+  }
+  if (reservation.status === 'completed') return reservation.analysis;
+  if (reservation.status === 'outcome_unknown')
+    throw new SemanticAnalysisOutcomeUnknownError();
 
-      const generated = await (client ?? configuredClient()).generate(input);
-      validateGenerated(generated, input);
+  let dispatched = false;
+  try {
+    const model = client ?? configuredClient();
+    await sql.begin(async (tx) => {
+      await authorize(tx, session);
+      const [started] = await tx<{ lease_token: string }[]>`
+        update app.semantic_analysis_leases set status = 'in_flight'
+        where tenant_id = ${session.tenantId} and input_hash = ${inputHash}
+          and lease_token = ${leaseToken} and status = 'reserved'
+          and expires_at > clock_timestamp() returning lease_token`;
+      if (!started) throw new LocalModelClientError('TIMEOUT');
+    });
+    dispatched = true;
+    // The lease survives a process failure; no connection or row lock spans inference.
+    const generated = await model.generate(input);
+    validateGenerated(generated, input);
+    return await sql.begin(async (tx) => {
+      await authorize(tx, session);
+      const [lease] = await tx<{ lease_token: string }[]>`
+        select lease_token from app.semantic_analysis_leases
+        where tenant_id = ${session.tenantId} and input_hash = ${inputHash}
+          and lease_token = ${leaseToken} and status = 'in_flight'
+          and expires_at > clock_timestamp()
+        for update`;
+      if (!lease) throw new LocalModelClientError('TIMEOUT');
+      const [job] = await tx<{ id: string }[]>`
+        select id from app.discovered_jobs
+        where tenant_id = ${session.tenantId} and id = ${match.opportunityId}
+          and revision = ${match.jobRevision} for share`;
+      if (!job)
+        throw new SemanticAnalysisInputUnavailableError(
+          'The job changed during analysis.',
+        );
       const [created] = await tx<
         AnalysisRow[]
       >`insert into app.semantic_analyses (
@@ -216,11 +266,69 @@ async function persistSemanticAnalysis(
         ${generated.usage.inputTokens}, ${generated.usage.outputTokens}, 0,
         ${generated.usage.costMicros}, ${generated.usage.latencyMs}
       ) returning ${analysisColumns(tx)}`;
+      await release(tx, session.tenantId, inputHash, leaseToken);
       return projection(created);
     });
-  } finally {
-    await sql.end();
+  } catch (error) {
+    // Fence cleanup too: an expired attempt must never release its successor's lease.
+    await sql
+      .begin(async (tx) => {
+        await authorize(tx, session);
+        if (dispatched) {
+          await tx`update app.semantic_analysis_leases set status = 'outcome_unknown'
+            where tenant_id = ${session.tenantId} and input_hash = ${inputHash}
+              and lease_token = ${leaseToken}`;
+        } else {
+          await release(tx, session.tenantId, inputHash, leaseToken);
+        }
+      })
+      .catch(() => undefined);
+    throw error;
   }
+}
+
+async function reserve(
+  tx: postgres.TransactionSql,
+  tenantId: string,
+  matchId: string,
+  inputHash: string,
+  leaseToken: string,
+) {
+  await tx`select pg_advisory_xact_lock(hashtextextended(
+    ${`semantic-analysis:${tenantId}:${inputHash}`}, 0
+  ))`;
+  const [existing] = await tx<AnalysisRow[]>`select ${analysisColumns(tx)}
+    from app.semantic_analyses where tenant_id = ${tenantId}
+      and input_hash = ${inputHash}`;
+  if (existing)
+    return { status: 'completed' as const, analysis: projection(existing) };
+  // Expired dispatched requests are ambiguous and must not call the model again.
+  const [unknown] = await tx<{ lease_token: string }[]>`
+    update app.semantic_analysis_leases set status = 'outcome_unknown'
+    where tenant_id = ${tenantId} and input_hash = ${inputHash}
+      and (status = 'outcome_unknown' or (status = 'in_flight' and expires_at <= clock_timestamp()))
+    returning lease_token`;
+  if (unknown) return { status: 'outcome_unknown' as const };
+  // Only a reservation which never dispatched may be reclaimed automatically.
+  const [claimed] = await tx<{ lease_token: string }[]>`
+    insert into app.semantic_analysis_leases (tenant_id, input_hash, job_match_id, lease_token, expires_at)
+    values (${tenantId}, ${inputHash}, ${matchId}, ${leaseToken}, clock_timestamp() + interval '150 seconds')
+    on conflict (tenant_id, input_hash) do update
+      set lease_token = excluded.lease_token, expires_at = excluded.expires_at
+      where app.semantic_analysis_leases.status = 'reserved'
+        and app.semantic_analysis_leases.expires_at <= clock_timestamp()
+    returning lease_token`;
+  return { status: claimed ? ('claimed' as const) : ('pending' as const) };
+}
+
+async function release(
+  tx: postgres.TransactionSql,
+  tenantId: string,
+  inputHash: string,
+  leaseToken: string,
+) {
+  await tx`delete from app.semantic_analysis_leases
+    where tenant_id = ${tenantId} and input_hash = ${inputHash} and lease_token = ${leaseToken}`;
 }
 
 function preparation(row: PreparationRow | undefined): SemanticAnalysisInput {
@@ -343,13 +451,4 @@ function analysisColumns(tx: postgres.TransactionSql) {
     living_profile_revision, input_hash, input, artifact, provider, model,
     provider_request_id, reserved_tokens, input_tokens, output_tokens,
     cost_budget_micros, cost_micros, latency_ms, created_at`;
-}
-
-async function authorize(
-  tx: postgres.TransactionSql,
-  session: PublicationSession,
-) {
-  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
-    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-  await tx.unsafe('set local role career_app');
 }

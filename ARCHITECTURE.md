@@ -16,6 +16,8 @@ The browser uses Better Auth organization sessions for tenant selection. Career 
 
 The company-researcher worker uses a dedicated PostgreSQL login with no direct table access. PostgreSQL assigns the next job globally and returns an opaque lease token; the process does not choose a tenant. Every later transition requires that exact step and lease token. The worker reserves the run budget and marks the provider request `in_flight` before calling a loopback OpenAI-compatible endpoint outside any database transaction. Completion writes one validated artifact, usage settlement and audit event atomically. A pre-dispatch crash can be reclaimed after lease expiry. An expired in-flight call is never replayed: its reservation is settled conservatively and the run fails with an explicit unknown provider outcome. This trades availability for protection against duplicate model calls and duplicate cost.
 
+Inbox semantic analyses use the same reservation and fencing rules without creating an application workflow. `semantic_analysis_leases` records `reserved`, `in_flight`, or `outcome_unknown`; generation happens outside transactions and persistence rechecks the job revision and lease token. An uncertain dispatched attempt blocks another generation for the same input. Completed artifacts can be read again, and changed input revisions can be analyzed separately.
+
 After the human confirms the extracted signals, PostgreSQL constructs the next immutable input from the run snapshot. It excludes inferred, restricted, disallowed, unsupported and mixed-permission claims before a separate `career_evidence_archivist` login can claim the step. This worker has exactly five executable capabilities: heartbeat, claim, complete, fail and reap expired work. It applies a bounded lexical ranking, returns claim and evidence IDs only, and writes no model usage. SQL validates every returned ID against the immutable input before committing the artifact.
 
 The current durable canary runs through research, evidence selection, strategy approval, deterministic PageSpec composition and three serialized reviews. Starting reviews remains an explicit human action. Recruiter and hiring-manager reviews use isolated loopback-model workers; factuality is deterministic. Publication remains gated on the current PageSpec lineage, all three persisted reviews and human decisions for every qualitative objection; soft-deleting an application revokes every active publication and share link derived from it.
@@ -27,3 +29,9 @@ Job URL import is a separate authenticated preview path. The server validates an
 PageSpec is data, not code. The renderer accepts only known blocks and bounded color tokens. Essential recruiter information is visible first; provenance details use native `details` elements for progressive disclosure.
 
 See [ADR-001](docs/ADR-001-agent-runtime.md) for agent runtime and isolation decisions.
+
+## Code boundaries
+
+Routes compose feature screens. Shared UI and layouts do not import the route dispatcher. Application services share the connection pool and transaction-local tenant context; worker credentials remain separate. Model roles share a bounded transport and keep their own prompts and output contracts. See [CONTRIBUTING.md](CONTRIBUTING.md) for the module map and validation commands.
+
+The runtime in `scripts/simulation/` is used only by tests and benchmarks. Its in-process pause/resume behavior does not prove production persistence or crash recovery.

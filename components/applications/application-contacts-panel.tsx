@@ -1,7 +1,8 @@
 'use client';
+import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 
-import { useEffect, useState } from 'react';
-import { useLocalizer } from '@/components/i18n/i18n-provider';
+import { useEffect, useId, useState } from 'react';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import {
   applicationContactListSchema,
   applicationContactSchema,
@@ -12,13 +13,14 @@ import {
   updateApplicationContact,
 } from '@/lib/career-api';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
+import type { Translator } from '@/lib/i18n/messages';
 
 export function ApplicationContactsPanel({
   applicationId,
 }: {
   applicationId: string;
 }) {
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages]);
   const [contacts, setContacts] = useState<ApplicationContact[]>();
   const [error, setError] = useState(false);
 
@@ -41,23 +43,24 @@ export function ApplicationContactsPanel({
     return () => controller.abort();
   }, [applicationId]);
 
-  return localize(
+  return (
     <section className="co-panel co-application-contacts">
       <header>
         <div>
-          <p>Approche humaine</p>
-          <h2>Personnes à contacter</h2>
+          <p>{t('dossier.human.outreach')}</p>
+          <h2>{t('dossier.people.to.contact')}</h2>
           <span>
-            Trois profils publics maximum, classés et sourcés. Vous gardez la
-            main sur chaque message et chaque envoi.
+            {t(
+              'dossier.up.to.three.ranked.sourced.public.profiles.you.control',
+            )}{' '}
           </span>
         </div>
         <span className="co-badge muted">{contacts?.length ?? 0} / 3</span>
       </header>
       {error ? (
-        <p role="alert">Les contacts n’ont pas pu être chargés.</p>
+        <p role="alert">{t('dossier.contacts.could.not.be.loaded')}</p>
       ) : !contacts ? (
-        <p>Chargement des contacts…</p>
+        <p>{t('dossier.loading.contacts')}</p>
       ) : contacts.length ? (
         <div className="co-contact-grid">
           {contacts.map((contact) => (
@@ -69,19 +72,21 @@ export function ApplicationContactsPanel({
           <span className="material-symbols-rounded" aria-hidden="true">
             person_search
           </span>
-          <h3>Aucune suggestion pour le moment</h3>
+          <h3>{t('dossier.no.suggestions.yet')}</h3>
           <p>
-            La recherche de contacts publics apparaîtra ici. Aucun profil privé
-            n’est collecté et rien n’est envoyé automatiquement.
+            {t(
+              'dossier.public.contact.research.will.appear.here.no.private.profile',
+            )}{' '}
           </p>
         </div>
       )}
-    </section>,
+    </section>
   );
 }
 
 function ContactCard({ initial }: { initial: ApplicationContact }) {
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages, applicationsMessages]);
+  const { locale } = useI18n();
   const [contact, setContact] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<'saved' | 'copied' | 'error'>();
@@ -122,7 +127,7 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
     }
   }
 
-  return localize(
+  return (
     <article className="co-contact-card">
       <header>
         <span className="co-contact-rank">{contact.rank}</span>
@@ -131,13 +136,13 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
           <p>{contact.role}</p>
         </div>
         <span className={`co-badge ${confidenceTone(contact.confidence)}`}>
-          {confidenceLabel(contact.confidence)}
+          {confidenceLabel(t, contact.confidence)}
         </span>
       </header>
       <div className="co-contact-meta">
-        <span>{relationshipLabel(contact.relationship)}</span>
+        <span>{relationshipLabel(t, contact.relationship)}</span>
         <a href={contact.profileUrl} rel="noreferrer" target="_blank">
-          Ouvrir le profil
+          {t('dossier.open.profile')}{' '}
           <span className="material-symbols-rounded" aria-hidden="true">
             open_in_new
           </span>
@@ -145,7 +150,9 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
       </div>
       <p className="co-contact-rationale">{contact.rationale}</p>
       <details>
-        <summary>Sources datées · {contact.sources.length}</summary>
+        <summary>
+          {t('dossier.dated.sources')} {contact.sources.length}
+        </summary>
         <ul>
           {contact.sources.map((source) => (
             <li key={source.url}>
@@ -153,7 +160,7 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
                 {source.title}
               </a>
               <time dateTime={source.collectedAt}>
-                {new Intl.DateTimeFormat(undefined, {
+                {new Intl.DateTimeFormat(locale, {
                   dateStyle: 'medium',
                 }).format(new Date(source.collectedAt))}
               </time>
@@ -163,7 +170,8 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
       </details>
       <form onSubmit={save}>
         <MessageField
-          label="Note de connexion"
+          label={t('dossier.connection.note')}
+          maxLength={500}
           onChange={(connectionNote) =>
             setContact((current) => ({ ...current, connectionNote }))
           }
@@ -171,7 +179,7 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
           value={contact.connectionNote}
         />
         <MessageField
-          label="Message après acceptation"
+          label={t('dossier.message.after.acceptance')}
           onChange={(acceptedMessage) =>
             setContact((current) => ({ ...current, acceptedMessage }))
           }
@@ -179,7 +187,7 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
           value={contact.acceptedMessage}
         />
         <MessageField
-          label="Relance optionnelle"
+          label={t('dossier.optional.follow.up')}
           onChange={(followUpMessage) =>
             setContact((current) => ({
               ...current,
@@ -192,7 +200,7 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
         />
         <div className="co-contact-tracking">
           <label>
-            Statut manuel
+            {t('dossier.manual.status')}{' '}
             <select
               onChange={(event) =>
                 setContact((current) => ({
@@ -202,16 +210,18 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
               }
               value={contact.status}
             >
-              <option value="suggested">Suggéré</option>
-              <option value="contacted">Contacté</option>
-              <option value="accepted">Connexion acceptée</option>
-              <option value="follow_up">À relancer</option>
-              <option value="replied">Réponse reçue</option>
-              <option value="closed">Clôturé</option>
+              <option value="suggested">{t('dossier.suggested')}</option>
+              <option value="contacted">{t('dossier.contacted')}</option>
+              <option value="accepted">
+                {t('dossier.connection.accepted')}
+              </option>
+              <option value="follow_up">{t('dossier.follow.up')}</option>
+              <option value="replied">{t('dossier.reply.received')}</option>
+              <option value="closed">{t('dossier.closed')}</option>
             </select>
           </label>
           <label>
-            Date de relance
+            {t('dossier.follow.up.date')}{' '}
             <input
               onChange={(event) =>
                 setContact((current) => ({
@@ -230,51 +240,62 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
         <footer>
           <p aria-live="polite">
             {feedback === 'saved'
-              ? 'Suivi enregistré.'
+              ? t('dossier.tracking.saved')
               : feedback === 'copied'
-                ? 'Message copié.'
+                ? t('dossier.message.copied')
                 : feedback === 'error'
-                  ? 'La modification n’a pas été enregistrée.'
-                  : 'Aucun envoi automatique.'}
+                  ? t('dossier.the.change.could.not.be.saved')
+                  : t('dossier.no.automatic.sending')}
           </p>
           <button className="co-button" disabled={saving} type="submit">
-            {saving ? 'Enregistrement…' : 'Enregistrer le suivi'}
+            {saving ? t('applications.saving') : t('dossier.save.tracking')}
           </button>
         </footer>
       </form>
-    </article>,
+    </article>
   );
 }
 
 function MessageField({
   label,
+  maxLength = 2_000,
   onChange,
   onCopy,
   optional = false,
   value,
 }: {
   label: string;
+  maxLength?: number;
   onChange: (value: string) => void;
   onCopy: () => void;
   optional?: boolean;
   value: string;
 }) {
+  const t = useTranslations([dossierMessages]);
+  const inputId = useId();
+
   return (
-    <label className="co-contact-message">
+    <div className="co-contact-message">
       <span>
-        {label}
-        <button disabled={!value} onClick={onCopy} type="button">
-          Copier
+        <label htmlFor={inputId}>{label}</label>
+        <button
+          aria-label={t('dossier.copy')}
+          disabled={!value}
+          onClick={onCopy}
+          type="button"
+        >
+          {t('dossier.copy')}{' '}
         </button>
       </span>
       <textarea
-        maxLength={label === 'Note de connexion' ? 500 : 2_000}
+        id={inputId}
+        maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
         required={!optional}
         rows={3}
         value={value}
       />
-    </label>
+    </div>
   );
 }
 
@@ -286,21 +307,27 @@ function confidenceTone(confidence: ApplicationContact['confidence']) {
       : 'muted';
 }
 
-function confidenceLabel(confidence: ApplicationContact['confidence']) {
+function confidenceLabel(
+  t: Translator<typeof dossierMessages>,
+  confidence: ApplicationContact['confidence'],
+) {
   return confidence === 'verified'
-    ? 'Vérifié'
+    ? t('dossier.contact.verified')
     : confidence === 'likely'
-      ? 'Probable'
-      : 'Incertain';
+      ? t('dossier.contact.likely')
+      : t('dossier.contact.uncertain');
 }
 
-function relationshipLabel(relationship: ApplicationContact['relationship']) {
+function relationshipLabel(
+  t: Translator<typeof dossierMessages>,
+  relationship: ApplicationContact['relationship'],
+) {
   return {
-    hiring_manager: 'Hiring manager',
-    founder_or_technical_leader: 'Fondateur ou direction technique',
-    internal_recruiter: 'Recrutement interne',
-    job_author: 'Auteur de l’offre',
-    team_leader: 'Responsable d’équipe',
+    hiring_manager: t('dossier.contact.hiring.manager'),
+    founder_or_technical_leader: t('dossier.contact.founder'),
+    internal_recruiter: t('dossier.contact.recruiter'),
+    job_author: t('dossier.contact.job.author'),
+    team_leader: t('dossier.contact.team.leader'),
   }[relationship];
 }
 

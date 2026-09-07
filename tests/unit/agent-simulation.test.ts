@@ -7,7 +7,7 @@ import {
   resumeRun,
   runAgentTeam,
   serializeRun,
-} from '../../lib/agent-runtime';
+} from '../../scripts/simulation/agent-runtime';
 import { syntheticProfile } from '../../lib/fixture';
 
 const input = {

@@ -16,6 +16,7 @@ import type { LocalSemanticMatchResult } from '../../lib/server/local-openai-sem
 import {
   runSemanticAnalysis,
   SemanticAnalysisModelNotConfiguredError,
+  SemanticAnalysisOutcomeUnknownError,
 } from '../../lib/server/semantic-analyses';
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
@@ -672,6 +673,41 @@ async function main() {
       error.code === 'PROVIDER_UNAVAILABLE',
   );
   assert.equal(unavailableCalls, 1);
+  await assert.rejects(
+    runSemanticAnalysis(
+      owner.session,
+      connected.opportunity.opportunityId,
+      searchProfile.searchProfileId,
+      {
+        generate: async () => {
+          unavailableCalls += 1;
+          throw new Error('must not retry');
+        },
+      },
+    ),
+    SemanticAnalysisOutcomeUnknownError,
+  );
+  assert.equal(unavailableCalls, 1);
+  const unknownOutcome = await owner.browser.request(semanticPath, 'POST');
+  await expectStatus(
+    unknownOutcome,
+    409,
+    'uncertain analysis is not automatically retried',
+  );
+  assert.equal(
+    ((await unknownOutcome.json()) as { code: string }).code,
+    'SEMANTIC_ANALYSIS_OUTCOME_UNKNOWN',
+  );
+  // Start the separate success scenario with a fresh fixture reservation.
+  const failedAttemptPool = new Pool({ connectionString: databaseUrl });
+  try {
+    await failedAttemptPool.query(
+      `delete from app.semantic_analysis_leases where tenant_id = $1 and status = 'outcome_unknown'`,
+      [owner.session.tenantId],
+    );
+  } finally {
+    await failedAttemptPool.end();
+  }
 
   const semanticClient = {
     async generate(

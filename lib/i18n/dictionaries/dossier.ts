@@ -1,499 +1,714 @@
 import type { MessageDictionary } from '../messages';
-
 export const dossierMessages = {
-  Brief: 'Brief',
-  Entreprise: 'Company',
-  'Exigences ↔ preuves': 'Requirements ↔ evidence',
-  Stratégie: 'Strategy',
-  Livrables: 'Deliverables',
-  Contacts: 'Contacts',
-  Versions: 'Versions',
-  'Toutes les candidatures': 'All applications',
-  Candidature: 'Application',
-  'Chargement…': 'Loading…',
-  'Chargement de la candidature…': 'Loading application…',
-  'Connectez-vous pour ouvrir ce dossier.': 'Sign in to open this application.',
-  'Cette candidature est introuvable.': 'This application could not be found.',
-  'Impossible de charger cette candidature.':
-    'Unable to load this application.',
-  'Chargement du suivi…': 'Loading application activity…',
-  'Journal manuel · données persistées': 'Manual log · persisted data',
-  'Suivi de candidature': 'Application activity',
-  'Contacts, entretiens et résultats': 'Contacts, interviews, and outcomes',
-  'Consignez les échanges importants dans un journal factuel. Rien n’est envoyé automatiquement.':
-    'Keep important interactions in a factual log. Nothing is sent automatically.',
-  'Ajouter un événement': 'Add an event',
-  Type: 'Type',
-  'Date et heure': 'Date and time',
-  Titre: 'Title',
-  Notes: 'Notes',
-  'Entretien technique avec l’équipe produit':
-    'Technical interview with the product team',
-  'Décisions, attentes et prochaine étape…':
-    'Decisions, expectations, and next step…',
-  'Ajouter au journal': 'Add to log',
-  'L’événement n’a pas été enregistré.': 'The event could not be saved.',
-  Journal: 'Activity log',
-  Entretien: 'Interview',
-  Réponse: 'Response',
-  Résultat: 'Outcome',
-  'Aucun événement pour le moment': 'No activity yet',
-  'Ajoutez le premier contact ou entretien de cette candidature.':
-    'Add the first contact or interview for this application.',
-  'Approche humaine': 'Human outreach',
-  'Personnes à contacter': 'People to contact',
-  'Trois profils publics maximum, classés et sourcés. Vous gardez la main sur chaque message et chaque envoi.':
-    'Up to three ranked, sourced public profiles. You control every message and every send.',
-  'Les contacts n’ont pas pu être chargés.': 'Contacts could not be loaded.',
-  'Chargement des contacts…': 'Loading contacts…',
-  'Aucune suggestion pour le moment': 'No suggestions yet',
-  'La recherche de contacts publics apparaîtra ici. Aucun profil privé n’est collecté et rien n’est envoyé automatiquement.':
-    'Public contact research will appear here. No private profile is collected and nothing is sent automatically.',
-  'Ouvrir le profil': 'Open profile',
-  'Sources datées ·': 'Dated sources ·',
-  'Note de connexion': 'Connection note',
-  'Message après acceptation': 'Message after acceptance',
-  'Relance optionnelle': 'Optional follow-up',
-  'Statut manuel': 'Manual status',
-  Suggéré: 'Suggested',
-  Contacté: 'Contacted',
-  'Connexion acceptée': 'Connection accepted',
-  'À relancer': 'Follow up',
-  'Réponse reçue': 'Reply received',
-  Clôturé: 'Closed',
-  'Date de relance': 'Follow-up date',
-  'Suivi enregistré.': 'Tracking saved.',
-  'Message copié.': 'Message copied.',
-  'Aucun envoi automatique.': 'No automatic sending.',
-  'Enregistrer le suivi': 'Save tracking',
-  Vérifié: 'Verified',
-  Probable: 'Likely',
-  Incertain: 'Uncertain',
-  'Fondateur ou direction technique': 'Founder or technical leadership',
-  'Recrutement interne': 'Internal recruiter',
-  'Auteur de l’offre': 'Job author',
-  'Responsable d’équipe': 'Team lead',
-  'Prochaines actions': 'Next actions',
-  'Tâches et relances datées': 'Dated tasks and follow-ups',
-  Tâche: 'Task',
-  Relance: 'Follow-up',
-  Échéance: 'Due date',
-  'Action à réaliser': 'Action',
-  'Relancer la recruteuse après l’entretien':
-    'Follow up with the recruiter after the interview',
-  Planifier: 'Schedule',
-  'La modification n’a pas été enregistrée.': 'The change could not be saved.',
-  'Chargement des prochaines actions…': 'Loading next actions…',
-  'Aucune action planifiée.': 'No action scheduled.',
-  'Candidature réelle · données persistées':
-    'Real application · persisted data',
-  Étape: 'Stage',
-  Révision: 'Revision',
-  'Dernière mise à jour': 'Last updated',
-  'Ouvrir la source': 'Open original job',
-  'Aucune URL source enregistrée.': 'No source URL saved.',
-  'Le dossier est prêt pour la recherche entreprise et le workflow agentique.':
-    'This application is ready for company research and the agent workflow.',
-  'Démarrage du workflow…': 'Starting workflow…',
-  'Démarrer le workflow agentique': 'Start agent workflow',
-  'Workflow agentique': 'Agent workflow',
-  'Identité visuelle de la page privée': 'Private page visual identity',
-  'Le logo et la couleur accompagnent cette candidature sans imiter le site de l’entreprise.':
-    'The logo and color personalize this application without imitating the company website.',
-  'Identité figée dans le snapshot de ce run.':
-    'Identity locked in this run snapshot.',
-  'Logo de l’entreprise': 'Company logo',
-  'Couleur principale accessible': 'Accessible primary color',
-  'Enregistrer l’identité': 'Save identity',
-  'Identité enregistrée pour le prochain run.':
-    'Identity saved for the next run.',
-  'L’identité n’a pas été enregistrée. Vérifiez l’URL et réessayez.':
-    'Identity could not be saved. Check the URL and try again.',
-  'Recherche d’un run existant…': 'Looking for an existing run…',
-  'Statut du run': 'Run status',
-  'Étape active': 'Active stage',
-  'Événements persistés': 'Persisted events',
-  Progression: 'Progress',
-  'Journal lisible': 'Readable log',
-  'Le premier événement apparaîtra ici.': 'The first event will appear here.',
-  'Décision humaine requise': 'Human decision required',
-  'Quels signaux doivent cadrer la candidature ?':
-    'Which signals should shape this application?',
-  'L’agent a extrait ces éléments. Vérifiez-les avant qu’ils influencent la sélection des preuves et la stratégie.':
-    'The agent extracted these signals. Review them before they influence evidence selection and strategy.',
-  'Données web non fiables jusqu’à votre validation.':
-    'Web data remains untrusted until you approve it.',
-  'La validation n’a pas été enregistrée. Vos choix sont conservés.':
-    'The decision was not saved. Your choices are preserved.',
-  'Preuves candidates': 'Candidate evidence',
-  'Ce que votre parcours démontre pour ce poste':
-    'What your experience demonstrates for this role',
-  'Le matching est limité aux affirmations autorisées pour une candidature. Vérifiez la sélection avant de lancer la stratégie.':
-    'Matching is limited to claims authorized for applications. Review the selection before starting strategy.',
-  'Aucune preuve éligible trouvée. Cet écart restera visible.':
-    'No eligible evidence found. This gap will remain visible.',
-  'La stratégie n’a pas démarré. Vous pouvez réessayer sans risque de doublon.':
-    'Strategy did not start. You can retry without creating a duplicate.',
-  'Vos faits restent inchangés. Seul leur ordre sera proposé.':
-    'Your facts stay unchanged. Only their ordering will be proposed.',
-  'Direction éditoriale interne': 'Internal editorial direction',
-  'Validez l’angle avant la rédaction': 'Approve the angle before drafting',
-  'Cet angle guide la future page. Il ne crée aucun nouveau fait et reste ancré aux preuves ci-dessous.':
-    'This angle guides the future page. It creates no new facts and remains anchored to the evidence below.',
-  'Preuve principale': 'Lead evidence',
-  Appui: 'Supporting evidence',
-  'Sujets à traiter honnêtement': 'Topics to address honestly',
-  'La validation n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.':
-    'Approval was not saved. You can retry without creating a duplicate.',
-  'La rédaction ne démarrera qu’après votre décision.':
-    'Drafting will only start after your decision.',
-  'Page structurée': 'Structured page',
-  'Relisez le brouillon avant les reviews':
-    'Review the draft before the checks',
-  'Les trois reviewers vérifieront maintenant la lisibilité recruteur, la pertinence hiring manager et chaque affirmation factuelle.':
-    'Three reviewers will now check recruiter readability, hiring-manager relevance, and every factual claim.',
-  'Les reviews n’ont pas démarré. Vous pouvez réessayer sans créer de doublon.':
-    'Reviews did not start. You can retry without creating a duplicate.',
-  'La publication reste bloquée pendant les contrôles.':
-    'Publishing remains blocked during the checks.',
-  'Contrôles indépendants': 'Independent checks',
-  'Trois regards avant publication': 'Three perspectives before publishing',
-  'Chaque objection reste visible avec son auteur. Une correction crée une nouvelle version ciblée ; garder une formulation reste votre décision.':
-    'Every objection remains visible with its author. A correction creates a targeted new version; keeping wording remains your decision.',
-  Bloquante: 'Blocking',
-  Suggestion: 'Suggestion',
-  'Conservée par vous': 'Kept by you',
-  'Correction lancée': 'Correction started',
-  'Garder tel quel': 'Keep as written',
-  'Corriger cette section': 'Correct this section',
-  'Aucune objection.': 'No objections.',
-  'La décision n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.':
-    'The decision was not saved. You can retry without creating a duplicate.',
-  'Tous les contrôles sont résolus. Prêt pour votre validation finale.':
-    'All checks are resolved. Ready for your final approval.',
-  'La publication reste bloquée tant qu’une décision manque.':
-    'Publishing remains blocked while a decision is missing.',
-  'Validation humaine finale': 'Final human approval',
-  'Le lien privé est prêt': 'The private link is ready',
-  'Préparer une nouvelle version': 'Prepare a new version',
-  'Le lien privé a été révoqué': 'The private link has been revoked',
-  'Publiez uniquement ce que vous avez validé':
-    'Publish only what you approved',
-  Publié: 'Published',
-  Révoqué: 'Revoked',
-  'Non publié': 'Unpublished',
-  'Le snapshot est immuable, non indexable et accessible pendant sept jours. Vous pouvez couper l’accès immédiatement.':
-    'The snapshot is immutable, non-indexable, and available for seven days. You can revoke access immediately.',
-  Ouvrir: 'Open',
-  'Révoquer le lien': 'Revoke link',
-  'Révocation…': 'Revoking…',
-  'L’accès est coupé immédiatement, y compris pour un onglet déjà ouvert.':
-    'Access is revoked immediately, including in a tab that is already open.',
-  'Les trois reviews sont résolues. Cette action fige la page actuelle dans un snapshot privé ; aucune modification ultérieure de votre mémoire ne changera ce qui est partagé.':
-    'All three reviews are resolved. This action freezes the current page in a private snapshot; later changes to your Career Memory will not alter what is shared.',
-  'Snapshot immuable': 'Immutable snapshot',
-  'Expiration automatique sous sept jours':
-    'Automatic expiration after seven days',
-  'Révocation immédiate': 'Immediate revocation',
-  'Aucun lien n’est créé sans cette action.':
-    'No link is created without this action.',
-  'Création du lien…': 'Creating link…',
-  'Valider et créer le lien privé': 'Approve and create private link',
-  'Votre session a expiré. Reconnectez-vous, puis réessayez.':
-    'Your session has expired. Sign in again, then retry.',
-  'La page ne passe plus les contrôles de publication. Rouvrez la revue et résolvez le point restant.':
-    'The page no longer passes the publication checks. Reopen the review and resolve the remaining issue.',
-  'La candidature a changé pendant la publication. Rechargez-la avant de réessayer.':
-    'The application changed while publishing. Reload it before retrying.',
-  'Trop de tentatives de publication. Attendez une minute avant de réessayer.':
-    'Too many publication attempts. Wait one minute before retrying.',
-  'Ce lien ne peut pas être révoqué depuis cet espace. Rechargez la candidature puis réessayez.':
-    'This link cannot be revoked from this workspace. Reload the application, then retry.',
-  'Le service de publication est momentanément indisponible. La page validée n’a pas été publiée ; réessayez plus tard.':
-    'The publication service is temporarily unavailable. The approved page was not published; retry later.',
-  'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.':
-    'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
-  'Compléter la mémoire professionnelle': 'Complete Career Memory',
-  'Connectez-vous pour lancer ce workflow.': 'Sign in to start this workflow.',
-  'Enregistrez d’abord votre mémoire professionnelle.':
-    'Save your Career Memory before starting.',
-  'La candidature ou la mémoire a changé. Rechargez ce dossier.':
-    'The application or Career Memory changed. Reload this page.',
-  'La limite de runs est atteinte. Réessayez dans une minute.':
-    'The run limit has been reached. Try again in one minute.',
-  'Le worker de recherche est indisponible. Vérifiez votre instance.':
-    'The research worker is unavailable. Check your instance.',
-  'Le workflow est momentanément indisponible.':
-    'The workflow is temporarily unavailable.',
-  'Se connecter': 'Sign in',
-  'Vérifier les workers': 'Check worker availability',
-  'Recharger la candidature': 'Reload application',
-  Réessayer: 'Try again',
-  'Historique des versions et décisions': 'Version and decision history',
-  'Dossier de candidature': 'Application workspace',
-  'À valider': 'Needs review',
-  'Relancer les agents': 'Rerun agents',
-  'Vue d’ensemble': 'Overview',
-  'Offre d’origine': 'Original job',
-  'Recherche entreprise': 'Company research',
-  Runs: 'Runs',
-  'Angle retenu': 'Selected angle',
-  'agent stratégie · 14:02': 'strategy agent · 14:02',
-  'L’opérabilité par une petite équipe, pas la performance brute.':
-    'Operability for a small team, not raw performance.',
-  'Nimbus a levé en juin et recrute quatre personnes sur Fleet Platform. On mène avec Corvid : outillage écrit puis transmis, pas une prouesse solo.':
-    'Nimbus raised funding in June and is hiring four people for Fleet Platform. Lead with Corvid: tooling built and handed over, not a solo feat.',
-  '6 sources consultées · 3 signaux de recrutement':
-    '6 sources reviewed · 3 hiring signals',
-  'Voir les 12': 'View all 12',
-  Couvert: 'Covered',
-  'Fiabilité du déploiement à grande échelle': 'Reliable deployment at scale',
-  'Exigence critique · 2 preuves vérifiées':
-    'Critical requirement · 2 verified evidence items',
-  'Outillage pour équipes internes': 'Internal team tooling',
-  'Exigence critique · 3 preuves vérifiées':
-    'Critical requirement · 3 verified evidence items',
-  Partiel: 'Partial',
-  'Expérience robotique / ROS2': 'Robotics / ROS2 experience',
-  'Secondaire · 1 preuve open source':
-    'Secondary · 1 open-source evidence item',
-  'Management d’une équipe de 5+': 'Managing a team of 5+',
-  'Exigence critique · aucune preuve': 'Critical requirement · no evidence',
-  'Publication bloquée': 'Publication blocked',
-  '1 affirmation sans preuve · 3 modifications à trancher.':
-    '1 unsupported claim · 3 changes need review.',
-  'Page privée v4 · 4 sections': 'Private page v4 · 4 sections',
-  'CV adapté · 1 page': 'Tailored resume · 1 page',
-  'Email de candidature': 'Application email',
-  'Message LinkedIn': 'LinkedIn message',
-  'Avant envoi': 'Before sending',
-  'Offre confirmée': 'Job confirmed',
-  'Entreprise documentée': 'Company researched',
-  'CV adapté relu': 'Tailored resume reviewed',
-  'Trancher 3 modifications': 'Review 3 changes',
-  'Créer le lien privé': 'Create private link',
-  'Fathom · Berlin / remote · importée il y a 48 s':
-    'Fathom · Berlin / remote · imported 48s ago',
-  'Analyse en cours': 'Analysis in progress',
-  'Voir l’offre d’origine': 'View original job',
-  'Annuler le run': 'Cancel run',
-  'Progression du run': 'Run progress',
-  '≈ 50 s restantes': '≈ 50s remaining',
-  'Offre récupérée et nettoyée': 'Job fetched and cleaned',
-  '1 648 mots': '1,648 words',
-  '14 exigences identifiées': '14 requirements identified',
-  '5 critiques': '5 critical',
-  '4 sources lues': '4 sources reviewed',
-  'Appariement des preuves': 'Evidence matching',
-  'Rédaction des livrables': 'Deliverable drafting',
-  'Vérification factuelle': 'Factual review',
-  'Déjà lisible': 'Already available',
-  'confirmé pendant que ça tourne': 'confirmed while the run continues',
-  'Exigences critiques': 'Critical requirements',
-  'Kubernetes multi-cluster': 'Multi-cluster Kubernetes',
-  'Observabilité end-to-end': 'End-to-end observability',
-  'Réduction du coût cloud': 'Cloud cost reduction',
-  'Astreinte partagée': 'Shared on-call',
-  'Go ou Rust en production': 'Go or Rust in production',
-  'À confirmer par vous': 'For you to confirm',
-  'Fourchette 90–110 k€ détectée': '€90–110k range detected',
-  Garder: 'Keep',
-  'Contrat CDI plein temps': 'Full-time permanent contract',
-  'Remote 100 % ambigu': '100% remote is ambiguous',
-  Préciser: 'Clarify',
-  'Vous pouvez déjà faire le tri en amont : les agents en tiendront compte à l’étape de rédaction.':
-    'You can already refine the input; agents will use your decisions during drafting.',
-  Cadrer: 'Refine',
-  'Ce que l’agent a trouvé': 'What the agent found',
-  'Série A de 18 M€ en mars 2026': '€18m Series A in March 2026',
-  'Équipe technique de 23 personnes': 'Engineering team of 23',
-  'Blog d’ingénierie : migration Go en cours':
-    'Engineering blog: Go migration in progress',
-  'Recherche des signaux de recrutement…': 'Searching for hiring signals…',
-  'Prédiction d’adéquation': 'Fit estimate',
-  'estimation provisoire': 'provisional estimate',
-  'Basée sur les exigences seules. L’appariement des preuves n’a pas encore tourné.':
-    'Based on requirements only. Evidence matching has not run yet.',
-  'Vous prévenir': 'Notify you',
-  'Une notification quand la revue est prête à être tranchée.':
-    'Notify me when the review is ready for a decision.',
-  'Email + notification navigateur': 'Email + browser notification',
-  'Ouvrir une autre candidature': 'Open another application',
-  'Le run continue en arrière-plan.': 'The run continues in the background.',
-  'En attente de l’humain': 'Waiting for your decision',
-  'Lecture de l’offre': 'Job analysis',
-  'Composition des livrables': 'Deliverable composition',
-  'Revue factuelle': 'Factual review',
-  'Revue confidentialité': 'Privacy review',
-  '3 problèmes · 1 bloquant': '3 issues · 1 blocking',
-  'étape enregistrée': 'step saved',
-  'Durée totale': 'Total duration',
-  Coût: 'Cost',
-  '3 modifications proposées': '3 suggested changes',
-  '1 bloque la publication': '1 blocks publication',
-  'Accepter les 2 sûres': 'Accept the 2 safe changes',
-  'Tout refuser': 'Reject all',
-  'Chiffre non soutenu par la preuve': 'Figure not supported by evidence',
-  'page privée · Ouverture · claim #12': 'private page · Opening · claim #12',
-  'Texte actuel': 'Current wording',
-  'J’ai réduit de 42 % le temps de build sur un monorepo de 340 services.':
-    'I reduced build time by 42% across a 340-service monorepo.',
-  'Proposition sourcée': 'Evidence-backed wording',
-  'Revue avant publication': 'Pre-publication review',
-  'Version actuelle': 'Current wording',
-  'J’ai ramené le temps de build de 11 à 7 minutes (p50) sur un monorepo de 340 services.':
-    'I brought build time down from 11 to 7 minutes (p50) across a 340-service monorepo.',
-  '« build p50 : 11m → 7m » · importé le 12/03/2024':
-    '“build p50: 11m → 7m” · imported Mar 12, 2024',
-  Accepter: 'Accept',
-  Éditer: 'Edit',
-  Ignorer: 'Ignore',
-  Inspecter: 'Inspect',
-  Refuser: 'Reject',
-  Reformulation: 'Rewording',
-  'Non sourcée': 'Unsupported',
-  '« passionné par la robotique » → « trois ans sur des systèmes temps réel embarqués ».':
-    '“passionate about robotics” → “three years working on embedded real-time systems.”',
-  '« Divisé les coûts d’infrastructure par deux » — retirer ou rattacher un document.':
-    '“Halved infrastructure costs” — remove it or attach a document.',
-  'La publication reste bloquée': 'Publication remains blocked',
-  'Career OS ne crée aucun lien avant votre validation explicite.':
-    'Career OS creates no link without your explicit approval.',
-  'Valider et créer le lien': 'Approve and create link',
-  'Brouillon v4 · non publiée': 'Draft v4 · unpublished',
-  'Preuves détaillées': 'Detailed evidence',
-  'Pourquoi Nimbus': 'Why Nimbus',
-  '30/60/90 jours': '30/60/90 days',
-  '1 affirmation': '1 claim',
-  '2 affirmations': '2 claims',
-  '3 affirmations': '3 claims',
-  '6 affirmations': '6 claims',
-  Sourcées: 'Sourced',
-  'Temps de lecture': 'Reading time',
-  'Pour Nimbus Robotics · équipe Fleet Platform':
-    'For Nimbus Robotics · Fleet Platform team',
-  'Faire tenir une flotte de 12 000 robots sur une plateforme opérable par trois personnes.':
-    'Keep a fleet of 12,000 robots running on a platform three people can operate.',
-  'Votre annonce insiste sur la fiabilité du déploiement à grande échelle et sur une équipe volontairement petite. C’est le problème que j’ai porté chez Corvid pendant trois ans.':
-    'Your job description emphasizes reliable deployment at scale and an intentionally small team. That is the problem I owned at Corvid for three years.',
-  'Le chiffre dépasse la preuve rattachée.':
-    'The figure exceeds the attached evidence.',
-  'Le point commun avec Fleet Platform : la contrainte n’était pas la technique mais la charge cognitive des équipes clientes. J’ai écrit l’outillage, formé l’équipe SRE, puis je l’ai retiré de mes mains.':
-    'The common thread with Fleet Platform: the constraint was not the technology but the cognitive load on customer teams. I built the tooling, trained the SRE team, then handed it over.',
-  'Ajouter un paragraphe': 'Add paragraph',
-  'Affirmation sélectionnée': 'Selected claim',
-  'Remplacer par « 11 → 7 min »': 'Replace with “11 → 7 min”',
-  'Rattacher une autre preuve': 'Attach different evidence',
-  'Retirer la phrase': 'Remove sentence',
-  'Autoriser l’inspection des preuves': 'Allow evidence inspection',
-  Actions: 'Actions',
-  'confiance 0,41': 'confidence 0.41',
-  '« réduit de 42 % le temps de build »': '“reduced build time by 42%”',
-  '« build p50 : 11 min → 7 min, sur 7 mois »':
-    '“build p50: 11 min → 7 min, over 7 months”',
-  'J’ai réduit de 42 % le temps de build sur un monorepo de 340 services, et ramené le déploiement d’un cycle hebdomadaire à quatre fois par jour.':
-    'I reduced build time by 42% across a 340-service monorepo and moved deployment from a weekly cycle to four times a day.',
-  'J’ai': 'I',
-  'réduit de 42 % le temps de build sur un monorepo de 340 services':
-    'reduced build time by 42% across a 340-service monorepo',
-  ', et ramené le déploiement d’un cycle hebdomadaire à quatre fois par jour.':
-    ', and moved deployment from a weekly cycle to four times a day.',
-  Corriger: 'Fix',
-  Candidatures: 'Applications',
-  'Publié à 14:22': 'Published at 14:22',
-  'Votre page privée est en ligne pour Nimbus Robotics.':
-    'Your private page for Nimbus Robotics is live.',
-  'Douze affirmations, toutes sourcées. Le lien n’est accessible qu’aux personnes à qui vous l’envoyez, et vous pouvez le couper à tout instant.':
-    'Twelve claims, all sourced. Only people you send the link to can access it, and you can revoke it at any time.',
-  'Lien privé': 'Private link',
-  Copier: 'Copy',
-  'Expire le 12 oct.': 'Expires Oct 12',
-  'Preuves inspectables': 'Inspectable evidence',
-  'Envoyer l’email préparé': 'Send prepared email',
-  'Ce qui part': 'What is shared',
-  'Page privée · 4 sections': 'Private page · 4 sections',
-  '12 preuves': '12 evidence items',
-  téléchargeable: 'downloadable',
-  'Extraits de preuves': 'Evidence excerpts',
-  '6 sur 12': '6 of 12',
-  exclu: 'excluded',
-  'Les documents « interne » n’ont pas été utilisés, même en reformulation.':
-    'Internal documents were not used, even as paraphrases.',
-  'Deux affirmations ont été renforcées au passage':
-    'Two claims were strengthened along the way',
-  '« 11 → 7 minutes » et « équipe de 3 » sont désormais sourcées dans votre mémoire : elles serviront à toutes vos prochaines candidatures.':
-    '“11 → 7 minutes” and “team of 3” are now sourced in your career memory and can support future applications.',
-  'Voir la mémoire': 'View career memory',
-  'Marquer comme envoyée': 'Mark as sent',
-  'Programmer une relance à J+8': 'Schedule a follow-up for day 8',
-  'Retour aux candidatures': 'Back to applications',
-  'v4 · publiée': 'v4 · published',
-  Vous: 'You',
-  'Agent rédaction': 'Writing agent',
-  actuelle: 'current',
-  'Comparaison v3 → v4': 'Compare v3 → v4',
-  '3 modifications · 1 section ajoutée': '3 changes · 1 section added',
-  'Restaurer v3': 'Restore v3',
-  'Exporter le diff': 'Export diff',
-  '+ 1 section': '+ 1 section',
-  '2 phrases': '2 sentences',
-  '− 1 affirmation': '− 1 claim',
-  '11 → 12 sourcées': '11 → 12 sourced',
-  'Section « Ouverture » · affirmation #12 modifiée par vous':
-    '“Opening” section · claim #12 edited by you',
-  'v3 · Agent': 'v3 · Agent',
-  'v4 · Vous': 'v4 · You',
-  'Nouvelle section « 30/60/90 jours » proposée par l’agent, acceptée':
-    'New “30/60/90 days” section suggested by the agent and accepted',
-  'J+30 · Cartographier les points de rupture.': 'Day 30 · Map failure points.',
-  'J+60 · Livrer un pipeline de release unifié.':
-    'Day 60 · Ship a unified release pipeline.',
-  'J+90 · Transférer l’exploitation à l’équipe.':
-    'Day 90 · Hand operations over to the team.',
-  'Restaurer une version ne supprime rien : les affirmations et leurs preuves restent dans votre mémoire.':
-    'Restoring a version deletes nothing: claims and evidence remain in your career memory.',
-  'Dossier entreprise': 'Company brief',
-  'Robotique logistique · Paris, Berlin · 68 personnes · fondée en 2021':
-    'Logistics robotics · Paris, Berlin · 68 people · founded in 2021',
-  'Rafraîchir la recherche': 'Refresh research',
-  'En une phrase reformulable': 'In one reusable sentence',
-  'Nimbus déploie des flottes de robots chez des logisticiens tiers ; leur difficulté n’est plus la robotique mais l’exploitation logicielle à grande échelle avec une équipe réduite.':
-    'Nimbus deploys robot fleets for logistics operators; the challenge is no longer robotics but operating software at scale with a small team.',
-  'Signaux datés et sourcés': 'Dated, sourced signals',
-  'Série B de 40 M€ en juin 2026': '€40m Series B in June 2026',
-  'Communiqué officiel + presse spécialisée · 2 sources concordantes':
-    'Official announcement + trade press · 2 corroborating sources',
-  '4 postes ouverts sur Fleet Platform': '4 open roles on Fleet Platform',
-  'Page carrières · relevé aujourd’hui': 'Careers page · checked today',
-  'Offres + dépôts publics + talk du CTO':
-    'Jobs + public repositories + CTO talk',
-  Hypothèse: 'Hypothesis',
-  'L’équipe Fleet serait de 3 personnes': 'Fleet may be a 3-person team',
-  'Déduit d’un post LinkedIn, à vérifier en entretien':
-    'Inferred from a LinkedIn post, to verify in interview',
-  'Ce qu’ils disent publiquement': 'What they say publicly',
-  '« Nous voulons rester une petite équipe très outillée. » · CTO, podcast août 2026':
-    '“We want to remain a small, highly tooled team.” · CTO, podcast, August 2026',
-  '« La fiabilité du déploiement est notre principal risque. » · blog ingénierie':
-    '“Deployment reliability is our primary risk.” · engineering blog',
-  'Points de vigilance': 'Points to verify',
-  'Deux départs de l’équipe plateforme en six mois.':
-    'Two platform team departures in six months.',
-  'Aucune information publique sur les niveaux de rémunération.':
-    'No public information on compensation levels.',
-  'Presse spécialisée': 'Trade press',
-  'levée de fonds · juin 2026': 'funding round · June 2026',
-  '2 dépôts publics': '2 public repositories',
-  'Interview du CTO': 'CTO interview',
-  'Sources retenues': 'Selected sources',
-  '3 articles · août 2026': '3 articles · August 2026',
-  'transcription · 48 min': 'transcript · 48 min',
-  'Sources publiques seules': 'Public sources only',
-  'Écartées · 8': 'Excluded · 8',
-  'Agrégateurs d’offres · contenu recopié': 'Job aggregators · copied content',
-  'Fiche société de 2023 · périmée': '2023 company profile · outdated',
-  'Avis salariés anonymes · non vérifiables':
-    'Anonymous employee reviews · unverifiable',
-  'Aucun scraping de profils privés, aucun contact non consenti. Le dossier ne contient que ce qu’un candidat pourrait lire lui-même.':
-    'No private-profile scraping and no contact without consent. This brief only contains information a candidate could read themselves.',
+  'dossier.the.workflow.is.temporarily.unavailable': {
+    fr: 'Le workflow est momentanément indisponible.',
+    en: 'The workflow is temporarily unavailable.',
+  },
+  'dossier.the.research.worker.is.unavailable.check.your.instance': {
+    fr: 'Le worker de recherche est indisponible. Vérifiez votre instance.',
+    en: 'The research worker is unavailable. Check your instance.',
+  },
+  'dossier.the.run.limit.has.been.reached.try.again.in': {
+    fr: 'La limite de runs est atteinte. Réessayez dans une minute.',
+    en: 'The run limit has been reached. Try again in one minute.',
+  },
+  'dossier.the.application.or.career.memory.changed.reload.this.page': {
+    fr: 'La candidature ou la mémoire a changé. Rechargez ce dossier.',
+    en: 'The application or Career Memory changed. Reload this page.',
+  },
+  'dossier.save.your.career.memory.before.starting': {
+    fr: 'Enregistrez d’abord votre mémoire professionnelle.',
+    en: 'Save your Career Memory before starting.',
+  },
+  'dossier.sign.in.to.start.this.workflow': {
+    fr: 'Connectez-vous pour lancer ce workflow.',
+    en: 'Sign in to start this workflow.',
+  },
+  'dossier.brief': {
+    fr: 'Brief',
+    en: 'Brief',
+  },
+  'dossier.company': {
+    fr: 'Entreprise',
+    en: 'Company',
+  },
+  'dossier.strategy': {
+    fr: 'Stratégie',
+    en: 'Strategy',
+  },
+  'dossier.deliverables': {
+    fr: 'Livrables',
+    en: 'Deliverables',
+  },
+  'dossier.contacts': {
+    fr: 'Contacts',
+    en: 'Contacts',
+  },
+  'dossier.versions': {
+    fr: 'Versions',
+    en: 'Versions',
+  },
+  'dossier.all.applications': {
+    fr: 'Toutes les candidatures',
+    en: 'All applications',
+  },
+  'dossier.application': {
+    fr: 'Candidature',
+    en: 'Application',
+  },
+  'dossier.loading': {
+    fr: 'Chargement…',
+    en: 'Loading…',
+  },
+  'dossier.loading.application': {
+    fr: 'Chargement de la candidature…',
+    en: 'Loading application…',
+  },
+  'dossier.sign.in.to.open.this.application': {
+    fr: 'Connectez-vous pour ouvrir ce dossier.',
+    en: 'Sign in to open this application.',
+  },
+  'dossier.this.application.could.not.be.found': {
+    fr: 'Cette candidature est introuvable.',
+    en: 'This application could not be found.',
+  },
+  'dossier.unable.to.load.this.application': {
+    fr: 'Impossible de charger cette candidature.',
+    en: 'Unable to load this application.',
+  },
+  'dossier.loading.application.activity': {
+    fr: 'Chargement du suivi…',
+    en: 'Loading application activity…',
+  },
+  'dossier.manual.log.persisted.data': {
+    fr: 'Journal manuel · données persistées',
+    en: 'Manual log · persisted data',
+  },
+  'dossier.application.activity': {
+    fr: 'Suivi de candidature',
+    en: 'Application activity',
+  },
+  'dossier.contacts.interviews.and.outcomes': {
+    fr: 'Contacts, entretiens et résultats',
+    en: 'Contacts, interviews, and outcomes',
+  },
+  'dossier.keep.important.interactions.in.a.factual.log.nothing.is': {
+    fr: 'Consignez les échanges importants dans un journal factuel. Rien n’est envoyé automatiquement.',
+    en: 'Keep important interactions in a factual log. Nothing is sent automatically.',
+  },
+  'dossier.add.an.event': {
+    fr: 'Ajouter un événement',
+    en: 'Add an event',
+  },
+  'dossier.type': {
+    fr: 'Type',
+    en: 'Type',
+  },
+  'dossier.date.and.time': {
+    fr: 'Date et heure',
+    en: 'Date and time',
+  },
+  'dossier.title': {
+    fr: 'Titre',
+    en: 'Title',
+  },
+  'dossier.notes': {
+    fr: 'Notes',
+    en: 'Notes',
+  },
+  'dossier.technical.interview.with.the.product.team': {
+    fr: 'Entretien technique avec l’équipe produit',
+    en: 'Technical interview with the product team',
+  },
+  'dossier.decisions.expectations.and.next.step': {
+    fr: 'Décisions, attentes et prochaine étape…',
+    en: 'Decisions, expectations, and next step…',
+  },
+  'dossier.add.to.log': {
+    fr: 'Ajouter au journal',
+    en: 'Add to log',
+  },
+  'dossier.the.event.could.not.be.saved': {
+    fr: 'L’événement n’a pas été enregistré.',
+    en: 'The event could not be saved.',
+  },
+  'dossier.activity.log': {
+    fr: 'Journal',
+    en: 'Activity log',
+  },
+  'dossier.response': {
+    fr: 'Réponse',
+    en: 'Response',
+  },
+  'dossier.outcome': {
+    fr: 'Résultat',
+    en: 'Outcome',
+  },
+  'dossier.no.activity.yet': {
+    fr: 'Aucun événement pour le moment',
+    en: 'No activity yet',
+  },
+  'dossier.add.the.first.contact.or.interview.for.this.application': {
+    fr: 'Ajoutez le premier contact ou entretien de cette candidature.',
+    en: 'Add the first contact or interview for this application.',
+  },
+  'dossier.human.outreach': {
+    fr: 'Approche humaine',
+    en: 'Human outreach',
+  },
+  'dossier.people.to.contact': {
+    fr: 'Personnes à contacter',
+    en: 'People to contact',
+  },
+  'dossier.up.to.three.ranked.sourced.public.profiles.you.control': {
+    fr: 'Trois profils publics maximum, classés et sourcés. Vous gardez la main sur chaque message et chaque envoi.',
+    en: 'Up to three ranked, sourced public profiles. You control every message and every send.',
+  },
+  'dossier.contacts.could.not.be.loaded': {
+    fr: 'Les contacts n’ont pas pu être chargés.',
+    en: 'Contacts could not be loaded.',
+  },
+  'dossier.loading.contacts': {
+    fr: 'Chargement des contacts…',
+    en: 'Loading contacts…',
+  },
+  'dossier.no.suggestions.yet': {
+    fr: 'Aucune suggestion pour le moment',
+    en: 'No suggestions yet',
+  },
+  'dossier.public.contact.research.will.appear.here.no.private.profile': {
+    fr: 'La recherche de contacts publics apparaîtra ici. Aucun profil privé n’est collecté et rien n’est envoyé automatiquement.',
+    en: 'Public contact research will appear here. No private profile is collected and nothing is sent automatically.',
+  },
+  'dossier.open.profile': {
+    fr: 'Ouvrir le profil',
+    en: 'Open profile',
+  },
+  'dossier.dated.sources': {
+    fr: 'Sources datées ·',
+    en: 'Dated sources ·',
+  },
+  'dossier.connection.note': {
+    fr: 'Note de connexion',
+    en: 'Connection note',
+  },
+  'dossier.message.after.acceptance': {
+    fr: 'Message après acceptation',
+    en: 'Message after acceptance',
+  },
+  'dossier.optional.follow.up': {
+    fr: 'Relance optionnelle',
+    en: 'Optional follow-up',
+  },
+  'dossier.manual.status': {
+    fr: 'Statut manuel',
+    en: 'Manual status',
+  },
+  'dossier.suggested': {
+    fr: 'Suggéré',
+    en: 'Suggested',
+  },
+  'dossier.contacted': {
+    fr: 'Contacté',
+    en: 'Contacted',
+  },
+  'dossier.connection.accepted': {
+    fr: 'Connexion acceptée',
+    en: 'Connection accepted',
+  },
+  'dossier.follow.up': {
+    fr: 'À relancer',
+    en: 'Follow up',
+  },
+  'dossier.reply.received': {
+    fr: 'Réponse reçue',
+    en: 'Reply received',
+  },
+  'dossier.closed': {
+    fr: 'Clôturé',
+    en: 'Closed',
+  },
+  'dossier.follow.up.date': {
+    fr: 'Date de relance',
+    en: 'Follow-up date',
+  },
+  'dossier.tracking.saved': {
+    fr: 'Suivi enregistré.',
+    en: 'Tracking saved.',
+  },
+  'dossier.message.copied': {
+    fr: 'Message copié.',
+    en: 'Message copied.',
+  },
+  'dossier.no.automatic.sending': {
+    fr: 'Aucun envoi automatique.',
+    en: 'No automatic sending.',
+  },
+  'dossier.save.tracking': {
+    fr: 'Enregistrer le suivi',
+    en: 'Save tracking',
+  },
+  'dossier.next.actions': {
+    fr: 'Prochaines actions',
+    en: 'Next actions',
+  },
+  'dossier.dated.tasks.and.follow.ups': {
+    fr: 'Tâches et relances datées',
+    en: 'Dated tasks and follow-ups',
+  },
+  'dossier.task': {
+    fr: 'Tâche',
+    en: 'Task',
+  },
+  'dossier.follow.up.2': {
+    fr: 'Relance',
+    en: 'Follow-up',
+  },
+  'dossier.due.date': {
+    fr: 'Échéance',
+    en: 'Due date',
+  },
+  'dossier.action': {
+    fr: 'Action à réaliser',
+    en: 'Action',
+  },
+  'dossier.follow.up.with.the.recruiter.after.the.interview': {
+    fr: 'Relancer la recruteuse après l’entretien',
+    en: 'Follow up with the recruiter after the interview',
+  },
+  'dossier.schedule': {
+    fr: 'Planifier',
+    en: 'Schedule',
+  },
+  'dossier.the.change.could.not.be.saved': {
+    fr: 'La modification n’a pas été enregistrée.',
+    en: 'The change could not be saved.',
+  },
+  'dossier.loading.next.actions': {
+    fr: 'Chargement des prochaines actions…',
+    en: 'Loading next actions…',
+  },
+  'dossier.no.action.scheduled': {
+    fr: 'Aucune action planifiée.',
+    en: 'No action scheduled.',
+  },
+  'dossier.real.application.persisted.data': {
+    fr: 'Candidature réelle · données persistées',
+    en: 'Real application · persisted data',
+  },
+  'dossier.stage': {
+    fr: 'Étape',
+    en: 'Stage',
+  },
+  'dossier.last.updated': {
+    fr: 'Dernière mise à jour',
+    en: 'Last updated',
+  },
+  'dossier.open.original.job': {
+    fr: 'Ouvrir la source',
+    en: 'Open original job',
+  },
+  'dossier.no.source.url.saved': {
+    fr: 'Aucune URL source enregistrée.',
+    en: 'No source URL saved.',
+  },
+  'dossier.this.application.is.ready.for.company.research.and.the': {
+    fr: 'Le dossier est prêt pour la recherche entreprise et le workflow agentique.',
+    en: 'This application is ready for company research and the agent workflow.',
+  },
+  'dossier.starting.workflow': {
+    fr: 'Démarrage du workflow…',
+    en: 'Starting workflow…',
+  },
+  'dossier.start.agent.workflow': {
+    fr: 'Démarrer le workflow agentique',
+    en: 'Start agent workflow',
+  },
+  'dossier.agent.workflow': {
+    fr: 'Workflow agentique',
+    en: 'Agent workflow',
+  },
+  'dossier.private.page.visual.identity': {
+    fr: 'Identité visuelle de la page privée',
+    en: 'Private page visual identity',
+  },
+  'dossier.the.logo.and.color.personalize.this.application.without.imitating': {
+    fr: 'Le logo et la couleur accompagnent cette candidature sans imiter le site de l’entreprise.',
+    en: 'The logo and color personalize this application without imitating the company website.',
+  },
+  'dossier.identity.locked.in.this.run.snapshot': {
+    fr: 'Identité figée dans le snapshot de ce run.',
+    en: 'Identity locked in this run snapshot.',
+  },
+  'dossier.company.logo': {
+    fr: 'Logo de l’entreprise',
+    en: 'Company logo',
+  },
+  'dossier.accessible.primary.color': {
+    fr: 'Couleur principale accessible',
+    en: 'Accessible primary color',
+  },
+  'dossier.save.identity': {
+    fr: 'Enregistrer l’identité',
+    en: 'Save identity',
+  },
+  'dossier.identity.saved.for.the.next.run': {
+    fr: 'Identité enregistrée pour le prochain run.',
+    en: 'Identity saved for the next run.',
+  },
+  'dossier.identity.could.not.be.saved.check.the.url.and': {
+    fr: 'L’identité n’a pas été enregistrée. Vérifiez l’URL et réessayez.',
+    en: 'Identity could not be saved. Check the URL and try again.',
+  },
+  'dossier.looking.for.an.existing.run': {
+    fr: 'Recherche d’un run existant…',
+    en: 'Looking for an existing run…',
+  },
+  'dossier.run.status': {
+    fr: 'Statut du run',
+    en: 'Run status',
+  },
+  'dossier.active.stage': {
+    fr: 'Étape active',
+    en: 'Active stage',
+  },
+  'dossier.persisted.events': {
+    fr: 'Événements persistés',
+    en: 'Persisted events',
+  },
+  'dossier.readable.log': {
+    fr: 'Journal lisible',
+    en: 'Readable log',
+  },
+  'dossier.the.first.event.will.appear.here': {
+    fr: 'Le premier événement apparaîtra ici.',
+    en: 'The first event will appear here.',
+  },
+  'dossier.human.decision.required': {
+    fr: 'Décision humaine requise',
+    en: 'Human decision required',
+  },
+  'dossier.which.signals.should.shape.this.application': {
+    fr: 'Quels signaux doivent cadrer la candidature ?',
+    en: 'Which signals should shape this application?',
+  },
+  'dossier.the.agent.extracted.these.signals.review.them.before.they': {
+    fr: 'L’agent a extrait ces éléments. Vérifiez-les avant qu’ils influencent la sélection des preuves et la stratégie.',
+    en: 'The agent extracted these signals. Review them before they influence evidence selection and strategy.',
+  },
+  'dossier.web.data.remains.untrusted.until.you.approve.it': {
+    fr: 'Données web non fiables jusqu’à votre validation.',
+    en: 'Web data remains untrusted until you approve it.',
+  },
+  'dossier.the.decision.was.not.saved.your.choices.are.preserved': {
+    fr: 'La validation n’a pas été enregistrée. Vos choix sont conservés.',
+    en: 'The decision was not saved. Your choices are preserved.',
+  },
+  'dossier.candidate.evidence': {
+    fr: 'Preuves candidates',
+    en: 'Candidate evidence',
+  },
+  'dossier.what.your.experience.demonstrates.for.this.role': {
+    fr: 'Ce que votre parcours démontre pour ce poste',
+    en: 'What your experience demonstrates for this role',
+  },
+  'dossier.matching.is.limited.to.claims.authorized.for.applications.review': {
+    fr: 'Le matching est limité aux affirmations autorisées pour une candidature. Vérifiez la sélection avant de lancer la stratégie.',
+    en: 'Matching is limited to claims authorized for applications. Review the selection before starting strategy.',
+  },
+  'dossier.no.eligible.evidence.found.this.gap.will.remain.visible': {
+    fr: 'Aucune preuve éligible trouvée. Cet écart restera visible.',
+    en: 'No eligible evidence found. This gap will remain visible.',
+  },
+  'dossier.strategy.did.not.start.you.can.retry.without.creating': {
+    fr: 'La stratégie n’a pas démarré. Vous pouvez réessayer sans risque de doublon.',
+    en: 'Strategy did not start. You can retry without creating a duplicate.',
+  },
+  'dossier.your.facts.stay.unchanged.only.their.ordering.will.be': {
+    fr: 'Vos faits restent inchangés. Seul leur ordre sera proposé.',
+    en: 'Your facts stay unchanged. Only their ordering will be proposed.',
+  },
+  'dossier.internal.editorial.direction': {
+    fr: 'Direction éditoriale interne',
+    en: 'Internal editorial direction',
+  },
+  'dossier.approve.the.angle.before.drafting': {
+    fr: 'Validez l’angle avant la rédaction',
+    en: 'Approve the angle before drafting',
+  },
+  'dossier.this.angle.guides.the.future.page.it.creates.no': {
+    fr: 'Cet angle guide la future page. Il ne crée aucun nouveau fait et reste ancré aux preuves ci-dessous.',
+    en: 'This angle guides the future page. It creates no new facts and remains anchored to the evidence below.',
+  },
+  'dossier.lead.evidence': {
+    fr: 'Preuve principale',
+    en: 'Lead evidence',
+  },
+  'dossier.supporting.evidence': {
+    fr: 'Appui',
+    en: 'Supporting evidence',
+  },
+  'dossier.topics.to.address.honestly': {
+    fr: 'Sujets à traiter honnêtement',
+    en: 'Topics to address honestly',
+  },
+  'dossier.approval.was.not.saved.you.can.retry.without.creating': {
+    fr: 'La validation n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.',
+    en: 'Approval was not saved. You can retry without creating a duplicate.',
+  },
+  'dossier.drafting.will.only.start.after.your.decision': {
+    fr: 'La rédaction ne démarrera qu’après votre décision.',
+    en: 'Drafting will only start after your decision.',
+  },
+  'dossier.structured.page': {
+    fr: 'Page structurée',
+    en: 'Structured page',
+  },
+  'dossier.review.the.draft.before.the.checks': {
+    fr: 'Relisez le brouillon avant les reviews',
+    en: 'Review the draft before the checks',
+  },
+  'dossier.three.reviewers.will.now.check.recruiter.readability.hiring.manager':
+    {
+      fr: 'Les trois reviewers vérifieront maintenant la lisibilité recruteur, la pertinence hiring manager et chaque affirmation factuelle.',
+      en: 'Three reviewers will now check recruiter readability, hiring-manager relevance, and every factual claim.',
+    },
+  'dossier.reviews.did.not.start.you.can.retry.without.creating': {
+    fr: 'Les reviews n’ont pas démarré. Vous pouvez réessayer sans créer de doublon.',
+    en: 'Reviews did not start. You can retry without creating a duplicate.',
+  },
+  'dossier.publishing.remains.blocked.during.the.checks': {
+    fr: 'La publication reste bloquée pendant les contrôles.',
+    en: 'Publishing remains blocked during the checks.',
+  },
+  'dossier.independent.checks': {
+    fr: 'Contrôles indépendants',
+    en: 'Independent checks',
+  },
+  'dossier.three.perspectives.before.publishing': {
+    fr: 'Trois regards avant publication',
+    en: 'Three perspectives before publishing',
+  },
+  'dossier.every.objection.remains.visible.with.its.author.a.correction': {
+    fr: 'Chaque objection reste visible avec son auteur. Une correction crée une nouvelle version ciblée ; garder une formulation reste votre décision.',
+    en: 'Every objection remains visible with its author. A correction creates a targeted new version; keeping wording remains your decision.',
+  },
+  'dossier.blocking': {
+    fr: 'Bloquante',
+    en: 'Blocking',
+  },
+  'dossier.suggestion': {
+    fr: 'Suggestion',
+    en: 'Suggestion',
+  },
+  'dossier.kept.by.you': {
+    fr: 'Conservée par vous',
+    en: 'Kept by you',
+  },
+  'dossier.correction.started': {
+    fr: 'Correction lancée',
+    en: 'Correction started',
+  },
+  'dossier.no.objections': {
+    fr: 'Aucune objection.',
+    en: 'No objections.',
+  },
+  'dossier.the.decision.was.not.saved.you.can.retry.without': {
+    fr: 'La décision n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.',
+    en: 'The decision was not saved. You can retry without creating a duplicate.',
+  },
+  'dossier.all.checks.are.resolved.ready.for.your.final.approval': {
+    fr: 'Tous les contrôles sont résolus. Prêt pour votre validation finale.',
+    en: 'All checks are resolved. Ready for your final approval.',
+  },
+  'dossier.publishing.remains.blocked.while.a.decision.is.missing': {
+    fr: 'La publication reste bloquée tant qu’une décision manque.',
+    en: 'Publishing remains blocked while a decision is missing.',
+  },
+  'dossier.final.human.approval': {
+    fr: 'Validation humaine finale',
+    en: 'Final human approval',
+  },
+  'dossier.the.private.link.is.ready': {
+    fr: 'Le lien privé est prêt',
+    en: 'The private link is ready',
+  },
+  'dossier.prepare.a.new.version': {
+    fr: 'Préparer une nouvelle version',
+    en: 'Prepare a new version',
+  },
+  'dossier.the.private.link.has.been.revoked': {
+    fr: 'Le lien privé a été révoqué',
+    en: 'The private link has been revoked',
+  },
+  'dossier.publish.only.what.you.approved': {
+    fr: 'Publiez uniquement ce que vous avez validé',
+    en: 'Publish only what you approved',
+  },
+  'dossier.published': {
+    fr: 'Publié',
+    en: 'Published',
+  },
+  'dossier.revoked': {
+    fr: 'Révoqué',
+    en: 'Revoked',
+  },
+  'dossier.unpublished': {
+    fr: 'Non publié',
+    en: 'Unpublished',
+  },
+  'dossier.the.snapshot.is.immutable.non.indexable.and.available.for': {
+    fr: 'Le snapshot est immuable, non indexable et accessible pendant sept jours. Vous pouvez couper l’accès immédiatement.',
+    en: 'The snapshot is immutable, non-indexable, and available for seven days. You can revoke access immediately.',
+  },
+  'dossier.open': {
+    fr: 'Ouvrir',
+    en: 'Open',
+  },
+  'dossier.revoke.link': {
+    fr: 'Révoquer le lien',
+    en: 'Revoke link',
+  },
+  'dossier.revoking': {
+    fr: 'Révocation…',
+    en: 'Revoking…',
+  },
+  'dossier.access.is.revoked.immediately.including.in.a.tab.that': {
+    fr: 'L’accès est coupé immédiatement, y compris pour un onglet déjà ouvert.',
+    en: 'Access is revoked immediately, including in a tab that is already open.',
+  },
+  'dossier.all.three.reviews.are.resolved.this.action.freezes.the': {
+    fr: 'Les trois reviews sont résolues. Cette action fige la page actuelle dans un snapshot privé ; aucune modification ultérieure de votre mémoire ne changera ce qui est partagé.',
+    en: 'All three reviews are resolved. This action freezes the current page in a private snapshot; later changes to your Career Memory will not alter what is shared.',
+  },
+  'dossier.immutable.snapshot': {
+    fr: 'Snapshot immuable',
+    en: 'Immutable snapshot',
+  },
+  'dossier.automatic.expiration.after.seven.days': {
+    fr: 'Expiration automatique sous sept jours',
+    en: 'Automatic expiration after seven days',
+  },
+  'dossier.immediate.revocation': {
+    fr: 'Révocation immédiate',
+    en: 'Immediate revocation',
+  },
+  'dossier.no.link.is.created.without.this.action': {
+    fr: 'Aucun lien n’est créé sans cette action.',
+    en: 'No link is created without this action.',
+  },
+  'dossier.creating.link': {
+    fr: 'Création du lien…',
+    en: 'Creating link…',
+  },
+  'dossier.approve.and.create.private.link': {
+    fr: 'Valider et créer le lien privé',
+    en: 'Approve and create private link',
+  },
+  'dossier.your.session.has.expired.sign.in.again.then.retry': {
+    fr: 'Votre session a expiré. Reconnectez-vous, puis réessayez.',
+    en: 'Your session has expired. Sign in again, then retry.',
+  },
+  'dossier.the.page.no.longer.passes.the.publication.checks.reopen': {
+    fr: 'La page ne passe plus les contrôles de publication. Rouvrez la revue et résolvez le point restant.',
+    en: 'The page no longer passes the publication checks. Reopen the review and resolve the remaining issue.',
+  },
+  'dossier.the.application.changed.while.publishing.reload.it.before.retrying':
+    {
+      fr: 'La candidature a changé pendant la publication. Rechargez-la avant de réessayer.',
+      en: 'The application changed while publishing. Reload it before retrying.',
+    },
+  'dossier.too.many.publication.attempts.wait.one.minute.before.retrying': {
+    fr: 'Trop de tentatives de publication. Attendez une minute avant de réessayer.',
+    en: 'Too many publication attempts. Wait one minute before retrying.',
+  },
+  'dossier.this.link.cannot.be.revoked.from.this.workspace.reload': {
+    fr: 'Ce lien ne peut pas être révoqué depuis cet espace. Rechargez la candidature puis réessayez.',
+    en: 'This link cannot be revoked from this workspace. Reload the application, then retry.',
+  },
+  'dossier.the.publication.service.is.temporarily.unavailable.the.approved.page':
+    {
+      fr: 'Le service de publication est momentanément indisponible. La page validée n’a pas été publiée ; réessayez plus tard.',
+      en: 'The publication service is temporarily unavailable. The approved page was not published; retry later.',
+    },
+  'dossier.no.run.yet.the.button.starts.a.bounded.persisted': {
+    fr: 'Aucun run. Le bouton démarre une exécution bornée et persistée à partir de cette candidature et de votre mémoire.',
+    en: 'No run yet. The button starts a bounded, persisted workflow from this application and your Career Memory.',
+  },
+  'dossier.complete.career.memory': {
+    fr: 'Compléter la mémoire professionnelle',
+    en: 'Complete Career Memory',
+  },
+  'dossier.sign.in': {
+    fr: 'Se connecter',
+    en: 'Sign in',
+  },
+  'dossier.check.worker.availability': {
+    fr: 'Vérifier les workers',
+    en: 'Check worker availability',
+  },
+  'dossier.reload.application': {
+    fr: 'Recharger la candidature',
+    en: 'Reload application',
+  },
+  'dossier.version.and.decision.history': {
+    fr: 'Historique des versions et décisions',
+    en: 'Version and decision history',
+  },
+  'dossier.application.workspace': {
+    fr: 'Dossier de candidature',
+    en: 'Application workspace',
+  },
+  'dossier.needs.review': {
+    fr: 'À valider',
+    en: 'Needs review',
+  },
+  'dossier.keep': {
+    fr: 'Garder',
+    en: 'Keep',
+  },
+  'dossier.i': {
+    fr: 'J’ai',
+    en: 'I',
+  },
+  'dossier.private.link': {
+    fr: 'Lien privé',
+    en: 'Private link',
+  },
+  'dossier.copy': {
+    fr: 'Copier',
+    en: 'Copy',
+  },
+  'dossier.back.to.applications': {
+    fr: 'Retour aux candidatures',
+    en: 'Back to applications',
+  },
+  'dossier.you': {
+    fr: 'Vous',
+    en: 'You',
+  },
+  'dossier.clipboard.unavailable': {
+    fr: 'La copie a échoué. Le lien reste disponible : ouvrez-le pour copier son adresse.',
+    en: 'Copy failed. The link is still available: open it to copy its address.',
+  },
+  'dossier.contact.verified': { fr: 'Vérifié', en: 'Verified' },
+  'dossier.contact.likely': { fr: 'Probable', en: 'Likely' },
+  'dossier.contact.uncertain': { fr: 'Incertain', en: 'Uncertain' },
+  'dossier.contact.hiring.manager': {
+    fr: 'Hiring manager',
+    en: 'Hiring manager',
+  },
+  'dossier.contact.founder': {
+    fr: 'Fondateur ou direction technique',
+    en: 'Founder or technical leader',
+  },
+  'dossier.contact.recruiter': {
+    fr: 'Recrutement interne',
+    en: 'Internal recruiter',
+  },
+  'dossier.contact.job.author': { fr: 'Auteur de l’offre', en: 'Job author' },
+  'dossier.contact.team.leader': {
+    fr: 'Responsable d’équipe',
+    en: 'Team leader',
+  },
 } as const satisfies MessageDictionary;

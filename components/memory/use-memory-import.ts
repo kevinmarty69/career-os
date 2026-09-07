@@ -1,4 +1,6 @@
 'use client';
+import type { memoryMessages } from '@/lib/i18n/dictionaries/memory';
+type ImportMessageKey = keyof typeof memoryMessages;
 
 import { useEffect, useRef, useState } from 'react';
 import { readProfile, saveProfile } from '@/lib/career-api';
@@ -77,7 +79,7 @@ export function useMemoryImport() {
   const [pasteSourceKind, setPasteSourceKind] =
     useState<ReviewSourceKind>('linkedin');
   const [sourceName, setSourceName] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ImportMessageKey | ''>('');
   const [revision, setRevision] = useState(0);
   const [existingProfile, setExistingProfile] = useState<Profile | null>(null);
   const pendingImport = useRef<AbortController | undefined>(undefined);
@@ -93,7 +95,9 @@ export function useMemoryImport() {
         setStage('review');
       } else if (raw) {
         sessionStorage.removeItem(REVIEW_STORAGE_KEY);
-        setError('Cette revue a expiré. Relancez la lecture pour continuer.');
+        setError(
+          'memory.this.review.expired.read.the.source.again.to.continue',
+        );
       }
 
       try {
@@ -128,12 +132,12 @@ export function useMemoryImport() {
     if (!reviewExpiresAt) return;
     const delay = reviewExpiresAt - Date.now();
     if (delay <= 0) {
-      discard('Cette revue a expiré. Relancez la lecture pour continuer.');
+      discard('memory.this.review.expired.read.the.source.again.to.continue');
       return;
     }
     const timer = window.setTimeout(
       () =>
-        discard('Cette revue a expiré. Relancez la lecture pour continuer.'),
+        discard('memory.this.review.expired.read.the.source.again.to.continue'),
       delay,
     );
     return () => window.clearTimeout(timer);
@@ -218,7 +222,7 @@ export function useMemoryImport() {
     pendingImport.current = undefined;
     setStage('source');
     setSourceName('');
-    setError('Lecture annulée. Vous pouvez choisir une autre source.');
+    setError('memory.reading.cancelled.you.can.choose.another.source');
   }
 
   function updateReview(updater: (current: ImportReview) => ImportReview) {
@@ -249,7 +253,7 @@ export function useMemoryImport() {
     }));
   }
 
-  function discard(message = '') {
+  function discard(message: ImportMessageKey | '' = '') {
     pendingImport.current?.abort();
     pendingImport.current = undefined;
     sessionStorage.removeItem(REVIEW_STORAGE_KEY);
@@ -275,9 +279,7 @@ export function useMemoryImport() {
       ) ||
       !review.permissionsConfirmed
     ) {
-      setError(
-        'Complétez votre identité, gardez au moins une affirmation avec un usage, puis confirmez la validation.',
-      );
+      setError('memory.complete.your.identity.keep.at.least.one.claim.with');
       return;
     }
 
@@ -287,7 +289,7 @@ export function useMemoryImport() {
     const parsed = profileSchema.safeParse(profile);
     if (!parsed.success) {
       setError(
-        'Certaines informations sont incomplètes. Corrigez les champs signalés.',
+        'memory.some.information.is.incomplete.fix.the.highlighted.fields',
       );
       return;
     }
@@ -297,15 +299,13 @@ export function useMemoryImport() {
     try {
       const response = await saveProfile(parsed.data, revision);
       if (response.status === 401) {
-        setError(
-          'Connectez-vous pour enregistrer cette mémoire dans votre espace.',
-        );
+        setError('memory.sign.in.to.save.this.career.memory.to.your');
         setStage('review');
         return;
       }
       if (response.status === 409) {
         setError(
-          'Votre mémoire a changé dans une autre session. Rechargez la page puis relancez la validation.',
+          'memory.your.career.memory.changed.in.another.session.reload.the',
         );
         setStage('review');
         return;
@@ -321,9 +321,7 @@ export function useMemoryImport() {
       sessionStorage.removeItem(REVIEW_STORAGE_KEY);
       setStage('saved');
     } catch {
-      setError(
-        'La mémoire n’a pas pu être enregistrée. Votre revue reste disponible dans ce navigateur.',
-      );
+      setError('memory.career.memory.could.not.be.saved.your.review.remains');
       setStage('review');
     }
   }
@@ -409,30 +407,30 @@ const sensitivityRank: Record<Sensitivity, number> = {
   restricted: 2,
 };
 
-function importErrorMessage(error: unknown) {
+function importErrorMessage(error: unknown): ImportMessageKey {
   if (error instanceof ProfileImportError) {
     if (error.code === 'file_too_large')
-      return 'Ce fichier dépasse la limite de 4 Mo.';
+      return 'memory.this.file.exceeds.the.4.mb.limit';
     if (error.code === 'unsupported_type' || error.code === 'type_mismatch')
-      return 'Choisissez un fichier PDF, DOCX ou TXT valide.';
+      return 'memory.choose.a.valid.pdf.docx.or.txt.file';
     if (error.code === 'pdf_encrypted')
-      return 'Ce PDF est protégé. Exportez une copie sans mot de passe puis réessayez.';
+      return 'memory.this.pdf.is.password.protected.export.an.unprotected.copy';
     if (error.code === 'pdf_attachments')
-      return 'Ce PDF contient une pièce jointe. Exportez une copie simple puis réessayez.';
+      return 'memory.this.pdf.contains.an.attachment.export.a.plain.copy';
     if (error.code === 'pdf_too_many_pages')
-      return 'Ce PDF dépasse la limite de 100 pages.';
+      return 'memory.this.pdf.exceeds.the.100.page.limit';
     if (
       error.code === 'docx_external_relationship' ||
       error.code === 'docx_unsafe_archive'
     )
-      return 'Ce document Word contient des éléments externes ou actifs. Exportez-le en PDF puis réessayez.';
+      return 'memory.this.word.document.contains.external.or.active.content.export';
     if (error.code === 'timeout')
-      return 'La lecture locale a pris trop de temps. Essayez une version plus légère.';
+      return 'memory.local.reading.took.too.long.try.a.smaller.version';
     if (error.code === 'empty_document')
-      return 'Aucun texte exploitable n’a été trouvé dans cette source.';
-    if (error.code === 'aborted') return 'Lecture annulée.';
+      return 'memory.no.usable.text.was.found.in.this.source';
+    if (error.code === 'aborted') return 'memory.reading.cancelled';
   }
-  return 'Cette source n’a pas pu être lue localement. Réessayez avec un fichier plus simple.';
+  return 'memory.this.source.could.not.be.read.locally.try.a';
 }
 
 function restoreReview(raw: string | null): ImportReview | undefined {

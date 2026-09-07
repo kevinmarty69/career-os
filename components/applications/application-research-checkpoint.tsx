@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
 
@@ -19,7 +19,7 @@ export function ApplicationResearchCheckpoint({
   onConfirm: (signalIds: string[]) => void;
 }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages]);
   const [selected, setSelected] = useState(() =>
     research.signals.map(({ signalId }) => signalId),
   );
@@ -30,12 +30,12 @@ export function ApplicationResearchCheckpoint({
         )
       : [];
 
-  return localize(
+  return (
     <section className="co-panel co-research-checkpoint">
       <header>
         <div>
-          <p>Décision humaine requise</p>
-          <h2>Quels signaux doivent cadrer la candidature ?</h2>
+          <p>{t('dossier.human.decision.required')}</p>
+          <h2>{t('dossier.which.signals.should.shape.this.application')}</h2>
         </div>
         <span>
           {locale === 'en'
@@ -44,8 +44,9 @@ export function ApplicationResearchCheckpoint({
         </span>
       </header>
       <p>
-        L’agent a extrait ces éléments. Vérifiez-les avant qu’ils influencent la
-        sélection des preuves et la stratégie.
+        {t(
+          'dossier.the.agent.extracted.these.signals.review.them.before.they',
+        )}{' '}
       </p>
       {sources.length ? (
         <div className="co-research-sources">
@@ -95,11 +96,15 @@ export function ApplicationResearchCheckpoint({
       </div>
       {error ? (
         <p role="alert">
-          La validation n’a pas été enregistrée. Vos choix sont conservés.
+          {t(
+            'dossier.the.decision.was.not.saved.your.choices.are.preserved',
+          )}{' '}
         </p>
       ) : null}
       <footer>
-        <span>Données web non fiables jusqu’à votre validation.</span>
+        <span>
+          {t('dossier.web.data.remains.untrusted.until.you.approve.it')}
+        </span>
         <button
           className="co-button"
           disabled={pending || selected.length === 0}
@@ -115,7 +120,7 @@ export function ApplicationResearchCheckpoint({
               : `Confirmer ${selected.length} signal${selected.length > 1 ? 'aux' : ''}`}
         </button>
       </footer>
-    </section>,
+    </section>
   );
 }
 

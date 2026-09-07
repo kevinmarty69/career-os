@@ -5,6 +5,31 @@ import nextTypeScript from 'eslint-config-next/typescript';
 export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
+  {
+    files: [
+      'app/**/*.{ts,tsx}',
+      'components/**/*.{ts,tsx}',
+      'lib/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '**/scripts/simulation/**',
+                '**/benchmarks/**',
+                '**/tests/**',
+              ],
+              message:
+                'Production modules must not import simulation or test code.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   globalIgnores([
     '.next/**',
     'playwright-report/**',

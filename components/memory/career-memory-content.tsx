@@ -1,38 +1,44 @@
 'use client';
+import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
+import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
 import type { Profile } from '@/lib/schemas';
 import { useCareerMemory } from './use-career-memory';
 
-const kindLabels: Record<Profile['claims'][number]['kind'], string> = {
-  summary: 'Synthèse',
-  experience: 'Expérience',
-  project: 'Projet',
-  skill: 'Compétence',
-  education: 'Formation',
-  result: 'Résultat',
-  preference: 'Préférence',
-  other: 'Autre',
-};
-const levelLabels: Record<Profile['claims'][number]['level'], string> = {
-  verified: 'Vérifié',
-  declared: 'Déclaré',
-  inferred: 'Inféré',
-  unsupported: 'Sans preuve',
-};
-const useLabels = {
-  application: 'Candidature',
-  resume: 'CV',
-  linkedin: 'LinkedIn',
-  interview: 'Entretien',
-} as const;
+function claimLabels(t: Translator<typeof memoryMessages>) {
+  const kindLabels: Record<Profile['claims'][number]['kind'], string> = {
+    summary: t('memory.summary'),
+    experience: t('memory.experience'),
+    project: t('memory.project'),
+    skill: t('memory.skill'),
+    education: t('memory.education'),
+    result: t('memory.result'),
+    preference: t('memory.preference'),
+    other: t('memory.other'),
+  };
+  const levelLabels: Record<Profile['claims'][number]['level'], string> = {
+    verified: t('memory.verified'),
+    declared: t('memory.declared'),
+    inferred: t('memory.inferred'),
+    unsupported: t('memory.unsupported'),
+  };
+  const useLabels = {
+    application: t('memory.application'),
+    resume: t('memory.resume'),
+    linkedin: t('memory.linkedin'),
+    interview: t('memory.interview'),
+  } as const;
 
+  return { kindLabels, levelLabels, useLabels };
+}
 export function CareerMemoryContent() {
   const { locale } = useI18n();
-  const localize = useLocalizer([memoryMessages]);
+  const t = useTranslations([memoryMessages, applicationsMessages]);
+  const { kindLabels, levelLabels } = claimLabels(t);
   const memory = useCareerMemory();
   const [expanded, setExpanded] = useState<string>();
   const [showManual, setShowManual] = useState(false);
@@ -60,7 +66,7 @@ export function CareerMemoryContent() {
     const sourceTitle = String(data.get('source') ?? '').trim();
     const excerpt = String(data.get('evidence') ?? '').trim();
     if (!statement || !sourceTitle) {
-      memory.setMessage('Une affirmation et sa source sont nécessaires.');
+      memory.setMessage(t('memory.a.claim.and.its.source.are.required'));
       return;
     }
     const suffix = crypto.randomUUID();
@@ -85,7 +91,7 @@ export function CareerMemoryContent() {
             {
               id: evidenceId,
               sourceId,
-              label: 'Extrait ajouté manuellement',
+              label: t('memory.manually.added.excerpt'),
               excerpt,
             },
           ]
@@ -104,20 +110,18 @@ export function CareerMemoryContent() {
       ],
     }));
     setShowManual(false);
-    memory.setMessage(
-      'Élément ajouté au brouillon. Enregistrez pour le conserver.',
-    );
+    memory.setMessage(t('memory.item.added.to.the.draft.save.to.keep.it'));
     event.currentTarget.reset();
   }
 
   if (memory.state === 'loading')
-    return localize(
+    return (
       <p className="co-memory-status" role="status">
-        Chargement de la mémoire…
-      </p>,
+        {t('memory.loading.career.memory')}{' '}
+      </p>
     );
 
-  return localize(
+  return (
     <>
       {memory.message ? (
         <p className="co-memory-status" role="status">
@@ -126,7 +130,7 @@ export function CareerMemoryContent() {
       ) : null}
       <div className="co-memory-identity">
         <label>
-          Nom
+          {t('memory.name')}{' '}
           <input
             value={memory.profile.name}
             onChange={(event) =>
@@ -138,7 +142,7 @@ export function CareerMemoryContent() {
           />
         </label>
         <label>
-          Positionnement
+          {t('memory.positioning')}{' '}
           <input
             value={memory.profile.headline}
             onChange={(event) =>
@@ -153,17 +157,14 @@ export function CareerMemoryContent() {
       <section className="co-memory-public-links">
         <header>
           <div>
-            <h2>Liens partagés sur les pages privées</h2>
-            <p>
-              Seuls les liens renseignés ici seront visibles par les
-              destinataires de vos candidatures.
-            </p>
+            <h2>{t('memory.links.shared.on.private.pages')}</h2>
+            <p>{t('memory.only.the.links.entered.here.will.be.visible.to')} </p>
           </div>
-          <span>Partage explicite</span>
+          <span>{t('memory.explicit.sharing')}</span>
         </header>
         <div>
           <label>
-            Email
+            {t('memory.email')}{' '}
             <input
               inputMode="email"
               onChange={(event) => setPublicLink('email', event.target.value)}
@@ -173,7 +174,7 @@ export function CareerMemoryContent() {
             />
           </label>
           <label>
-            CV
+            {t('memory.resume')}{' '}
             <input
               inputMode="url"
               onChange={(event) => setPublicLink('resume', event.target.value)}
@@ -183,7 +184,7 @@ export function CareerMemoryContent() {
             />
           </label>
           <label>
-            LinkedIn
+            {t('memory.linkedin')}{' '}
             <input
               inputMode="url"
               onChange={(event) =>
@@ -195,7 +196,7 @@ export function CareerMemoryContent() {
             />
           </label>
           <label>
-            GitHub
+            {t('memory.github')}{' '}
             <input
               inputMode="url"
               onChange={(event) => setPublicLink('github', event.target.value)}
@@ -205,7 +206,7 @@ export function CareerMemoryContent() {
             />
           </label>
           <label>
-            Portfolio
+            {t('memory.portfolio')}{' '}
             <input
               inputMode="url"
               onChange={(event) =>
@@ -220,35 +221,40 @@ export function CareerMemoryContent() {
       </section>
       <div className="co-memory-metrics">
         <article>
-          <span>Couverture expliquée</span>
+          <span>{t('memory.explained.coverage')}</span>
           <div>
             <strong>
               {memory.coverage.presentCount}/{memory.coverage.totalCount}
             </strong>
           </div>
-          <small>catégories documentées, sans score artificiel</small>
+          <small>
+            {t('memory.documented.categories.without.an.artificial.score')}
+          </small>
         </article>
         <article>
-          <span>Affirmations</span>
+          <span>{t('memory.claims')}</span>
           <div>
             <strong>{memory.profile.claims.length}</strong>
           </div>
-          <small>{memory.profile.sources.length} source(s) reliée(s)</small>
+          <small>
+            {memory.profile.sources.length} {t('memory.linked.source.s')}
+          </small>
         </article>
         <article>
-          <span>Non publiables</span>
+          <span>{t('memory.not.publishable')}</span>
           <div>
             <strong className={unsupported ? 'crit' : ''}>{unsupported}</strong>
           </div>
-          <small>inférées ou encore sans preuve</small>
+          <small>{t('memory.inferred.or.still.unsupported')}</small>
         </article>
         <article>
-          <span>Historique</span>
+          <span>{t('memory.history')}</span>
           <div>
             <strong>{memory.history.length}</strong>
           </div>
           <small>
-            révision actuelle : {memory.revision || 'non enregistrée'}
+            {t('memory.current.revision')}{' '}
+            {memory.revision || t('memory.not.saved')}
           </small>
         </article>
       </div>
@@ -256,21 +262,21 @@ export function CareerMemoryContent() {
         <section className="co-memory-main">
           <div className="co-memory-toolbar">
             <Link className="co-button" href="/memory/import">
-              Importer une source
+              {t('memory.import.a.source')}{' '}
             </Link>
             <button
               className="co-button quiet"
               onClick={() => setShowManual(!showManual)}
               type="button"
             >
-              Ajouter manuellement
+              {t('memory.add.manually')}{' '}
             </button>
             <button
               className="co-button quiet"
               onClick={memory.mergeDuplicates}
               type="button"
             >
-              Fusionner les doublons
+              {t('memory.merge.duplicates')}{' '}
             </button>
             <button
               className="co-button"
@@ -278,15 +284,16 @@ export function CareerMemoryContent() {
               onClick={() => void memory.save()}
               type="button"
             >
-              {memory.state === 'saving' ? 'Enregistrement…' : 'Enregistrer'}
+              {memory.state === 'saving'
+                ? t('applications.saving')
+                : t('memory.save')}
             </button>
           </div>
           {showManual ? (
             <form className="co-memory-manual" onSubmit={addManual}>
-              <h2>Nouvel élément</h2>
+              <h2>{t('memory.new.item')}</h2>
               <label>
-                Affirmation
-                <textarea name="statement" required />
+                {t('memory.claim')} <textarea name="statement" required />
               </label>
               <label>
                 Type
@@ -299,15 +306,14 @@ export function CareerMemoryContent() {
                 </select>
               </label>
               <label>
-                Source
-                <input name="source" required />
+                {t('memory.source')} <input name="source" required />
               </label>
               <label>
-                Extrait de preuve (facultatif)
+                {t('memory.evidence.excerpt.optional')}{' '}
                 <textarea name="evidence" />
               </label>
               <button className="co-button" type="submit">
-                Ajouter au brouillon
+                {t('memory.add.to.draft')}{' '}
               </button>
             </form>
           ) : null}
@@ -338,10 +344,12 @@ export function CareerMemoryContent() {
                           {levelLabels[claim.level]}
                         </span>
                         <small>{kindLabels[claim.kind]}</small>
-                        <code>{evidence.length} preuve(s)</code>
+                        <code>
+                          {evidence.length} {t('memory.evidence.item.s')}
+                        </code>
                       </header>
                       <textarea
-                        aria-label="Affirmation"
+                        aria-label={t('memory.claim')}
                         className="co-memory-statement"
                         value={claim.statement}
                         onChange={(event) =>
@@ -364,8 +372,8 @@ export function CareerMemoryContent() {
                           type="button"
                         >
                           {open
-                            ? 'Fermer la provenance'
-                            : 'Voir et corriger la provenance'}
+                            ? t('memory.close.provenance')
+                            : t('memory.view.and.edit.provenance')}
                         </button>
                       </footer>
                       {open ? (
@@ -377,13 +385,14 @@ export function CareerMemoryContent() {
               })
             ) : (
               <section className="co-memory-empty">
-                <h2>Votre mémoire est vide</h2>
+                <h2>{t('memory.your.career.memory.is.empty')}</h2>
                 <p>
-                  Importez votre CV ou ajoutez une première information. Rien ne
-                  sera publié automatiquement.
+                  {t(
+                    'memory.import.your.resume.or.add.your.first.item.nothing',
+                  )}{' '}
                 </p>
                 <Link className="co-button" href="/memory/import">
-                  Commencer par une source
+                  {t('memory.start.with.a.source')}{' '}
                 </Link>
               </section>
             )}
@@ -391,7 +400,7 @@ export function CareerMemoryContent() {
         </section>
         <aside className="co-memory-side">
           <header>
-            <h2>Couverture</h2>
+            <h2>{t('memory.coverage')}</h2>
           </header>
           <div className="co-memory-prompt-list">
             {memory.coverage.items.map((item) => (
@@ -402,16 +411,28 @@ export function CareerMemoryContent() {
                 >
                   {item.present ? 'check_circle' : 'radio_button_unchecked'}
                 </span>
-                <span>{item.label}</span>
+                <span>
+                  {
+                    {
+                      experience: t('memory.experiences'),
+                      project: t('memory.projects'),
+                      skill: t('memory.skills'),
+                      result: t('memory.results'),
+                      preference: t('memory.preferences'),
+                    }[item.kind]
+                  }
+                </span>
               </div>
             ))}
           </div>
           <footer>
-            <h2>Dernières corrections</h2>
+            <h2>{t('memory.latest.changes')}</h2>
             <dl>
               {memory.history.slice(0, 5).map((item) => (
                 <div key={item.revision}>
-                  <dt>Révision {item.revision}</dt>
+                  <dt>
+                    {t('memory.revision')} {item.revision}
+                  </dt>
                   <dd>
                     {new Intl.DateTimeFormat(locale, {
                       dateStyle: 'short',
@@ -424,7 +445,7 @@ export function CareerMemoryContent() {
           </footer>
         </aside>
       </div>
-    </>,
+    </>
   );
 }
 
@@ -439,8 +460,13 @@ function ClaimEditor({
   const evidence = memory.profile.evidence.filter(({ id }) =>
     claim.evidenceIds.includes(id),
   );
-  const localize = useLocalizer([memoryMessages]);
-  return localize(
+  const t = useTranslations([
+    memoryMessages,
+    activeRoutesMessages,
+    applicationsMessages,
+  ]);
+  const { kindLabels, levelLabels, useLabels } = claimLabels(t);
+  return (
     <section className="co-memory-provenance">
       <div className="co-memory-edit-grid">
         <label>
@@ -461,7 +487,7 @@ function ClaimEditor({
           </select>
         </label>
         <label>
-          Statut
+          {t('active-routes.status')}{' '}
           <select
             disabled={claim.level === 'verified'}
             value={claim.level}
@@ -479,7 +505,7 @@ function ClaimEditor({
           </select>
         </label>
         <label>
-          Sensibilité
+          {t('memory.sensitivity')}{' '}
           <select
             value={claim.sensitivity}
             onChange={(event) =>
@@ -488,14 +514,14 @@ function ClaimEditor({
               })
             }
           >
-            <option value="public">Public</option>
-            <option value="private">Privé</option>
-            <option value="restricted">Restreint</option>
+            <option value="public">{t('memory.public.2')}</option>
+            <option value="private">{t('memory.private')}</option>
+            <option value="restricted">{t('memory.restricted')}</option>
           </select>
         </label>
       </div>
       <fieldset>
-        <legend>Usages autorisés</legend>
+        <legend>{t('memory.allowed.uses')}</legend>
         {Object.entries(useLabels).map(([value, label]) => (
           <label key={value}>
             <input
@@ -524,7 +550,7 @@ function ClaimEditor({
           return (
             <div className="co-memory-evidence" key={item.id}>
               <label>
-                Source
+                {t('memory.source')}{' '}
                 <input
                   value={source?.title ?? ''}
                   onChange={(event) =>
@@ -535,7 +561,7 @@ function ClaimEditor({
                 />
               </label>
               <label>
-                Type de source
+                {t('memory.source.type')}{' '}
                 <select
                   value={source?.kind ?? 'manual'}
                   onChange={(event) =>
@@ -546,13 +572,13 @@ function ClaimEditor({
                   }
                 >
                   <option value="document">Document</option>
-                  <option value="linkedin">LinkedIn</option>
+                  <option value="linkedin">{t('memory.linkedin')}</option>
                   <option value="web">Web</option>
-                  <option value="manual">Saisie manuelle</option>
+                  <option value="manual">{t('memory.manual.entry')}</option>
                 </select>
               </label>
               <label>
-                Localisation
+                {t('applications.location.2')}{' '}
                 <input
                   value={source?.locator ?? ''}
                   onChange={(event) =>
@@ -563,7 +589,7 @@ function ClaimEditor({
                 />
               </label>
               <label>
-                Sensibilité de la source
+                {t('memory.source.sensitivity')}{' '}
                 <select
                   value={source?.sensitivity ?? 'private'}
                   onChange={(event) =>
@@ -573,13 +599,13 @@ function ClaimEditor({
                     })
                   }
                 >
-                  <option value="public">Public</option>
-                  <option value="private">Privé</option>
-                  <option value="restricted">Restreint</option>
+                  <option value="public">{t('memory.public.2')}</option>
+                  <option value="private">{t('memory.private')}</option>
+                  <option value="restricted">{t('memory.restricted')}</option>
                 </select>
               </label>
               <label>
-                Repère
+                {t('memory.locator')}{' '}
                 <input
                   value={item.label}
                   onChange={(event) =>
@@ -605,20 +631,17 @@ function ClaimEditor({
         })
       ) : (
         <div>
-          <p>
-            Cette affirmation n’a pas encore de preuve. Elle ne peut pas être
-            publiée.
-          </p>
+          <p>{t('memory.this.claim.has.no.evidence.yet.it.cannot.be')} </p>
           <button
             className="co-button quiet"
             onClick={() => addEvidence(memory, claimId)}
             type="button"
           >
-            Ajouter une preuve
+            {t('memory.add.evidence')}{' '}
           </button>
         </div>
       )}
-    </section>,
+    </section>
   );
 }
 
@@ -702,3 +725,5 @@ function addEvidence(
     'Preuve ajoutée au brouillon. Corrigez sa source et son extrait avant d’enregistrer.',
   );
 }
+
+import type { Translator } from '@/lib/i18n/messages';

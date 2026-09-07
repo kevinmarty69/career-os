@@ -11,6 +11,7 @@ import {
   runSemanticAnalysis,
   SemanticAnalysisInputUnavailableError,
   SemanticAnalysisModelNotConfiguredError,
+  SemanticAnalysisOutcomeUnknownError,
 } from '@/lib/server/semantic-analyses';
 
 export async function GET(
@@ -62,6 +63,15 @@ function semanticError(error: unknown) {
     error instanceof MatchSearchProfileNotFoundError
   )
     return response('Not found', 404);
+  if (error instanceof SemanticAnalysisOutcomeUnknownError)
+    return Response.json(
+      {
+        code: 'SEMANTIC_ANALYSIS_OUTCOME_UNKNOWN',
+        message:
+          'Previous analysis outcome is unknown; automatic retry is disabled.',
+      },
+      { status: 409, headers: { 'cache-control': 'private, no-store' } },
+    );
   if (error instanceof SemanticAnalysisInputUnavailableError)
     return response('Exact semantic analysis input is unavailable.', 409);
   if (error instanceof SemanticAnalysisModelNotConfiguredError)

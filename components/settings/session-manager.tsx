@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { authClient } from '@/lib/auth-client';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 
@@ -15,7 +15,7 @@ type DeviceSession = {
 };
 
 export function SessionManager() {
-  const localize = useLocalizer([activeRoutesMessages]);
+  const t = useTranslations([activeRoutesMessages]);
   const { locale } = useI18n();
   const [sessions, setSessions] = useState<DeviceSession[]>();
   const [currentToken, setCurrentToken] = useState<string>();
@@ -63,23 +63,24 @@ export function SessionManager() {
     }
   }
 
-  return localize(
+  return (
     <section className="co-panel co-session-manager">
       <header>
         <div>
-          <h2>Sessions actives</h2>
-          <p>Révoquez un appareil que vous ne reconnaissez plus.</p>
+          <h2>{t('active-routes.active.sessions')}</h2>
+          <p>{t('active-routes.revoke.any.device.you.no.longer.recognize')}</p>
         </div>
         <span className="co-badge muted">
           {sessions
             ? `${sessions.length} ${locale === 'fr' ? 'actives' : 'active'}`
-            : 'Chargement…'}
+            : t('active-routes.loading')}
         </span>
       </header>
       {error ? (
         <p className="co-session-error" role="alert">
-          Les sessions ne sont pas disponibles. Reconnectez-vous, puis
-          réessayez.
+          {t(
+            'active-routes.sessions.are.unavailable.sign.in.again.then.retry',
+          )}{' '}
         </p>
       ) : null}
       {sessions?.map((session) => {
@@ -90,10 +91,14 @@ export function SessionManager() {
               <span className="material-symbols-rounded co-icon">devices</span>
             </span>
             <div>
-              <strong>{current ? 'Cet appareil' : 'Autre appareil'}</strong>
+              <strong>
+                {current
+                  ? t('active-routes.this.device')
+                  : t('active-routes.other.device')}
+              </strong>
               <small>{sessionLabel(session, locale)}</small>
               <small>
-                Dernière activité{' '}
+                {t('active-routes.last.active')}{' '}
                 {new Date(session.updatedAt).toLocaleString(
                   locale === 'fr' ? 'fr-FR' : 'en-GB',
                   { dateStyle: 'medium', timeStyle: 'short' },
@@ -101,7 +106,9 @@ export function SessionManager() {
               </small>
             </div>
             {current ? (
-              <span className="co-badge ok">Session courante</span>
+              <span className="co-badge ok">
+                {t('active-routes.current.session')}
+              </span>
             ) : (
               <button
                 className="co-button quiet danger"
@@ -109,13 +116,15 @@ export function SessionManager() {
                 onClick={() => void revoke(session.token)}
                 type="button"
               >
-                {revoking === session.token ? 'Révocation…' : 'Révoquer'}
+                {revoking === session.token
+                  ? t('active-routes.revoking')
+                  : t('active-routes.revoke')}
               </button>
             )}
           </article>
         );
       })}
-    </section>,
+    </section>
   );
 }
 

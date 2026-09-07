@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const root = new URL('../..', import.meta.url);
 const css = readFileSync(new URL('app/design-system.css', root), 'utf8');
-const legacyCss = readFileSync(new URL('app/globals.css', root), 'utf8');
+const baseCss = readFileSync(new URL('app/globals.css', root), 'utf8');
 const layout = readFileSync(new URL('app/layout.tsx', root), 'utf8');
 const scopedCss = [
   'components/applications/applications-page.module.css',
@@ -21,15 +21,15 @@ test('design system v2 remains the final active visual contract', () => {
   assert.match(css, /--color-pub-accent:\s*#0e7c86/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(
-    legacyCss,
+    baseCss,
     /src:\s*url\('\/fonts\/material-symbols-rounded\.ttf'\)/,
   );
-  assert.match(legacyCss, /font-display:\s*block/);
+  assert.match(baseCss, /font-display:\s*block/);
   assert.match(layout, /Geist_Mono, Instrument_Sans/);
   assert.ok(
     layout.indexOf("import './design-system.css'") >
       layout.indexOf("import './globals.css'"),
-    'the normative design system must load after legacy compatibility styles',
+    'the normative design system must load after shared component styles',
   );
   assert.doesNotMatch(layout, /fonts\.googleapis\.com/);
 

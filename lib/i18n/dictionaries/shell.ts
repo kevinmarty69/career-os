@@ -1,51 +1,107 @@
 import type { MessageDictionary } from '../messages';
-
 export const shellMessages = {
-  'Aller au contenu': 'Skip to main content',
-  Accueil: 'Home',
-  'À trancher': 'Needs review',
-  Candidatures: 'Applications',
-  'Mémoire pro': 'Career memory',
-  'Profils de recherche': 'Search profiles',
-  Entretiens: 'Interviews',
-  'Liens privés': 'Private links',
-  Réglages: 'Settings',
-  'Navigation principale': 'Main navigation',
-  'Chercher une preuve, une entreprise, une affirmation…':
-    'Search evidence, a company, or a claim…',
-  Aide: 'Help',
-  Notifications: 'Notifications',
-  'Ingénieur plateforme': 'Platform engineer',
-  'En cours': 'In progress',
-  'Auto-hébergé · 3 workers': 'Self-hosted · 3 workers',
-  'dernière sauvegarde 03:00': 'last backup at 03:00',
-  'Instance saine': 'Instance healthy',
-  'Palette de commandes': 'Command palette',
-  'Chercher une preuve, une entreprise, une action…':
-    'Search evidence, a company, or an action…',
-  'Recherche globale': 'Global search',
-  'Recherche en cours…': 'Searching…',
-  'Recherche indisponible': 'Search unavailable',
-  Candidature: 'Application',
-  Opportunité: 'Opportunity',
-  Affirmation: 'Claim',
-  Preuve: 'Evidence',
-  'Aucun résultat pour cette recherche.': 'No results for this search.',
-  '↵ ouvrir le premier résultat': '↵ open first result',
-  'Preuves · 3': 'Evidence · 3',
-  'corvid_postmortem.md · §4 · vérifiée':
-    'corvid_postmortem.md · §4 · verified',
-  'Cache de build partagé entre 340 services':
-    'Shared build cache across 340 services',
-  'Temps de build divisé par deux': 'Build time cut in half',
-  'déclaré · en conflit avec la source': 'declared · conflicts with the source',
-  'Candidatures · 2': 'Applications · 2',
-  'Nimbus Robotics — cite ce chiffre': 'Nimbus Robotics — cites this figure',
-  'Staff Product Engineer · publiée': 'Staff Product Engineer · published',
-  'Fathom — appariement en cours': 'Fathom — matching in progress',
-  'Nouvelle candidature depuis une URL': 'New application from a URL',
-  'Importer un document dans la mémoire':
-    'Import a document into career memory',
-  '↵ ouvrir': '↵ open',
-  'recherche dans 128 preuves': 'searching 128 evidence items',
+  'shell.skip.to.main.content': {
+    fr: 'Aller au contenu',
+    en: 'Skip to main content',
+  },
+  'shell.home': {
+    fr: 'Accueil',
+    en: 'Home',
+  },
+  'shell.needs.review': {
+    fr: 'À trancher',
+    en: 'Needs review',
+  },
+  'shell.applications': {
+    fr: 'Candidatures',
+    en: 'Applications',
+  },
+  'shell.career.memory': {
+    fr: 'Mémoire pro',
+    en: 'Career memory',
+  },
+  'shell.search.profiles': {
+    fr: 'Profils de recherche',
+    en: 'Search profiles',
+  },
+  'shell.private.links': {
+    fr: 'Liens privés',
+    en: 'Private links',
+  },
+  'shell.settings': {
+    fr: 'Réglages',
+    en: 'Settings',
+  },
+  'shell.main.navigation': {
+    fr: 'Navigation principale',
+    en: 'Main navigation',
+  },
+  'shell.search.evidence.a.company.or.a.claim': {
+    fr: 'Chercher une preuve, une entreprise, une affirmation…',
+    en: 'Search evidence, a company, or a claim…',
+  },
+  'shell.in.progress': {
+    fr: 'En cours',
+    en: 'In progress',
+  },
+  'shell.instance.healthy': {
+    fr: 'Instance saine',
+    en: 'Instance healthy',
+  },
+  'shell.command.palette': {
+    fr: 'Palette de commandes',
+    en: 'Command palette',
+  },
+  'shell.search.evidence.a.company.or.an.action': {
+    fr: 'Chercher une preuve, une entreprise, une action…',
+    en: 'Search evidence, a company, or an action…',
+  },
+  'shell.global.search': {
+    fr: 'Recherche globale',
+    en: 'Global search',
+  },
+  'shell.searching': {
+    fr: 'Recherche en cours…',
+    en: 'Searching…',
+  },
+  'shell.search.unavailable': {
+    fr: 'Recherche indisponible',
+    en: 'Search unavailable',
+  },
+  'shell.application': {
+    fr: 'Candidature',
+    en: 'Application',
+  },
+  'shell.opportunity': {
+    fr: 'Opportunité',
+    en: 'Opportunity',
+  },
+  'shell.claim': {
+    fr: 'Affirmation',
+    en: 'Claim',
+  },
+  'shell.evidence': {
+    fr: 'Preuve',
+    en: 'Evidence',
+  },
+  'shell.no.results.for.this.search': {
+    fr: 'Aucun résultat pour cette recherche.',
+    en: 'No results for this search.',
+  },
+  'shell.open.first.result': {
+    fr: '↵ ouvrir le premier résultat',
+    en: '↵ open first result',
+  },
+  'shell.new.application.from.a.url': {
+    fr: 'Nouvelle candidature depuis une URL',
+    en: 'New application from a URL',
+  },
+  'shell.import.a.document.into.career.memory': {
+    fr: 'Importer un document dans la mémoire',
+    en: 'Import a document into career memory',
+  },
+  'shell.open': {
+    fr: '↵ ouvrir',
+    en: '↵ open',
+  },
 } as const satisfies MessageDictionary;

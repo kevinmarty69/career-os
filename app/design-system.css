@@ -18,15 +18,15 @@
   --color-card: #ffffff;
 
   --color-green: #22a06b;
-  --color-green-text: #2a7a55;
+  --color-green-text: #28744f;
   --color-green-strong: #1b6b4a;
   --color-green-tint: #dff0e7;
   --color-amber: #d9a62a;
-  --color-amber-text: #8a6a1f;
+  --color-amber-text: #80601b;
   --color-amber-strong: #7a5c18;
   --color-amber-tint: #f7f0dc;
   --color-clay: #e05a63;
-  --color-clay-text: #a85643;
+  --color-clay-text: #a14d3b;
   --color-clay-strong: #a8402c;
   --color-clay-tint: #f7e6e3;
   --color-indigo: #5b6cc4;
@@ -154,9 +154,7 @@ textarea {
 code,
 kbd,
 samp,
-pre,
-.co-source-anchor,
-.co-mono {
+pre {
   font-family: var(--font-mono), ui-monospace, monospace;
 }
 
@@ -168,11 +166,7 @@ pre,
 
 .co-shell,
 .co-dossier-shell,
-.co-settings-shell,
-.co-messages,
-.co-guided-shell,
-.co-hosting,
-.co-not-found {
+.co-settings-shell {
   --co-text: var(--color-ink-900);
   --co-text-2: var(--color-ink-700);
   --co-text-3: var(--color-ink-600);
@@ -310,8 +304,7 @@ pre,
 
 .co-surface,
 .co-dossier-shell > section,
-.co-settings-shell > section,
-.co-guided-shell > * {
+.co-settings-shell > section {
   border: 0;
   border-radius: 0;
   background: var(--color-canvas);
@@ -319,7 +312,6 @@ pre,
 }
 
 .co-home-topbar,
-.co-topbar,
 .co-dossier-top,
 .co-settings-shell > section > header {
   min-height: 72px;
@@ -330,8 +322,7 @@ pre,
 }
 
 .co-page-header p,
-.co-home-hero > p,
-.co-overline {
+.co-home-hero > p {
   color: var(--color-ink-400);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -428,23 +419,6 @@ pre,
 .co-button.danger:hover {
   border-color: #8e3524;
   background: #8e3524;
-}
-
-.co-round {
-  width: 42px;
-  min-width: 42px;
-  min-height: 42px;
-  padding: 0;
-  color: var(--color-ink-700);
-  border: 0;
-  border-radius: 50%;
-  background: var(--color-card);
-  box-shadow: none;
-}
-
-.co-round:hover {
-  color: var(--color-ink-900);
-  background: var(--color-panel);
 }
 
 .co-panel,
@@ -564,7 +538,6 @@ pre,
   font-size: 20px;
 }
 
-.co-search,
 .co-home-search {
   min-height: 42px;
   color: var(--color-ink-600);
@@ -585,9 +558,7 @@ pre,
 }
 
 .co-dossier-shell,
-.co-settings-shell,
-.co-messages,
-.co-guided-shell {
+.co-settings-shell {
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -599,18 +570,8 @@ pre,
   grid-template-columns: 212px minmax(0, 1fr);
 }
 
-.co-settings-shell.has-side,
 .co-settings-shell:has(.co-settings-side) {
   grid-template-columns: 212px minmax(0, 1fr) 340px;
-}
-
-.co-guided-shell {
-  grid-template-columns: 212px minmax(0, 1fr) 340px;
-  gap: 18px;
-}
-
-.co-messages {
-  grid-template-columns: 280px minmax(0, 1fr) 340px;
 }
 
 .co-public-page,
@@ -700,10 +661,7 @@ pre,
   .co-shell.has-aside,
   .co-dossier-shell,
   .co-settings-shell,
-  .co-settings-shell.has-side,
-  .co-settings-shell:has(.co-settings-side),
-  .co-guided-shell,
-  .co-messages {
+  .co-settings-shell:has(.co-settings-side) {
     display: block;
   }
 

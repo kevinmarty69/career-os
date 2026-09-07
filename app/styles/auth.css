@@ -1,0 +1,139 @@
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  padding: 32px 20px;
+  place-items: center;
+}
+
+.auth-card {
+  width: min(100%, 420px);
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 36px rgb(24 24 27 / 8%);
+}
+
+.auth-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.auth-brand > .co-locale-switch {
+  margin-left: auto;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 28px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--surface-hover);
+}
+
+.auth-tabs button {
+  min-height: 38px;
+  padding: 7px 10px;
+  color: var(--secondary);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.auth-tabs button:hover,
+.auth-tabs button.active {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.auth-card header h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.auth-card header p {
+  margin: 8px 0 24px;
+  color: var(--secondary);
+}
+
+.auth-card form > button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.auth-error {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  color: #7a271a;
+  border: 1px solid #e6b8b1;
+  border-radius: 8px;
+  background: #fff4f2;
+  font-size: 13px;
+}
+
+.auth-back {
+  display: block;
+  margin-top: 22px;
+  color: var(--secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.brand-mark.light {
+  font-size: 0;
+}
+
+.brand-mark.light::after {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: #fff;
+  content: '';
+}
+
+.brand-mark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  color: #181817;
+  border: 0;
+  border-radius: 12px;
+  background: #f6f6f2;
+  box-shadow: none;
+  font-size: 15px;
+  font-weight: 800;
+  place-items: center;
+}
+
+.brand-mark:hover:not(:disabled) {
+  color: #181817;
+  border-color: transparent;
+  background: #fff;
+}
+
+@media (max-width: 760px) {
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+  }
+}
+
+.brand-mark.light {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  color: #fff;
+  border: 0;
+  border-radius: 12px;
+  background: #5945e8;
+  box-shadow: 0 7px 18px rgb(89 69 232 / 24%);
+}

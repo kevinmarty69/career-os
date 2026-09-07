@@ -44,4 +44,4 @@ The control plane is Next.js plus PostgreSQL: identities, RLS, workflow state, b
 
 The model gateway is server-side and records tenant, run, role, provider/model, input/output tokens, cost, latency and cache hit before allowing another call. UI counters are informational; the gateway and workflow transaction enforce limits.
 
-No `AgentRuntime` interface exists yet: only the deterministic implementation is real. Add the interface when the direct structured-API runtime lands; the second implementation must be either a tested fake used for contract tests or the sandboxed Hermes adapter.
+The application workflow is implemented by `lib/server/runs.ts`, durable worker modules under `lib/server/`, and the SQL migrations. Model-backed workers use bounded local OpenAI-compatible clients. The in-process `scripts/simulation/agent-runtime.ts` exists only for benchmarks and simulated contract tests; it does not implement the production persistence or recovery contract. Production modules must not import the simulator.

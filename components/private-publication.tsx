@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import {
   LocaleSwitch,
   useI18n,
-  useLocalizer,
+  useTranslations,
 } from '@/components/i18n/i18n-provider';
 import { publicationMessages } from '@/lib/i18n/dictionaries/publication';
 import {
@@ -24,7 +24,7 @@ type Publication = {
 export function PrivatePublication() {
   const { capability } = useParams<{ capability: string }>();
   const { locale } = useI18n();
-  const localize = useLocalizer([publicationMessages]);
+  const t = useTranslations([publicationMessages]);
   const [publication, setPublication] = useState<Publication | null>();
   const [logoFailed, setLogoFailed] = useState(false);
   const recorded = useRef(new Set<string>());
@@ -96,7 +96,7 @@ export function PrivatePublication() {
   }, [capability, record]);
 
   if (publication === undefined)
-    return localize(
+    return (
       <main className="co-public-state" aria-busy="true">
         <div className="co-public-language">
           <LocaleSwitch compact />
@@ -104,11 +104,11 @@ export function PrivatePublication() {
         <span className="co-public-mark" aria-hidden="true">
           <i />
         </span>
-        <p role="status">Vérification du lien privé…</p>
-      </main>,
+        <p role="status">{t('publication.checking.private.link')}</p>
+      </main>
     );
   if (!publication?.spec)
-    return localize(
+    return (
       <main className="co-public-state">
         <div className="co-public-language">
           <LocaleSwitch compact />
@@ -116,20 +116,24 @@ export function PrivatePublication() {
         <span className="co-public-mark" aria-hidden="true">
           <i />
         </span>
-        <p>Page privée</p>
+        <p>{t('publication.private.page')}</p>
         <span className="material-symbols-rounded" aria-hidden="true">
           link_off
         </span>
-        <h1>Ce lien n’est plus actif.</h1>
+        <h1>{t('publication.this.link.is.no.longer.active')}</h1>
         <strong>
-          Le candidat a révoqué l’accès ou la date d’expiration est passée.
+          {t(
+            'publication.the.candidate.revoked.access.or.the.link.has.expired',
+          )}{' '}
         </strong>
-        <small>Aucune information n’est conservée sur cette page.</small>
+        <small>{t('publication.no.information.is.stored.on.this.page')}</small>
         <a href="mailto:?subject=Demande%20de%20nouvel%20accès">
-          Demander un nouvel accès
+          {t('publication.request.new.access')}{' '}
         </a>
-        <footer>Career OS · les pages privées ne sont jamais indexées</footer>
-      </main>,
+        <footer>
+          {t('publication.career.os.private.pages.are.never.indexed')}
+        </footer>
+      </main>
     );
 
   const { spec, profile } = publication;
@@ -137,7 +141,7 @@ export function PrivatePublication() {
   const claims = new Map(profile.claims.map((claim) => [claim.id, claim]));
   const publicLinks = profile.publicLinks ?? {};
 
-  return localize(
+  return (
     <main
       className="co-public-page"
       style={{ '--company-accent': spec.company.accent } as React.CSSProperties}
@@ -168,7 +172,7 @@ export function PrivatePublication() {
             <span className="material-symbols-rounded" aria-hidden="true">
               lock
             </span>
-            Lien privé · non indexable
+            {t('publication.private.link.not.indexed')}{' '}
           </span>
           <LocaleSwitch compact />
         </div>
@@ -178,7 +182,8 @@ export function PrivatePublication() {
           {spec.hero.eyebrow} · {spec.company.role} · {spec.company.name}
         </p>
         <span className="co-public-independent">
-          Candidature indépendante préparée et validée par {profile.name}
+          {t('publication.independent.application.prepared.and.approved.by')}{' '}
+          {profile.name}
         </span>
         <h1>{spec.hero.title}</h1>
         <p>{spec.hero.thesis}</p>
@@ -186,7 +191,7 @@ export function PrivatePublication() {
           href="#strongest-evidence"
           onClick={() => record('action', 'strongest-evidence')}
         >
-          Voir les preuves principales
+          {t('publication.view.key.evidence')}{' '}
         </a>
       </section>
       <div className="co-public-body">
@@ -223,10 +228,10 @@ export function PrivatePublication() {
                         <p>
                           <span className={`co-public-level ${claim.level}`}>
                             {claim.level === 'verified'
-                              ? 'Sourcé'
+                              ? t('publication.sourced')
                               : claim.level === 'declared'
-                                ? 'Déclaré'
-                                : 'Sans source'}
+                                ? t('publication.declared')
+                                : t('publication.unsourced')}
                           </span>
                           {claim.evidenceIds.length
                             ? locale === 'fr'
@@ -245,8 +250,9 @@ export function PrivatePublication() {
                               <strong>{source?.title}</strong>
                               <span>« {item!.excerpt} »</span>
                               <small>
-                                Extrait partagé volontairement par le candidat.
-                                Le document complet n’est pas accessible.
+                                {t(
+                                  'publication.excerpt.voluntarily.shared.by.the.candidate.the.full.document',
+                                )}{' '}
                               </small>
                             </blockquote>
                           );
@@ -267,7 +273,7 @@ export function PrivatePublication() {
           </span>
           <h2>{profile.name}</h2>
           <p>{profile.headline}</p>
-          <h3>Liens du candidat</h3>
+          <h3>{t('publication.candidate.links')}</h3>
           <a
             href="#strongest-evidence"
             onClick={() => record('action', 'inspectable-evidence')}
@@ -275,7 +281,7 @@ export function PrivatePublication() {
             <span className="material-symbols-rounded" aria-hidden="true">
               description
             </span>
-            Preuves inspectables
+            {t('publication.inspectable.evidence')}{' '}
           </a>
           {publicLinks.resume ? (
             <a
@@ -284,7 +290,7 @@ export function PrivatePublication() {
               rel="noreferrer noopener"
               target="_blank"
             >
-              CV
+              {t('publication.resume')}{' '}
               <span className="material-symbols-rounded" aria-hidden="true">
                 north_east
               </span>
@@ -297,7 +303,7 @@ export function PrivatePublication() {
               rel="noreferrer noopener"
               target="_blank"
             >
-              LinkedIn
+              {t('publication.linkedin')}{' '}
               <span className="material-symbols-rounded" aria-hidden="true">
                 north_east
               </span>
@@ -310,7 +316,7 @@ export function PrivatePublication() {
               rel="noreferrer noopener"
               target="_blank"
             >
-              GitHub
+              {t('publication.github')}{' '}
               <span className="material-symbols-rounded" aria-hidden="true">
                 north_east
               </span>
@@ -323,7 +329,7 @@ export function PrivatePublication() {
               rel="noreferrer noopener"
               target="_blank"
             >
-              Portfolio
+              {t('publication.portfolio')}{' '}
               <span className="material-symbols-rounded" aria-hidden="true">
                 north_east
               </span>
@@ -334,7 +340,7 @@ export function PrivatePublication() {
               href={`mailto:${publicLinks.email}?subject=${encodeURIComponent(spec.company.role)}`}
               onClick={() => record('action', 'contact')}
             >
-              Proposer un échange
+              {t('publication.start.a.conversation')}{' '}
               <span className="material-symbols-rounded" aria-hidden="true">
                 north_east
               </span>
@@ -343,8 +349,10 @@ export function PrivatePublication() {
         </aside>
       </div>
       <footer>
-        Page privée générée avec Career OS. Contenu validé par le candidat.
+        {t(
+          'publication.private.page.generated.with.career.os.content.approved.by',
+        )}{' '}
       </footer>
-    </main>,
+    </main>
   );
 }

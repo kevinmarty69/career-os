@@ -70,9 +70,9 @@ The repository currently proves the self-hosted implementation. A managed servic
 | Publication requires complete, current reviews                  | [`durable-reviewers.mjs`](supabase/tests/durable-reviewers.mjs), [`publication-security.test.ts`](tests/unit/publication-security.test.ts)       |
 | Critical failures explain the safe recovery action              | [`application-dossier.spec.ts`](tests/e2e/application-dossier.spec.ts), [`opportunities-ui.spec.ts`](tests/e2e/opportunities-ui.spec.ts)         |
 | Security boundaries fail closed as one executable gate          | [`SECURITY.md`](SECURITY.md), [`package.json`](package.json)                                                                                     |
-| The active front has keyboard, contrast and semantic-tree tests | [`accessibility.spec.ts`](tests/e2e/accessibility.spec.ts), [`ui-contrast.test.ts`](tests/unit/ui-contrast.test.ts)                              |
+| The active front has keyboard, contrast and semantic-tree tests | [`accessibility.spec.ts`](tests/e2e/accessibility.spec.ts), [`design-system-v2.test.ts`](tests/unit/design-system-v2.test.ts)                    |
 
-CI runs formatting, linting, TypeScript, the unit suite, a production build, and a production-dependency audit. PostgreSQL isolation, concurrency, worker integration, and browser suites remain separate because they require service processes; their commands are documented below and in the self-hosting guide.
+CI runs formatting, zero-warning lint, TypeScript, unit tests, a production build, PostgreSQL isolation and concurrency tests, HTTP integration, page-correction worker integration, and a production-dependency audit. Chromium and mobile browser checks cover the application workflow, keyboard accessibility, computed contrast, and responsive layout. Browser workflow tests mock the API; SQL and HTTP tests independently verify persistence and authorization. The full worker suite can also be run locally with `pnpm test:integration:worker`.
 
 ## Run the real workflow
 
@@ -81,6 +81,8 @@ The persisted workflow needs PostgreSQL, eight isolated worker credentials, and 
 See **[Self-hosting Career OS](docs/SELF_HOSTING.md)** for the complete setup, least-privilege role creation, worker supervision, and verification commands.
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for module boundaries and the checks expected for each change.
 
 ```bash
 pnpm check
@@ -101,6 +103,8 @@ pnpm db:down
 ```
 
 The PostgreSQL test suite also covers migration compatibility on PostgreSQL 17 without pgvector.
+
+The in-process runtime in [`scripts/simulation/`](scripts/simulation/agent-runtime.ts) is a benchmark tool. Its tests cover simulated contracts, not database leases, crash recovery, or production budget settlement. The application uses [`lib/server/runs.ts`](lib/server/runs.ts) and the durable SQL workers.
 
 ## Decisions worth inspecting
 

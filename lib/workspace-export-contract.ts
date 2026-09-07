@@ -277,6 +277,18 @@ export const workspaceExportTables = [
     orderBy: ['id'],
   },
   {
+    type: 'semantic_analysis_leases',
+    table: 'semantic_analysis_leases',
+    columns: [
+      'tenant_id',
+      'input_hash',
+      'job_match_id',
+      'status',
+      'expires_at',
+    ],
+    orderBy: ['input_hash'],
+  },
+  {
     type: 'semantic_analyses',
     table: 'semantic_analyses',
     columns: [

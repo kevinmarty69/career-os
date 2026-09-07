@@ -1,0 +1,453 @@
+.co-public-page,
+.co-public-state {
+  min-height: 100vh;
+}
+
+.co-public-page {
+  margin: 0 auto;
+}
+
+.co-public-page > header {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f2f2f5;
+}
+
+.co-public-page > header > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #6e7079;
+  font-size: 12px;
+}
+
+.co-public-page > header > span > i,
+.co-public-company-logo {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  border-radius: 9px;
+  font-size: 10px;
+  font-style: normal;
+  place-items: center;
+}
+
+.co-public-company-logo {
+  object-fit: contain;
+  padding: 4px;
+}
+
+.co-public-page > header > span > span,
+.co-public-page > header > span > span > * {
+  display: block;
+}
+
+.co-public-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.co-public-actions > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #6e7079;
+  font-size: 12px;
+}
+
+.co-public-language {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+}
+
+.co-public-page > header strong {
+  font-size: 14px;
+}
+
+.co-public-page > header small {
+  color: #8a8d99;
+  font-size: 12px;
+}
+
+.co-public-page > header .material-symbols-rounded {
+  font-size: 17px;
+}
+
+.co-public-hero > p:first-child {
+  margin: 0 0 16px;
+  font-family: var(--font-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.co-public-independent {
+  display: inline-flex;
+  margin-bottom: 18px;
+  padding: 6px 9px;
+  border: 1px solid #eaebef;
+  border-radius: 999px;
+}
+
+.co-public-hero h1 {
+  margin: 0;
+  text-wrap: balance;
+}
+
+.co-public-hero > p:not(:first-child) {
+  margin: 24px 0 0;
+}
+
+.co-public-hero > a {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 28px;
+  padding: 0 18px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.co-public-body {
+  display: grid;
+  align-items: start;
+}
+
+.co-public-block {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 18px;
+  border-top: 1px solid #eaebef;
+}
+
+.co-public-block > span {
+  padding-top: 4px;
+  color: #9a9ca6;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+}
+
+.co-public-block h2 {
+  margin: 0 0 18px;
+  letter-spacing: -0.04em;
+}
+
+.co-public-block details {
+  margin: 0;
+  padding: 15px 0;
+  border-top: 1px solid #f2f2f5;
+}
+
+.co-public-block summary {
+  min-height: 0;
+  padding: 0;
+  font-weight: 650;
+}
+
+.co-public-block details > p {
+  margin: 8px 0 0;
+  color: #8a8d99;
+  font-size: 11px;
+}
+
+.co-public-level {
+  color: #6e7079;
+  font-weight: 750;
+}
+
+.co-public-level.verified {
+  color: #128a5c;
+}
+
+.co-public-level.declared {
+  color: #b4761a;
+}
+
+.co-public-level.inferred {
+  color: #c0492f;
+}
+
+.co-public-block blockquote {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0 0;
+  padding: 14px;
+  border: 0;
+}
+
+.co-public-block blockquote strong,
+.co-public-block blockquote span,
+.co-public-block blockquote small {
+  display: block;
+}
+
+.co-public-block blockquote strong {
+  color: #42444e;
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+}
+
+.co-public-block blockquote span {
+  color: #24252c;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.co-public-block blockquote small {
+  color: #9a9ca6;
+  font-size: 10px;
+}
+
+.co-public-body > aside {
+  position: sticky;
+  top: 24px;
+  padding: 20px;
+}
+
+.co-public-body > aside > span:first-child {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  color: #fff;
+  border-radius: 13px;
+  font-size: 12px;
+  place-items: center;
+}
+
+.co-public-body > aside h2 {
+  margin: 14px 0 3px;
+  font-size: 17px;
+}
+
+.co-public-body > aside p {
+  margin: 0 0 24px;
+  color: #6e7079;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.co-public-body > aside h3 {
+  margin: 0 0 8px;
+  color: #9a9ca6;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.co-public-body > aside a {
+  display: flex;
+  min-height: 42px;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  color: #42444e;
+  border-top: 1px solid #eaebef;
+  font-size: 11.5px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.co-public-body > aside a .material-symbols-rounded {
+  font-size: 18px;
+}
+
+.co-public-page > footer {
+  margin-top: 34px;
+  padding-top: 18px;
+  color: #9a9ca6;
+  border-top: 1px solid #f2f2f5;
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.co-public-state {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.co-public-mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 24px;
+  border-radius: 14px;
+  place-items: center;
+}
+
+.co-public-mark i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.co-public-state > p {
+  margin: 0 0 20px;
+  color: #9a9ca6;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.co-public-state > .material-symbols-rounded {
+  color: #c0492f;
+  font-size: 30px;
+}
+
+.co-public-state h1 {
+  margin: 14px 0 8px;
+  font-size: clamp(28px, 5vw, 42px);
+  letter-spacing: -0.045em;
+}
+
+.co-public-state > strong,
+.co-public-state > small {
+  display: block;
+  max-width: 520px;
+  color: #5c5e68;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.co-public-state > small {
+  margin-top: 5px;
+  color: #9a9ca6;
+  font-size: 11px;
+}
+
+.co-public-state > a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  margin-top: 24px;
+  padding: 0 18px;
+  color: #fff;
+  border-radius: 999px;
+  background: #15161c;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.co-public-state footer {
+  position: fixed;
+  bottom: 22px;
+  color: #9a9ca6;
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .co-public-page > header {
+    min-height: 62px;
+  }
+
+  .co-public-actions > span {
+    font-size: 0;
+  }
+
+  .co-public-actions > span .material-symbols-rounded {
+    font-size: 18px;
+  }
+
+  .co-public-body {
+    display: block;
+  }
+
+  .co-public-body > aside {
+    position: static;
+    margin-top: 24px;
+  }
+
+  .co-public-block {
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 10px;
+  }
+}
+
+.co-public-page > header {
+  border-color: var(--co-public-line);
+}
+
+.co-public-page > header > span > i,
+.co-public-company-logo {
+  background: var(--co-public-accent);
+  font-weight: 600;
+}
+
+.co-public-page > header strong {
+  color: var(--co-public-deep);
+  font-weight: 600;
+}
+
+.co-public-hero {
+  margin: 24px auto 0;
+}
+
+.co-public-hero > p:first-child {
+  color: var(--co-public-light);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.co-public-independent {
+  color: #ffffff;
+  border-color: var(--co-public-accent);
+  background: var(--co-public-accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.co-public-hero > a {
+  min-height: 42px;
+  color: var(--co-public-deep);
+  background: #ffffff;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.co-public-block h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.co-public-block > div > p,
+.co-public-block summary {
+  color: var(--co-public-body);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.co-public-block details {
+  border-color: var(--co-public-line);
+}
+
+.co-public-body > aside > span:first-child {
+  background: var(--co-public-deep);
+  font-weight: 600;
+}
+
+.co-public-body > aside a {
+  border-color: var(--co-public-line);
+}
+
+.co-public-body > aside a .material-symbols-rounded {
+  color: var(--co-public-accent);
+}
+
+.co-public-page > footer {
+  border-color: var(--co-public-line);
+}
+
+.co-public-mark {
+  background: var(--co-public-deep);
+}

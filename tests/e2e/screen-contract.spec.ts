@@ -10,18 +10,15 @@ const screens = [
   [`/applications/${applicationId}/page`, 'Staff Platform Engineer'],
   ['/links', 'Liens privés'],
   ['/insights', 'Insights'],
-  [
-    '/memory/interview',
-    'Sur la migration du monorepo, qu’est-ce qui n’a pas marché comme prévu ?',
-  ],
-  ['/interviews/demo', 'Entretien technique · Vantage Labs'],
+  ['/memory/interview', 'Entretien guidé'],
+  ['/interviews/demo', 'Entretiens'],
   ['/assets', 'Assets'],
   ['/settings/models', 'Modèles & agents'],
   [`/applications/${applicationId}?state=running`, 'Staff Platform Engineer'],
   ['/memory/conflicts', 'Conflits entre sources'],
   ['/settings/privacy', 'Confidentialité des preuves'],
   [`/applications/${applicationId}/published`, 'Staff Platform Engineer'],
-  ['/interviews/demo/debrief', 'Débrief d’entretien'],
+  ['/interviews/demo/debrief', 'Entretiens'],
   [
     `/applications/${applicationId}/versions`,
     'Historique des versions et décisions',
@@ -30,14 +27,14 @@ const screens = [
   [`/applications/${applicationId}/company`, 'Dossier entreprise'],
   ['/messages', 'Messages'],
   ['/memory/skills', 'Compétences'],
-  ['/onboarding/hosting', 'Choisissez votre mode d’hébergement'],
+  ['/onboarding/hosting', 'Hébergement'],
   ['/inbox', 'À trancher'],
   ['/settings/billing', 'Abonnement'],
-  ['/settings/integrations', 'Intégrations & API'],
+  ['/settings/integrations', 'Intégrations'],
   ['/settings/data', 'Export & suppression'],
 ] as const;
 
-test('renders every routed handoff screen', async ({ page }) => {
+test('renders route headings with mocked persisted data', async ({ page }) => {
   await mockPersistedWorkspace(page);
   for (const [route, heading] of screens) {
     await test.step(route, async () => {
@@ -110,6 +107,7 @@ test('exposes current navigation and traps focus in the job import dialog', asyn
 });
 
 test('offers a visible skip link to the primary content', async ({ page }) => {
+  await mockPersistedWorkspace(page);
   await page.goto('/');
   await page.keyboard.press('Tab');
   const skip = page.getByRole('link', { name: 'Aller au contenu' });
@@ -121,12 +119,13 @@ test('offers a visible skip link to the primary content', async ({ page }) => {
 test('keeps the documented mobile surfaces inside the viewport', async ({
   page,
 }) => {
+  await mockPersistedWorkspace(page);
   await page.setViewportSize({ width: 390, height: 844 });
   for (const route of [
     '/',
-    '/applications/nimbus/review',
-    '/applications/nimbus/page',
-    '/applications/nimbus/company',
+    `/applications/${applicationId}/review`,
+    `/applications/${applicationId}/page`,
+    `/applications/${applicationId}/company`,
     '/links',
     '/memory/interview',
     '/interviews/demo',
@@ -139,6 +138,14 @@ test('keeps the documented mobile surfaces inside the viewport', async ({
   ]) {
     await test.step(route, async () => {
       await page.goto(route);
+      const screen = screens.find(([path]) => path === route);
+      expect(screen, `${route} needs a loaded-state assertion`).toBeDefined();
+      await expect(
+        page.getByRole('heading', { level: 1, name: screen![1], exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Sign in', exact: true }),
+      ).toHaveCount(0);
       const overflows = await page.evaluate(
         () =>
           document.documentElement.scrollWidth >
@@ -425,4 +432,63 @@ test('shows anonymous private-page metrics in the links inventory', async ({
   await row.getByRole('button', { name: 'Revoke' }).click();
   await expect(row).toContainText('Revoked');
   expect(revoked).toBe(true);
+});
+
+test('settings expose measured worker availability and honest unavailable services', async ({
+  context,
+  page,
+  isMobile,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page);
+  const services = [
+    'company-researcher',
+    'evidence-archivist',
+    'recruiter-strategist',
+    'page-composer',
+    'recruiter-reviewer',
+    'hiring-manager-reviewer',
+    'factuality-reviewer',
+    'job-discovery',
+  ];
+  await page.route('**/api/instance-status', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        mode: 'self-hosted',
+        services: services.map((service) => ({ service, status: 'missing' })),
+      }),
+    }),
+  );
+  await page.goto('/settings/models');
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: 'Models & agents',
+      exact: true,
+    }),
+  ).toBeVisible();
+  if (!isMobile) {
+    await expect(
+      page.getByRole('link', { name: 'Models & agents', exact: true }),
+    ).toHaveAttribute('aria-current', 'page');
+  }
+  await expect(page.getByText('missing', { exact: true })).toHaveCount(
+    services.length,
+  );
+  await expect(page.getByText('3 / 3 actifs')).toHaveCount(0);
+  await page.goto('/settings/billing');
+  await expect(
+    page.getByRole('heading', { name: 'Billing unavailable' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Upgrade|Subscribe|Pay/ }),
+  ).toHaveCount(0);
+  await page.goto('/settings/integrations');
+  await expect(
+    page.getByRole('heading', { name: 'Connectors unavailable' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Import a document' }),
+  ).toHaveAttribute('href', '/memory/import');
 });

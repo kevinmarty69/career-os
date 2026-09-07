@@ -11,7 +11,7 @@ import {
   type AgentProvider,
   type AgentRole,
   type AgentUsage,
-} from '../../../lib/agent-runtime.ts';
+} from '../../../scripts/simulation/agent-runtime.ts';
 import { syntheticProfile } from '../../../lib/fixture.ts';
 import type { Opportunity } from '../../../lib/workflow.ts';
 import { blockNetwork } from './network.ts';
@@ -266,7 +266,7 @@ async function frameworkChecks(
       handoff: {
         passed: true,
         evidence:
-          'Production FakeAgentProvider dispatches seven role contracts.',
+          'In-process FakeAgentProvider simulates seven role contracts.',
       },
       nativePauseResume: {
         passed: true,
@@ -538,7 +538,7 @@ export async function executeBakeoff() {
     schemaVersion: 1,
     fixture: {
       profile: 'lib/fixture.ts#syntheticProfile',
-      workflow: 'lib/agent-runtime.ts#runAgentTeam',
+      workflow: 'scripts/simulation/agent-runtime.ts#runAgentTeam',
     },
     networkBlocked,
     blockedNetworkProbes: network.attempts(),

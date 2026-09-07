@@ -1,5 +1,6 @@
 import 'server-only';
-import postgres from 'postgres';
+import type postgres from 'postgres';
+import { database, authorize } from './database';
 import { z } from 'zod';
 import {
   applicationContactDraftSchema,
@@ -38,32 +39,23 @@ const columns = `id, application_id, rank, name, role, profile_url,
   accepted_message, follow_up_message, status, follow_up_at, revision,
   created_at, updated_at`;
 
-function database() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required.');
-  return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
 export async function listApplicationContacts(
   session: PublicationSession,
   rawApplicationId: string,
 ) {
   const applicationId = z.string().uuid().parse(rawApplicationId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      await requireApplication(tx, session.tenantId, applicationId);
-      const rows = await tx.unsafe<ContactRow[]>(
-        `select ${columns} from app.application_contacts
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    await requireApplication(tx, session.tenantId, applicationId);
+    const rows = await tx.unsafe<ContactRow[]>(
+      `select ${columns} from app.application_contacts
          where tenant_id = $1 and application_id = $2 order by rank`,
-        [session.tenantId, applicationId],
-      );
-      return rows.map(project);
-    });
-  } finally {
-    await sql.end();
-  }
+      [session.tenantId, applicationId],
+    );
+    return rows.map(project);
+  });
 }
 
 export async function createApplicationContact(
@@ -96,8 +88,6 @@ export async function createApplicationContact(
   } catch (error) {
     if (isUniqueViolation(error)) throw new ApplicationContactConflictError();
     throw error;
-  } finally {
-    await sql.end();
   }
 }
 
@@ -111,29 +101,29 @@ export async function updateApplicationContact(
   const contactId = z.string().uuid().parse(rawContactId);
   const input = updateApplicationContactInputSchema.parse(rawInput);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      await requireApplication(tx, session.tenantId, applicationId);
-      const [current] = await tx.unsafe<ContactRow[]>(
-        `select ${columns} from app.application_contacts
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    await requireApplication(tx, session.tenantId, applicationId);
+    const [current] = await tx.unsafe<ContactRow[]>(
+      `select ${columns} from app.application_contacts
          where tenant_id = $1 and application_id = $2 and id = $3 for update`,
-        [session.tenantId, applicationId, contactId],
-      );
-      if (!current) throw new ApplicationContactNotFoundError();
-      const desired = {
-        connectionNote: input.connectionNote,
-        acceptedMessage: input.acceptedMessage,
-        followUpMessage: input.followUpMessage,
-        status: input.status,
-        followUpAt: input.followUpAt,
-      };
-      if (Number(current.revision) !== input.expectedRevision) {
-        if (sameEditableValues(current, desired)) return project(current);
-        throw new ApplicationContactConflictError();
-      }
+      [session.tenantId, applicationId, contactId],
+    );
+    if (!current) throw new ApplicationContactNotFoundError();
+    const desired = {
+      connectionNote: input.connectionNote,
+      acceptedMessage: input.acceptedMessage,
+      followUpMessage: input.followUpMessage,
+      status: input.status,
+      followUpAt: input.followUpAt,
+    };
+    if (Number(current.revision) !== input.expectedRevision) {
       if (sameEditableValues(current, desired)) return project(current);
-      const [updated] = await tx<ContactRow[]>`
+      throw new ApplicationContactConflictError();
+    }
+    if (sameEditableValues(current, desired)) return project(current);
+    const [updated] = await tx<ContactRow[]>`
         update app.application_contacts set
           connection_note = ${input.connectionNote},
           accepted_message = ${input.acceptedMessage},
@@ -144,12 +134,9 @@ export async function updateApplicationContact(
         where tenant_id = ${session.tenantId} and application_id = ${applicationId}
           and id = ${contactId}
         returning ${tx.unsafe(columns)}`;
-      await audit(tx, session.tenantId, applicationId, updated.id, 'updated');
-      return project(updated);
-    });
-  } finally {
-    await sql.end();
-  }
+    await audit(tx, session.tenantId, applicationId, updated.id, 'updated');
+    return project(updated);
+  });
 }
 
 async function requireApplication(
@@ -228,13 +215,4 @@ function isUniqueViolation(error: unknown) {
     'code' in error &&
     error.code === '23505'
   );
-}
-
-async function authorize(
-  tx: postgres.TransactionSql,
-  session: PublicationSession,
-) {
-  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
-    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-  await tx.unsafe('set local role career_app');
 }

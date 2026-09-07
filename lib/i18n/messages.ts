@@ -1,12 +1,26 @@
-export type MessageDictionary = Readonly<Record<string, string>>;
+import type { Locale } from './locale';
 
-export function translateMessage(
-  dictionaries: readonly MessageDictionary[],
-  message: string,
+export type MessageDictionary = Readonly<
+  Record<string, Readonly<Record<Locale, string>>>
+>;
+type MessageKeys<D> = D extends MessageDictionary ? keyof D & string : never;
+export type MessageParams = Readonly<Record<string, string | number>>;
+
+export function createTranslator<const D extends readonly MessageDictionary[]>(
+  locale: Locale,
+  dictionaries: D,
 ) {
-  for (const dictionary of dictionaries) {
-    const translated = dictionary[message];
-    if (translated) return translated;
-  }
-  return message;
+  return (key: MessageKeys<D[number]>, params: MessageParams = {}): string => {
+    const message = dictionaries.find((dictionary) =>
+      Object.hasOwn(dictionary, key),
+    )?.[key];
+    if (!message) throw new Error(`Unknown translation key: ${key}`);
+    return message[locale].replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+      Object.hasOwn(params, name) ? String(params[name]) : placeholder,
+    );
+  };
 }
+
+export type Translator<D extends MessageDictionary> = ReturnType<
+  typeof createTranslator<readonly [D]>
+>;

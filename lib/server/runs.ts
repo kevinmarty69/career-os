@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
-import postgres from 'postgres';
+import type postgres from 'postgres';
+import { database, authorize } from './database';
 import { applicationCompanySourcesSchema } from '../application-contract';
 import {
   createRunInputSchema,
@@ -48,38 +49,29 @@ const MAX_ACTIVE_RUNS_PER_TENANT = 5;
 const MAX_RUNS_PER_TENANT_HOUR = 30;
 const PENDING_WAIT_MS = 10_000;
 
-function database() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required.');
-  return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
 export async function readInstanceStatus(
   session: RunSession,
 ): Promise<InstanceStatus> {
   const mode = deploymentMode();
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session, 'career_app');
-      const services = await tx<
-        Array<{
-          service: WorkerService;
-          status: 'fresh' | 'stale' | 'missing';
-        }>
-      >`select requested.service, status.status
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const services = await tx<
+      Array<{
+        service: WorkerService;
+        status: 'fresh' | 'stale' | 'missing';
+      }>
+    >`select requested.service, status.status
         from unnest(${tx.array(workerServices)}::text[])
           with ordinality requested(service, position)
         cross join lateral app.worker_service_status(requested.service) status
         order by requested.position`;
-      return instanceStatusSchema.parse({
-        mode,
-        services,
-      });
+    return instanceStatusSchema.parse({
+      mode,
+      services,
     });
-  } finally {
-    await sql.end();
-  }
+  });
 }
 
 function deploymentMode() {
@@ -96,90 +88,89 @@ export async function createPersistedRun(
   const key = idempotencyKeySchema(idempotencyKey);
   const inputHash = hashJson(input);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await tx`select pg_advisory_xact_lock(
+
+  return await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(
         hashtextextended(${`${session.tenantId}:${key}`}, 0)
       )`;
-      await authorize(tx, session, 'career_app');
+    await authorize(tx, session);
 
-      const [existing] = await tx<{ id: string; input_hash: string }[]>`
+    const [existing] = await tx<{ id: string; input_hash: string }[]>`
         select id, input_hash from app.workflow_runs
         where tenant_id = ${session.tenantId} and idempotency_key = ${key}`;
-      if (existing) {
-        if (existing.input_hash !== inputHash)
-          throw new RunConflictError(
-            'The idempotency key belongs to a different run input.',
-          );
-        return {
-          created: false,
-          run: await readRunProjection(tx, session.tenantId, existing.id),
-        };
-      }
+    if (existing) {
+      if (existing.input_hash !== inputHash)
+        throw new RunConflictError(
+          'The idempotency key belongs to a different run input.',
+        );
+      return {
+        created: false,
+        run: await readRunProjection(tx, session.tenantId, existing.id),
+      };
+    }
 
-      const worker = await readWorkerServiceStatus(tx, 'company-researcher');
-      if (!worker.available)
-        throw new WorkerUnavailableError('company-researcher');
+    const worker = await readWorkerServiceStatus(tx, 'company-researcher');
+    if (!worker.available)
+      throw new WorkerUnavailableError('company-researcher');
 
-      await tx`select pg_advisory_xact_lock(
+    await tx`select pg_advisory_xact_lock(
         hashtextextended(${`${session.tenantId}:run-admission`}, 0)
       )`;
-      const [admission] = await tx<
-        Array<{ active: number; recent: number }>
-      >`select
+    const [admission] = await tx<
+      Array<{ active: number; recent: number }>
+    >`select
         (select count(*)::integer from app.workflow_runs
           where tenant_id = ${session.tenantId} and status = 'running') active,
         (select count(*)::integer from app.workflow_steps
           where tenant_id = ${session.tenantId}
             and stage = 'company-researcher'
             and created_at >= now() - interval '1 hour') recent`;
-      if (
-        admission.active >= MAX_ACTIVE_RUNS_PER_TENANT ||
-        admission.recent >= MAX_RUNS_PER_TENANT_HOUR
-      )
-        throw new RunRateLimitError();
+    if (
+      admission.active >= MAX_ACTIVE_RUNS_PER_TENANT ||
+      admission.recent >= MAX_RUNS_PER_TENANT_HOUR
+    )
+      throw new RunRateLimitError();
 
-      const [application] = await tx<
-        Array<{
-          company: string;
-          role: string;
-          raw_text: string;
-          url: string | null;
-          logo_url: string | null;
-          accent: string;
-          company_sources: unknown;
-          revision: string;
-        }>
-      >`select company, role, raw_text, url, logo_url, accent, company_sources, revision
+    const [application] = await tx<
+      Array<{
+        company: string;
+        role: string;
+        raw_text: string;
+        url: string | null;
+        logo_url: string | null;
+        accent: string;
+        company_sources: unknown;
+        revision: string;
+      }>
+    >`select company, role, raw_text, url, logo_url, accent, company_sources, revision
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${input.applicationId}
           and deleted_at is null
         for update`;
-      if (!application)
-        throw new RunRejectedError('Application is unavailable.');
-      if (Number(application.revision) !== input.applicationRevision)
-        throw new RunConflictError(
-          'Run requires the current application revision.',
-        );
-      const companySources = applicationCompanySourcesSchema.parse(
-        application.company_sources,
+    if (!application) throw new RunRejectedError('Application is unavailable.');
+    if (Number(application.revision) !== input.applicationRevision)
+      throw new RunConflictError(
+        'Run requires the current application revision.',
+      );
+    const companySources = applicationCompanySourcesSchema.parse(
+      application.company_sources,
+    );
+
+    const living = await readLivingProfile(tx, session);
+    if (!living || living.revision !== input.profileRevision)
+      throw new RunConflictError(
+        'Run requires the current saved Career Memory revision.',
       );
 
-      const living = await readLivingProfile(tx, session);
-      if (!living || living.revision !== input.profileRevision)
-        throw new RunConflictError(
-          'Run requires the current saved Career Memory revision.',
-        );
-
-      const snapshot = await cloneProfileSnapshot(
-        tx,
-        session.tenantId,
-        living.profile,
-        living.revision,
-      );
-      const opportunityId = randomUUID();
-      const runId = randomUUID();
-      await tx`insert into app.opportunities (
+    const snapshot = await cloneProfileSnapshot(
+      tx,
+      session.tenantId,
+      living.profile,
+      living.revision,
+    );
+    const opportunityId = randomUUID();
+    const runId = randomUUID();
+    await tx`insert into app.opportunities (
         id, tenant_id, application_id, application_revision, company, role,
         raw_text, url, logo_url, accent, company_sources, extraction_status
       ) values (
@@ -188,7 +179,7 @@ export async function createPersistedRun(
         ${application.raw_text}, ${application.url}, ${application.logo_url},
         ${application.accent}, ${tx.json(companySources)}, 'ready'
       )`;
-      await tx`insert into app.workflow_runs (
+    await tx`insert into app.workflow_runs (
         id, tenant_id, opportunity_id, profile_id, source_profile_id,
         source_profile_revision, idempotency_key, state, status, token_budget,
         cost_budget_micros, deadline_at, input_hash
@@ -198,42 +189,36 @@ export async function createPersistedRun(
         ${COMPANY_RESEARCH_RUN_TOKEN_BUDGET + RECRUITER_STRATEGY_RUN_TOKEN_BUDGET + REVIEW_RUN_TOKEN_BUDGET * 2},
         0, now() + interval '1 hour', ${inputHash}
       )`;
-      const researchInput = {
-        schemaVersion: 2,
-        company: application.company,
-        role: application.role,
-        description: application.raw_text,
-        companySources,
-        source: {
-          kind: 'job-posting',
-          ...(application.url ? { url: application.url } : {}),
-          trust: 'untrusted-data',
-        },
-      };
-      await tx`select app.enqueue_company_researcher_step(
+    const researchInput = {
+      schemaVersion: 2,
+      company: application.company,
+      role: application.role,
+      description: application.raw_text,
+      companySources,
+      source: {
+        kind: 'job-posting',
+        ...(application.url ? { url: application.url } : {}),
+        trust: 'untrusted-data',
+      },
+    };
+    await tx`select app.enqueue_company_researcher_step(
         ${session.tenantId}, ${runId}, ${tx.json(researchInput)}
       )`;
-      return {
-        created: true,
-        run: await readRunProjection(tx, session.tenantId, runId),
-      };
-    });
-  } finally {
-    await sql.end();
-  }
+    return {
+      created: true,
+      run: await readRunProjection(tx, session.tenantId, runId),
+    };
+  });
 }
 
 export async function readPersistedRun(session: RunSession, rawRunId: string) {
   const runId = idempotencyKeySchema(rawRunId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session, 'career_app');
-      return readRunProjection(tx, session.tenantId, runId, true);
-    });
-  } finally {
-    await sql.end();
-  }
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    return readRunProjection(tx, session.tenantId, runId, true);
+  });
 }
 
 export async function readLatestApplicationRun(
@@ -242,10 +227,10 @@ export async function readLatestApplicationRun(
 ) {
   const applicationId = idempotencyKeySchema(rawApplicationId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session, 'career_app');
-      const [run] = await tx<Array<{ id: string }>>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [run] = await tx<Array<{ id: string }>>`
         select candidate.id
         from app.workflow_runs candidate
         join app.opportunities opportunity
@@ -260,13 +245,10 @@ export async function readLatestApplicationRun(
             and step.workflow_run_id = candidate.id
         ) desc nulls last, candidate.revision_count desc
         limit 1`;
-      return run
-        ? readRunProjection(tx, session.tenantId, run.id, true)
-        : undefined;
-    });
-  } finally {
-    await sql.end();
-  }
+    return run
+      ? readRunProjection(tx, session.tenantId, run.id, true)
+      : undefined;
+  });
 }
 
 export async function confirmResearchSelection(
@@ -281,7 +263,7 @@ export async function confirmResearchSelection(
   const sql = database();
   try {
     return await sql.begin(async (tx) => {
-      await authorize(tx, session, 'career_app');
+      await authorize(tx, session);
       const [result] = await tx<{ created: boolean }[]>`
         select app.confirm_research_signal_selection(
           ${session.tenantId}, ${runId}, ${input.researchArtifactId},
@@ -296,8 +278,6 @@ export async function confirmResearchSelection(
     if (isDatabaseConflict(error)) throw new RunConflictError();
     if (isDatabaseRejection(error)) throw new RunRejectedError();
     throw error;
-  } finally {
-    await sql.end();
   }
 }
 
@@ -313,7 +293,7 @@ export async function startRecruiterStrategy(
   const sql = database();
   try {
     return await sql.begin(async (tx) => {
-      await authorize(tx, session, 'career_app');
+      await authorize(tx, session);
       const [result] = await tx<{ created: boolean }[]>`
         select app.confirm_evidence_archive_selection(
           ${session.tenantId}, ${runId}, ${input.evidenceArtifactId},
@@ -328,8 +308,6 @@ export async function startRecruiterStrategy(
     if (isDatabaseConflict(error)) throw new RunConflictError();
     if (isDatabaseRejection(error)) throw new RunRejectedError();
     throw error;
-  } finally {
-    await sql.end();
   }
 }
 
@@ -345,7 +323,7 @@ export async function approveRecruiterStrategy(
   const sql = database();
   try {
     return await sql.begin(async (tx) => {
-      await authorize(tx, session, 'career_app');
+      await authorize(tx, session);
       const [result] = await tx<{ created: boolean }[]>`
         select app.approve_recruiter_strategy(
           ${session.tenantId}, ${runId}, ${input.strategyArtifactId},
@@ -360,8 +338,6 @@ export async function approveRecruiterStrategy(
     if (isDatabaseConflict(error)) throw new RunConflictError();
     if (isDatabaseRejection(error)) throw new RunRejectedError();
     throw error;
-  } finally {
-    await sql.end();
   }
 }
 
@@ -377,7 +353,7 @@ export async function startPageSpecReviews(
   const sql = database();
   try {
     return await sql.begin(async (tx) => {
-      await authorize(tx, session, 'career_app');
+      await authorize(tx, session);
       const [result] = await tx<{ created: boolean }[]>`
         select app.start_page_spec_reviews(
           ${session.tenantId}, ${runId}, ${key}
@@ -391,8 +367,6 @@ export async function startPageSpecReviews(
     if (isDatabaseConflict(error)) throw new RunConflictError();
     if (isDatabaseRejection(error)) throw new RunRejectedError();
     throw error;
-  } finally {
-    await sql.end();
   }
 }
 
@@ -412,7 +386,7 @@ export async function decideReviewIssue(
       await tx`select pg_advisory_xact_lock(
         hashtextextended(${`${session.tenantId}:review-decision:${key}`}, 0)
       )`;
-      await authorize(tx, session, 'career_app');
+      await authorize(tx, session);
       const [replay] = await tx<
         Array<StoredReviewDecision>
       >`select id, workflow_run_id, page_spec_id, review_id, issue_index, decision,
@@ -512,7 +486,7 @@ export async function decideReviewIssue(
       }
 
       if (input.decision === 'keep') {
-        await authorize(tx, session, 'career_app');
+        await authorize(tx, session);
         await tx`insert into app.review_issue_decisions (
         id, tenant_id, workflow_run_id, page_spec_id, review_id, issue_index,
         issue_text, decision, corrected_run_id, decided_by, idempotency_key,
@@ -568,8 +542,6 @@ export async function decideReviewIssue(
     if (isDatabaseConflict(error)) throw new RunConflictError();
     if (isDatabaseRejection(error)) throw new RunRejectedError();
     throw error;
-  } finally {
-    await sql.end();
   }
 }
 
@@ -1110,16 +1082,6 @@ async function readWorkerServiceStatus(
   return {
     available: status?.status === 'fresh',
   };
-}
-
-async function authorize(
-  tx: postgres.TransactionSql,
-  session: RunSession,
-  role: 'career_app' | 'career_reviewer',
-) {
-  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
-    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-  await tx.unsafe(`set local role ${role}`);
 }
 
 function idempotencyKeySchema(value: string) {

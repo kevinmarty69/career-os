@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useI18n, useLocalizer } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
 
@@ -82,7 +82,7 @@ export function ApplicationReviewCheckpoint({
   run: PersistedRun;
 }) {
   const { locale } = useI18n();
-  const localize = useLocalizer([dossierMessages]);
+  const t = useTranslations([dossierMessages]);
   const decisions = new Map(
     run.reviewDecisions.map((decision) => [
       `${decision.reviewId}:${decision.issueIndex}`,
@@ -102,12 +102,12 @@ export function ApplicationReviewCheckpoint({
     0,
   );
 
-  return localize(
+  return (
     <section className="co-panel co-research-checkpoint co-review-checkpoint">
       <header>
         <div>
-          <p>Contrôles indépendants</p>
-          <h2>Trois regards avant publication</h2>
+          <p>{t('dossier.independent.checks')}</p>
+          <h2>{t('dossier.three.perspectives.before.publishing')}</h2>
         </div>
         <span>
           {locale === 'en'
@@ -116,8 +116,9 @@ export function ApplicationReviewCheckpoint({
         </span>
       </header>
       <p>
-        Chaque objection reste visible avec son auteur. Une correction crée une
-        nouvelle version ciblée ; garder une formulation reste votre décision.
+        {t(
+          'dossier.every.objection.remains.visible.with.its.author.a.correction',
+        )}{' '}
       </p>
       <div className="co-review-list">
         {run.reviews.map((review) => (
@@ -142,14 +143,16 @@ export function ApplicationReviewCheckpoint({
                   <section key={key}>
                     <small>
                       {issue.section} ·{' '}
-                      {issue.blocking ? 'Bloquante' : 'Suggestion'}
+                      {issue.blocking
+                        ? t('dossier.blocking')
+                        : t('dossier.suggestion')}
                     </small>
                     <p>{issue.message}</p>
                     {decision ? (
                       <strong>
                         {decision === 'keep'
-                          ? 'Conservée par vous'
-                          : 'Correction lancée'}
+                          ? t('dossier.kept.by.you')
+                          : t('dossier.correction.started')}
                       </strong>
                     ) : (
                       <ApplicationReviewIssueActions
@@ -164,25 +167,26 @@ export function ApplicationReviewCheckpoint({
                 );
               })
             ) : (
-              <p>Aucune objection.</p>
+              <p>{t('dossier.no.objections')}</p>
             )}
           </article>
         ))}
       </div>
       {error ? (
         <p role="alert">
-          La décision n’a pas été enregistrée. Vous pouvez réessayer sans risque
-          de doublon.
+          {t('dossier.the.decision.was.not.saved.you.can.retry.without')}{' '}
         </p>
       ) : null}
       <footer>
         <span>
           {issueCount === 0 || (unresolved === 0 && run.publicationEligible)
-            ? 'Tous les contrôles sont résolus. Prêt pour votre validation finale.'
-            : 'La publication reste bloquée tant qu’une décision manque.'}
+            ? t('dossier.all.checks.are.resolved.ready.for.your.final.approval')
+            : t(
+                'dossier.publishing.remains.blocked.while.a.decision.is.missing',
+              )}
         </span>
       </footer>
-    </section>,
+    </section>
   );
 }
 

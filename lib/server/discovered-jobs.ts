@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import postgres from 'postgres';
+import type postgres from 'postgres';
+import { database, authorize } from './database';
 import {
   discoveredJobPersistenceInputSchema,
   discoveredJobSchema,
@@ -64,12 +65,6 @@ type ObservationRow = {
   normalized: unknown;
 };
 
-function database(databaseUrl?: string) {
-  const url = databaseUrl ?? process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required.');
-  return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
 export function discoveredJobFingerprint(
   input: Pick<DiscoveredJobPersistenceInput, 'extraction' | 'normalized'>,
 ) {
@@ -93,54 +88,54 @@ export async function storeDiscoveredJob(
     ? `${input.normalized.sourceKind}:${input.normalized.externalId}`
     : input.provenance.requestedUrl;
   const sql = database(options?.databaseUrl);
-  try {
-    return await sql.begin(async (tx) => {
-      await tx`select pg_advisory_xact_lock(hashtextextended(
+
+  return await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtextextended(
         ${`${session.tenantId}:discovered-job:${fingerprint ?? sourceIdentity}`}, 0
       ))`;
-      if (options?.discoveryLeaseToken) {
-        await authorizeDiscovery(tx, session, options.discoveryLeaseToken);
-      } else {
-        const [owner] = await tx<{ user_id: string }[]>`
+    if (options?.discoveryLeaseToken) {
+      await authorizeDiscovery(tx, session, options.discoveryLeaseToken);
+    } else {
+      const [owner] = await tx<{ user_id: string }[]>`
           select "userId" as user_id from auth."member"
           where "organizationId" = ${session.tenantId} and role = 'owner'
           order by "createdAt" limit 1`;
-        await authorize(tx, session);
-        await tx`insert into app.tenants (id, owner_id, name)
+      await authorize(tx, session);
+      await tx`insert into app.tenants (id, owner_id, name)
           values (
             ${session.tenantId}, ${owner?.user_id ?? session.userId},
             ${session.tenantName ?? 'Workspace'}
           ) on conflict (id) do update set name = excluded.name`;
-      }
+    }
 
-      const knownSource = await findExactSource(tx, session.tenantId, input);
-      let job: JobRow | undefined;
-      let matchedBy: SourceRow['matched_by'] = 'new';
-      if (knownSource) {
-        [job] = await tx<JobRow[]>`select ${jobColumns(tx)}
+    const knownSource = await findExactSource(tx, session.tenantId, input);
+    let job: JobRow | undefined;
+    let matchedBy: SourceRow['matched_by'] = 'new';
+    if (knownSource) {
+      [job] = await tx<JobRow[]>`select ${jobColumns(tx)}
           from app.discovered_jobs where tenant_id = ${session.tenantId}
             and id = ${knownSource.discovered_job_id} for update`;
-        matchedBy = 'exact_source';
-      }
-      if (!job) {
-        [job] = await tx<JobRow[]>`select ${jobColumns(tx)}
+      matchedBy = 'exact_source';
+    }
+    if (!job) {
+      [job] = await tx<JobRow[]>`select ${jobColumns(tx)}
           from app.discovered_jobs where tenant_id = ${session.tenantId}
             and canonical_url = ${input.provenance.finalUrl} for update`;
-        if (job) matchedBy = 'canonical_url';
-      }
-      if (!job && fingerprint) {
-        const matches = await tx<JobRow[]>`select ${jobColumns(tx)}
+      if (job) matchedBy = 'canonical_url';
+    }
+    if (!job && fingerprint) {
+      const matches = await tx<JobRow[]>`select ${jobColumns(tx)}
           from app.discovered_jobs where tenant_id = ${session.tenantId}
             and fingerprint = ${fingerprint} order by id limit 2 for update`;
-        if (matches.length === 1) {
-          [job] = matches;
-          matchedBy = 'fingerprint';
-        }
+      if (matches.length === 1) {
+        [job] = matches;
+        matchedBy = 'fingerprint';
       }
+    }
 
-      const created = !job;
-      if (!job) {
-        [job] = await tx<JobRow[]>`insert into app.discovered_jobs (
+    const created = !job;
+    if (!job) {
+      [job] = await tx<JobRow[]>`insert into app.discovered_jobs (
           tenant_id, company, role, description, canonical_url, location,
           remote_mode, contract_type, salary_min, salary_max, salary_currency,
           salary_period,
@@ -159,25 +154,25 @@ export async function storeDiscoveredJob(
           ${fingerprint}, ${input.provenance.fetchedAt},
           ${input.provenance.fetchedAt}
         ) returning ${jobColumns(tx)}`;
-      }
+    }
 
-      const changedFields = !sameCurrentFields(job, input);
-      const change = observationChange(
-        created,
-        job.lifecycle,
-        input.normalized.lifecycleSignal,
-        knownSource?.content_sha256,
-        input.provenance.sha256,
-        changedFields,
-      );
-      const lifecycle = nextLifecycle(
-        job.lifecycle,
-        input.normalized.lifecycleSignal,
-        change,
-      );
-      if (!created) {
-        const current = aggregateFields(job, input);
-        [job] = await tx<JobRow[]>`update app.discovered_jobs set
+    const changedFields = !sameCurrentFields(job, input);
+    const change = observationChange(
+      created,
+      job.lifecycle,
+      input.normalized.lifecycleSignal,
+      knownSource?.content_sha256,
+      input.provenance.sha256,
+      changedFields,
+    );
+    const lifecycle = nextLifecycle(
+      job.lifecycle,
+      input.normalized.lifecycleSignal,
+      change,
+    );
+    if (!created) {
+      const current = aggregateFields(job, input);
+      [job] = await tx<JobRow[]>`update app.discovered_jobs set
           company = ${current.company}, role = ${current.role},
           description = ${current.description}, location = ${current.location},
           remote_mode = ${current.remoteMode}, contract_type = ${current.contractType},
@@ -192,19 +187,19 @@ export async function storeDiscoveredJob(
           updated_at = clock_timestamp()
           where tenant_id = ${session.tenantId} and id = ${job.id}
           returning ${jobColumns(tx)}`;
-      }
+    }
 
-      const source = knownSource
-        ? await updateSource(
-            tx,
-            session.tenantId,
-            knownSource.id,
-            job.id,
-            input,
-            matchedBy,
-          )
-        : await insertSource(tx, session.tenantId, job.id, input, matchedBy);
-      await tx`insert into app.job_observations (
+    const source = knownSource
+      ? await updateSource(
+          tx,
+          session.tenantId,
+          knownSource.id,
+          job.id,
+          input,
+          matchedBy,
+        )
+      : await insertSource(tx, session.tenantId, job.id, input, matchedBy);
+    await tx`insert into app.job_observations (
         tenant_id, discovered_job_id, source_record_id, observed_at,
         content_sha256, change_kind, lifecycle_signal, matched_by, normalized
       ) values (
@@ -213,34 +208,28 @@ export async function storeDiscoveredJob(
         ${matchedBy}, ${tx.json(input.normalized)}
       )`;
 
-      return {
-        created,
-        opportunity: await projection(tx, session.tenantId, job),
-      };
-    });
-  } finally {
-    await sql.end();
-  }
+    return {
+      created,
+      opportunity: await projection(tx, session.tenantId, job),
+    };
+  });
 }
 
 export async function listDiscoveredJobs(
   session: PublicationSession,
 ): Promise<DiscoveredJob[]> {
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const jobs = await tx<JobRow[]>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const jobs = await tx<JobRow[]>`
         select ${jobColumns(tx)} from app.discovered_jobs
         where tenant_id = ${session.tenantId}
         order by last_seen_at desc, id desc limit 100`;
-      return await Promise.all(
-        jobs.map((job) => projection(tx, session.tenantId, job)),
-      );
-    });
-  } finally {
-    await sql.end();
-  }
+    return await Promise.all(
+      jobs.map((job) => projection(tx, session.tenantId, job)),
+    );
+  });
 }
 
 async function findExactSource(
@@ -479,15 +468,6 @@ function jobColumns(tx: postgres.TransactionSql) {
 function sourceColumns(tx: postgres.TransactionSql) {
   return tx`id, requested_url, final_url, fetched_url, source_kind, external_id,
     matched_by, fetched_at, content_type, bytes, content_sha256, trust`;
-}
-
-async function authorize(
-  tx: postgres.TransactionSql,
-  session: PublicationSession,
-) {
-  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
-    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-  await tx.unsafe('set local role career_app');
 }
 
 async function authorizeDiscovery(

@@ -1,6 +1,7 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import postgres from 'postgres';
+import { authorize } from './database';
 import {
   workspaceExportExclusions,
   workspaceExportFormat,
@@ -64,12 +65,7 @@ export async function exportWorkspace(session: ExportSession) {
       await sql.begin(
         'isolation level repeatable read read only',
         async (transaction) => {
-          await transaction`select set_config(
-            'request.jwt.claim.sub', ${session.userId}, true
-          ), set_config(
-            'request.jwt.claim.tenant_id', ${session.tenantId}, true
-          )`;
-          await transaction.unsafe('set local role career_app');
+          await authorize(transaction, session);
           let metadata: WorkspaceMetadata;
           try {
             const [row] = await transaction<

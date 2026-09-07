@@ -9,7 +9,7 @@
     "start": "next start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/unit/*.test.ts",
     "benchmark:mvp": "tsx scripts/benchmark-mvp.ts",
@@ -20,7 +20,7 @@
     "test:integration:discovery-concurrency": "DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/scheduled-discovery-concurrency.mjs",
     "test:integration:http": "node scripts/run-http-integration-tests.mjs",
     "test:security": "tsx --test tests/unit/safe-http.test.ts tests/unit/profile-import.test.ts tests/unit/publication-security.test.ts && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/tenant_isolation.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/auth_security.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/capability_security.sql && pnpm test:integration:http",
-    "test:accessibility": "tsx --test tests/unit/ui-contrast.test.ts && playwright test tests/e2e/accessibility.spec.ts --project=chromium --project=mobile",
+    "test:accessibility": "playwright test tests/e2e/accessibility.spec.ts --project=chromium --project=mobile",
     "worker": "tsx scripts/run-agent-worker.ts",
     "worker:company-researcher": "tsx scripts/run-agent-worker.ts",
     "worker:evidence": "tsx scripts/run-evidence-worker.ts",
@@ -42,7 +42,8 @@
     "db:migrate": "node --env-file-if-exists=.env.local --import tsx scripts/migrate.ts",
     "db:test:migration": "DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/application-migration.mjs",
     "db:test": "pnpm db:test:migration && pnpm test:integration:export && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/tenant_isolation.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/trust_foundation.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/career_memory_history.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/agent_ledger.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/capability_security.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/auth_security.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/workspace_deletion.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/agent_runs.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/hitl_decisions.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/applications.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/publication_inventory.sql && DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/budget_concurrency.mjs && DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/durable-step-concurrency.mjs && pnpm test:integration:discovery-concurrency && DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/page-composer.mjs && DATABASE_URL=postgres://career_os:career_os@127.0.0.1:54329/career_os node supabase/tests/durable-reviewers.mjs && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/worker-heartbeats.sql && docker compose exec -T db psql -v ON_ERROR_STOP=1 -U career_os -d career_os < supabase/tests/page-corrections.sql",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "test:integration:semantic": "NODE_OPTIONS=--conditions=react-server DATABASE_URL=${DATABASE_URL:-postgres://career_os:career_os@127.0.0.1:54329/career_os} tsx --test tests/integration/semantic-analyses.test.ts"
   },
   "dependencies": {
     "better-auth": "1.7.2",

@@ -7,7 +7,7 @@ import { authClient } from '@/lib/auth-client';
 import {
   LocaleSwitch,
   useI18n,
-  useLocalizer,
+  useTranslations,
 } from '@/components/i18n/i18n-provider';
 import { authMessages } from '@/lib/i18n/dictionaries/auth';
 
@@ -17,7 +17,7 @@ type OrganizationChoice = { id: string; name: string };
 export function AuthForm() {
   const router = useRouter();
   const { locale } = useI18n();
-  const localize = useLocalizer([authMessages]);
+  const t = useTranslations([authMessages]);
   const [mode, setMode] = useState<Mode>('sign-in');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -60,8 +60,8 @@ export function AuthForm() {
     } catch (cause) {
       setError(
         cause instanceof Error && cause.message === 'WORKSPACE_FAILED'
-          ? 'Votre compte est prêt, mais l’espace n’a pas pu être chargé. Connectez-vous pour continuer.'
-          : 'Échec de l’authentification. Vérifiez vos informations et réessayez.',
+          ? t('auth.your.account.is.ready.but.the.workspace.could.not')
+          : t('auth.authentication.failed.check.your.details.and.retry'),
       );
       if (cause instanceof Error && cause.message === 'WORKSPACE_FAILED') {
         setMode('sign-in');
@@ -75,7 +75,7 @@ export function AuthForm() {
     setError('');
     const result = await authClient.organization.setActive({ organizationId });
     if (result.error) {
-      setError('L’espace n’a pas pu être sélectionné. Réessayez.');
+      setError(t('auth.the.workspace.could.not.be.selected.retry'));
       setPending(false);
       return;
     }
@@ -94,7 +94,7 @@ export function AuthForm() {
       slug: `personal-${crypto.randomUUID()}`,
     });
     if (result.error) {
-      setError('L’espace n’a pas pu être créé. Réessayez.');
+      setError(t('auth.the.workspace.could.not.be.created.retry'));
       setPending(false);
       return;
     }
@@ -102,7 +102,7 @@ export function AuthForm() {
     router.refresh();
   }
 
-  return localize(
+  return (
     <main className="auth-shell">
       <section className="auth-card" aria-labelledby="auth-title">
         <div className="auth-brand">
@@ -113,7 +113,10 @@ export function AuthForm() {
           <LocaleSwitch compact />
         </div>
         {mode !== 'workspace' ? (
-          <div className="auth-tabs" aria-label="Mode d’authentification">
+          <div
+            className="auth-tabs"
+            aria-label={t('auth.authentication.method')}
+          >
             <button
               aria-pressed={mode === 'sign-in'}
               className={mode === 'sign-in' ? 'active' : ''}
@@ -123,7 +126,7 @@ export function AuthForm() {
               }}
               type="button"
             >
-              Se connecter
+              {t('auth.sign.in')}{' '}
             </button>
             <button
               aria-pressed={mode === 'sign-up'}
@@ -134,26 +137,30 @@ export function AuthForm() {
               }}
               type="button"
             >
-              Créer un compte
+              {t('auth.create.account')}{' '}
             </button>
           </div>
         ) : null}
         <header>
           <h1 id="auth-title">
             {mode === 'sign-in'
-              ? 'Bon retour'
+              ? t('auth.welcome.back')
               : mode === 'sign-up'
-                ? 'Créez votre compte'
+                ? t('auth.create.your.account')
                 : organizations.length
-                  ? 'Choisissez un espace'
-                  : 'Créez votre espace'}
+                  ? t('auth.choose.a.workspace')
+                  : t('auth.create.your.workspace')}
           </h1>
           <p>
             {mode === 'sign-in'
-              ? 'Connectez-vous pour gérer et révoquer vos liens de candidature privés.'
+              ? t('auth.sign.in.to.manage.and.revoke.private.application.links')
               : mode === 'sign-up'
-                ? 'Votre compte isole vos candidatures de celles des autres utilisateurs.'
-                : 'Les liens privés sont toujours créés dans un seul espace actif.'}
+                ? t(
+                    'auth.your.account.keeps.applications.isolated.from.every.other.user',
+                  )
+                : t(
+                    'auth.private.links.are.always.created.inside.one.active.workspace',
+                  )}
           </p>
         </header>
         {mode === 'workspace' && organizations.length ? (
@@ -172,7 +179,7 @@ export function AuthForm() {
         ) : mode === 'workspace' ? (
           <form onSubmit={createWorkspace}>
             <label>
-              Nom de l’espace
+              {t('auth.workspace.name')}{' '}
               <input
                 autoComplete="organization"
                 defaultValue={
@@ -192,14 +199,14 @@ export function AuthForm() {
               </p>
             ) : null}
             <button disabled={pending} type="submit">
-              {pending ? 'Veuillez patienter…' : 'Créer l’espace'}
+              {pending ? t('auth.please.wait') : t('auth.create.workspace')}
             </button>
           </form>
         ) : (
           <form onSubmit={submit}>
             {mode === 'sign-up' ? (
               <label>
-                Nom
+                {t('auth.name')}{' '}
                 <input
                   autoComplete="name"
                   minLength={2}
@@ -221,7 +228,7 @@ export function AuthForm() {
               />
             </label>
             <label>
-              Mot de passe
+              {t('auth.password')}{' '}
               <input
                 autoComplete={
                   mode === 'sign-in' ? 'current-password' : 'new-password'
@@ -233,7 +240,7 @@ export function AuthForm() {
                 type="password"
               />
               {mode === 'sign-up' ? (
-                <span>Utilisez au moins 12 caractères.</span>
+                <span>{t('auth.use.at.least.12.characters')}</span>
               ) : null}
             </label>
             {error ? (
@@ -243,17 +250,17 @@ export function AuthForm() {
             ) : null}
             <button disabled={pending} type="submit">
               {pending
-                ? 'Veuillez patienter…'
+                ? t('auth.please.wait')
                 : mode === 'sign-in'
-                  ? 'Se connecter'
-                  : 'Créer un compte'}
+                  ? t('auth.sign.in')
+                  : t('auth.create.account')}
             </button>
           </form>
         )}
         <Link className="auth-back" href="/">
-          Retour à l’espace local
+          {t('auth.back.to.local.workspace')}{' '}
         </Link>
       </section>
-    </main>,
+    </main>
   );
 }

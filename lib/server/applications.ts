@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
-import postgres from 'postgres';
+import { database, authorize } from './database';
 import { z } from 'zod';
 import {
   applicationFieldsSchema,
@@ -41,12 +41,6 @@ type ApplicationRow = {
   deleted_at: Date | null;
 };
 
-function database() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL is required.');
-  return postgres(url, { max: 5, idle_timeout: 5 });
-}
-
 export async function createApplication(
   session: PublicationSession,
   rawInput: unknown,
@@ -56,40 +50,40 @@ export async function createApplication(
   const idempotencyKey = uuid(rawIdempotencyKey);
   const inputHash = hashJson(input);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await tx`select pg_advisory_xact_lock(
+
+  return await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(
         hashtextextended(${`${session.tenantId}:application:${idempotencyKey}`}, 0)
       )`;
-      const [owner] = await tx<{ user_id: string }[]>`
+    const [owner] = await tx<{ user_id: string }[]>`
         select "userId" as user_id from auth."member"
         where "organizationId" = ${session.tenantId} and role = 'owner'
         order by "createdAt" limit 1`;
-      await authorize(tx, session);
-      await tx`insert into app.tenants (id, owner_id, name)
+    await authorize(tx, session);
+    await tx`insert into app.tenants (id, owner_id, name)
         values (
           ${session.tenantId}, ${owner?.user_id ?? session.userId},
           ${session.tenantName ?? 'Workspace'}
         )
         on conflict (id) do update set name = excluded.name`;
-      const [existing] = await tx<ApplicationRow[]>`
+    const [existing] = await tx<ApplicationRow[]>`
         select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId}
           and create_idempotency_key = ${idempotencyKey}`;
-      if (existing) {
-        if (existing.create_input_hash !== inputHash)
-          throw new ApplicationConflictError(
-            'The idempotency key belongs to another application input.',
-          );
-        if (existing.deleted_at) throw new ApplicationNotFoundError();
-        return { created: false, application: projection(existing) };
-      }
+    if (existing) {
+      if (existing.create_input_hash !== inputHash)
+        throw new ApplicationConflictError(
+          'The idempotency key belongs to another application input.',
+        );
+      if (existing.deleted_at) throw new ApplicationNotFoundError();
+      return { created: false, application: projection(existing) };
+    }
 
-      const id = randomUUID();
-      const [created] = await tx<ApplicationRow[]>`
+    const id = randomUUID();
+    const [created] = await tx<ApplicationRow[]>`
         insert into app.applications (
           id, tenant_id, company, role, raw_text, url, logo_url, accent, stage,
           company_sources,
@@ -102,11 +96,8 @@ export async function createApplication(
         ) returning id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
-      return { created: true, application: projection(created) };
-    });
-  } finally {
-    await sql.end();
-  }
+    return { created: true, application: projection(created) };
+  });
 }
 
 export async function promoteDiscoveredJobToApplication(
@@ -115,61 +106,60 @@ export async function promoteDiscoveredJobToApplication(
 ) {
   const jobId = z.string().uuid().parse(rawJobId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      await tx`select pg_advisory_xact_lock(hashtextextended(
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    await tx`select pg_advisory_xact_lock(hashtextextended(
         ${`${session.tenantId}:opportunity-decision:${jobId}`}, 0
       ))`;
-      const [job] = await tx<
-        {
-          company: string | null;
-          role: string | null;
-          description: string | null;
-          canonical_url: string;
-          lifecycle: string;
-          revision: string;
-        }[]
-      >`select company, role, description, canonical_url, lifecycle, revision
+    const [job] = await tx<
+      {
+        company: string | null;
+        role: string | null;
+        description: string | null;
+        canonical_url: string;
+        lifecycle: string;
+        revision: string;
+      }[]
+    >`select company, role, description, canonical_url, lifecycle, revision
         from app.discovered_jobs
         where tenant_id = ${session.tenantId} and id = ${jobId}
         for share`;
-      if (!job) throw new ApplicationNotFoundError();
-      if (job.lifecycle === 'closed')
-        throw new OpportunityApplicationClosedError();
+    if (!job) throw new ApplicationNotFoundError();
+    if (job.lifecycle === 'closed')
+      throw new OpportunityApplicationClosedError();
 
-      const [decision] = await tx<
-        { disposition: 'saved' | 'ignored' | 'archived' }[]
-      >`
+    const [decision] = await tx<
+      { disposition: 'saved' | 'ignored' | 'archived' }[]
+    >`
         select disposition from app.opportunity_decisions
         where tenant_id = ${session.tenantId} and discovered_job_id = ${jobId}`;
-      if (
-        decision?.disposition === 'ignored' ||
-        decision?.disposition === 'archived'
-      )
-        throw new OpportunityApplicationExcludedError(decision.disposition);
+    if (
+      decision?.disposition === 'ignored' ||
+      decision?.disposition === 'archived'
+    )
+      throw new OpportunityApplicationExcludedError(decision.disposition);
 
-      const [existing] = await tx<ApplicationRow[]>`
+    const [existing] = await tx<ApplicationRow[]>`
         select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
           discovered_job_id, revision, create_input_hash, created_at, updated_at,
           deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and discovered_job_id = ${jobId}
           and deleted_at is null`;
-      if (existing)
-        return { created: false, application: projection(existing) };
+    if (existing) return { created: false, application: projection(existing) };
 
-      const company = job.company ?? 'Unknown company';
-      const role = job.role ?? 'Unknown role';
-      const input = applicationFieldsSchema.parse({
-        company,
-        role,
-        description: job.description ?? `${company} - ${role}`,
-        url: job.canonical_url,
-        accent: '#5847e8',
-        stage: 'draft',
-      });
-      const [created] = await tx<ApplicationRow[]>`
+    const company = job.company ?? 'Unknown company';
+    const role = job.role ?? 'Unknown role';
+    const input = applicationFieldsSchema.parse({
+      company,
+      role,
+      description: job.description ?? `${company} - ${role}`,
+      url: job.canonical_url,
+      accent: '#5847e8',
+      stage: 'draft',
+    });
+    const [created] = await tx<ApplicationRow[]>`
         insert into app.applications (
           tenant_id, discovered_job_id, company, role, raw_text, url, accent,
           stage, create_idempotency_key, create_input_hash
@@ -180,34 +170,28 @@ export async function promoteDiscoveredJobToApplication(
         ) returning id, company, role, raw_text, url, logo_url, accent, stage,
           company_sources, discovered_job_id, revision, create_input_hash,
           created_at, updated_at, deleted_at`;
-      await tx`select app.record_human_audit_event(
+    await tx`select app.record_human_audit_event(
         ${session.tenantId}, 'opportunity_promoted', 'application', ${created.id},
         ${tx.json({ discoveredJobId: jobId, jobRevision: Number(job.revision) })}
       )`;
-      return { created: true, application: projection(created) };
-    });
-  } finally {
-    await sql.end();
-  }
+    return { created: true, application: projection(created) };
+  });
 }
 
 export async function listApplications(session: PublicationSession) {
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const rows = await tx<ApplicationRow[]>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const rows = await tx<ApplicationRow[]>`
         select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and deleted_at is null
         order by updated_at desc, id desc limit 100`;
-      return rows.map(projection);
-    });
-  } finally {
-    await sql.end();
-  }
+    return rows.map(projection);
+  });
 }
 
 export async function readApplication(
@@ -216,21 +200,18 @@ export async function readApplication(
 ) {
   const applicationId = z.string().uuid().parse(rawApplicationId);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const [row] = await tx<ApplicationRow[]>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [row] = await tx<ApplicationRow[]>`
         select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${applicationId}
           and deleted_at is null`;
-      return row ? projection(row) : undefined;
-    });
-  } finally {
-    await sql.end();
-  }
+    return row ? projection(row) : undefined;
+  });
 }
 
 export async function updateApplication(
@@ -241,28 +222,25 @@ export async function updateApplication(
   const applicationId = z.string().uuid().parse(rawApplicationId);
   const input = updateApplicationInputSchema.parse(rawInput);
   const sql = database();
-  try {
-    return await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const [existing] = await tx<ApplicationRow[]>`
+
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [existing] = await tx<ApplicationRow[]>`
         select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
         where tenant_id = ${session.tenantId} and id = ${applicationId}
         for update`;
-      if (!existing || existing.deleted_at)
-        throw new ApplicationNotFoundError();
-      const revision = Number(existing.revision);
-      if (
-        revision !== input.expectedRevision &&
-        !(
-          revision === input.expectedRevision + 1 && sameFields(existing, input)
-        )
-      )
-        throw new ApplicationConflictError('Application revision is stale.');
-      if (sameFields(existing, input)) return projection(existing);
-      const [updated] = await tx<ApplicationRow[]>`
+    if (!existing || existing.deleted_at) throw new ApplicationNotFoundError();
+    const revision = Number(existing.revision);
+    if (
+      revision !== input.expectedRevision &&
+      !(revision === input.expectedRevision + 1 && sameFields(existing, input))
+    )
+      throw new ApplicationConflictError('Application revision is stale.');
+    if (sameFields(existing, input)) return projection(existing);
+    const [updated] = await tx<ApplicationRow[]>`
         update app.applications set company = ${input.company}, role = ${input.role},
           raw_text = ${input.description}, url = ${input.url ?? null},
           logo_url = ${input.logoUrl ?? null}, accent = ${input.accent},
@@ -273,11 +251,8 @@ export async function updateApplication(
         returning id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
-      return projection(updated);
-    });
-  } finally {
-    await sql.end();
-  }
+    return projection(updated);
+  });
 }
 
 export async function deleteApplication(
@@ -288,26 +263,23 @@ export async function deleteApplication(
   const applicationId = z.string().uuid().parse(rawApplicationId);
   const input = deleteApplicationInputSchema.parse(rawInput);
   const sql = database();
-  try {
-    await sql.begin(async (tx) => {
-      await authorize(tx, session);
-      const [existing] = await tx<
-        { revision: string; deleted_at: Date | null }[]
-      >`
+
+  await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const [existing] = await tx<
+      { revision: string; deleted_at: Date | null }[]
+    >`
         select revision, deleted_at from app.applications
         where tenant_id = ${session.tenantId} and id = ${applicationId}
         for update`;
-      if (!existing) throw new ApplicationNotFoundError();
-      if (existing.deleted_at) return;
-      if (Number(existing.revision) !== input.expectedRevision)
-        throw new ApplicationConflictError('Application revision is stale.');
-      await tx`update app.applications set deleted_at = now(),
+    if (!existing) throw new ApplicationNotFoundError();
+    if (existing.deleted_at) return;
+    if (Number(existing.revision) !== input.expectedRevision)
+      throw new ApplicationConflictError('Application revision is stale.');
+    await tx`update app.applications set deleted_at = now(),
         revision = revision + 1
         where tenant_id = ${session.tenantId} and id = ${applicationId}`;
-    });
-  } finally {
-    await sql.end();
-  }
+  });
 }
 
 function projection(row: ApplicationRow): Application {
@@ -330,15 +302,6 @@ function projection(row: ApplicationRow): Application {
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   });
-}
-
-async function authorize(
-  tx: postgres.TransactionSql,
-  session: PublicationSession,
-) {
-  await tx`select set_config('request.jwt.claim.sub', ${session.userId}, true),
-    set_config('request.jwt.claim.tenant_id', ${session.tenantId}, true)`;
-  await tx.unsafe('set local role career_app');
 }
 
 function uuid(value: string) {
