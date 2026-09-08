@@ -38,6 +38,7 @@ Designer defaults do not override PRODUCT-REFERENCE.md or existing security boun
 - Full browser regression: 166 checks passed on desktop and mobile. Sixteen subsequent focused checks passed for the final interview layout and memory entry point, EN/FR entry, PKCE request, notifications, settings, focus restoration and session revocation.
 - Browser persistence and Supabase Auth requests in these checks use synthetic, intercepted responses. No live email delivery, real model run, payment, deployment or new Supabase record is claimed as validated by them.
 - Fixed a session-revocation edge case: the SDK returns a successful no-op when the browser session is absent. The UI now refuses to report other devices as revoked in that case.
+- Logout uses the SDK's error-preserving JWT endpoint: 401/403/404/500 responses keep devices visible and permit retry. Four desktop/mobile regression checks pass; no service-role credential is used in the browser.
 - Fixed class merging between custom typography and semantic colors; transparent buttons no longer inherit the old generic dark button background.
 - Removed the obsolete empty-state stylesheet. Unrelated social-post edits were kept outside this milestone.
 

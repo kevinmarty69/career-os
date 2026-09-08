@@ -52,7 +52,12 @@ export function SessionManager() {
       // signOut is a successful no-op without a local session. Do not claim revocation.
       if (session.error || !session.data.session)
         throw new Error('Session unavailable');
-      const result = await auth.signOut({ scope: 'others' });
+      // Use the same JWT logout endpoint without the convenience method's
+      // suppression of 401/403/404: those do not prove other devices were revoked.
+      const result = await auth.admin.signOut(
+        session.data.session.access_token,
+        'others',
+      );
       if (result.error) setError(true);
       else
         setSessions((current) =>

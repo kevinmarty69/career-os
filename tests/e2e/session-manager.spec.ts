@@ -32,6 +32,7 @@ test('lists device IDs and revokes other Supabase sessions without displaying be
     },
   ]);
   let attempts = 0;
+  const failures = [500, 401, 403, 404];
   await page.route('**/auth/v1/**', async (route) => {
     expect(new URL(route.request().url()).pathname).toBe('/auth/v1/logout');
     expect(new URL(route.request().url()).searchParams.get('scope')).toBe(
@@ -40,8 +41,11 @@ test('lists device IDs and revokes other Supabase sessions without displaying be
     expect(route.request().headers().authorization).toBe(`Bearer ${token}`);
     attempts += 1;
     await route.fulfill(
-      attempts === 1
-        ? { status: 500, json: { message: 'Synthetic outage' } }
+      attempts <= failures.length
+        ? {
+            status: failures[attempts - 1],
+            json: { message: 'Synthetic outage' },
+          }
         : { status: 204 },
     );
   });
@@ -70,16 +74,18 @@ test('lists device IDs and revokes other Supabase sessions without displaying be
   const revoke = manager.getByRole('button', {
     name: 'Sign out other devices',
   });
-  await revoke.click();
-  await expect(manager.getByRole('alert')).toBeVisible();
-  expect(attempts).toBe(1);
-  await expect(manager.getByText('2 active')).toBeVisible();
+  for (let attempt = 1; attempt <= failures.length; attempt++) {
+    await revoke.click();
+    await expect(manager.getByRole('alert')).toBeVisible();
+    expect(attempts).toBe(attempt);
+    await expect(manager.getByText('2 active')).toBeVisible();
+  }
   await revoke.click();
   await expect(manager.getByText('1 active')).toBeVisible();
   await expect(manager.getByText('Other device', { exact: true })).toHaveCount(
     0,
   );
-  expect(attempts).toBe(2);
+  expect(attempts).toBe(failures.length + 1);
 });
 
 test('does not report revoked devices when the local auth session is missing', async ({
