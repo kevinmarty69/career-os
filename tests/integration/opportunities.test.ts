@@ -607,7 +607,7 @@ async function main() {
   await expectStatus(unavailable, 503, 'unconfigured local semantic model');
   assert.equal(
     await unavailable.text(),
-    'Local semantic model is not configured.',
+    'Semantic model is not configured.',
   );
   let unavailableCalls = 0;
   await assert.rejects(
