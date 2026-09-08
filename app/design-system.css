@@ -244,7 +244,7 @@ pre {
   width: min(100%, 1680px);
   min-height: 100vh;
   grid-template-columns: var(--spacing-sidebar) minmax(0, 1fr);
-  gap: 0;
+  gap: 0 18px;
   margin: 0 auto;
   padding: 0;
   border: 0;

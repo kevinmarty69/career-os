@@ -78,6 +78,7 @@ test('keeps sidebar labels and counters on one line in both languages', async ({
     await page.goto('/memory');
     const link = page.locator('.co-sidebar nav > a[href="/memory"]');
     await expect(link).toBeVisible();
+    await link.focus();
     await expect(link.locator('b')).toHaveText('20');
     const label = link.locator('span:not(.co-icon)');
     await expect(label).toHaveCSS('white-space', 'nowrap');
@@ -90,6 +91,11 @@ test('keeps sidebar labels and counters on one line in both languages', async ({
     const countBounds = await link.locator('b').boundingBox();
     const linkBounds = await link.boundingBox();
     const navBounds = await page.locator('.co-sidebar nav').boundingBox();
+    const sidebarBounds = await page.locator('.co-sidebar').boundingBox();
+    const surfaceBounds = await page.locator('.co-surface').boundingBox();
+    expect(
+      surfaceBounds!.x - sidebarBounds!.x - sidebarBounds!.width,
+    ).toBeGreaterThanOrEqual(18);
     expect(linkBounds!.x + linkBounds!.width).toBeLessThanOrEqual(
       navBounds!.x + navBounds!.width,
     );
