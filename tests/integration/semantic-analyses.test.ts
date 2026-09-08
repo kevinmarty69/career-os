@@ -186,6 +186,91 @@ test('concurrent requests share one inference without keeping SQL transactions o
   assert.equal(calls, 1);
 });
 
+test('completion and a competing reservation cannot recreate a lease after the artifact commits', async () => {
+  const jobId = await job();
+  const locker = postgres(databaseUrl!, { max: 1 });
+  let generatedStarted!: () => void;
+  let releaseGeneration!: () => void;
+  let rowLocked!: () => void;
+  let releaseRow!: () => void;
+  const started = new Promise<void>((resolve) => {
+    generatedStarted = resolve;
+  });
+  const generation = new Promise<void>((resolve) => {
+    releaseGeneration = resolve;
+  });
+  const locked = new Promise<void>((resolve) => {
+    rowLocked = resolve;
+  });
+  const rowRelease = new Promise<void>((resolve) => {
+    releaseRow = resolve;
+  });
+  let calls = 0;
+  const client = {
+    async generate(input: SemanticAnalysisInput) {
+      calls += 1;
+      generatedStarted();
+      await generation;
+      return generated(input);
+    },
+  };
+  const first = runSemanticAnalysis(session, jobId, searchProfileId, client);
+  const requests = [first];
+  void first.catch(() => undefined);
+  let heldRow: Promise<unknown> | undefined;
+  try {
+    await Promise.race([started, first]);
+    heldRow = locker.begin(async (tx) => {
+      await tx`select lease_token from app.semantic_analysis_leases
+        where tenant_id = ${session.tenantId}
+          and job_match_id in (select id from app.job_matches where discovered_job_id = ${jobId})
+        for update`;
+      rowLocked();
+      await rowRelease;
+    });
+    void heldRow.catch(() => undefined);
+    await Promise.race([locked, heldRow]);
+    releaseGeneration();
+    // Put completion first in the row-lock queue, then start a competing reservation.
+    await waitForSemanticWaiters(1);
+    const second = runSemanticAnalysis(session, jobId, searchProfileId, client);
+    requests.push(second);
+    void second.catch(() => undefined);
+    await waitForSemanticWaiters(2);
+    releaseRow();
+    await heldRow;
+    const results = await Promise.all(requests);
+    assert.equal(
+      calls,
+      1,
+      'A completion race must not dispatch the provider twice.',
+    );
+    assert.deepEqual(results[1], results[0]);
+    const [{ count }] = await admin`select count(*)::integer count
+      from app.semantic_analyses where discovered_job_id = ${jobId}`;
+    assert.equal(count, 1);
+  } finally {
+    releaseGeneration();
+    releaseRow();
+    await Promise.allSettled([...requests, ...(heldRow ? [heldRow] : [])]);
+    await locker.end();
+  }
+});
+
+async function waitForSemanticWaiters(count: number) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const [{ waiting }] = await admin<{ waiting: number }[]>`
+      select count(*)::integer waiting from pg_stat_activity
+      where datname = current_database() and wait_event_type = 'Lock'
+        and (query like '%semantic_analysis_leases%'
+          or query like '%pg_advisory_xact_lock(hashtextextended(%')`;
+    if (waiting >= count) return;
+    await delay(10);
+  }
+  assert.fail(`Expected ${count} blocked semantic transactions.`);
+}
+
 test('pre-dispatch configuration failures release the reservation', async () => {
   const jobId = await job();
   const previous = process.env.CAREER_OS_LOCAL_MODEL_BASE_URL;

@@ -234,13 +234,6 @@ async function persistSemanticAnalysis(
     validateGenerated(generated, input);
     return await sql.begin(async (tx) => {
       await authorize(tx, session);
-      const [lease] = await tx<{ lease_token: string }[]>`
-        select lease_token from app.semantic_analysis_leases
-        where tenant_id = ${session.tenantId} and input_hash = ${inputHash}
-          and lease_token = ${leaseToken} and status = 'in_flight'
-          and expires_at > clock_timestamp()
-        for update`;
-      if (!lease) throw new LocalModelClientError('TIMEOUT');
       const [job] = await tx<{ id: string }[]>`
         select id from app.discovered_jobs
         where tenant_id = ${session.tenantId} and id = ${match.opportunityId}
@@ -249,6 +242,16 @@ async function persistSemanticAnalysis(
         throw new SemanticAnalysisInputUnavailableError(
           'The job changed during analysis.',
         );
+      // Use the reservation lock through artifact insertion and lease deletion.
+      // Otherwise a reserver can observe no artifact, then recreate the released lease.
+      await lockInput(tx, session.tenantId, inputHash);
+      const [lease] = await tx<{ lease_token: string }[]>`
+        select lease_token from app.semantic_analysis_leases
+        where tenant_id = ${session.tenantId} and input_hash = ${inputHash}
+          and lease_token = ${leaseToken} and status = 'in_flight'
+          and expires_at > clock_timestamp()
+        for update`;
+      if (!lease) throw new LocalModelClientError('TIMEOUT');
       const [created] = await tx<
         AnalysisRow[]
       >`insert into app.semantic_analyses (
@@ -295,9 +298,7 @@ async function reserve(
   inputHash: string,
   leaseToken: string,
 ) {
-  await tx`select pg_advisory_xact_lock(hashtextextended(
-    ${`semantic-analysis:${tenantId}:${inputHash}`}, 0
-  ))`;
+  await lockInput(tx, tenantId, inputHash);
   const [existing] = await tx<AnalysisRow[]>`select ${analysisColumns(tx)}
     from app.semantic_analyses where tenant_id = ${tenantId}
       and input_hash = ${inputHash}`;
@@ -320,6 +321,16 @@ async function reserve(
         and app.semantic_analysis_leases.expires_at <= clock_timestamp()
     returning lease_token`;
   return { status: claimed ? ('claimed' as const) : ('pending' as const) };
+}
+
+async function lockInput(
+  tx: postgres.TransactionSql,
+  tenantId: string,
+  inputHash: string,
+) {
+  await tx`select pg_advisory_xact_lock(hashtextextended(
+    ${`semantic-analysis:${tenantId}:${inputHash}`}, 0
+  ))`;
 }
 
 async function release(

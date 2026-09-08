@@ -80,13 +80,18 @@ test('keeps sidebar labels and counters on one line in both languages', async ({
     await expect(link).toBeVisible();
     await link.focus();
     await expect(link.locator('b')).toHaveText('20');
+    await page.evaluate(() => document.fonts.ready);
     const label = link.locator('span:not(.co-icon)');
     await expect(label).toHaveCSS('white-space', 'nowrap');
+    const dimensions = await label.evaluate((element) => ({
+      width: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      font: getComputedStyle(element).font,
+    }));
     expect(
-      await label.evaluate(
-        (element) => element.scrollWidth <= element.clientWidth,
-      ),
-    ).toBe(true);
+      dimensions.scrollWidth,
+      `${locale}: ${JSON.stringify(dimensions)}`,
+    ).toBeLessThanOrEqual(dimensions.width);
     const labelBounds = await label.boundingBox();
     const countBounds = await link.locator('b').boundingBox();
     const linkBounds = await link.boundingBox();
