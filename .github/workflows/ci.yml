@@ -31,6 +31,9 @@ jobs:
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get update
           sudo apt-get install -y postgresql-17 postgresql-client-17
+          if [ ! -f /etc/postgresql/17/main/postgresql.conf ]; then
+            sudo pg_createcluster 17 main
+          fi
           sudo pg_conftool 17 main set port 54339
           sudo pg_ctlcluster 17 main restart
           sudo -u postgres psql -p 54339 -c "ALTER USER postgres PASSWORD 'postgres';"
