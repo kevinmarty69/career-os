@@ -14,6 +14,8 @@ assertOpenSourceDeploymentMode(
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   reactStrictMode: true,
+  // Keep build/page-generation workers within the budget of an 8 GB dev machine.
+  experimental: { cpus: 1 },
   async headers() {
     return [
       {

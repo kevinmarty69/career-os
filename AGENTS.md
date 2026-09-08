@@ -1,3 +1,10 @@
+# Local resource limits
+
+- Do not start Docker, Docker Desktop, or `supabase start` on this workstation.
+- Use the configured Supabase project or disposable native PostgreSQL/Auth tests; never reset existing databases.
+- Run builds, typechecks and browser suites sequentially, not in parallel across agents.
+- Do not load or download a local inference model on this 8 GB machine. Keep provider calls opt-in and obtain approval before spending.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
