@@ -1,0 +1,478 @@
+/* ============================================================
+   Career OS — app/globals.css
+   FICHIER DE RÉFÉRENCE. À copier tel quel.
+   Ne pas modifier une valeur sans mettre à jour le DS v2.
+   Tailwind v4 : aucun tailwind.config.js n'est nécessaire.
+   ============================================================ */
+
+/* No preflight reset: preserve the existing application while adopting the kit. */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' source(none);
+@source "../components/ui/index.tsx";
+@source "../components/form";
+@source "../components/feedback";
+@source "../components/shell";
+@source "../components/handoff";
+
+.co-kit-checkbox:focus-visible + span {
+  outline: 2px solid var(--color-ink-900);
+  outline-offset: 3px;
+}
+
+/* Compatibility with the existing app; token values remain the designer's. */
+@theme {
+  --color-ink-100: var(--color-hairline);
+  --color-success: var(--color-green);
+}
+
+.co-kit-control {
+  min-height: 42px;
+  border: 0;
+  box-shadow: none;
+}
+.co-kit-field > input,
+.co-kit-field > select {
+  min-height: 0;
+  border: 0;
+  padding-block: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+}
+.co-kit-field > input {
+  padding-inline: 0;
+}
+.co-kit-field:focus-within {
+  border-color: var(--color-ink-900);
+}
+.co-kit-field > input:focus-visible,
+.co-kit-field > select:focus-visible,
+.co-kit-textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none;
+}
+.co-kit-field:focus-within {
+  outline: 1px solid var(--color-ink-900);
+}
+.co-kit-textarea:focus-visible {
+  border-color: var(--color-ink-900);
+}
+
+@theme {
+  /* ---------- polices ---------- */
+  --font-sans:
+    var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* ---------- encre & surfaces ---------- */
+  --color-ink-900: #0d0d0f;
+  --color-ink-800: #262932;
+  --color-ink-700: #3a3b42;
+  --color-ink-600: #5c5e68;
+  --color-ink-500: #8a8c95;
+  --color-ink-400: #9a9ba3;
+  --color-ink-300: #c5c6cd;
+  --color-ink-250: #d5d6dc;
+  --color-ink-200: #dfe0e5;
+  --color-track: #e0e1e6;
+  --color-canvas: #ebebf0;
+  --color-hairline: #edeef1;
+  --color-divider: #f0f0f3;
+  --color-panel: #f4f4f7;
+  --color-card: #ffffff;
+
+  /* ---------- sémantique ---------- */
+  --color-green: #22a06b;
+  --color-green-text: #2a7a55;
+  --color-green-strong: #1b6b4a;
+  --color-green-tint: #dff0e7;
+
+  --color-amber: #d9a62a;
+  --color-amber-text: #8a6a1f;
+  --color-amber-strong: #7a5c18;
+  --color-amber-tint: #f7f0dc;
+
+  --color-clay: #e05a63;
+  --color-clay-text: #a85643;
+  --color-clay-strong: #a8402c;
+  --color-clay-hover: #8e3524;
+  --color-clay-tint: #f7e6e3;
+
+  --color-indigo: #5b6cc4;
+  --color-indigo-text: #4356a8;
+  --color-indigo-deep: #22305c;
+  --color-indigo-tint: #e9ecf9;
+
+  /* ---------- page publique (fallback ; surchargé inline) ---------- */
+  --color-pub-deep: #16211f;
+  --color-pub-accent: #2f6b5e;
+  --color-pub-light: #7fd4db;
+  --color-pub-body: #3d4a4d;
+  --color-pub-line: #e5e9ea;
+  --color-pub-subtle: #fafbfb;
+  --color-pub-bg: #f4f4f2;
+
+  /* ---------- rayons ---------- */
+  --radius-shell: 22px;
+  --radius-panel: 20px;
+  --radius-card-lg: 18px;
+  --radius-card: 16px;
+  --radius-tile: 14px;
+  --radius-chip-lg: 13px;
+  --radius-control: 12px;
+  --radius-nav: 12px;
+  --radius-nav-sm: 11px;
+  --radius-logo: 9px;
+  --radius-badge: 8px;
+  --radius-pill: 999px;
+
+  /* ---------- ombres — les 4 seules autorisées ---------- */
+  --shadow-screen: 0 40px 80px -46px rgb(13 13 15 / 0.42);
+  --shadow-overlay: 0 40px 80px -30px rgb(13 13 15 / 0.5);
+  --shadow-raised: 0 18px 36px -24px rgb(13 13 15 / 0.35);
+  --shadow-tooltip: 0 16px 30px -16px rgb(13 13 15 / 0.6);
+
+  /* ---------- typographie ---------- */
+  --text-decision: 36px;
+  --text-decision--line-height: 1.22;
+  --text-decision--letter-spacing: -0.04em;
+  --text-decision--font-weight: 600;
+
+  --text-display: 32px;
+  --text-display--line-height: 1.15;
+  --text-display--letter-spacing: -0.036em;
+  --text-display--font-weight: 600;
+
+  --text-h1: 30px;
+  --text-h1--line-height: 1.2;
+  --text-h1--letter-spacing: -0.035em;
+  --text-h1--font-weight: 600;
+
+  --text-hero: 28px;
+  --text-hero--line-height: 1.24;
+  --text-hero--letter-spacing: -0.033em;
+  --text-hero--font-weight: 600;
+
+  --text-h2: 26px;
+  --text-h2--line-height: 1.24;
+  --text-h2--letter-spacing: -0.032em;
+  --text-h2--font-weight: 600;
+
+  --text-metric: 24px;
+  --text-metric--line-height: 1.1;
+  --text-metric--letter-spacing: -0.04em;
+  --text-metric--font-weight: 600;
+
+  --text-h3: 19px;
+  --text-h3--line-height: 1.3;
+  --text-h3--letter-spacing: -0.028em;
+  --text-h3--font-weight: 600;
+
+  --text-drawer: 18px;
+  --text-drawer--line-height: 1.3;
+  --text-drawer--letter-spacing: -0.03em;
+  --text-drawer--font-weight: 600;
+
+  --text-wordmark: 17px;
+  --text-wordmark--line-height: 1.2;
+  --text-wordmark--letter-spacing: -0.03em;
+  --text-wordmark--font-weight: 600;
+
+  --text-section: 16px;
+  --text-section--line-height: 1.35;
+  --text-section--letter-spacing: -0.025em;
+  --text-section--font-weight: 600;
+
+  --text-body-lg: 15.5px;
+  --text-body-lg--line-height: 1.65;
+
+  --text-nav: 14.5px;
+  --text-nav--line-height: 1.4;
+
+  --text-body: 14.5px;
+  --text-body--line-height: 1.6;
+
+  --text-btn: 14px;
+  --text-btn--line-height: 1.2;
+  --text-btn--font-weight: 600;
+
+  --text-body-sm: 13.5px;
+  --text-body-sm--line-height: 1.6;
+
+  --text-ui: 13px;
+  --text-ui--line-height: 1.45;
+
+  --text-label: 12.5px;
+  --text-label--line-height: 1.5;
+
+  --text-caption: 11.5px;
+  --text-caption--line-height: 1.5;
+
+  --text-overline: 11.5px;
+  --text-overline--line-height: 1.4;
+  --text-overline--letter-spacing: 0.06em;
+  --text-overline--font-weight: 600;
+
+  --text-mono-xs: 10.5px;
+  --text-mono-xs--line-height: 1.5;
+  --text-mono-sm: 11px;
+  --text-mono-sm--line-height: 1.5;
+  --text-mono: 12px;
+  --text-mono--line-height: 1.5;
+  --text-mono-lg: 14px;
+  --text-mono-lg--line-height: 1.5;
+
+  /* ---------- motion ---------- */
+  --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ---------- gabarit ---------- */
+  --spacing-sidebar: 212px;
+  --spacing-rail-sm: 340px;
+  --spacing-rail: 372px;
+  --spacing-rail-lg: 452px;
+  --spacing-wizard: 1080px;
+  --spacing-drawer: 480px;
+  --spacing-modal: 560px;
+  --spacing-command: 680px;
+  --spacing-public: 820px;
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    line-height: 1.6;
+  }
+
+  /* Liens — définis même si le design en compte peu :
+     un lien non stylé retombe sur le bleu du navigateur. */
+  a {
+    color: var(--color-ink-900);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ink-300);
+    text-underline-offset: 3px;
+  }
+  a:hover {
+    color: var(--color-indigo-text);
+    text-decoration-color: var(--color-indigo-text);
+  }
+
+  /* Focus — jamais supprimé, jamais remplacé par une ombre */
+  :focus-visible {
+    outline: 2px solid var(--color-indigo);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+
+  /* Chiffres alignés partout où ils sont comparés */
+  .tabular,
+  [data-metric],
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--color-indigo-tint);
+    color: var(--color-indigo-deep);
+  }
+}
+
+/* ============================================================
+   ICÔNES — Material Symbols Rounded, graisse 300, non rempli.
+   Chargées dans app/layout.tsx via <link>. Aucune autre lib.
+   ============================================================ */
+
+@layer components {
+  .material-symbols-rounded {
+    font-family: 'Material Symbols Rounded';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    direction: ltr;
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 300,
+      'GRAD' 0,
+      'opsz' 24;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+}
+
+/* ============================================================
+   ANIMATIONS — table normative DS v2 §12.
+   Toute animation hors de ce bloc est un ajout non autorisé.
+   ============================================================ */
+
+@layer utilities {
+  @keyframes co-enter-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes co-enter-down {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes co-enter-right {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes co-decision-in {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes co-decision-out {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+  }
+  @keyframes co-modal-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes co-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes co-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  @keyframes co-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Entrée de panneau au montage de route */
+  .co-enter {
+    animation: co-enter-up 220ms var(--ease-out-quart) both;
+  }
+  /* Ligne d'extraction en direct — décalage géré en JS (60ms/ligne) */
+  .co-enter-row {
+    animation: co-enter-up 200ms var(--ease-out-quart) both;
+  }
+  .co-decision-in {
+    animation: co-decision-in 180ms var(--ease-out-quart) both;
+  }
+  .co-decision-out {
+    animation: co-decision-out 180ms var(--ease-out-quart) both;
+  }
+  .co-modal-in {
+    animation: co-modal-in 240ms var(--ease-out-quart) both;
+  }
+  .co-drawer-in {
+    animation: co-enter-right 240ms var(--ease-out-quart) both;
+  }
+  .co-command-in {
+    animation: co-enter-down 180ms var(--ease-out-quart) both;
+  }
+  .co-toast-in {
+    animation: co-toast-in 200ms var(--ease-out-quart) both;
+  }
+  /* Icône autorenew uniquement */
+  .co-spin {
+    animation: co-spin 1100ms linear infinite;
+  }
+  /* Squelette : pulsation d'opacité, JAMAIS de shimmer en dégradé */
+  .co-skeleton {
+    animation: co-pulse 1400ms var(--ease-standard) infinite;
+  }
+  /* Barre de progression : linéaire, une progression ne rebondit pas */
+  .co-progress {
+    transition: width 400ms linear;
+  }
+  /* Hover : couleur seulement, jamais de transform */
+  .co-hover {
+    transition:
+      background-color 160ms var(--ease-standard),
+      color 160ms var(--ease-standard),
+      border-color 160ms var(--ease-standard);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+  }
+  .co-enter,
+  .co-enter-row,
+  .co-decision-in,
+  .co-decision-out,
+  .co-modal-in,
+  .co-drawer-in,
+  .co-command-in,
+  .co-toast-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

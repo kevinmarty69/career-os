@@ -8,6 +8,7 @@ const focusableSelector =
 export function useDialogFocus<T extends HTMLElement>(
   onClose: () => void,
   closeDisabled = false,
+  enabled = true,
 ) {
   const dialog = useRef<T>(null);
   const close = useRef(onClose);
@@ -19,6 +20,7 @@ export function useDialogFocus<T extends HTMLElement>(
   }, [closeDisabled, onClose]);
 
   useEffect(() => {
+    if (!enabled) return;
     const node = dialog.current;
     const previous =
       document.activeElement instanceof HTMLElement
@@ -64,7 +66,7 @@ export function useDialogFocus<T extends HTMLElement>(
       document.removeEventListener('keydown', onKeyDown);
       requestAnimationFrame(() => previous?.focus());
     };
-  }, []);
+  }, [enabled]);
 
   return dialog;
 }

@@ -9,6 +9,8 @@ import './styles/workspace.css';
 import './styles/publication.css';
 import './styles/auth.css';
 import './design-system.css';
+import './handoff.css';
+import { ToastProvider } from '@/components/feedback';
 
 const sans = Instrument_Sans({
   subsets: ['latin'],
@@ -47,7 +49,9 @@ export default async function RootLayout({
       lang={locale}
     >
       <body>
-        <I18nProvider initialLocale={locale}>{children}</I18nProvider>
+        <I18nProvider initialLocale={locale}>
+          <ToastProvider>{children}</ToastProvider>
+        </I18nProvider>
       </body>
     </html>
   );

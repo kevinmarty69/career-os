@@ -41,8 +41,8 @@ for (const locale of ['en', 'fr'] as const) {
     });
     const example =
       locale === 'fr'
-        ? 'Aperçu · exemple fictif'
-        : 'Preview · illustrative example';
+        ? 'Exemple — vos propres preuves apparaîtront ici.'
+        : 'Example — your own evidence will appear here.';
     for (const [path, kind] of [
       ['/', 'memory'],
       ['/memory', 'memory'],
@@ -54,15 +54,19 @@ for (const locale of ['en', 'fr'] as const) {
       await page.goto(path);
       const state = page.locator(`[data-onboarding="${kind}"]`);
       await expect(state).toBeVisible();
-      await expect(state.locator('figcaption')).toContainText(example);
-      await expect(state.locator('ol').first().locator('li')).toHaveCount(3);
+      if (kind === 'applications') {
+        await expect(state.getByRole('heading', { level: 3 })).toHaveCount(5);
+      } else {
+        await expect(state.locator('figcaption')).toContainText(example);
+      }
+      await expect(state.locator('button.bg-ink-900')).toHaveCount(1);
       expect(
         await state
           .locator('h2 + p')
           .evaluate((element) =>
             parseFloat(getComputedStyle(element).fontSize),
           ),
-      ).toBeGreaterThanOrEqual(14.5);
+      ).toBeGreaterThanOrEqual(13.5);
       await expect(
         page.getByText('Career memory fully sourced', { exact: true }),
       ).toHaveCount(0);
@@ -86,7 +90,7 @@ for (const locale of ['en', 'fr'] as const) {
     await page.goto('/');
     await page
       .locator('[data-onboarding="memory"]')
-      .getByRole('link', {
+      .getByRole('button', {
         name: locale === 'fr' ? 'Importer mon CV' : 'Import my CV',
       })
       .click();
@@ -97,16 +101,15 @@ for (const locale of ['en', 'fr'] as const) {
       .getByRole('link', {
         name:
           locale === 'fr'
-            ? 'Pas de CV sous la main ? Collez vos notes'
-            : 'No CV handy? Paste your career notes',
+            ? 'PDF, DOCX ou coller le texte'
+            : 'PDF, DOCX or paste text',
       })
       .click();
     await expect(page.locator('#profile-text')).toBeVisible();
     await page.goto('/applications');
     await page
       .getByRole('button', {
-        name:
-          locale === 'fr' ? 'Ajouter ma première offre' : 'Add my first job',
+        name: locale === 'fr' ? 'Coller une offre' : 'Paste a job',
       })
       .click();
     await expect(page.getByRole('dialog')).toBeVisible();
