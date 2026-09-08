@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { syntheticProfile } from '../../lib/fixture';
 import { applicationId, mockPersistedWorkspace } from './persisted-workspace';
 
 const screens = [
@@ -47,6 +48,49 @@ test('renders route headings with mocked persisted data', async ({ page }) => {
         page.getByRole('heading', { name: 'Écran non documenté' }),
       ).toHaveCount(0);
     });
+  }
+});
+
+test('keeps sidebar labels and counters on one line in both languages', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await mockPersistedWorkspace(page);
+  await page.route('**/api/profile', (route) =>
+    route.fulfill({
+      json: {
+        revision: 1,
+        profile: {
+          ...syntheticProfile,
+          claims: Array.from({ length: 20 }, (_, index) => ({
+            ...syntheticProfile.claims[0],
+            id: `claim-${index}`,
+          })),
+        },
+      },
+    }),
+  );
+  for (const locale of ['en', 'fr']) {
+    await context.addCookies([
+      { name: 'career-os-locale', value: locale, url: 'http://localhost:3117' },
+    ]);
+    await page.goto('/memory');
+    const link = page.locator('.co-sidebar nav > a[href="/memory"]');
+    await expect(link).toBeVisible();
+    await expect(link.locator('b')).toHaveText('20');
+    const label = link.locator('span:not(.co-icon)');
+    await expect(label).toHaveCSS('white-space', 'nowrap');
+    expect(
+      await label.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    const labelBounds = await label.boundingBox();
+    const countBounds = await link.locator('b').boundingBox();
+    expect(labelBounds!.x + labelBounds!.width).toBeLessThanOrEqual(
+      countBounds!.x,
+    );
   }
 });
 

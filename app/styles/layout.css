@@ -169,6 +169,22 @@
   margin-left: auto;
 }
 
+.co-sidebar nav > a:has(> b) {
+  column-gap: 8px;
+}
+
+.co-sidebar nav > a > span:not(.co-icon) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.co-sidebar nav > a > .co-icon,
+.co-sidebar nav > a > b {
+  flex-shrink: 0;
+}
+
 .co-command kbd {
   padding: 3px 6px;
   color: var(--co-text-4);
