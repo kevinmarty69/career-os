@@ -21,9 +21,12 @@ import {
   PrivacyScreen,
 } from '@/components/settings/service-settings-screen';
 import { UnavailableScreen } from '@/components/layout/unavailable-screen';
+import { GuidedInterviewScreen } from '@/components/handoff/guided-interview';
+import { SystemState } from '@/components/handoff/system-state';
+import { AppShell } from '@/components/layout/app-shell';
+import { LandingScreen } from '@/components/handoff/landing';
 
 const unavailableRoutes: Record<string, [string, string, string]> = {
-  '/memory/interview': ['Entretien guidé', 'Guided interview', '/memory'],
   '/memory/conflicts': [
     'Conflits entre sources',
     'Source conflicts',
@@ -43,6 +46,8 @@ export function KitRoutePage({
   query: Record<string, string | string[] | undefined>;
 }) {
   const { locale } = useI18n();
+  if (path === '/welcome') return <LandingScreen />;
+  if (path === '/memory/interview') return <GuidedInterviewScreen />;
   if (path === '/settings/profile') return <ProfileSettingsScreen />;
   if (path === '/') return <HomeScreen />;
   if (path === '/memory') return <MemoryScreen />;
@@ -104,10 +109,8 @@ export function KitRoutePage({
       />
     );
   return (
-    <UnavailableScreen
-      path={path}
-      title={locale === 'fr' ? 'Page introuvable' : 'Page not found'}
-      href="/"
-    />
+    <AppShell path={path}>
+      <SystemState kind="not-found" />
+    </AppShell>
   );
 }

@@ -5,6 +5,7 @@ import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
 import { Badge, Icon } from '@/components/ui/primitives';
 import { memoryOverviewMessages } from '@/lib/i18n/dictionaries/memory-overview';
 import { type Profile } from '@/lib/schemas';
+import { interviewSourceLocator, readInterview } from '@/lib/guided-interview';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useCareerMemory } from './use-career-memory';
@@ -16,6 +17,10 @@ export function CareerMemoryOverview() {
   const { locale } = useI18n();
   const t = useTranslations([memoryOverviewMessages]);
   const memory = useCareerMemory();
+  const interview = readInterview(memory.profile);
+  const interviewSourceId = memory.profile.sources.find(
+    (source) => source.locator === interviewSourceLocator,
+  )?.id;
   const [view, setView] = useState<View>('graph');
   const visibleClaims = useMemo(
     () =>
@@ -150,7 +155,14 @@ export function CareerMemoryOverview() {
                   <Icon>description</Icon>
                   {item.label}
                 </span>
-                <blockquote>“{item.excerpt}”</blockquote>
+                <blockquote>
+                  “
+                  {item.sourceId === interviewSourceId
+                    ? interview.statement ||
+                      interview.answers.filter(Boolean).join('\n\n')
+                    : item.excerpt}
+                  ”
+                </blockquote>
               </article>
             ))}
             {!evidence.length ? (

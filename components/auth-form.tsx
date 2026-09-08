@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { browserSupabase } from '@/lib/auth-client';
@@ -10,6 +11,7 @@ import {
   useTranslations,
 } from '@/components/i18n/i18n-provider';
 import { authMessages } from '@/lib/i18n/dictionaries/auth';
+import { HostingOptions } from '@/components/handoff/hosting-options';
 
 type Mode = 'sign-in' | 'sign-up' | 'workspace';
 type OrganizationChoice = { id: string; name: string };
@@ -22,6 +24,7 @@ export function AuthForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [passwordLogin, setPasswordLogin] = useState(false);
   const [accountName, setAccountName] = useState('Personal');
   const [organizations, setOrganizations] = useState<OrganizationChoice[]>([]);
 
@@ -63,6 +66,24 @@ export function AuthForm() {
     const name = String(form.get('name') ?? '').trim();
 
     try {
+      if (!passwordLogin) {
+        const result = await browserSupabase().auth.signInWithOtp({
+          email,
+          options: {
+            shouldCreateUser: mode === 'sign-up',
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            ...(mode === 'sign-up' ? { data: { name } } : {}),
+          },
+        });
+        if (result.error) throw new Error('AUTH_FAILED');
+        setNotice(
+          locale === 'fr'
+            ? 'Si cette adresse est autorisée, un lien de connexion vous a été envoyé. Vérifiez votre boîte mail.'
+            : 'If this address is eligible, a sign-in link has been sent. Check your email.',
+        );
+        setPending(false);
+        return;
+      }
       const result =
         mode === 'sign-up'
           ? await browserSupabase().auth.signUp({
@@ -144,11 +165,16 @@ export function AuthForm() {
   }
 
   return (
-    <main className="auth-shell">
+    <main className="auth-shell auth-handoff">
       <section className="auth-card" aria-labelledby="auth-title">
         <div className="auth-brand">
           <span className="brand-mark" aria-hidden="true">
-            C
+            <Image
+              src="/brand/symbol/careeros-symbol-inverse.svg"
+              width={18}
+              height={18}
+              alt=""
+            />
           </span>
           <strong>Career OS</strong>
           <LocaleSwitch compact />
@@ -274,22 +300,30 @@ export function AuthForm() {
                 type="email"
               />
             </label>
-            <label>
-              {t('auth.password')}{' '}
-              <input
-                autoComplete={
-                  mode === 'sign-in' ? 'current-password' : 'new-password'
-                }
-                minLength={12}
-                maxLength={128}
-                name="password"
-                required
-                type="password"
-              />
-              {mode === 'sign-up' ? (
-                <span>{t('auth.use.at.least.12.characters')}</span>
-              ) : null}
-            </label>
+            {passwordLogin ? (
+              <label>
+                {t('auth.password')}{' '}
+                <input
+                  autoComplete={
+                    mode === 'sign-in' ? 'current-password' : 'new-password'
+                  }
+                  minLength={12}
+                  maxLength={128}
+                  name="password"
+                  required
+                  type="password"
+                />
+                {mode === 'sign-up' ? (
+                  <span>{t('auth.use.at.least.12.characters')}</span>
+                ) : null}
+              </label>
+            ) : (
+              <p className="auth-method-hint">
+                {locale === 'fr'
+                  ? 'Un lien de connexion par email. Aucun mot de passe à retenir.'
+                  : 'An email sign-in link. No password to remember.'}
+              </p>
+            )}
             {error ? (
               <p className="auth-error" role="alert">
                 {error}
@@ -298,9 +332,31 @@ export function AuthForm() {
             <button disabled={pending} type="submit">
               {pending
                 ? t('auth.please.wait')
-                : mode === 'sign-in'
-                  ? t('auth.sign.in')
-                  : t('auth.create.account')}
+                : !passwordLogin
+                  ? locale === 'fr'
+                    ? 'Recevoir mon lien'
+                    : 'Send my sign-in link'
+                  : mode === 'sign-in'
+                    ? t('auth.sign.in')
+                    : t('auth.create.account')}
+            </button>
+            <button
+              type="button"
+              className="auth-method-toggle"
+              disabled={pending}
+              onClick={() => {
+                setPasswordLogin(!passwordLogin);
+                setError('');
+                setNotice('');
+              }}
+            >
+              {passwordLogin
+                ? locale === 'fr'
+                  ? 'Utiliser un lien de connexion'
+                  : 'Use an email sign-in link'
+                : locale === 'fr'
+                  ? 'Utiliser un mot de passe'
+                  : 'Use a password'}
             </button>
           </form>
         )}
@@ -308,6 +364,7 @@ export function AuthForm() {
           {t('auth.back.to.local.workspace')}{' '}
         </Link>
       </section>
+      {mode !== 'workspace' && <HostingOptions />}
     </main>
   );
 }

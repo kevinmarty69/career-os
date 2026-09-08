@@ -22,6 +22,7 @@ import {
 } from '@/lib/server/publication-input';
 import Link from 'next/link';
 import Image from 'next/image';
+import { OfflineNotice } from '@/components/handoff/system-state';
 import { type ReactNode, useEffect, useState } from 'react';
 
 export function AppShell({
@@ -140,6 +141,7 @@ export function AppShell({
           <ProfileMenu placement="below" />
         </div>
         <div className="co-content" id="main-content" tabIndex={-1}>
+          <OfflineNotice />
           {children}
         </div>
       </section>

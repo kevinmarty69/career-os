@@ -342,10 +342,11 @@ export function Skeleton({
 
 /** Squelette de transition de route — en-tête + 3 lignes, pas plus. */
 export function SkeletonBlock({ className }: { className?: string }) {
+  const fr = useI18n().locale === 'fr';
   return (
     <div
       role="status"
-      aria-label="Chargement"
+      aria-label={fr ? 'Chargement' : 'Loading'}
       className={cn('flex flex-col gap-4 rounded-card bg-card p-5', className)}
     >
       <div className="flex items-center gap-[13px]">

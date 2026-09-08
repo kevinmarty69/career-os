@@ -47,7 +47,12 @@ export function SessionManager() {
     setRevoking('others');
     setError(false);
     try {
-      const result = await browserSupabase().auth.signOut({ scope: 'others' });
+      const auth = browserSupabase().auth;
+      const session = await auth.getSession();
+      // signOut is a successful no-op without a local session. Do not claim revocation.
+      if (session.error || !session.data.session)
+        throw new Error('Session unavailable');
+      const result = await auth.signOut({ scope: 'others' });
       if (result.error) setError(true);
       else
         setSessions((current) =>

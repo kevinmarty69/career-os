@@ -567,22 +567,24 @@ test('settings expose measured worker availability and honest unavailable servic
       page.getByRole('link', { name: 'Models & agents', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
   }
-  await expect(page.getByText('missing', { exact: true })).toHaveCount(
+  await expect(page.getByText('No heartbeat', { exact: true })).toHaveCount(
     services.length,
   );
   await expect(page.getByText('3 / 3 actifs')).toHaveCount(0);
   await page.goto('/settings/billing');
   await expect(
-    page.getByRole('heading', { name: 'Billing unavailable' }),
-  ).toBeVisible();
+    page.getByRole('button', { name: 'Billing unavailable' }),
+  ).toBeDisabled();
   await expect(
     page.getByRole('button', { name: /Upgrade|Subscribe|Pay/ }),
   ).toHaveCount(0);
   await page.goto('/settings/integrations');
   await expect(
-    page.getByRole('heading', { name: 'Connectors unavailable' }),
+    page
+      .getByText('Not configured · no access granted', { exact: true })
+      .first(),
   ).toBeVisible();
   await expect(
-    page.getByRole('link', { name: 'Import a document' }),
+    page.getByRole('link', { name: 'Import a document' }).first(),
   ).toHaveAttribute('href', '/memory/import');
 });

@@ -7,6 +7,7 @@ import { useTranslations } from '@/components/i18n/i18n-provider';
 import { Icon } from '@/components/ui/primitives';
 import { ProfileMenu } from './profile-menu';
 import Link from 'next/link';
+import Image from 'next/image';
 import { type ReactNode } from 'react';
 
 export function SettingsNav({ active }: { active: string }) {
@@ -67,7 +68,12 @@ export function SettingsShell({
         <header>
           <Link className="co-brand" href="/">
             <span>
-              <i />
+              <Image
+                src="/brand/symbol/careeros-symbol-inverse.svg"
+                width={18}
+                height={18}
+                alt=""
+              />
             </span>
             <strong>Career OS</strong>
           </Link>

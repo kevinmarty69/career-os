@@ -6,7 +6,10 @@ import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { SettingsShell } from '@/components/layout/settings-shell';
 import { SessionManager } from '@/components/settings/session-manager';
-import { Badge, PageHeader } from '@/components/ui/primitives';
+import { PageHeader } from '@/components/ui/primitives';
+import { Card, Panel } from '@/components/shell';
+import { Button, Icon, Mono } from '@/components/ui';
+import { SkeletonBlock, useDelayedPending } from '@/components/feedback';
 import { readInstanceStatus } from '@/lib/career-api';
 import { instanceStatusSchema } from '@/lib/run-contract';
 import Link from 'next/link';
@@ -20,6 +23,7 @@ export function ModelsScreen() {
   const [status, setStatus] =
     useState<ReturnType<typeof instanceStatusSchema.parse>>();
   const [error, setError] = useState(false);
+  const showSkeleton = useDelayedPending(!status && !error);
   useEffect(() => {
     const controller = new AbortController();
     void readInstanceStatus(controller.signal)
@@ -43,9 +47,11 @@ export function ModelsScreen() {
             : 'Worker status for this instance.'
         }
       />
-      <section className="co-panel">
-        <h2>{fr ? 'Configuration de l’instance' : 'Instance configuration'}</h2>
-        <p>
+      <Panel className="co-kit">
+        <h2 className="m-0 text-section">
+          {fr ? 'Un modèle par étape' : 'A model for each step'}
+        </h2>
+        <p className="m-0 text-body-sm text-ink-700">
           {fr
             ? 'Les modèles sont configurés par l’administrateur de l’instance. Leur configuration ne peut pas être modifiée depuis cet écran.'
             : 'Models are configured by the instance administrator. Their configuration cannot be changed from this screen.'}
@@ -57,21 +63,74 @@ export function ModelsScreen() {
               : 'Worker status unavailable.'}
           </p>
         ) : !status ? (
-          <p role="status">{fr ? t('active-routes.loading') : 'Loading…'}</p>
+          showSkeleton ? (
+            <SkeletonBlock />
+          ) : null
         ) : (
-          status.services.map((service) => (
-            <div className="co-model-row" key={service.service}>
-              <strong>{service.service}</strong>
-              <Badge tone={service.status === 'fresh' ? 'ok' : 'warn'}>
-                {service.status}
-              </Badge>
-            </div>
-          ))
+          <div className="overflow-x-auto rounded-card bg-card">
+            <table className="w-full text-left text-label">
+              <thead className="bg-panel text-ink-600">
+                <tr>
+                  <th className="p-4">{fr ? 'Étape' : 'Stage'}</th>
+                  <th className="p-4">{fr ? 'Worker' : 'Worker'}</th>
+                  <th className="p-4">
+                    {fr ? 'Modèle / coût' : 'Model / cost'}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {status.services.map((service) => (
+                  <tr key={service.service} className="border-b border-panel">
+                    <th className="p-4 font-semibold break-words">
+                      {service.service}
+                    </th>
+                    <td className="p-4">
+                      <span
+                        className={
+                          service.status === 'fresh'
+                            ? 'text-green-strong'
+                            : 'text-amber-strong'
+                        }
+                      >
+                        {service.status === 'fresh'
+                          ? fr
+                            ? 'Disponible'
+                            : 'Available'
+                          : service.status === 'stale'
+                            ? fr
+                              ? 'Signal ancien'
+                              : 'Stale heartbeat'
+                            : fr
+                              ? 'Sans signal'
+                              : 'No heartbeat'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-ink-600">
+                      {fr
+                        ? 'Voir la configuration administrateur'
+                        : 'See administrator configuration'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-        <Link className="co-button quiet" href="/runs">
+        <Card padding={18}>
+          <div className="flex gap-3 text-body-sm text-ink-700">
+            <Icon name="lock" />
+            {fr
+              ? 'Les permissions des sources restent obligatoires. Cet écran ne modifie ni les modèles, ni les limites de dépenses, ni les autorisations d’envoi.'
+              : 'Source permissions remain mandatory. This screen does not change models, spending limits or data-sharing permissions.'}
+          </div>
+        </Card>
+        <Link
+          className="text-label font-semibold text-ink-900 underline"
+          href="/runs"
+        >
           {fr ? 'Consulter le journal des agents' : 'View agent run journal'}
         </Link>
-      </section>
+      </Panel>
     </SettingsShell>
   );
 }
@@ -86,17 +145,50 @@ export function BillingScreen() {
       <PageHeader
         title={fr ? t('active-routes.subscription') : 'Subscription'}
       />
-      <section className="co-panel">
-        <h2>{fr ? 'Facturation indisponible' : 'Billing unavailable'}</h2>
-        <p>
-          {fr
-            ? 'Cette instance ne propose pas de gestion d’abonnement ou de paiement.'
-            : 'This instance does not provide subscription or payment management.'}
-        </p>
-        <Link className="co-button quiet" href="/settings/models">
-          {fr ? 'Voir l’instance' : 'View instance'}
-        </Link>
-      </section>
+      <div className="co-kit grid gap-4 lg:grid-cols-2">
+        <Card padding={24}>
+          <div className="flex items-center gap-3">
+            <Icon name="dns" size={23} />
+            <h2 className="m-0 text-section">
+              {fr ? 'Votre instance' : 'Your instance'}
+            </h2>
+            <Mono className="ml-auto">AGPL-3.0</Mono>
+          </div>
+          <p className="m-0 text-body-sm text-ink-700">
+            {fr
+              ? 'Cette instance ne propose pas de gestion d’abonnement ou de paiement.'
+              : 'This instance does not provide subscription or payment management.'}
+          </p>
+          <Link
+            className="text-label text-ink-900 underline"
+            href="/settings/models"
+          >
+            {fr ? 'Voir l’instance' : 'View instance'}
+          </Link>
+          <Link
+            className="text-label text-ink-900 underline"
+            href="/settings/data"
+          >
+            {fr ? 'Exporter mes données' : 'Export my data'}
+          </Link>
+        </Card>
+        <Card padding={24} className="!bg-ink-900 text-white">
+          <div className="flex items-center gap-3">
+            <Icon name="cloud" size={23} />
+            <h2 className="m-0 text-section text-white">
+              {fr ? 'SaaS hébergé' : 'Managed cloud'}
+            </h2>
+          </div>
+          <p className="m-0 text-body-sm text-white/80">
+            {fr
+              ? 'L’offre cloud n’est pas activée. Aucun essai payant, abonnement ou prélèvement ne peut être démarré ici.'
+              : 'The cloud offer is not enabled. No paid trial, subscription or charge can be started here.'}
+          </p>
+          <Button disabled>
+            {fr ? 'Facturation indisponible' : 'Billing unavailable'}
+          </Button>
+        </Card>
+      </div>
     </SettingsShell>
   );
 }
@@ -111,20 +203,67 @@ export function IntegrationsScreen() {
       <PageHeader
         title={fr ? t('active-routes.integrations') : 'Integrations'}
       />
-      <section className="co-panel">
-        <h2>{fr ? 'Connecteurs non disponibles' : 'Connectors unavailable'}</h2>
-        <p>
-          {fr
-            ? 'Aucun connecteur de compte externe ne peut être configuré ici. Vous pouvez importer vos documents et ajouter des offres depuis leur URL.'
-            : 'External account connectors cannot be configured here. You can import documents and add jobs using their URL.'}
-        </p>
-        <Link className="co-button quiet" href="/memory/import">
-          {fr ? 'Importer un document' : 'Import a document'}
-        </Link>
-        <Link className="co-button quiet" href="/applications">
-          {fr ? 'Ajouter une offre' : 'Add a job'}
-        </Link>
-      </section>
+      <div className="co-kit grid gap-4 lg:grid-cols-2">
+        {[
+          [
+            'code',
+            'GitHub',
+            fr
+              ? 'Connecteur non configuré. Vous pouvez importer manuellement un README ou la description de votre contribution.'
+              : 'Connector not configured. Manually import a README or a description of your contribution.',
+          ],
+          [
+            'badge',
+            'LinkedIn',
+            fr
+              ? 'Import manuel uniquement. Collez votre parcours ou importez un document PDF ; aucune synchronisation de compte n’est active.'
+              : 'Manual import only. Paste your experience or import a PDF; no account synchronization is active.',
+          ],
+          [
+            'cloud_upload',
+            'Google Drive',
+            fr
+              ? 'Aucun accès à votre Drive. Téléchargez les documents choisis puis importez-les dans votre mémoire.'
+              : 'No access to your Drive. Download the documents you choose, then import them into career memory.',
+          ],
+          [
+            'terminal',
+            fr ? 'Clé API personnelle' : 'Personal API key',
+            fr
+              ? 'La génération de clés personnelles n’est pas disponible. Aucune clé fictive n’est créée et aucune publication automatique n’est autorisée.'
+              : 'Personal key generation is unavailable. No sample key is created and automated publication is not permitted.',
+          ],
+        ].map(([icon, title, description]) => (
+          <Card key={title} padding={24}>
+            <div className="flex items-center gap-[14px]">
+              <span className="grid size-[42px] shrink-0 place-items-center rounded-tile bg-panel">
+                <Icon name={icon} size={23} />
+              </span>
+              <h2 className="m-0 text-section">{title}</h2>
+            </div>
+            <p className="m-0 text-body-sm text-ink-700">{description}</p>
+            <div className="rounded-control bg-panel p-4 text-label text-ink-600">
+              {title === 'LinkedIn'
+                ? fr
+                  ? 'Manuel · PDF, DOCX ou texte'
+                  : 'Manual · PDF, DOCX or text'
+                : fr
+                  ? 'Non configuré · aucun accès accordé'
+                  : 'Not configured · no access granted'}
+            </div>
+            {icon === 'terminal' ? (
+              <Button disabled>{fr ? 'Indisponible' : 'Unavailable'}</Button>
+            ) : (
+              <Link
+                className="text-label text-ink-900 font-semibold underline"
+                href="/memory/import"
+              >
+                {fr ? 'Importer un document' : 'Import a document'}
+              </Link>
+            )}
+          </Card>
+        ))}
+      </div>
     </SettingsShell>
   );
 }

@@ -75,8 +75,8 @@ export function useCareerMemory() {
 
   const coverage = useMemo(() => memoryCoverage(profile), [profile]);
 
-  async function save() {
-    const parsed = profileSchema.safeParse(profile);
+  async function save(nextProfile: Profile = profile) {
+    const parsed = profileSchema.safeParse(nextProfile);
     if (!parsed.success) {
       setMessage(
         locale === 'fr'

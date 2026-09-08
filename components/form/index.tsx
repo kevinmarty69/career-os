@@ -199,6 +199,7 @@ export function TextArea({
   invalid = false,
   disabled = false,
   rows = 4,
+  maxLength,
   id,
   className,
 }: {
@@ -209,6 +210,7 @@ export function TextArea({
   invalid?: boolean;
   disabled?: boolean;
   rows?: number;
+  maxLength?: number;
   id?: string;
   className?: string;
 }) {
@@ -217,6 +219,7 @@ export function TextArea({
       id={id}
       value={value}
       rows={rows}
+      maxLength={maxLength}
       disabled={disabled}
       placeholder={placeholder}
       aria-invalid={invalid || undefined}

@@ -14,6 +14,15 @@
 @source "../components/feedback";
 @source "../components/shell";
 @source "../components/handoff";
+@source "../components/settings/service-settings-screen.tsx";
+
+.co-kit :focus-visible,
+.co-kit-control:focus-visible,
+.co-drawer-in :focus-visible,
+.co-decision-in :focus-visible {
+  outline: 2px solid var(--color-ink-900) !important;
+  outline-offset: 3px;
+}
 
 .co-kit-checkbox:focus-visible + span {
   outline: 2px solid var(--color-ink-900);

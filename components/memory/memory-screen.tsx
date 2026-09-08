@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
 import { activeRoutesMessages } from '@/lib/i18n/dictionaries/active-routes';
 import { demoMessages } from '@/lib/i18n/dictionaries/demo';
@@ -12,6 +12,7 @@ import { CareerMemoryOverview } from '@/components/memory/career-memory-overview
 import { memoryOverviewMessages } from '@/lib/i18n/dictionaries/memory-overview';
 
 export function MemoryScreen() {
+  const fr = useI18n().locale === 'fr';
   const t = useTranslations([
     memoryMessages,
     activeRoutesMessages,
@@ -52,10 +53,16 @@ export function MemoryScreen() {
         title={t('demo.career.memory')}
         copy={t('memory.overview.copy')}
         actions={
-          <Link className="co-button quiet" href="/memory/import">
-            <Icon>upload_file</Icon>
-            {t('memory.overview.import')}
-          </Link>
+          <>
+            <Link className="co-button quiet" href="/memory/interview">
+              <Icon>psychology</Icon>
+              {fr ? 'Entretien guidé' : 'Guided interview'}
+            </Link>
+            <Link className="co-button quiet" href="/memory/import">
+              <Icon>upload_file</Icon>
+              {t('memory.overview.import')}
+            </Link>
+          </>
         }
       />
       <CareerMemoryOverview />

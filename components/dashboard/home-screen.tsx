@@ -16,6 +16,7 @@ import {
 } from '@/lib/dashboard-priority';
 import { initials } from '@/lib/initials';
 import Link from 'next/link';
+import { NotificationsButton } from '@/components/handoff/notifications';
 
 export function HomeScreen() {
   const { locale } = useI18n();
@@ -86,6 +87,7 @@ export function HomeScreen() {
       <AppShell path="/">
         <div className="co-home-v2">
           <PageHeader
+            actions={<NotificationsButton />}
             title={
               locale === 'fr'
                 ? `Bienvenue${firstName ? ` ${firstName}` : ''}`
@@ -130,6 +132,7 @@ export function HomeScreen() {
               {firstName ? ` ${firstName}` : ''}
             </h1>
           </div>
+          <NotificationsButton />
           <Link className="co-home-import" href="/applications/new">
             <Icon>link</Icon>
             <span>

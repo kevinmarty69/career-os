@@ -16,8 +16,41 @@
 
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
 import type { ReactNode } from 'react';
+
+// The designer's named font sizes are not colors. Preserve both when merging.
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      text: [
+        'decision',
+        'display',
+        'h1',
+        'hero',
+        'h2',
+        'metric',
+        'h3',
+        'drawer',
+        'wordmark',
+        'section',
+        'body-lg',
+        'nav',
+        'body',
+        'btn',
+        'body-sm',
+        'ui',
+        'label',
+        'caption',
+        'overline',
+        'mono-xs',
+        'mono-sm',
+        'mono',
+        'mono-lg',
+      ],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -81,12 +114,13 @@ const buttonVariants: Record<ButtonVariant, string> = {
     'rounded-pill bg-card text-ink-700 text-[13.5px] font-medium px-[20px] py-[13px] hover:bg-panel',
   'secondary-on-panel':
     'rounded-pill bg-panel text-ink-700 text-[13.5px] font-medium px-[20px] py-[13px] hover:bg-canvas',
-  ghost: 'text-ink-600 text-btn font-medium px-2 py-[14px] hover:text-ink-900',
+  ghost:
+    'rounded-pill bg-transparent hover:bg-transparent text-ink-600 text-btn font-medium px-2 py-[14px] hover:text-ink-900',
   destructive:
     'rounded-pill bg-clay-strong text-white text-[13.5px] font-semibold px-[22px] py-[13px] hover:bg-clay-hover',
   icon: 'rounded-full bg-card size-[42px] text-ink-900 hover:bg-panel',
   inline:
-    'text-label font-semibold text-ink-900 underline decoration-ink-300 underline-offset-[3px] hover:decoration-ink-900',
+    'bg-transparent hover:bg-transparent px-0 py-0 text-label font-semibold text-ink-900 underline decoration-ink-300 underline-offset-[3px] hover:decoration-ink-900',
 };
 
 export function Button({
@@ -215,7 +249,7 @@ export function StatusChip({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-pill shrink-0',
+        'inline-flex w-fit items-center rounded-pill shrink-0',
         s.chip,
         sizes[size],
         className,

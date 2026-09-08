@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { existsSync } from 'node:fs';
+
+// Match Next's local build environment when constructing the synthetic auth cookie.
+// CI-provided variables keep precedence; no real authentication request is sent.
+if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
 test('lists device IDs and revokes other Supabase sessions without displaying bearer tokens', async ({
   context,
@@ -67,6 +72,7 @@ test('lists device IDs and revokes other Supabase sessions without displaying be
   });
   await revoke.click();
   await expect(manager.getByRole('alert')).toBeVisible();
+  expect(attempts).toBe(1);
   await expect(manager.getByText('2 active')).toBeVisible();
   await revoke.click();
   await expect(manager.getByText('1 active')).toBeVisible();
@@ -74,4 +80,34 @@ test('lists device IDs and revokes other Supabase sessions without displaying be
     0,
   );
   expect(attempts).toBe(2);
+});
+
+test('does not report revoked devices when the local auth session is missing', async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  await page.route('**/api/auth/sessions', (route) =>
+    route.fulfill({
+      json: {
+        currentSessionId: 'current',
+        sessions: ['current', 'other'].map((token) => ({
+          token,
+          createdAt: '2026-09-05T10:00:00.000Z',
+          updatedAt: '2026-09-05T10:00:00.000Z',
+        })),
+      },
+    }),
+  );
+  let authRequests = 0;
+  await page.route('**/auth/v1/**', (route) => {
+    authRequests += 1;
+    return route.abort();
+  });
+  await page.goto('/settings/privacy');
+  const manager = page.locator('.co-session-manager');
+  await manager.getByRole('button', { name: 'Sign out other devices' }).click();
+  await expect(manager.getByRole('alert')).toBeVisible();
+  await expect(manager.getByText('2 active')).toBeVisible();
+  expect(authRequests).toBe(0);
 });
