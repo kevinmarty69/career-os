@@ -56,6 +56,25 @@ synthetic accounts. Browser checks do not prove model quality or production
 operation. Destructive database fixtures are confined to isolated CI, not the
 connected Supabase project.
 
+## Final GitHub validation
+
+[CI run 34209828583](https://github.com/kevinmarty69/career-os/actions/runs/34209828583)
+passed on code commit `efa6db234fdc8f82d54afccdb1f032792c11531d`:
+
+- Formatting, lint, TypeScript and unit tests: 229 passed, zero failures, two
+  opt-in native checks skipped.
+- Full isolated SQL, export, semantic, worker and HTTP integration suites passed,
+  including real GoTrue sessions, capability publication and durable agent runs.
+- The complete desktop/mobile browser suite passed in one run: **154/154**.
+- Production dependency audit reported no known vulnerabilities.
+
+CI exercises uncovered and fixed its PostgreSQL cluster setup, GoTrue connection
+search path and web-login inheritance. The self-hosting instructions now grant
+identity access through `career_web` while keeping tenant-role activation explicit
+and worker logins NOINHERIT. These checks ran on GitHub, not on the workstation or
+the connected Supabase project. The later report-only commit does not change the
+validated application code.
+
 Live ATS check also found an actual Ashby compatibility bug: equity compensation
 can omit currency. The optional field is now accepted without inventing a salary;
 the n8n job and its 44-job public board parse successfully. Cohere uses the existing
