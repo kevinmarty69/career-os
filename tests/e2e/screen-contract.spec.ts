@@ -65,6 +65,11 @@ test('opens the documented command palette with the keyboard shortcut', async ({
   await expect(dialog).toBeVisible();
   const search = dialog.getByRole('searchbox', { name: 'Recherche globale' });
   await expect(search).toBeFocused();
+  await expect(search).toHaveCSS('outline-style', 'none');
+  await expect(dialog.locator('form label')).toHaveCSS(
+    'border-bottom-color',
+    'rgb(13, 13, 15)',
+  );
   await page.keyboard.press('Shift+Tab');
   await expect(
     dialog.getByRole('link', {

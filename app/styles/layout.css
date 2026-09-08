@@ -368,8 +368,12 @@
 }
 
 .co-command input:focus-visible {
-  outline: 3px solid var(--co-accent);
-  outline-offset: -3px;
+  /* The containing search row carries focus, not the global blue input ring. */
+  outline: none !important;
+}
+
+.co-command form label:focus-within {
+  border-bottom-color: var(--co-text);
 }
 
 .co-command form {
