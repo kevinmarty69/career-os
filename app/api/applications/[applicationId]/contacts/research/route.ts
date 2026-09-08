@@ -57,7 +57,7 @@ async function handle(
           ? 429
           : error instanceof PayloadTooLargeError
             ? 413
-            : error instanceof ZodError
+            : error instanceof ZodError || error instanceof SyntaxError
               ? 400
               : 503;
     return new Response(

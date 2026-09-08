@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useI18n } from '@/components/i18n/i18n-provider';
-import { Card } from '@/components/shell';
-import { Icon, Mono } from '@/components/ui';
+import { Card } from '@/components/ui/surfaces';
+import { Icon, Mono } from '@/components/ui/controls';
 
 export function HostingOptions() {
   const fr = useI18n().locale === 'fr';

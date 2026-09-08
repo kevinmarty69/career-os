@@ -1,0 +1,293 @@
+'use client';
+
+import { useTranslations } from '@/components/i18n/i18n-provider';
+import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
+import styles from './memory-import-flow.module.css';
+import Link from 'next/link';
+import { useRef, useState, type DragEvent } from 'react';
+import {
+  Icon,
+  PageHeading,
+  ErrorBanner,
+  type MemoryImportController as Controller,
+} from './memory-import-presentation';
+export function SourceStep({ controller }: { controller: Controller }) {
+  const t = useTranslations([memoryMessages]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const canReadPaste = controller.pasteText.trim().length > 0;
+  function chooseFile(files: FileList | null) {
+    const file = files?.item(0);
+    if (file) void controller.importFile(file);
+  }
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    chooseFile(event.dataTransfer.files);
+  }
+
+  return (
+    <div className={styles.flowStep} data-motion="enter">
+      <PageHeading
+        accessibleTitle={t('memory.add.your.background')}
+        copy={t('memory.import.resume.intro')}
+        eyebrow={t('memory.step.1.of.3')}
+        title={t('memory.import.your.resume')}
+        action={
+          <Link className={styles.ghostButton} href="/memory">
+            {t('memory.cancel')}
+          </Link>
+        }
+      />
+      <ErrorBanner message={controller.error} />
+      <div className={styles.sourceGrid}>
+        <section className={styles.sourcePanel} aria-labelledby="file-title">
+          <div
+            className={`${styles.dropzone} ${dragging ? styles.dragging : ''}`}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={onDrop}
+          >
+            <span className={styles.majorIcon}>
+              <Icon>picture_as_pdf</Icon>
+            </span>
+            <h2 id="file-title">{t('memory.drop.your.resume.here')}</h2>
+            <p>{t('memory.pdf.docx.or.txt.4.mb.maximum')}</p>
+            <button
+              className={styles.primaryButton}
+              onClick={() => inputRef.current?.click()}
+              type="button"
+            >
+              {t('memory.choose.a.file')}
+              <Icon>arrow_forward</Icon>
+            </button>
+            <input
+              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              className={styles.fileInput}
+              onChange={(event) => chooseFile(event.currentTarget.files)}
+              ref={inputRef}
+              type="file"
+            />
+          </div>
+          <div className={styles.pasteDivider}>
+            <span>{t('memory.or.paste.text')}</span>
+          </div>
+          <div className={styles.pasteFields}>
+            <label htmlFor="pasted-source-kind">
+              {t('memory.source.type.2')}
+              <select
+                id="pasted-source-kind"
+                onChange={(event) =>
+                  controller.setPasteSourceKind(
+                    event.target.value as Controller['pasteSourceKind'],
+                  )
+                }
+                value={controller.pasteSourceKind}
+              >
+                <option value="linkedin">{t('memory.linkedin.profile')}</option>
+                <option value="document">{t('memory.resume.as.text')}</option>
+                <option value="manual">{t('memory.career.notes')}</option>
+              </select>
+            </label>
+            <label htmlFor="profile-text">
+              {t('memory.content.to.analyze')}
+              <textarea
+                id="profile-text"
+                onChange={(event) =>
+                  controller.setPasteText(event.target.value)
+                }
+                placeholder={t('memory.paste.your.profile.text.here')}
+                value={controller.pasteText}
+              />
+            </label>
+            <button
+              className={styles.secondaryButton}
+              disabled={!canReadPaste}
+              onClick={() => void controller.importPastedText()}
+              type="button"
+            >
+              {t('memory.read.this.text')}
+              <Icon>arrow_forward</Icon>
+            </button>
+          </div>
+        </section>
+        <aside className={styles.privacyPanel}>
+          <div className={styles.panelHeading}>
+            <span className={styles.safeIcon}>
+              <Icon>shield</Icon>
+            </span>
+            <div>
+              <p>{t('memory.before.you.begin')}</p>
+              <h2>{t('memory.nothing.is.saved.without.your.approval')}</h2>
+            </div>
+          </div>
+          <ul>
+            <PrivacyItem
+              body={t('memory.the.raw.file.is.not.sent.to.the.server')}
+              title={t('memory.extraction.in.your.browser')}
+            />
+            <PrivacyItem
+              body={t('memory.every.claim.remains.editable.or.removable')}
+              title={t('memory.review.required')}
+            />
+            <PrivacyItem
+              body={t('memory.only.your.selection.is.saved.after.confirmation')}
+              title={t('memory.explicit.save')}
+            />
+          </ul>
+          <div className={styles.privacyFootnote}>
+            <Icon>info</Icon>
+            <p>{t('memory.you.will.review.everything.before.saving')}</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function PrivacyItem({ title, body }: { title: string; body: string }) {
+  return (
+    <li>
+      <Icon>check</Icon>
+      <span>
+        <strong>{title}</strong>
+        <small>{body}</small>
+      </span>
+    </li>
+  );
+}
+
+export function ReadingStep({ controller }: { controller: Controller }) {
+  const t = useTranslations([memoryMessages]);
+  return (
+    <div className={styles.flowStep} data-motion="enter">
+      <PageHeading
+        copy={t('memory.reading.resume.intro')}
+        eyebrow={t('memory.step.1.of.3')}
+        title={t('memory.reading.your.resume')}
+        action={
+          <button
+            className={styles.ghostButton}
+            onClick={controller.cancelReading}
+            type="button"
+          >
+            {t('memory.cancel.import')}
+          </button>
+        }
+      />
+      <div className={styles.readingLayout}>
+        <section aria-busy="true" className={styles.readingPanel}>
+          <header className={styles.fileHeader}>
+            <span className={styles.fileIcon}>
+              <Icon>picture_as_pdf</Icon>
+            </span>
+            <div>
+              <h2>{controller.sourceName}</h2>
+              <p>{t('memory.local.source.processed.in.browser')}</p>
+            </div>
+          </header>
+          <div className={styles.progressMeta}>
+            <strong>{t('memory.processing')}</strong>
+            <span>{t('memory.duration.depends.on.your.device')}</span>
+          </div>
+          <div
+            aria-label={t('memory.extracting.and.structuring.content')}
+            aria-valuetext={t('memory.extracting.and.structuring.content')}
+            className={styles.indeterminate}
+            role="progressbar"
+          >
+            <i />
+          </div>
+          <ol className={styles.readingSteps}>
+            <ReadingPhase
+              icon="autorenew"
+              state="current"
+              title={t('memory.text.extracted.and.structured')}
+              value={t('memory.reading.the.document')}
+            />
+            <ReadingPhase
+              icon="radio_button_unchecked"
+              state="upcoming"
+              title={t('memory.splitting.into.claims')}
+              value={t('memory.queued')}
+            />
+            <ReadingPhase
+              icon="radio_button_unchecked"
+              state="upcoming"
+              title={t('memory.linking.to.the.original.location')}
+              value={t('memory.queued')}
+            />
+            <ReadingPhase
+              icon="radio_button_unchecked"
+              state="upcoming"
+              title={t('memory.grouping.by.skill')}
+              value={t('memory.queued')}
+            />
+          </ol>
+          <div className={styles.infoNote}>
+            <Icon>info</Icon>
+            <div>
+              <strong>{t('memory.you.will.review.everything')}</strong>
+              <p>{t('memory.reading.review.promise')}</p>
+            </div>
+          </div>
+        </section>
+        <aside aria-live="polite" className={styles.livePanel}>
+          <header>
+            <div>
+              <Icon className={styles.spinning}>autorenew</Icon>
+              <div>
+                <p>{t('memory.live.extraction')}</p>
+                <h2>{t('memory.building.the.first.claims')}</h2>
+              </div>
+            </div>
+            <span className={styles.machineChip}>{t('memory.local')}</span>
+          </header>
+          <div className={styles.liveEmpty}>
+            <span className={styles.liveIcon}>
+              <Icon>format_quote</Icon>
+            </span>
+            <p>{t('memory.claims.will.appear.after.local.parsing')}</p>
+            <small>{t('memory.no.result.is.invented.while.reading')}</small>
+          </div>
+          <footer>
+            <span>
+              <i className={styles.directDot} />
+              {t('memory.direct.quote')}
+            </span>
+            <span>
+              <i className={styles.reviewDot} />
+              {t('memory.to.confirm')}
+            </span>
+          </footer>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function ReadingPhase({
+  icon,
+  state,
+  title,
+  value,
+}: {
+  icon: string;
+  state: 'current' | 'upcoming';
+  title: string;
+  value: string;
+}) {
+  return (
+    <li className={styles[state]}>
+      <Icon className={state === 'current' ? styles.spinning : ''}>{icon}</Icon>
+      <span>
+        <strong>{title}</strong>
+        <small>{value}</small>
+      </span>
+    </li>
+  );
+}

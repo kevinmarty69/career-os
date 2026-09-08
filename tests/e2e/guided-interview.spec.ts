@@ -20,8 +20,10 @@ test('guided interview resumes, preserves failed saves and signs only a private 
   };
   let revision = 1;
   let fail = false;
+  let pendingSave: Promise<void> | undefined;
   await page.route('**/api/profile', async (route) => {
     if (route.request().method() === 'PUT') {
+      await pendingSave;
       if (fail)
         return route.fulfill({ status: 503, json: { error: 'unavailable' } });
       const input = route.request().postDataJSON();
@@ -59,7 +61,17 @@ test('guided interview resumes, preserves failed saves and signs only a private 
     'Built a deployment cache.',
   );
   fail = false;
+  let releaseSave!: () => void;
+  pendingSave = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
   await page.getByRole('button', { name: 'Next question' }).click();
+  await expect(page.getByLabel('Your answer')).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Save and exit' }),
+  ).toBeDisabled();
+  releaseSave();
+  pendingSave = undefined;
   await expect(page.getByText('Question 2 of 5')).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Resume', exact: true }).click();
@@ -87,6 +99,15 @@ test('guided interview resumes, preserves failed saves and signs only a private 
     fullPage: true,
     animations: 'disabled',
   });
+  await page.getByRole('checkbox').check();
+  await page
+    .getByLabel('Your testimony', { exact: true })
+    .fill('Built a deployment cache. Reviewed.');
+  await expect(page.getByRole('checkbox')).not.toBeChecked();
+  await expect(sign).toBeDisabled();
+  await page
+    .getByLabel('Your testimony', { exact: true })
+    .fill('Built a deployment cache.');
   await page.getByRole('checkbox').check();
   await sign.click();
   await expect(

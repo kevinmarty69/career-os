@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cn } from '../../components/ui';
+import { cn } from '../../lib/class-names';
 
 test('designer typography never drops a semantic text color during class merging', () => {
   assert.equal(

@@ -34,7 +34,7 @@
   white-space: nowrap;
 }
 
-.tabs button[aria-selected='true'] {
+.tabs button[aria-pressed='true'] {
   color: var(--color-card);
   background: var(--color-ink-900);
   font-weight: 600;

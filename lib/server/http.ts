@@ -2,35 +2,36 @@ export class PayloadTooLargeError extends Error {}
 
 // Next can normalize the request hostname behind a proxy (including localhost).
 // Auth cookies and callback redirects must stay on the configured public origin.
+export function applicationOrigin(configured = process.env.CAREER_OS_APP_URL) {
+  if (!configured) throw new Error('CAREER_OS_APP_URL is required.');
+  const url = new URL(configured);
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password
+  )
+    throw new Error('Invalid application origin.');
+  return new URL(url.origin);
+}
+
 export function authRedirectUrl(
   outcome: 'workspace' | 'callback' | 'confirmation',
 ) {
-  const configured = process.env.CAREER_OS_APP_URL;
-  if (!configured) throw new Error('CAREER_OS_APP_URL is required.');
-  const origin = new URL(configured);
-  if (
-    !['http:', 'https:'].includes(origin.protocol) ||
-    origin.username ||
-    origin.password
-  )
-    throw new Error('Invalid application origin.');
   return new URL(
     outcome === 'workspace'
       ? '/sign-in?workspace=1'
       : `/sign-in?error=${outcome}`,
-    origin.origin,
+    applicationOrigin(),
   );
 }
 
 export function isSameOrigin(request: Request) {
   try {
-    const configuredUrl =
-      process.env.CAREER_OS_APP_URL ?? process.env.BETTER_AUTH_URL;
-    if (!configuredUrl) return false;
-    const expected = new URL(configuredUrl);
     return (
-      ['http:', 'https:'].includes(expected.protocol) &&
-      request.headers.get('origin') === expected.origin
+      request.headers.get('origin') ===
+      applicationOrigin(
+        process.env.CAREER_OS_APP_URL ?? process.env.BETTER_AUTH_URL,
+      ).origin
     );
   } catch {
     return false;

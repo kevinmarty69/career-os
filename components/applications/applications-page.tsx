@@ -8,7 +8,7 @@ import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { useCareerMemory } from '@/components/memory/use-career-memory';
 import { Badge, Icon } from '@/components/ui/primitives';
-import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
+import { OnboardingEmptyState } from '@/components/onboarding/empty-states';
 import { LoadingRows } from '@/components/applications/pipeline-empty-state';
 import { type Application } from '@/lib/application-contract';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';

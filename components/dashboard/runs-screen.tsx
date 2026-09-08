@@ -13,7 +13,7 @@ import {
 import { useWorkflowDashboard } from '@/components/dashboard/use-workflow-dashboard';
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
-import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
+import { OnboardingEmptyState } from '@/components/onboarding/empty-states';
 import { Badge, Company, Icon, PageHeader } from '@/components/ui/primitives';
 import { operationalMessages } from '@/lib/i18n/dictionaries/operational';
 import { initials } from '@/lib/initials';

@@ -257,6 +257,29 @@ test('the durable worker dispatches one local call and stores one wrapped result
       /restricted company researcher login/,
     );
     assert.equal(calls, 0);
+    // The managed auth schema is separate from career_identity. A NOINHERIT
+    // worker login with direct auth access must fail before claiming or calling.
+    await target.query(`grant usage on schema auth to ${workerLogin}`);
+    await target.query(`grant select on auth.sessions to ${workerLogin}`);
+    const reserve = client.reserve;
+    client.reserve = () => {
+      throw new Error('Auth-capable worker reached model reservation.');
+    };
+    try {
+      await assert.rejects(
+        processCompanyResearchStep({
+          databaseUrl: workerUrl.toString(),
+          client,
+          fetchText,
+        }),
+        /restricted company researcher login/,
+      );
+      assert.equal(calls, 0);
+    } finally {
+      client.reserve = reserve;
+      await target.query(`revoke select on auth.sessions from ${workerLogin}`);
+      await target.query(`revoke usage on schema auth from ${workerLogin}`);
+    }
     await target.query(
       'grant select on app.workflow_steps to career_company_researcher',
     );

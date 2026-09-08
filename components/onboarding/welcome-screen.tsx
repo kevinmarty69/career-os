@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { LocaleSwitch, useI18n } from '@/components/i18n/i18n-provider';
-import { Icon } from '@/components/ui';
+import { Icon } from '@/components/ui/controls';
 import styles from './landing.module.css';
 
 const repository = 'https://github.com/kevinmarty69/career-os';

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useI18n } from '@/components/i18n/i18n-provider';
-import { Button, Icon, Mono } from '@/components/ui';
+import { Button, Icon, Mono } from '@/components/ui/controls';
 
 export function SystemState({
   kind,

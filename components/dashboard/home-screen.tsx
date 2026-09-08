@@ -9,14 +9,14 @@ import { useI18n } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';
 import { useCareerMemory } from '@/components/memory/use-career-memory';
 import { Icon, PageHeader } from '@/components/ui/primitives';
-import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
+import { OnboardingEmptyState } from '@/components/onboarding/empty-states';
 import {
   dashboardActions,
   type DashboardAction,
 } from '@/lib/dashboard-priority';
 import { initials } from '@/lib/initials';
 import Link from 'next/link';
-import { NotificationsButton } from '@/components/handoff/notifications';
+import { NotificationsButton } from '@/components/dashboard/notifications';
 
 export function HomeScreen() {
   const { locale } = useI18n();

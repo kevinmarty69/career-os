@@ -114,31 +114,6 @@ export function Company({
   );
 }
 
-export function DataTable({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: ReactNode[][];
-}) {
-  return (
-    <div className="co-table">
-      <div className="co-table-head">
-        {headers.map((h) => (
-          <span key={h}>{h}</span>
-        ))}
-      </div>
-      {rows.map((row, i) => (
-        <div className="co-table-row" key={i}>
-          {row.map((cell, j) => (
-            <span key={j}>{cell}</span>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function ClaimRow({
   tone = 'ok',
   label,

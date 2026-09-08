@@ -9,7 +9,7 @@ import {
 } from '@/components/applications/application-review-checkpoint';
 import { reviewerLabel } from '@/components/applications/application-versions-screen';
 import { homePriorityRow } from '@/components/dashboard/home-screen';
-import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
+import { OnboardingEmptyState } from '@/components/onboarding/empty-states';
 import { useWorkflowDashboard } from '@/components/dashboard/use-workflow-dashboard';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { AppShell } from '@/components/layout/app-shell';

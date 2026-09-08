@@ -22,7 +22,7 @@ import {
 } from '@/lib/server/publication-input';
 import Link from 'next/link';
 import Image from 'next/image';
-import { OfflineNotice } from '@/components/handoff/system-state';
+import { OfflineNotice } from '@/components/layout/system-state';
 import { type ReactNode, useEffect, useState } from 'react';
 
 export function AppShell({

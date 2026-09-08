@@ -79,7 +79,11 @@ test('keeps the file local until review, then saves the edited selection', async
   page,
 }) => {
   const savedBodies: unknown[] = [];
-  await mockProfilePort(page, savedBodies);
+  let releaseSave!: () => void;
+  const pendingSave = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  await mockProfilePort(page, savedBodies, pendingSave);
 
   await page.goto('/memory/import');
   await expect(
@@ -117,6 +121,14 @@ test('keeps the file local until review, then saves the edited selection', async
   expect(savedBodies).toHaveLength(0);
 
   await page.getByRole('button', { name: 'Valider et enregistrer' }).click();
+  await expect(firstCandidate.getByLabel('Formulation')).toBeDisabled();
+  await expect(page.getByLabel('Nom complet')).toBeDisabled();
+  await expect(
+    page.getByLabel(
+      'J’ai relu cette sélection et j’autorise les usages indiqués.',
+    ),
+  ).toBeDisabled();
+  releaseSave();
   await expect(
     page.getByRole('heading', { name: 'Votre sélection est enregistrée.' }),
   ).toBeVisible();
@@ -224,7 +236,11 @@ test('keeps the source and review surfaces inside a mobile viewport', async ({
   await expectNoHorizontalOverflow(page);
 });
 
-async function mockProfilePort(page: Page, savedBodies: unknown[]) {
+async function mockProfilePort(
+  page: Page,
+  savedBodies: unknown[],
+  pendingSave?: Promise<void>,
+) {
   await page.route('**/api/profile', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
@@ -238,6 +254,7 @@ async function mockProfilePort(page: Page, savedBodies: unknown[]) {
       expectedRevision: number;
     };
     savedBodies.push(body);
+    await pendingSave;
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ profile: body.profile, revision: 1 }),

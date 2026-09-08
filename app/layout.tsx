@@ -4,13 +4,6 @@ import { Geist_Mono, Instrument_Sans, Space_Grotesk } from 'next/font/google';
 import { I18nProvider } from '@/components/i18n/i18n-provider';
 import { localeCookieName, resolveLocale } from '@/lib/i18n/locale';
 import './globals.css';
-import './styles/layout.css';
-import './styles/workspace.css';
-import './styles/publication.css';
-import './styles/auth.css';
-import './design-system.css';
-import './handoff.css';
-import { ToastProvider } from '@/components/feedback';
 
 const sans = Instrument_Sans({
   subsets: ['latin'],
@@ -49,9 +42,7 @@ export default async function RootLayout({
       lang={locale}
     >
       <body>
-        <I18nProvider initialLocale={locale}>
-          <ToastProvider>{children}</ToastProvider>
-        </I18nProvider>
+        <I18nProvider initialLocale={locale}>{children}</I18nProvider>
       </body>
     </html>
   );

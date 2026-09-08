@@ -1,7 +1,7 @@
 'use client';
 
 import { AppShell } from '@/components/layout/app-shell';
-import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
+import { OnboardingEmptyState } from '@/components/onboarding/empty-states';
 import {
   Badge,
   Button,

@@ -1,0 +1,536 @@
+.co-home-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.co-home-v2-header {
+  display: flex;
+  gap: 24px;
+}
+
+.co-home-v2-header > div {
+  display: grid;
+  gap: 9px;
+}
+
+.co-home-v2-header time {
+  color: var(--color-ink-500);
+  font-size: var(--text-ui);
+  text-transform: capitalize;
+}
+
+.co-home-v2-header h1 {
+  margin: 0;
+  font-size: var(--text-display);
+  line-height: 1.15;
+  letter-spacing: -0.036em;
+}
+
+.co-home-import {
+  display: flex;
+  min-height: 46px;
+  gap: 13px;
+  align-items: center;
+  margin: 26px 0 0 auto;
+  padding: 6px 7px 6px 18px;
+  color: var(--color-ink-400);
+  border-radius: var(--radius-pill);
+  background: var(--color-card);
+  font-size: var(--text-body-sm);
+  text-decoration: none;
+}
+
+.co-home-import > .co-icon {
+  color: var(--color-ink-500);
+  font-size: 19px;
+}
+
+.co-home-import > i {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  color: var(--color-card);
+  border-radius: 50%;
+  background: var(--color-ink-900);
+  place-items: center;
+}
+
+.co-home-import > i .co-icon {
+  font-size: 18px;
+}
+
+.co-home-signal {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  align-items: center;
+  color: var(--color-card);
+  border-radius: var(--radius-panel);
+  background: var(--color-ink-900);
+}
+
+.co-home-signal::before {
+  position: absolute;
+  top: -120px;
+  right: -90px;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-indigo) 16%, transparent);
+  content: '';
+}
+
+.co-home-signal > div,
+.co-home-signal > aside {
+  position: relative;
+}
+
+.co-home-signal > div {
+  display: grid;
+  gap: 18px;
+}
+
+.co-home-signal p,
+.co-home-signal h2,
+.co-home-signal span,
+.co-home-signal small {
+  margin: 0;
+}
+
+.co-home-signal > div > p {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  color: #4ed19a;
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.co-home-signal > div > p .co-icon {
+  font-size: 19px;
+}
+
+.co-home-signal h2 {
+  max-width: 28ch;
+  color: var(--color-card);
+  line-height: 1.26;
+  letter-spacing: -0.032em;
+}
+
+.co-home-signal > div > span {
+  max-width: 56ch;
+  color: rgb(255 255 255 / 66%);
+  font-size: var(--text-body);
+  line-height: 1.65;
+}
+
+.co-home-signal > div > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.co-home-signal > div > div > a {
+  display: inline-flex;
+  min-height: 42px;
+  gap: 9px;
+  align-items: center;
+  padding: 13px 20px;
+  color: var(--color-ink-900);
+  border-radius: var(--radius-pill);
+  background: var(--color-card);
+  font-size: var(--text-body-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.co-home-signal > div > div > a + a {
+  color: rgb(255 255 255 / 82%);
+  background: rgb(255 255 255 / 9%);
+  font-weight: 500;
+}
+
+.co-home-signal > aside {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: rgb(255 255 255 / 7%);
+}
+
+.co-home-signal > aside > p {
+  color: rgb(255 255 255 / 50%);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.co-home-signal > aside > div {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.co-home-signal > aside > div > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 30%);
+}
+
+.co-home-signal > aside > div > i.active {
+  background: #4ed19a;
+}
+
+.co-home-signal > aside > div > span {
+  color: rgb(255 255 255 / 82%);
+  font-size: var(--text-label);
+}
+
+.co-home-signal > aside > div > b {
+  color: rgb(255 255 255 / 52%);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 400 !important;
+}
+
+.co-home-signal > aside > small {
+  padding-top: 13px;
+  color: rgb(255 255 255 / 52%);
+  border-top: 1px solid rgb(255 255 255 / 12%);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.co-home-v2-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  gap: 18px;
+}
+
+.co-home-applications,
+.co-home-strengthen {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 24px;
+  border-radius: var(--radius-panel);
+  background: var(--color-panel);
+}
+
+.co-home-applications > header,
+.co-home-strengthen > header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.co-home-applications h2,
+.co-home-strengthen h2,
+.co-home-applications h3 {
+  margin: 0;
+  color: var(--color-ink-900);
+  letter-spacing: -0.025em;
+}
+
+.co-home-applications h2,
+.co-home-strengthen h2 {
+  font-size: 17px;
+}
+
+.co-home-applications h3 {
+  padding-top: 2px;
+  font-size: var(--text-body);
+}
+
+.co-home-applications > header > span {
+  margin-left: auto;
+  color: var(--color-ink-500);
+  font-size: var(--text-ui);
+}
+
+.co-home-applications > a {
+  display: grid;
+  align-items: center;
+  color: var(--color-ink-800);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  text-decoration: none;
+}
+
+.co-home-applications > a > i {
+  display: grid;
+  color: var(--color-ink-600);
+  border-radius: var(--radius-tile);
+  background: var(--color-panel);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  place-items: center;
+}
+
+.co-home-applications > a > span,
+.co-home-calendar > a > span {
+  display: grid;
+  min-width: 0;
+}
+
+.co-home-applications > a strong {
+  font-size: 15px;
+}
+
+.co-home-applications > a small,
+.co-home-calendar > a small {
+  overflow: hidden;
+  color: var(--color-ink-500);
+  font-size: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.co-home-applications > a > em {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-ink-300);
+}
+
+.co-home-applications > a > em.active {
+  background: var(--color-green);
+}
+
+.co-home-applications > a > b {
+  font-size: var(--text-ui);
+  font-weight: 400 !important;
+  white-space: nowrap;
+}
+
+.co-home-applications > a > .co-icon {
+  color: var(--color-ink-300);
+}
+
+.co-home-calendar,
+.co-home-strengthen > div {
+  display: grid;
+  gap: 9px;
+}
+
+.co-home-calendar > a {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 15px 16px;
+  color: var(--color-ink-800);
+  border-radius: var(--radius-tile);
+  background: var(--color-card);
+  text-decoration: none;
+}
+
+.co-home-calendar > a > i {
+  padding: 5px 9px;
+  color: var(--color-ink-600);
+  border-radius: var(--radius-badge);
+  background: var(--color-panel);
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-caption);
+  font-style: normal;
+}
+
+.co-home-calendar > a > span,
+.co-home-applications > a > span {
+  gap: 2px;
+}
+
+.co-home-calendar > a > b {
+  font-size: var(--text-label);
+  white-space: nowrap;
+}
+
+.co-home-strengthen {
+  gap: 16px;
+  background: var(--color-card);
+}
+
+.co-home-strengthen > header {
+  gap: 10px;
+}
+
+.co-home-strengthen > header > .co-icon {
+  color: var(--color-ink-500);
+  font-size: 19px;
+}
+
+.co-home-strengthen > p {
+  margin: 0;
+  color: var(--color-ink-600);
+  font-size: var(--text-label);
+  line-height: 1.55;
+}
+
+.co-home-strengthen > div > a {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  color: var(--color-ink-800);
+  border-radius: var(--radius-tile);
+  background: var(--color-panel);
+  text-decoration: none;
+}
+
+.co-home-strengthen > div > a.priority {
+  border: 1px solid var(--color-ink-900);
+  background: var(--color-card);
+}
+
+.co-home-strengthen > div > a > span {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+}
+
+.co-home-strengthen > div > a .co-icon {
+  color: var(--color-ink-600);
+  font-size: 18px;
+}
+
+.co-home-strengthen > div > a strong {
+  overflow: hidden;
+  font-size: var(--text-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.co-home-strengthen > div > a b {
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-900);
+  color: var(--color-card);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.co-home-strengthen > div > a small,
+.co-home-strengthen-complete small {
+  color: var(--color-ink-600);
+  font-size: var(--text-caption);
+  line-height: 1.55;
+}
+
+.co-home-strengthen-complete {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 5px 10px;
+  padding: 16px;
+  border-radius: var(--radius-tile);
+  background: var(--color-panel);
+}
+
+.co-home-strengthen-complete > .co-icon {
+  grid-row: 1 / span 2;
+  color: var(--color-green);
+  font-size: 19px;
+}
+
+.co-home-strengthen-complete strong {
+  font-size: var(--text-body-sm);
+}
+
+.co-home-strengthen > footer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: auto;
+  padding-top: 15px;
+  color: var(--color-ink-600);
+  border-top: 1px solid var(--color-hairline);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.co-home-strengthen > footer .co-icon {
+  color: var(--color-ink-900);
+  font-size: 18px;
+}
+
+.co-home-empty {
+  display: grid;
+  min-height: 80px;
+  color: var(--color-ink-500);
+  border: 1px dashed var(--color-ink-250);
+  border-radius: var(--radius-tile);
+  font-size: var(--text-body-sm);
+  place-items: center;
+}
+
+.co-home-empty.compact {
+  min-height: 58px;
+}
+
+@media (max-width: 1180px) {
+  .co-home-signal {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 24px;
+  }
+  .co-home-v2-grid {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+@media (max-width: 899px) {
+  .co-home-v2 {
+    min-height: auto;
+  }
+  .co-home-v2-header {
+  }
+  .co-home-import {
+    margin-top: 0;
+  }
+  .co-home-signal,
+  .co-home-v2-grid {
+    grid-template-columns: 1fr;
+  }
+  .co-home-signal {
+    padding: 24px 20px;
+  }
+}
+
+@media (max-width: 760px) {
+  .co-home-v2-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .co-home-import {
+    width: 100%;
+  }
+  .co-home-import > span {
+    flex: 1;
+  }
+  .co-home-signal h2 {
+    font-size: 24px;
+  }
+  .co-home-applications,
+  .co-home-strengthen {
+    padding: 18px 16px;
+  }
+  .co-home-applications > a {
+    grid-template-columns: 40px minmax(0, 1fr) 18px;
+    gap: 12px;
+    padding: 15px;
+  }
+  .co-home-applications > a > i {
+    width: 40px;
+    height: 40px;
+  }
+  .co-home-applications > a > em,
+  .co-home-applications > a > b {
+    display: none;
+  }
+}

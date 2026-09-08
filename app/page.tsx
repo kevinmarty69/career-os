@@ -1,5 +1,5 @@
-import { KitRoutePage } from '@/components/kit-route-page';
+import { HomeScreen } from '@/components/dashboard/home-screen';
 
 export default function Home() {
-  return <KitRoutePage path="/" query={{}} />;
+  return <HomeScreen />;
 }

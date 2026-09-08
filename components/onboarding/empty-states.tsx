@@ -10,12 +10,12 @@ import {
   Monogram,
   Overline,
   StatusChip,
-} from '@/components/ui';
-import { Card, Panel } from '@/components/shell';
+} from '@/components/ui/controls';
+import { Card, Panel } from '@/components/ui/surfaces';
 
 export type EmptyKind = 'memory' | 'applications' | 'review' | 'links' | 'runs';
 
-export function HandoffEmptyState({
+export function OnboardingEmptyState({
   kind,
   onAction,
 }: {

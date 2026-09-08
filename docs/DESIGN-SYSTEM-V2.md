@@ -14,7 +14,9 @@ The artifact is the source of truth. Its values are requirements, not suggestion
 
 ## Implementation
 
-- [`app/design-system.css`](../app/design-system.css) owns the normative tokens and the compatibility mapping for existing screens.
+- [`app/design-system.css`](../app/design-system.css) defines the shared `@theme static` tokens and compatibility aliases. CSS modules and Tailwind utilities consume the same values.
+- [`app/globals.css`](../app/globals.css) is the only stylesheet imported by the root layout. It declares the cascade order; `app/styles/` owns shared controls, layout, and feature styles. Keep responsive rules after the corresponding base rules.
+- Dashboard and publication styling lives in `app/styles/dashboard.css` and `app/styles/publication.css`; screen styles do not belong in the token file.
 - [`app/layout.tsx`](../app/layout.tsx) loads Instrument Sans 400/500/600 and Geist Mono 400.
 - Material Symbols Rounded is the only icon family.
 - Indigo is reserved for agent activity, generated output, and focus. Primary actions use `ink-900`.

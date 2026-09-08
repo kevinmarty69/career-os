@@ -140,7 +140,7 @@ async function verifyRestrictedCredential(sql: postgres.Sql) {
     ) as "unexpectedRole",
     exists(
       select 1 from pg_namespace namespace
-      where namespace.nspname in ('app', 'career_identity') and (
+      where namespace.nspname in ('app', 'auth', 'career_identity') and (
         has_schema_privilege(current_user, namespace.oid, 'usage')
         or has_schema_privilege(current_user, namespace.oid, 'create')
       )
@@ -150,6 +150,13 @@ async function verifyRestrictedCredential(sql: postgres.Sql) {
       or target.rolinherit
       or has_schema_privilege(target.rolname, app_namespace.oid, 'create')
       or not has_schema_privilege(target.rolname, app_namespace.oid, 'usage')
+      or exists(
+        select 1 from pg_namespace namespace
+        where namespace.nspname in ('auth', 'career_identity') and (
+          has_schema_privilege(target.rolname, namespace.oid, 'usage')
+          or has_schema_privilege(target.rolname, namespace.oid, 'create')
+        )
+      )
       or exists(
         select 1 from pg_roles inherited
         where inherited.rolname <> target.rolname

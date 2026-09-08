@@ -57,10 +57,21 @@ test('renders every active route in English without a locale cookie', async ({
   }
 
   await page.goto('/memory');
-  for (const label of ['Graph', 'Claims', 'Documents', 'Skills', 'Privacy'])
+  for (const label of ['Claims', 'Skills'])
     await expect(
-      page.getByRole('tab', { name: label, exact: true }),
+      page.getByRole('button', { name: label, exact: true }),
     ).toBeVisible();
+  const claim = page.getByText('Reduced build p50 from 11 to 7 minutes.', {
+    exact: true,
+  });
+  await expect(claim).toBeVisible();
+  await page.getByRole('button', { name: 'Skills', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Skills', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(claim).toHaveCount(0);
+  await page.getByRole('button', { name: 'Claims', exact: true }).click();
+  await expect(claim).toBeVisible();
   if (process.env.CAREER_OS_I18N_SCREENSHOT)
     await page.screenshot({
       path: process.env.CAREER_OS_I18N_SCREENSHOT,

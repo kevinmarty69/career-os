@@ -11,7 +11,7 @@ import {
   useTranslations,
 } from '@/components/i18n/i18n-provider';
 import { authMessages } from '@/lib/i18n/dictionaries/auth';
-import { HostingOptions } from '@/components/handoff/hosting-options';
+import { HostingOptions } from '@/components/onboarding/hosting-options';
 
 type Mode = 'sign-in' | 'sign-up' | 'workspace';
 type OrganizationChoice = { id: string; name: string };
@@ -57,6 +57,7 @@ export function AuthForm() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     setPending(true);
     setError('');
     setNotice('');
@@ -128,6 +129,7 @@ export function AuthForm() {
   }
 
   async function selectOrganization(organizationId: string) {
+    if (pending) return;
     setPending(true);
     setError('');
     const result = await fetch('/api/auth/workspaces', {
@@ -146,6 +148,7 @@ export function AuthForm() {
 
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     setPending(true);
     setError('');
     const form = new FormData(event.currentTarget);
@@ -185,22 +188,26 @@ export function AuthForm() {
             aria-label={t('auth.authentication.method')}
           >
             <button
+              disabled={pending}
               aria-pressed={mode === 'sign-in'}
               className={mode === 'sign-in' ? 'active' : ''}
               onClick={() => {
                 setMode('sign-in');
                 setError('');
+                setNotice('');
               }}
               type="button"
             >
               {t('auth.sign.in')}{' '}
             </button>
             <button
+              disabled={pending}
               aria-pressed={mode === 'sign-up'}
               className={mode === 'sign-up' ? 'active' : ''}
               onClick={() => {
                 setMode('sign-up');
                 setError('');
+                setNotice('');
               }}
               type="button"
             >
@@ -254,6 +261,7 @@ export function AuthForm() {
             <label>
               {t('auth.workspace.name')}{' '}
               <input
+                disabled={pending}
                 autoComplete="organization"
                 defaultValue={
                   locale === 'fr'
@@ -266,11 +274,6 @@ export function AuthForm() {
                 required
               />
             </label>
-            {error ? (
-              <p className="auth-error" role="alert">
-                {error}
-              </p>
-            ) : null}
             <button disabled={pending} type="submit">
               {pending ? t('auth.please.wait') : t('auth.create.workspace')}
             </button>
@@ -281,6 +284,7 @@ export function AuthForm() {
               <label>
                 {t('auth.name')}{' '}
                 <input
+                  disabled={pending}
                   autoComplete="name"
                   minLength={2}
                   name="name"
@@ -292,6 +296,7 @@ export function AuthForm() {
             <label>
               Email
               <input
+                disabled={pending}
                 autoComplete="email"
                 name="email"
                 placeholder="alex@example.com"
@@ -304,6 +309,7 @@ export function AuthForm() {
               <label>
                 {t('auth.password')}{' '}
                 <input
+                  disabled={pending}
                   autoComplete={
                     mode === 'sign-in' ? 'current-password' : 'new-password'
                   }

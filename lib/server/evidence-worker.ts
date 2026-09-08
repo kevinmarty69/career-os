@@ -114,7 +114,7 @@ async function verifyRestrictedWorkerCredential(sql: postgres.Sql) {
     pg_has_role(current_user, target.oid, 'member') as expected_role,
     exists (
       select 1 from pg_namespace namespace
-      where namespace.nspname in ('app', 'career_identity') and (
+      where namespace.nspname in ('app', 'auth', 'career_identity') and (
         has_schema_privilege(current_user, namespace.oid, 'usage')
         or has_schema_privilege(current_user, namespace.oid, 'create')
       )

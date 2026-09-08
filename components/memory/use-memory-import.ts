@@ -83,6 +83,7 @@ export function useMemoryImport() {
   const [revision, setRevision] = useState(0);
   const [existingProfile, setExistingProfile] = useState<Profile | null>(null);
   const pendingImport = useRef<AbortController | undefined>(undefined);
+  const pendingSave = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -226,7 +227,7 @@ export function useMemoryImport() {
   }
 
   function updateReview(updater: (current: ImportReview) => ImportReview) {
-    if (!review) return;
+    if (!review || pendingSave.current) return;
     persistReview(updater(review));
     setError('');
   }
@@ -254,6 +255,7 @@ export function useMemoryImport() {
   }
 
   function discard(message: ImportMessageKey | '' = '') {
+    if (pendingSave.current) return;
     pendingImport.current?.abort();
     pendingImport.current = undefined;
     sessionStorage.removeItem(REVIEW_STORAGE_KEY);
@@ -264,7 +266,11 @@ export function useMemoryImport() {
   }
 
   async function validate() {
-    if (!review) return;
+    if (!review || pendingSave.current) return;
+    if (review.expiresAt <= Date.now()) {
+      discard('memory.this.review.expired.read.the.source.again.to.continue');
+      return;
+    }
     const selected = review.candidates.filter(
       (candidate) => candidate.selected,
     );
@@ -294,6 +300,7 @@ export function useMemoryImport() {
       return;
     }
 
+    pendingSave.current = true;
     setStage('saving');
     setError('');
     try {
@@ -316,13 +323,17 @@ export function useMemoryImport() {
         revision: number;
       };
       const saved = profileSchema.safeParse(payload.profile);
-      if (saved.success) setExistingProfile(saved.data);
-      if (Number.isInteger(payload.revision)) setRevision(payload.revision);
+      if (!saved.success || !Number.isInteger(payload.revision))
+        throw new Error('INVALID_PROFILE_RESPONSE');
+      setExistingProfile(saved.data);
+      setRevision(payload.revision);
       sessionStorage.removeItem(REVIEW_STORAGE_KEY);
       setStage('saved');
     } catch {
       setError('memory.career.memory.could.not.be.saved.your.review.remains');
       setStage('review');
+    } finally {
+      pendingSave.current = false;
     }
   }
 

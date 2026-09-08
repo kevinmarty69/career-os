@@ -1,7 +1,7 @@
 'use client';
 
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
-import { OnboardingEmptyState } from '@/components/ui/onboarding-empty-state';
+import { OnboardingEmptyState } from '@/components/onboarding/empty-states';
 import { Badge, Icon } from '@/components/ui/primitives';
 import { memoryOverviewMessages } from '@/lib/i18n/dictionaries/memory-overview';
 import { type Profile } from '@/lib/schemas';
@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react';
 import { useCareerMemory } from './use-career-memory';
 import styles from './career-memory-overview.module.css';
 
-type View = 'graph' | 'claims' | 'documents' | 'skills' | 'privacy';
+type View = 'claims' | 'skills';
 
 export function CareerMemoryOverview() {
   const { locale } = useI18n();
@@ -21,7 +21,7 @@ export function CareerMemoryOverview() {
   const interviewSourceId = memory.profile.sources.find(
     (source) => source.locator === interviewSourceLocator,
   )?.id;
-  const [view, setView] = useState<View>('graph');
+  const [view, setView] = useState<View>('claims');
   const visibleClaims = useMemo(
     () =>
       memory.profile.claims.filter((claim) =>
@@ -37,12 +37,9 @@ export function CareerMemoryOverview() {
         selected.evidenceIds.includes(id),
       )
     : [];
-  const tabs: Array<[View, string]> = [
-    ['graph', t('memory.overview.graph')],
+  const filters: Array<[View, string]> = [
     ['claims', t('memory.overview.claims')],
-    ['documents', t('memory.overview.documents')],
     ['skills', t('memory.overview.skills')],
-    ['privacy', t('memory.overview.privacy')],
   ];
 
   if (memory.state === 'loading')
@@ -83,13 +80,16 @@ export function CareerMemoryOverview() {
           {memory.message}
         </p>
       ) : null}
-      <div className={styles.tabs} role="tablist">
-        {tabs.map(([id, label]) => (
+      <div
+        className={styles.tabs}
+        role="group"
+        aria-label={t('memory.overview.claims')}
+      >
+        {filters.map(([id, label]) => (
           <button
-            aria-selected={view === id}
+            aria-pressed={view === id}
             key={id}
             onClick={() => setView(id)}
-            role="tab"
             type="button"
           >
             {label}
@@ -97,7 +97,7 @@ export function CareerMemoryOverview() {
         ))}
       </div>
 
-      <div className={styles.graph} data-view={view}>
+      <div className={styles.graph}>
         <section className={styles.sources}>
           <header>
             <span>{t('memory.overview.sources')}</span>

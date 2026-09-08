@@ -11,13 +11,13 @@ export function UnavailableScreen({
   href,
 }: {
   path: string;
-  title: string;
+  title: { fr: string; en: string };
   href: string;
 }) {
   const { locale } = useI18n();
   return (
     <AppShell path={path}>
-      <PageHeader title={title} />
+      <PageHeader title={title[locale]} />
       <section className="co-panel">
         <h2>
           {locale === 'fr'

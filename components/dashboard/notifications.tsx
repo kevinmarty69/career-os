@@ -9,9 +9,9 @@ import {
   Drawer,
   SkeletonBlock,
   useDelayedPending,
-} from '@/components/feedback';
-import { Button, Icon, Overline } from '@/components/ui';
-import { Card } from '@/components/shell';
+} from '@/components/ui/feedback';
+import { Button, Icon, Overline } from '@/components/ui/controls';
+import { Card } from '@/components/ui/surfaces';
 
 export function NotificationsButton() {
   const [open, setOpen] = useState(false);

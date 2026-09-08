@@ -7,6 +7,10 @@ test('magic-link entry uses Supabase PKCE and reports delivery errors without cr
   await context.clearCookies();
   let fail = true;
   let attempts = 0;
+  let releaseResponse!: () => void;
+  const pendingResponse = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
   await page.route('**/auth/v1/**', async (route) => {
     const url = new URL(route.request().url());
     expect(url.pathname).toBe('/auth/v1/otp');
@@ -21,6 +25,7 @@ test('magic-link entry uses Supabase PKCE and reports delivery errors without cr
     });
     expect(body.code_challenge).toBeTruthy();
     attempts++;
+    await pendingResponse;
     await route.fulfill(
       fail
         ? { status: 503, json: { message: 'Synthetic outage' } }
@@ -30,6 +35,12 @@ test('magic-link entry uses Supabase PKCE and reports delivery errors without cr
   await page.goto('/sign-in');
   await page.getByLabel('Email', { exact: true }).fill('test@example.com');
   await page.getByRole('button', { name: 'Send my sign-in link' }).click();
+  await expect(page.getByLabel('Email', { exact: true })).toBeDisabled();
+  await expect(page.locator('.auth-tabs button')).toHaveCount(2);
+  for (const tab of await page.locator('.auth-tabs button').all()) {
+    await expect(tab).toBeDisabled();
+  }
+  releaseResponse();
   await expect(page.locator('.auth-card').getByRole('alert')).toBeVisible();
   fail = false;
   await page.getByRole('button', { name: 'Send my sign-in link' }).click();

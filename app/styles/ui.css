@@ -1,0 +1,123 @@
+.co-kit :focus-visible,
+.co-kit-control:focus-visible,
+.co-drawer-in :focus-visible {
+  outline: 2px solid var(--color-ink-900) !important;
+  outline-offset: 3px;
+}
+
+.co-kit-checkbox:focus-visible + span {
+  outline: 2px solid var(--color-ink-900);
+  outline-offset: 3px;
+}
+
+.co-kit-control {
+  min-height: 42px;
+  border: 0;
+  box-shadow: none;
+}
+.co-kit-textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none;
+  border-color: var(--color-ink-900);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink-900);
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    line-height: 1.6;
+  }
+  a {
+    color: var(--color-ink-900);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ink-300);
+    text-underline-offset: 3px;
+  }
+  a:hover {
+    color: var(--color-indigo-text);
+    text-decoration-color: var(--color-indigo-text);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-indigo);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
+  .tabular,
+  [data-metric],
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--color-indigo-tint);
+    color: var(--color-indigo-deep);
+  }
+}
+
+@layer utilities {
+  @keyframes co-enter-right {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes co-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes co-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  .co-drawer-in {
+    animation: co-enter-right 240ms var(--ease-out-quart) both;
+  }
+  .co-spin {
+    animation: co-spin 1100ms linear infinite;
+  }
+  .co-skeleton {
+    animation: co-pulse 1400ms var(--ease-standard) infinite;
+  }
+  .co-hover {
+    transition:
+      background-color 160ms var(--ease-standard),
+      color 160ms var(--ease-standard),
+      border-color 160ms var(--ease-standard);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+  }
+  .co-drawer-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  [data-motion='enter'] {
+    transform: none !important;
+  }
+}

@@ -451,3 +451,128 @@
 .co-public-mark {
   background: var(--co-public-deep);
 }
+
+.co-public-page,
+.co-public-state {
+  --co-public-accent: var(--company-accent, var(--color-pub-accent));
+  --co-public-deep: var(
+    --company-deep,
+    color-mix(in srgb, var(--co-public-accent) 24%, var(--color-ink-900))
+  );
+  --co-public-light: var(
+    --company-light,
+    color-mix(in srgb, var(--co-public-accent) 35%, var(--color-card))
+  );
+  --co-public-body: var(--color-pub-body);
+  --co-public-line: var(--color-pub-line);
+  --co-public-bg: var(--color-pub-bg);
+  color: var(--co-public-deep);
+  background: var(--co-public-bg);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+.co-public-page {
+  width: 100%;
+  max-width: none;
+}
+
+.co-public-page > header,
+.co-public-body,
+.co-public-page > footer,
+.co-public-hero {
+  width: min(100%, 820px);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.co-public-hero {
+  color: var(--color-card);
+  border-radius: var(--radius-card);
+  background: var(--co-public-deep);
+  box-shadow: none;
+}
+
+.co-public-hero h1 {
+  max-width: 24ch;
+  color: var(--color-card);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.038em;
+}
+
+.co-public-hero > p:not(:first-child) {
+  max-width: 76ch;
+  color: var(--color-pub-line);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.co-public-body {
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 24px;
+}
+
+.co-public-proof-strip {
+  display: grid;
+  width: min(100%, 820px);
+  margin: 0 auto;
+  background: var(--co-public-accent);
+}
+
+.co-public-proof-strip > a {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding-right: 14px;
+  color: var(--color-card);
+  text-decoration: none;
+}
+
+.co-public-proof-strip strong {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.co-public-proof-strip span {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--color-card) 82%, transparent);
+  font-size: var(--text-caption);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.co-public-block {
+  padding: 24px 0;
+  border-color: var(--color-pub-line);
+}
+
+.co-public-block blockquote {
+  border-radius: var(--radius-tile);
+  background: #fafbfb;
+}
+
+.co-public-body > aside {
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  .co-public-page {
+    padding: 0 14px 24px;
+  }
+  .co-public-hero {
+    margin-top: 14px;
+    padding: 24px 18px;
+  }
+  .co-public-hero h1 {
+    font-size: 30px;
+  }
+  .co-public-proof-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 16px 18px;
+  }
+}

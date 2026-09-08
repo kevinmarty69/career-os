@@ -1,6 +1,6 @@
 'use client';
 
-import { SystemState } from '@/components/handoff/system-state';
+import { SystemState } from '@/components/layout/system-state';
 
 export default function ErrorPage({
   error,

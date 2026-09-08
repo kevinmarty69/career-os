@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { readProfile, readProfileHistory, saveProfile } from '@/lib/career-api';
-import { memoryCoverage, mergeDuplicateClaims } from '@/lib/career-memory';
+import { useEffect, useRef, useState } from 'react';
+import { readProfile, saveProfile } from '@/lib/career-api';
 import { profileSchema, type Profile } from '@/lib/schemas';
-import type { ProfileRevisionSummary } from '@/lib/server/profile';
 import { useI18n } from '@/components/i18n/i18n-provider';
 
 const emptyProfile: Profile = {
@@ -20,25 +18,18 @@ export function useCareerMemory() {
   const { locale } = useI18n();
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [revision, setRevision] = useState(0);
-  const [history, setHistory] = useState<ProfileRevisionSummary[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'saving'>('loading');
   const [message, setMessage] = useState('');
   const [loadError, setLoadError] = useState<'auth' | 'unavailable'>();
+  const saving = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    void Promise.all([
-      readProfile(controller.signal),
-      readProfileHistory(controller.signal),
-    ])
-      .then(async ([profileResponse, historyResponse]) => {
+    void readProfile(controller.signal)
+      .then(async (profileResponse) => {
+        if (controller.signal.aborted) return;
         if (profileResponse.status === 401) {
           setLoadError('auth');
-          setMessage(
-            locale === 'fr'
-              ? 'Connectez-vous pour consulter votre mémoire professionnelle.'
-              : 'Sign in to view your career memory.',
-          );
           return;
         }
         if (!profileResponse.ok) throw new Error();
@@ -49,33 +40,24 @@ export function useCareerMemory() {
         const parsed = profileSchema.nullable().safeParse(payload.profile);
         if (!parsed.success || !Number.isInteger(payload.revision))
           throw new Error();
+        if (controller.signal.aborted) return;
         setProfile(parsed.data ?? emptyProfile);
         setLoadError(undefined);
         setRevision(payload.revision);
-        if (historyResponse.ok)
-          setHistory(
-            (await historyResponse.json()) as ProfileRevisionSummary[],
-          );
       })
       .catch(() => {
         if (!controller.signal.aborted) {
           setLoadError('unavailable');
-          setMessage(
-            locale === 'fr'
-              ? 'La mémoire professionnelle est momentanément indisponible.'
-              : 'Career memory is temporarily unavailable.',
-          );
         }
       })
       .finally(() => {
         if (!controller.signal.aborted) setState('ready');
       });
     return () => controller.abort();
-  }, [locale]);
-
-  const coverage = useMemo(() => memoryCoverage(profile), [profile]);
+  }, []);
 
   async function save(nextProfile: Profile = profile) {
+    if (saving.current || state === 'loading' || loadError) return false;
     const parsed = profileSchema.safeParse(nextProfile);
     if (!parsed.success) {
       setMessage(
@@ -85,6 +67,7 @@ export function useCareerMemory() {
       );
       return false;
     }
+    saving.current = true;
     setState('saving');
     setMessage('');
     try {
@@ -103,17 +86,9 @@ export function useCareerMemory() {
         revision: number;
       };
       const stored = profileSchema.parse(payload.profile);
+      if (!Number.isInteger(payload.revision)) throw new Error();
       setProfile(stored);
       setRevision(payload.revision);
-      setHistory((current) => [
-        {
-          revision: payload.revision,
-          createdAt: new Date().toISOString(),
-          sourceCount: stored.sources.length,
-          claimCount: stored.claims.length,
-        },
-        ...current.filter(({ revision: item }) => item !== payload.revision),
-      ]);
       setMessage(
         locale === 'fr'
           ? 'Mémoire enregistrée. La correction reste disponible dans l’historique.'
@@ -128,35 +103,24 @@ export function useCareerMemory() {
       );
       return false;
     } finally {
+      saving.current = false;
       setState('ready');
     }
   }
 
-  function mergeDuplicates() {
-    const merged = mergeDuplicateClaims(profile);
-    setProfile(merged.profile);
-    setMessage(
-      merged.mergedCount
-        ? locale === 'fr'
-          ? `${merged.mergedCount} doublon${merged.mergedCount > 1 ? 's' : ''} fusionné${merged.mergedCount > 1 ? 's' : ''}. Enregistrez pour confirmer.`
-          : `${merged.mergedCount} duplicate${merged.mergedCount > 1 ? 's' : ''} merged. Save to confirm.`
-        : locale === 'fr'
-          ? 'Aucun doublon sûr à fusionner.'
-          : 'No safe duplicate to merge.',
-    );
-  }
-
   return {
-    coverage,
     loadError,
-    history,
-    message,
+    message: loadError
+      ? loadError === 'auth'
+        ? locale === 'fr'
+          ? 'Connectez-vous pour consulter votre mémoire professionnelle.'
+          : 'Sign in to view your career memory.'
+        : locale === 'fr'
+          ? 'La mémoire professionnelle est momentanément indisponible.'
+          : 'Career memory is temporarily unavailable.'
+      : message,
     profile,
-    revision,
     save,
-    setMessage,
-    setProfile,
     state,
-    mergeDuplicates,
   };
 }

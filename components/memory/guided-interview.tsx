@@ -5,10 +5,16 @@ import Link from 'next/link';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { useCareerMemory } from '@/components/memory/use-career-memory';
 import { AppShell } from '@/components/layout/app-shell';
-import { Button, Icon, Overline, StatusChip, StepDots } from '@/components/ui';
-import { Card, Panel, ActionBar } from '@/components/shell';
-import { CharCount, Checkbox, Field, TextArea } from '@/components/form';
-import { SkeletonBlock, useDelayedPending } from '@/components/feedback';
+import {
+  Button,
+  Icon,
+  Overline,
+  StatusChip,
+  StepDots,
+} from '@/components/ui/controls';
+import { Card, Panel, ActionBar } from '@/components/ui/surfaces';
+import { CharCount, Checkbox, Field, TextArea } from '@/components/ui/form';
+import { SkeletonBlock, useDelayedPending } from '@/components/ui/feedback';
 import { readInterview, saveInterview } from '@/lib/guided-interview';
 
 export function GuidedInterviewScreen() {
@@ -332,15 +338,17 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
                 <TextArea
                   id="interview-answer"
                   maxLength={1000}
+                  disabled={saving}
                   value={draft.answers[draft.step]}
-                  onChange={(value) =>
+                  onChange={(value) => {
+                    setConfirmed(false);
                     setDraft({
                       ...draft,
                       answers: draft.answers.map((a, i) =>
                         i === draft.step ? value : a,
                       ),
-                    })
-                  }
+                    });
+                  }}
                 />
               </Field>
             ) : (
@@ -358,14 +366,17 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
                   <TextArea
                     id="interview-statement"
                     maxLength={3000}
+                    disabled={saving}
                     value={draft.statement}
-                    onChange={(value) =>
-                      setDraft({ ...draft, statement: value })
-                    }
+                    onChange={(value) => {
+                      setConfirmed(false);
+                      setDraft({ ...draft, statement: value });
+                    }}
                   />
                 </Field>
                 <Checkbox
                   checked={confirmed}
+                  disabled={saving}
                   onChange={setConfirmed}
                   label={
                     fr
@@ -456,7 +467,7 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
             (draft.step === 5 &&
               (!confirmed ||
                 !draft.statement.trim() ||
-                !draft.answers.some(Boolean)))
+                !draft.answers.some((answer) => answer.trim())))
           }
           icon="arrow_forward"
           onClick={() =>

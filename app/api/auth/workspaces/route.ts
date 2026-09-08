@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { authenticatedAccount, workspaceCookie } from '@/lib/server/auth';
-import { database } from '@/lib/server/database';
+import { authorize, database } from '@/lib/server/database';
 import {
+  applicationOrigin,
   isSameOrigin,
   readBoundedJson,
   PayloadTooLargeError,
@@ -62,9 +63,7 @@ async function mutate(request: Request, create: boolean) {
           values (${id}::uuid, ${name}, ${id}, now())`;
         await tx`insert into career_identity.member (id, "organizationId", "userId", role, "createdAt")
           values (${randomUUID()}::uuid, ${id}::uuid, ${account.user.id}::uuid, 'owner', now())`;
-        await tx`select set_config('request.jwt.claim.sub', ${account.user.id}, true),
-          set_config('request.jwt.claim.tenant_id', ${id}, true)`;
-        await tx.unsafe('set local role career_app');
+        await authorize(tx, { userId: account.user.id, tenantId: id });
         await tx`insert into app.tenants(id, owner_id, name) values (${id}::uuid, ${account.user.id}::uuid, ${name})`;
       });
     } else {
@@ -76,7 +75,7 @@ async function mutate(request: Request, create: boolean) {
     (await cookies()).set(workspaceCookie, id, {
       httpOnly: true,
       sameSite: 'lax',
-      secure: new URL(request.url).protocol === 'https:',
+      secure: applicationOrigin().protocol === 'https:',
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
