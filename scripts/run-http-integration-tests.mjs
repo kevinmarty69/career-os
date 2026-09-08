@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import process from 'node:process';
@@ -71,7 +72,24 @@ try {
   await admin.connect();
   adminConnected = true;
   await admin.query(
-    `create role ${webLogin} login noinherit password '${webPassword}' in role career_web`,
+    `create role ${webLogin} login inherit password '${webPassword}' in role career_web`,
+  );
+  const {
+    rows: [permissions],
+  } = await admin.query(
+    `select has_function_privilege($1, 'career_identity.active_session(uuid, uuid)', 'execute') as session_access,
+      pg_has_role($1, 'career_app', 'usage') as implicit_app_access`,
+    [webLogin],
+  );
+  assert.equal(
+    permissions.session_access,
+    true,
+    'Web login can verify sessions',
+  );
+  assert.equal(
+    permissions.implicit_app_access,
+    false,
+    'Tenant role remains explicit',
   );
   server = spawnTracked('pnpm', ['exec', 'next', 'start', '-p', String(port)], {
     ...environment,

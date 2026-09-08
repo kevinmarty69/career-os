@@ -73,7 +73,7 @@ Create a strong, separate login for the app and each worker using the operator
 connection. These are examples, not passwords to reuse:
 
 ```sql
-create role career_web_login login noinherit password '<unique password>';
+create role career_web_login login inherit password '<unique password>';
 grant career_web to career_web_login;
 create role career_company_login login noinherit password '<different password>';
 grant career_company_researcher to career_company_login;
@@ -81,7 +81,10 @@ grant career_company_researcher to career_company_login;
 
 Set the app's `DATABASE_URL` to its restricted login. Repeat the worker pattern
 for each role below. Logins must not own tables or have SUPERUSER, BYPASSRLS,
-CREATEDB, CREATEROLE or inherited roles. Workers reject excessive privileges.
+CREATEDB or CREATEROLE. The web login inherits only `career_web`'s identity
+permissions; `career_web` is itself NOINHERIT, so tenant roles still require
+explicit transaction-scoped activation. Worker logins remain NOINHERIT and reject
+excessive privileges.
 
 | Role                             | Database variable                                | Command                               |
 | -------------------------------- | ------------------------------------------------ | ------------------------------------- |
