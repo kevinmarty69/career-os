@@ -73,6 +73,11 @@ assert.ok(
 );
 const targetUrl = new URL(adminUrl);
 targetUrl.pathname = `/${databaseName}`;
+// GoTrue migrations use DB_NAMESPACE, but its runtime models query unqualified
+// users/identities tables. Scope the search path to this connection only, not
+// the shared postgres role or the application/migration connections.
+const authDatabaseUrl = new URL(targetUrl);
+authDatabaseUrl.searchParams.set('search_path', 'auth');
 const admin = new Client({ connectionString: adminUrl.toString() });
 const children = new Set();
 let created = false;
@@ -232,7 +237,7 @@ try {
       HOME: process.env.HOME,
       GOMAXPROCS: '1',
       GOMEMLIMIT: '128MiB',
-      DATABASE_URL: targetUrl.toString(),
+      DATABASE_URL: authDatabaseUrl.toString(),
       GOTRUE_DB_DRIVER: 'postgres',
       DB_NAMESPACE: 'auth',
       GOTRUE_DB_MAX_POOL_SIZE: '3',
@@ -266,6 +271,20 @@ try {
   }
   assert.ok(ready, 'Native GoTrue readiness timeout.');
   await completed(run('node', ['--import', 'tsx', 'scripts/migrate.ts'], env));
+  // /health confirms the HTTP listener, not that runtime SQL resolves correctly.
+  const usersResponse = await fetch(
+    `${apiUrl}/auth/v1/admin/users?page=1&per_page=1`,
+    {
+      headers: { Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}` },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  await usersResponse.arrayBuffer();
+  assert.equal(
+    usersResponse.status,
+    200,
+    `Native GoTrue runtime database check failed: ${auth.diagnostic}`,
+  );
   const args = process.argv
     .slice(2)
     .filter((arg, index) => index !== 0 || arg !== '--');
@@ -274,7 +293,13 @@ try {
     'Provide the command to run against the disposable stack.',
   );
   console.log('Native Supabase Auth + isolated PostgreSQL ready (no Docker).');
-  await completed(run(args[0], args.slice(1), env));
+  try {
+    await completed(run(args[0], args.slice(1), env));
+  } catch (error) {
+    if (auth.diagnostic)
+      console.error(`Native GoTrue diagnostic: ${auth.diagnostic}`);
+    throw error;
+  }
 } finally {
   await cleanup();
 }
