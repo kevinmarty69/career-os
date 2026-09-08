@@ -1,7 +1,8 @@
 # Local resource limits
 
 - Do not start Docker, Docker Desktop, or `supabase start` on this workstation.
-- Use the configured Supabase project or disposable native PostgreSQL/Auth tests; never reset existing databases.
+- Use the configured Career OS Supabase development project for local product/integration validation. Do not start a local PostgreSQL/Auth stack or create local test databases.
+- Use synthetic accounts and workspaces for tests; delete only records created by that run. Never reset the connected project or run destructive migration/schema fixtures against it. Keep destructive fixtures isolated in CI, not on this workstation.
 - Run builds, typechecks and browser suites sequentially, not in parallel across agents.
 - Do not load or download a local inference model on this 8 GB machine. Keep provider calls opt-in and obtain approval before spending.
 
