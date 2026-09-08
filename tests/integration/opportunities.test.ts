@@ -605,10 +605,7 @@ async function main() {
   );
   const unavailable = await owner.browser.request(semanticPath, 'POST');
   await expectStatus(unavailable, 503, 'unconfigured local semantic model');
-  assert.equal(
-    await unavailable.text(),
-    'Semantic model is not configured.',
-  );
+  assert.equal(await unavailable.text(), 'Semantic model is not configured.');
   let unavailableCalls = 0;
   await assert.rejects(
     runSemanticAnalysis(

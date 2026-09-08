@@ -308,7 +308,7 @@ test('runs semantic analysis only on request, retries the local model and reads 
   const semantic: SemanticMock = {
     postCalls: 0,
     postResponses: [
-      { status: 503, body: 'Local semantic model is not configured.' },
+      { status: 503, body: 'Semantic model is not configured.' },
       { status: 200, body: completedSemanticAnalysis() },
     ],
   };
