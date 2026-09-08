@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 
 begin;
+select pg_temp.seed_identity('ee000000-0000-4000-8000-000000000001','ee000000-0000-4000-8000-000000000002');
 
 insert into app.tenants (id, owner_id, name) values (
   'ee000000-0000-4000-8000-000000000001',

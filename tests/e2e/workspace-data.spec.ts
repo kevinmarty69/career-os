@@ -27,14 +27,14 @@ test('exports the workspace and requires an exact deletion confirmation', async 
   await page.goto('/settings/data');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: 'Générer l’archive' }).click(),
+    page.getByRole('button', { name: 'Télécharger l’archive' }).click(),
   ]);
   await expect.poll(() => exported).toBe(true);
   await expect(page.getByRole('status')).toContainText('Export téléchargé');
   expect(download.suggestedFilename()).toBe('careeros-export.ndjson');
 
   const remove = page.getByRole('button', {
-    name: 'Supprimer définitivement',
+    name: 'Supprimer mon compte',
   });
   await expect(remove).toBeDisabled();
   await page.getByLabel('Tapez SUPPRIMER pour confirmer').fill('supprimer');

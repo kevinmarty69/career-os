@@ -38,6 +38,7 @@ export const applicationContactSourceSchema = z
     collectedAt: z.string().datetime({ offset: true }),
     trust: z.enum(['authoritative', 'corroborating', 'weak']),
     supports: z.array(sourceSupportSchema).min(1).max(4),
+    excerpt: z.string().trim().min(1).max(1_000).optional(),
   })
   .strict();
 

@@ -2,22 +2,22 @@
 
 begin;
 
-insert into auth."user" (id, name, email, "emailVerified") values
+insert into career_identity."user" (id, name, email, "emailVerified") values
   ('f1000000-0000-4000-8000-000000000001', 'Workspace Owner', 'workspace-owner@example.test', true),
   ('f1000000-0000-4000-8000-000000000002', 'Workspace Member', 'workspace-member@example.test', true);
-insert into auth.organization (id, name, slug, "createdAt") values
+insert into career_identity.organization (id, name, slug, "createdAt") values
   ('f2000000-0000-4000-8000-000000000001', 'Delete me exactly', 'delete-me-exactly', now()),
   ('f2000000-0000-4000-8000-000000000002', 'Keep me', 'keep-me', now());
-insert into auth.member (id, "organizationId", "userId", role, "createdAt") values
+insert into career_identity.member (id, "organizationId", "userId", role, "createdAt") values
   ('f3000000-0000-4000-8000-000000000001', 'f2000000-0000-4000-8000-000000000001', 'f1000000-0000-4000-8000-000000000001', 'owner', now()),
   ('f3000000-0000-4000-8000-000000000002', 'f2000000-0000-4000-8000-000000000001', 'f1000000-0000-4000-8000-000000000002', 'member', now()),
   ('f3000000-0000-4000-8000-000000000003', 'f2000000-0000-4000-8000-000000000002', 'f1000000-0000-4000-8000-000000000001', 'owner', now());
-insert into auth.session (
-  id, "expiresAt", token, "updatedAt", "userId", "activeOrganizationId"
-) values
-  ('f4000000-0000-4000-8000-000000000001', now() + interval '1 day', 'workspace-owner-session', now(), 'f1000000-0000-4000-8000-000000000001', 'f2000000-0000-4000-8000-000000000001'),
-  ('f4000000-0000-4000-8000-000000000002', now() + interval '1 day', 'workspace-member-session', now(), 'f1000000-0000-4000-8000-000000000002', 'f2000000-0000-4000-8000-000000000001');
-insert into auth.invitation (
+insert into auth.users(id) values
+  ('f1000000-0000-4000-8000-000000000001'),('f1000000-0000-4000-8000-000000000002');
+insert into auth.sessions(id, user_id, created_at, not_after) values
+  ('f4000000-0000-4000-8000-000000000001','f1000000-0000-4000-8000-000000000001',now(),now()+interval '1 day'),
+  ('f4000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002',now(),now()+interval '1 day');
+insert into career_identity.invitation (
   id, "organizationId", email, role, status, "expiresAt", "inviterId"
 ) values (
   'f5000000-0000-4000-8000-000000000001', 'f2000000-0000-4000-8000-000000000001',
@@ -183,14 +183,14 @@ insert into app.share_links (
   'f7500000-0000-4000-8000-000000000001',
   'f2000000-0000-4000-8000-000000000001',
   'f7400000-0000-4000-8000-000000000001',
-  digest('workspace-delete-token', 'sha256'), now() + interval '1 day'
+  extensions.digest('workspace-delete-token', 'sha256'), now() + interval '1 day'
 );
 set local session_replication_role = origin;
 
 set local role career_reader;
 select 1 / ((app.read_shared_publication(
   'f7400000-0000-4000-8000-000000000001',
-  digest('workspace-delete-token', 'sha256')
+  extensions.digest('workspace-delete-token', 'sha256')
 ) is not null)::integer) as publication_readable_before_deletion;
 reset role;
 
@@ -237,7 +237,7 @@ reset role;
 set local role career_reader;
 select 1 / ((app.read_shared_publication(
   'f7400000-0000-4000-8000-000000000001',
-  digest('workspace-delete-token', 'sha256')
+  extensions.digest('workspace-delete-token', 'sha256')
 ) is null)::integer) as publication_unreadable_after_deletion;
 reset role;
 
@@ -252,25 +252,23 @@ do $$ begin
     or exists(select 1 from app.opportunity_decision_events where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.semantic_analyses where tenant_id = 'f2000000-0000-4000-8000-000000000001')
     or exists(select 1 from app.audit_events where tenant_id = 'f2000000-0000-4000-8000-000000000001')
-    or exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000001')
-    or exists(select 1 from auth.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
-    or exists(select 1 from auth.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then
+    or exists(select 1 from career_identity.organization where id = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from career_identity.member where "organizationId" = 'f2000000-0000-4000-8000-000000000001')
+    or exists(select 1 from career_identity.invitation where "organizationId" = 'f2000000-0000-4000-8000-000000000001') then
     raise exception 'workspace deletion left orphaned data';
   end if;
-  if (select count(*) from auth."user" where id in (
+  if (select count(*) from career_identity."user" where id in (
       'f1000000-0000-4000-8000-000000000001',
       'f1000000-0000-4000-8000-000000000002'
     )) <> 2
-    or exists(select 1 from auth.session
-      where "activeOrganizationId" = 'f2000000-0000-4000-8000-000000000001')
-    or (select count(*) from auth.session where id in (
+    or (select count(*) from auth.sessions where id in (
       'f4000000-0000-4000-8000-000000000001',
       'f4000000-0000-4000-8000-000000000002'
     )) <> 2 then
-    raise exception 'workspace deletion removed identities or left active sessions';
+    raise exception 'workspace deletion removed identities or global Supabase sessions';
   end if;
   if not exists(select 1 from app.tenants where id = 'f2000000-0000-4000-8000-000000000002')
-    or not exists(select 1 from auth.organization where id = 'f2000000-0000-4000-8000-000000000002')
+    or not exists(select 1 from career_identity.organization where id = 'f2000000-0000-4000-8000-000000000002')
     or not exists(select 1 from app.sources where tenant_id = 'f2000000-0000-4000-8000-000000000002') then
     raise exception 'workspace deletion affected another tenant';
   end if;

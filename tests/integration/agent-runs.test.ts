@@ -1,3 +1,4 @@
+import { BrowserSession } from './supabase-browser-session';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
@@ -9,48 +10,11 @@ import {
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
 const authOrigin = process.env.TEST_AUTH_ORIGIN ?? baseUrl;
-const requestOrigin = process.env.TEST_REQUEST_ORIGIN ?? baseUrl;
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required.');
 const suffix = randomUUID();
 const livingProfile = structuredClone(syntheticProfile);
 for (const claim of livingProfile.claims) claim.level = 'declared';
-
-class BrowserSession {
-  private readonly cookies = new Map<string, string>();
-
-  async request(path: string, method = 'GET', body?: unknown, headers = {}) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method,
-      headers: {
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...(method === 'GET' ? {} : { origin: requestOrigin }),
-        ...(this.cookieHeader() ? { cookie: this.cookieHeader() } : {}),
-        ...headers,
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    const responseHeaders = response.headers as Headers & {
-      getSetCookie?: () => string[];
-    };
-    for (const setCookie of responseHeaders.getSetCookie?.() ?? [
-      response.headers.get('set-cookie'),
-    ]) {
-      if (!setCookie) continue;
-      const [pair] = setCookie.split(';');
-      const separator = pair.indexOf('=');
-      if (separator > 0)
-        this.cookies.set(pair.slice(0, separator), pair.slice(separator + 1));
-    }
-    return response;
-  }
-
-  private cookieHeader() {
-    return [...this.cookies.entries()]
-      .map(([name, value]) => `${name}=${value}`)
-      .join('; ');
-  }
-}
 
 async function expectStatus(
   response: Response,
@@ -66,22 +30,17 @@ async function expectStatus(
 async function createWorkspace(label: string) {
   const browser = new BrowserSession();
   await expectStatus(
-    await browser.request(
-      '/api/auth/sign-up/email',
-      'POST',
-      {
-        name: label,
-        email: `${label.toLowerCase()}-${suffix}@example.test`,
-        password: 'safe-local-password',
-      },
-      { origin: authOrigin },
-    ),
+    await browser.signUp({
+      name: label,
+      email: `${label.toLowerCase()}-${suffix}@example.test`,
+      password: 'safe-local-password',
+    }),
     200,
     `${label} sign-up`,
   );
   await expectStatus(
     await browser.request(
-      '/api/auth/organization/create',
+      '/api/auth/workspaces',
       'POST',
       { name: label, slug: `${label.toLowerCase()}-${suffix}` },
       { origin: authOrigin },
@@ -465,7 +424,7 @@ async function main() {
          output_artifact_id,page_spec_id,completed_at
        ) select tenant_id,id,'page-composer','completed',
          'http-review-fixture','{}'::jsonb,
-         encode(digest('{}'::jsonb::text,'sha256'),'hex'),$2,$3,now()
+         encode(extensions.digest('{}'::jsonb::text,'sha256'),'hex'),$2,$3,now()
          from app.workflow_runs where id=$1`,
       [run.runId, artifactId, pageSpecId],
     );

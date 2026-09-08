@@ -1,4 +1,5 @@
 import 'server-only';
+import { serverModelConfig } from './local-openai-transport';
 import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import type postgres from 'postgres';
@@ -263,7 +264,7 @@ async function persistSemanticAnalysis(
         ${match.livingProfile.revision}, ${inputHash}, ${tx.json(input)},
         ${tx.json(generated.output)}, ${generated.provider}, ${generated.model},
         ${generated.providerRequestId ?? null}, ${generated.usage.reservedTokens},
-        ${generated.usage.inputTokens}, ${generated.usage.outputTokens}, 0,
+        ${generated.usage.inputTokens}, ${generated.usage.outputTokens}, ${generated.usage.reservedCostMicros},
         ${generated.usage.costMicros}, ${generated.usage.latencyMs}
       ) returning ${analysisColumns(tx)}`;
       await release(tx, session.tenantId, inputHash, leaseToken);
@@ -379,9 +380,13 @@ function validateGenerated(
     artifact.jobRevision !== input.job.revision ||
     artifact.profileSnapshotId !== input.profile.profileSnapshotId ||
     artifact.profileRevision !== input.profile.revision ||
-    result.provider !== 'openai-compatible-local' ||
-    result.usage.costMicros !== 0 ||
-    result.usage.reservedCostMicros !== 0
+    !['openai-compatible-local', 'openai-compatible-remote'].includes(
+      result.provider,
+    ) ||
+    !Number.isSafeInteger(result.usage.costMicros) ||
+    result.usage.costMicros < 0 ||
+    !Number.isSafeInteger(result.usage.reservedCostMicros) ||
+    result.usage.costMicros > result.usage.reservedCostMicros
   )
     throw new LocalModelClientError('INVALID_RESPONSE');
 }
@@ -391,11 +396,7 @@ function configuredClient() {
   const model = process.env.CAREER_OS_LOCAL_MODEL;
   if (!baseUrl || !model) throw new SemanticAnalysisModelNotConfiguredError();
   try {
-    return new LocalOpenAISemanticMatchClient({
-      baseUrl,
-      apiKey: process.env.CAREER_OS_LOCAL_MODEL_API_KEY ?? 'local-only',
-      model,
-    });
+    return new LocalOpenAISemanticMatchClient(serverModelConfig());
   } catch (error) {
     if (error instanceof LocalModelClientError)
       throw new SemanticAnalysisModelNotConfiguredError();

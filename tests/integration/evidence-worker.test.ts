@@ -1,6 +1,6 @@
+import { applyTestMigrations } from './database-fixtures';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { Client } from 'pg';
 import { buildEvidenceArchive } from '../../lib/evidence-archive';
@@ -46,12 +46,7 @@ test('the evidence archivist keeps only permitted proof and writes no model usag
     await admin.connect();
     await admin.query(`create database ${databaseName}`);
     await target.connect();
-    for (const migration of (await readdir('supabase/migrations'))
-      .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-      .sort())
-      await target.query(
-        await readFile(`supabase/migrations/${migration}`, 'utf8'),
-      );
+    await applyTestMigrations(target);
     await target.query(
       `create role ${workerLogin} login noinherit password '${workerPassword}'
        in role career_evidence_archivist`,
@@ -79,6 +74,16 @@ test('the evidence archivist keeps only permitted proof and writes no model usag
       /restricted evidence archivist login/,
     );
     await target.query(`revoke ${extraRole} from ${workerLogin}`);
+
+    await target.query('select pg_temp.seed_identity($1,$2)', [
+      tenantId,
+      ownerId,
+    ]);
+
+    await target.query('select pg_temp.seed_identity($1,$2)', [
+      otherTenantId,
+      ownerId,
+    ]);
 
     await target.query(
       `insert into app.tenants (id, owner_id, name) values

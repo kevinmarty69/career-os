@@ -82,10 +82,11 @@ See **[Self-hosting Career OS](docs/SELF_HOSTING.md)** for the complete setup, l
 
 ## Development
 
-**Supabase Auth migration branch:** account/session flows now use Supabase Auth.
-Fresh-instance setup and live smoke commands are in [ADR-006](docs/ADR-006-supabase-auth.md).
-The historical PostgreSQL-only/Better Auth integration harness below still needs
-porting before merge; do not interpret it as verified for this branch.
+Account/session flows use Supabase Auth. See [Self-hosting](docs/SELF_HOSTING.md)
+for signup/SMTP setup and [ADR-006](docs/ADR-006-supabase-auth.md) for identity boundaries.
+Local validation uses the configured Supabase development project and disposable
+synthetic accounts. Destructive persisted fixtures run only in isolated CI with
+native PostgreSQL and official GoTrue, without Docker.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for module boundaries and the checks expected for each change.
 
@@ -95,16 +96,19 @@ pnpm build
 pnpm audit --prod --audit-level high
 ```
 
-Database and browser verification:
+Database verification in isolated CI (not on the workstation):
 
 ```bash
-pnpm db:up
-pnpm db:test
-pnpm test:security
+pnpm test:native pnpm verify:persisted
+pnpm test:native pnpm test:security
+```
+
+For local account/CV/persistence validation, use the scoped Supabase smoke command
+in [Self-hosting](docs/SELF_HOSTING.md). Browser contract checks:
+
+```bash
 pnpm test:accessibility
-pnpm test:integration:worker
 pnpm test:e2e
-pnpm db:down
 ```
 
 The PostgreSQL test suite also covers migration compatibility on PostgreSQL 17 without pgvector.

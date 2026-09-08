@@ -40,11 +40,11 @@ let searchProfileId: string;
 
 before(async () => {
   await admin.begin(async (tx) => {
-    await tx`insert into auth."user" (id, name, email, "emailVerified")
+    await tx`insert into career_identity."user" (id, name, email, "emailVerified")
       values (${session.userId}, 'Test owner', ${`${session.userId}@example.test`}, true)`;
-    await tx`insert into auth.organization (id, name, slug, "createdAt")
+    await tx`insert into career_identity.organization (id, name, slug, "createdAt")
       values (${session.tenantId}, ${session.tenantName}, ${session.tenantId}, now())`;
-    await tx`insert into auth.member (id, "organizationId", "userId", role, "createdAt")
+    await tx`insert into career_identity.member (id, "organizationId", "userId", role, "createdAt")
       values (${randomUUID()}, ${session.tenantId}, ${session.userId}, 'owner', now())`;
   });
   await saveLivingProfile(
@@ -68,7 +68,7 @@ before(async () => {
 
 after(async () => {
   await deleteWorkspace(session, { confirmation: 'DELETE' });
-  await admin`delete from auth."user" where id = ${session.userId}`;
+  await admin`delete from career_identity."user" where id = ${session.userId}`;
   await closeApplicationDatabases();
   await admin.end();
 });

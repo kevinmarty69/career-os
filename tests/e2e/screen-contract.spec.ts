@@ -2,10 +2,10 @@ import { expect, test } from '@playwright/test';
 import { applicationId, mockPersistedWorkspace } from './persisted-workspace';
 
 const screens = [
-  ['/', 'Lancez le workflow de preuves pour Signal Forge.'],
+  ['/', 'Bonjour Alex'],
   ['/memory', 'Mémoire professionnelle'],
   ['/applications', 'Candidatures'],
-  [`/applications/${applicationId}/review`, 'Staff Platform Engineer'],
+  [`/applications/${applicationId}/review`, 'Aucune review pour le moment.'],
   ['/memory/import', 'Ajoutez votre parcours'],
   [`/applications/${applicationId}/page`, 'Staff Platform Engineer'],
   ['/links', 'Liens privés'],
@@ -31,7 +31,8 @@ const screens = [
   ['/inbox', 'À trancher'],
   ['/settings/billing', 'Abonnement'],
   ['/settings/integrations', 'Intégrations'],
-  ['/settings/data', 'Export & suppression'],
+  ['/settings/data', 'Vos données vous appartiennent'],
+  ['/settings/profile', 'Paramètres du profil'],
 ] as const;
 
 test('renders route headings with mocked persisted data', async ({ page }) => {
@@ -55,7 +56,8 @@ test('opens the documented command palette with the keyboard shortcut', async ({
   await mockPersistedWorkspace(page);
   await page.goto('/');
   const trigger = page.getByRole('button', {
-    name: /Chercher une preuve, une entreprise, une affirmation/,
+    name: 'Recherche globale',
+    exact: true,
   });
   await trigger.focus();
   await page.keyboard.press('ControlOrMeta+K');
@@ -74,22 +76,26 @@ test('opens the documented command palette with the keyboard shortcut', async ({
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByRole('link', { name: 'Nouvelle candidature depuis une URL' })
+    .click();
+  await expect(page).toHaveURL('/applications/new');
+  await expect(
+    page.getByRole('dialog', { name: 'Coller une offre' }),
+  ).toBeVisible();
 });
 
 test('exposes current navigation and traps focus in the job import dialog', async ({
   page,
-}, testInfo) => {
+}) => {
   await mockPersistedWorkspace(page);
   await page.goto('/applications');
-  const navigationName =
-    testInfo.project.name === 'mobile'
-      ? 'Navigation mobile'
-      : 'Navigation principale';
   await expect(
-    page.getByRole('navigation', { name: navigationName }).getByRole('link', {
-      name: 'Candidatures',
-      exact: true,
-    }),
+    page
+      .getByRole('navigation', { name: 'Navigation principale' })
+      .locator('a[href="/applications"]'),
   ).toHaveAttribute('aria-current', 'page');
 
   const trigger = page.getByRole('button', { name: 'Coller une offre' });
@@ -166,7 +172,7 @@ test('navigates from memory to the kit home without reviving the legacy shell', 
   await expect(page).toHaveURL('/');
   await expect(
     page.getByRole('heading', {
-      name: 'Lancez le workflow de preuves pour Signal Forge.',
+      name: 'Bonjour Alex',
     }),
   ).toBeVisible();
   await expect(page.locator('main.co-shell')).toBeVisible();
@@ -184,7 +190,7 @@ test('shows a private source choice before human validation', async ({
     page.getByText('Le fichier brut n’est pas envoyé au serveur.'),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Ou collez du texte' }),
+    page.getByText('Ou collez du texte', { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('progressbar')).toHaveCount(0);
 });
@@ -381,6 +387,7 @@ test('identifies a valid private page as an independent application', async ({
 test('shows anonymous private-page metrics in the links inventory', async ({
   context,
   page,
+  isMobile,
 }) => {
   await context.clearCookies();
   const publicationId = '988c0a00-0000-4000-8000-000000000025';
@@ -420,16 +427,37 @@ test('shows anonymous private-page metrics in the links inventory', async ({
   );
 
   await page.goto('/links');
+  // The secondary side panel is intentionally hidden below 1180px.
+  if (!isMobile)
+    await expect(
+      page.getByText('No fingerprint, IP address, or user agent is recorded.'),
+    ).toBeVisible();
+  const row = page.getByRole('article').filter({ hasText: 'Signal Forge' });
   await expect(
-    page.getByText('No fingerprint, IP address, or user agent is recorded.'),
+    row.getByRole('heading', { name: 'Staff Platform Engineer', exact: true }),
   ).toBeVisible();
-  const row = page.locator('.co-table-row').filter({ hasText: 'Signal Forge' });
-  await expect(row).toContainText('Staff Platform Engineer');
-  await expect(row.locator(':scope > span').nth(1)).toHaveText('4');
-  await expect(row.locator(':scope > span').nth(2)).toHaveText('3');
-  await expect(row.locator(':scope > span').nth(3)).toHaveText('2');
-  page.once('dialog', (dialog) => void dialog.accept());
+  for (const [label, value] of [
+    ['Opens', '4'],
+    ['Sections', '3'],
+    ['Actions', '2'],
+    ['Downloads', '1'],
+  ]) {
+    const metric = row.locator('dl > div').filter({
+      has: page.locator('dt').filter({ hasText: new RegExp(`^${label}$`) }),
+    });
+    await expect(metric.getByRole('definition')).toHaveText(value);
+  }
   await row.getByRole('button', { name: 'Revoke' }).click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Revoke the Signal Forge link?',
+  });
+  await expect(dialog).toBeVisible();
+  const confirm = dialog.getByRole('button', { name: 'Revoke', exact: true });
+  await expect(confirm).toBeDisabled();
+  expect(revoked).toBe(false);
+  await dialog.getByLabel('Type REVOKE to confirm').fill('REVOKE');
+  await confirm.click();
+  await expect(dialog).toBeHidden();
   await expect(row).toContainText('Revoked');
   expect(revoked).toBe(true);
 });

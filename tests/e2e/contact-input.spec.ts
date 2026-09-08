@@ -47,7 +47,6 @@ test('contact input limits and stored messages stay unchanged across locales', a
         }),
     );
   }
-  await page.goto(`/applications/${applicationId}/timeline`);
   for (const [locale, open, close, note, message] of [
     [
       'FR',
@@ -64,7 +63,15 @@ test('contact input limits and stored messages stay unchanged across locales', a
       'Message after acceptance',
     ],
   ] as const) {
-    await page.getByRole('button', { name: locale, exact: true }).click();
+    await page.goto('/settings/profile');
+    await page
+      .locator('#interface-language')
+      .selectOption(locale.toLowerCase());
+    await expect(page.locator('html')).toHaveAttribute(
+      'lang',
+      locale.toLowerCase(),
+    );
+    await page.goto(`/applications/${applicationId}/timeline`);
     await page.getByRole('button', { name: open, exact: true }).click();
     await expect(page).toHaveURL(/\?contacts=1$/);
     const noteInput = page.getByRole('textbox', { name: note, exact: true });

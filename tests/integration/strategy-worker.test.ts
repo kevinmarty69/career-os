@@ -1,6 +1,6 @@
+import { applyTestMigrations } from './database-fixtures';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import test from 'node:test';
 import { Client } from 'pg';
@@ -98,12 +98,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     await admin.connect();
     await admin.query(`create database ${databaseName}`);
     await target.connect();
-    for (const migration of (await readdir('supabase/migrations'))
-      .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-      .sort())
-      await target.query(
-        await readFile(`supabase/migrations/${migration}`, 'utf8'),
-      );
+    await applyTestMigrations(target);
     await target.query(
       `create role ${workerLogin} login noinherit password '${workerPassword}'
        in role career_recruiter_strategist`,
@@ -118,6 +113,16 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
       worker.query('select * from app.workflow_steps'),
       /permission denied/,
     );
+
+    await target.query('select pg_temp.seed_identity($1,$2)', [
+      tenantId,
+      ownerId,
+    ]);
+
+    await target.query('select pg_temp.seed_identity($1,$2)', [
+      otherTenantId,
+      ownerId,
+    ]);
 
     await target.query(
       `insert into app.tenants (id, owner_id, name) values
@@ -176,7 +181,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
       `insert into app.workflow_runs
         (id, tenant_id, opportunity_id, profile_id, state, status,
          token_budget, cost_budget_micros, deadline_at)
-       values ($1, $2, $3, $4, 'strategy', 'paused', 300000, 0,
+       values ($1, $2, $3, $4, 'strategy', 'paused', 300000, 300000,
          now() + interval '1 hour')`,
       [runId, tenantId, opportunityId, profileId],
     );
@@ -201,7 +206,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     );
     const researchHash = (
       await target.query(
-        `select encode(digest(body::text, 'sha256'), 'hex') hash
+        `select encode(extensions.digest(body::text, 'sha256'), 'hex') hash
          from app.artifacts where id = $1`,
         [researchId],
       )
@@ -236,7 +241,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     );
     const archiveHash = (
       await target.query(
-        `select encode(digest(body::text, 'sha256'), 'hex') hash
+        `select encode(extensions.digest(body::text, 'sha256'), 'hex') hash
          from app.artifacts where id = $1`,
         [evidenceArchiveId],
       )
@@ -283,14 +288,22 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
       apiKey: 'local-test',
       model: 'fake-strategist',
     });
+    const pricedClient = new LocalOpenAIRecruiterStrategyClient({
+      baseUrl: `http://127.0.0.1:${address.port}/v1`,
+      apiKey: 'local-test',
+      model: 'fake-strategist',
+      inputMicrosPerToken: 1,
+      outputMicrosPerToken: 1,
+      maxRequestCostMicros: 300000,
+    });
     const outcomes = await Promise.all([
       processRecruiterStrategyStep({
         databaseUrl: workerUrl.toString(),
-        client,
+        client: pricedClient,
       }),
       processRecruiterStrategyStep({
         databaseUrl: workerUrl.toString(),
-        client,
+        client: pricedClient,
       }),
     ]);
     assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), [
@@ -301,7 +314,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
 
     const [strategy] = (
       await target.query(
-        `select id, body, encode(digest(body::text, 'sha256'), 'hex') hash
+        `select id, body, encode(extensions.digest(body::text, 'sha256'), 'hex') hash
          from app.artifacts where workflow_run_id = $1 and kind = 'strategy'`,
         [runId],
       )
@@ -321,7 +334,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
       status: 'paused',
       state: 'strategy_review',
       used_tokens: 120,
-      used_cost_micros: '0',
+      used_cost_micros: '120',
       reserved_tokens: 0,
       reserved_cost_micros: '0',
     });
@@ -334,7 +347,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     assert.deepEqual(ledger.rows[0], {
       count: 1,
       usage_basis: 'actual',
-      cost_micros: '0',
+      cost_micros: '120',
     });
     const reservation = await target.query(
       `select status, actual_tokens, actual_cost_micros::text
@@ -344,7 +357,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     assert.deepEqual(reservation.rows[0], {
       status: 'settled',
       actual_tokens: 120,
-      actual_cost_micros: '0',
+      actual_cost_micros: '120',
     });
 
     const completedStep = await target.query(
@@ -458,7 +471,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     );
     const hostileResearchHash = (
       await target.query(
-        `select encode(digest(body::text, 'sha256'), 'hex') hash
+        `select encode(extensions.digest(body::text, 'sha256'), 'hex') hash
          from app.artifacts where id = $1`,
         [hostileResearchId],
       )
@@ -482,7 +495,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
     );
     const hostileArchiveHash = (
       await target.query(
-        `select encode(digest(body::text, 'sha256'), 'hex') hash
+        `select encode(extensions.digest(body::text, 'sha256'), 'hex') hash
          from app.artifacts where id = $1`,
         [hostileArchiveId],
       )
@@ -684,7 +697,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
         (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
          input, input_hash)
        values ($1, $2, $3, 'recruiter-strategist', 'pending', $4,
-         '{}'::jsonb, encode(digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
+         '{}'::jsonb, encode(extensions.digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
       [reclaimStepId, tenantId, reclaimRunId, randomUUID()],
     );
     await target.query('set role career_recruiter_strategist');
@@ -726,7 +739,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
         (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
          input, input_hash)
        values ($1, $2, $3, 'recruiter-strategist', 'pending', $4,
-         '{}'::jsonb, encode(digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
+         '{}'::jsonb, encode(extensions.digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
       [expiredStepId, tenantId, expiredRunId, randomUUID()],
     );
     await target.query('set role career_recruiter_strategist');
@@ -795,7 +808,7 @@ test('the recruiter strategist is tenant-safe, durable and exactly-once', async 
         (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
          input, input_hash)
        values ($1, $2, $3, 'recruiter-strategist', 'pending', $4,
-         '{}'::jsonb, encode(digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
+         '{}'::jsonb, encode(extensions.digest('{}'::jsonb::text, 'sha256'), 'hex'))`,
       [invalidStepId, tenantId, invalidRunId, randomUUID()],
     );
     const invalidOutcome = await processRecruiterStrategyStep({

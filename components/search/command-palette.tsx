@@ -152,19 +152,17 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
           </div>
         ) : null}
         <p>Actions</p>
-        <Link href="/applications#new" onClick={onClose}>
+        <Link href="/applications/new" onClick={onClose}>
           <Icon>add_link</Icon>
           <span>
             <strong>{t('shell.new.application.from.a.url')}</strong>
           </span>
-          <kbd>⌘N</kbd>
         </Link>
         <Link href="/memory/import" onClick={onClose}>
           <Icon>upload_file</Icon>
           <span>
             <strong>{t('shell.import.a.document.into.career.memory')}</strong>
           </span>
-          <kbd>⌘U</kbd>
         </Link>
         <footer>
           <span>{t('shell.open.first.result')}</span>

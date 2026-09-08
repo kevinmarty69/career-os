@@ -1,6 +1,6 @@
+import { applyTestMigrations } from './database-fixtures';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { Client } from 'pg';
 import { composeApprovedStrategyPage } from '../../lib/page-composer';
@@ -30,12 +30,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
     await admin.connect();
     await admin.query(`create database ${databaseName}`);
     await target.connect();
-    for (const migration of (await readdir('supabase/migrations'))
-      .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-      .sort())
-      await target.query(
-        await readFile(`supabase/migrations/${migration}`, 'utf8'),
-      );
+    await applyTestMigrations(target);
     await target.query(
       `create role ${login} login noinherit password '${password}'
        in role career_page_composer`,
@@ -67,6 +62,10 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
         'decisionKey',
       ].map((key) => [key, randomUUID()]),
     );
+    await target.query('select pg_temp.seed_identity($1,$2)', [
+      ids.tenant,
+      ids.owner,
+    ]);
     await target.query(
       `insert into app.tenants(id,owner_id,name) values($1,$2,'Correction')`,
       [ids.tenant, ids.owner],
@@ -164,7 +163,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
         `insert into app.artifacts(
            id,tenant_id,workflow_run_id,kind,version,schema_version,body,created_by
          ) values($1,$2,$3,'research',1,1,$4,'company_researcher')
-         returning encode(digest(body::text,'sha256'),'hex') hash`,
+         returning encode(extensions.digest(body::text,'sha256'),'hex') hash`,
         [ids.researchArtifact, ids.tenant, ids.run, research],
       )
     ).rows[0].hash;
@@ -194,7 +193,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
         `insert into app.artifacts(
            id,tenant_id,workflow_run_id,kind,version,schema_version,body,created_by
          ) values($1,$2,$3,'evidence_archive',1,1,$4,'evidence_archivist')
-         returning encode(digest(body::text,'sha256'),'hex') hash`,
+         returning encode(extensions.digest(body::text,'sha256'),'hex') hash`,
         [ids.evidenceArtifact, ids.tenant, ids.run, evidenceArchive],
       )
     ).rows[0].hash;
@@ -226,7 +225,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
         `insert into app.artifacts(
            id,tenant_id,workflow_run_id,kind,version,schema_version,body,created_by
          ) values($1,$2,$3,'strategy',1,1,$4,'recruiter_strategist')
-         returning encode(digest(body::text,'sha256'),'hex') hash`,
+         returning encode(extensions.digest(body::text,'sha256'),'hex') hash`,
         [ids.strategyArtifact, ids.tenant, ids.run, strategy],
       )
     ).rows[0].hash;
@@ -292,7 +291,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
     await target.query(
       `insert into app.page_specs(
          id,tenant_id,workflow_run_id,version,spec,input_hash,source_artifact_id
-       ) values($1,$2,$3,1,$4,encode(digest($5::jsonb::text,'sha256'),'hex'),$6)`,
+       ) values($1,$2,$3,1,$4,encode(extensions.digest($5::jsonb::text,'sha256'),'hex'),$6)`,
       [ids.page, ids.tenant, ids.run, sourcePage, baseInput, ids.artifact],
     );
     await target.query(
@@ -300,7 +299,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
          id,tenant_id,workflow_run_id,stage,status,idempotency_key,input,input_hash,
          output_artifact_id,page_spec_id,completed_at
        ) values($1,$2,$3,'page-composer','completed','source',$4,
-         encode(digest($4::jsonb::text,'sha256'),'hex'),$5,$6,now())`,
+         encode(extensions.digest($4::jsonb::text,'sha256'),'hex'),$5,$6,now())`,
       [ids.step, ids.tenant, ids.run, baseInput, ids.artifact, ids.page],
     );
     await target.query(
@@ -314,7 +313,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
          id,tenant_id,workflow_run_id,stage,status,idempotency_key,input,input_hash,
          output_artifact_id,completed_at
        ) values($1,$2,$3,'recruiter-reviewer','completed','review-source','{}',
-         encode(digest('{}'::jsonb::text,'sha256'),'hex'),$4,now())`,
+         encode(extensions.digest('{}'::jsonb::text,'sha256'),'hex'),$4,now())`,
       [ids.reviewStep, ids.tenant, ids.run, ids.reviewArtifact],
     );
     await target.query(
@@ -552,7 +551,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
         `insert into app.artifacts(
            id,tenant_id,workflow_run_id,kind,version,schema_version,body,created_by
          ) values($1,$2,$3,'strategy',1,1,$4,'recruiter_strategist')
-         returning encode(digest(body::text,'sha256'),'hex') hash`,
+         returning encode(extensions.digest(body::text,'sha256'),'hex') hash`,
         [childStrategyId, ids.tenant, childId, strategy],
       )
     ).rows[0].hash;
@@ -590,7 +589,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
     tamperedInput.correction.pageSpecHash = '0'.repeat(64);
     await target.query(
       `update app.workflow_steps set input=$2,
-         input_hash=encode(digest($2::jsonb::text,'sha256'),'hex')
+         input_hash=encode(extensions.digest($2::jsonb::text,'sha256'),'hex')
        where id=$1`,
       [composer.id, tamperedInput],
     );

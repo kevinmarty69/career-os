@@ -1,6 +1,8 @@
 \set ON_ERROR_STOP on
 
 begin;
+select pg_temp.seed_identity('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001');
+select pg_temp.seed_identity('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002');
 
 do $$ begin
   if exists (

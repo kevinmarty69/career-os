@@ -1,6 +1,6 @@
+import { applyTestMigrations } from './database-fixtures';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import test from 'node:test';
 import { Client } from 'pg';
@@ -52,12 +52,7 @@ test('three isolated reviewers persist exactly once without a paid provider', as
     await admin.connect();
     await admin.query(`create database ${databaseName}`);
     await target.connect();
-    for (const migration of (await readdir('supabase/migrations'))
-      .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-      .sort())
-      await target.query(
-        await readFile(`supabase/migrations/${migration}`, 'utf8'),
-      );
+    await applyTestMigrations(target);
 
     await createWorker(
       target,
@@ -255,6 +250,10 @@ async function insertFixture(
   target: Client,
   ids: ReturnType<typeof fixtureIds>,
 ) {
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    ids.tenantId,
+    ids.ownerId,
+  ]);
   await target.query(
     `insert into app.tenants (id, owner_id, name)
      values ($1, $2, 'Review tenant')`,
@@ -374,7 +373,7 @@ async function insertFixture(
       (id, tenant_id, workflow_run_id, stage, status, idempotency_key,
        input, input_hash, output_artifact_id, page_spec_id, completed_at)
      values ($1, $2, $3, 'page-composer', 'completed', 'page-composer-fixture',
-       '{}'::jsonb, encode(digest('{}'::jsonb::text, 'sha256'), 'hex'),
+       '{}'::jsonb, encode(extensions.digest('{}'::jsonb::text, 'sha256'), 'hex'),
        $4, $5, now())`,
     [
       ids.composerStepId,

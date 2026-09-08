@@ -1,6 +1,6 @@
+import { applyTestMigrations } from '../../tests/integration/database-fixtures.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
 import { Client } from 'pg';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -171,7 +171,7 @@ async function seedPage(label, tenant = tenantId) {
       tenant_id,workflow_run_id,stage,status,idempotency_key,input,input_hash,
       output_artifact_id,page_spec_id,completed_at
     ) values ($1,$2,'page-composer','completed','page-composer-v1','{}',
-      encode(digest('{}'::jsonb::text,'sha256'),'hex'),$3,$4,now())`,
+      encode(extensions.digest('{}'::jsonb::text,'sha256'),'hex'),$3,$4,now())`,
     [tenant, runId, artifactId, pageSpecId],
   );
   const hash = (
@@ -305,13 +305,17 @@ try {
   await admin.connect();
   await admin.query(`create database ${databaseName}`);
   await target.connect();
-  const migrations = (await readdir('supabase/migrations'))
-    .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-    .sort();
-  for (const migration of migrations)
-    await target.query(
-      await readFile(`supabase/migrations/${migration}`, 'utf8'),
-    );
+  await applyTestMigrations(target);
+
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    tenantId,
+    ownerId,
+  ]);
+
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    otherTenantId,
+    otherOwnerId,
+  ]);
 
   await target.query(
     `insert into app.tenants (id,owner_id,name) values
@@ -581,7 +585,7 @@ try {
       exists (
         select 1 from pg_class relation
         join pg_namespace namespace on namespace.oid=relation.relnamespace
-        where namespace.nspname in ('app','auth')
+        where namespace.nspname in ('app','career_identity')
           and relation.relkind in ('r','p','v','m','f')
           and (has_table_privilege(role_name,relation.oid,
             'select,insert,update,delete,truncate,references,trigger')
@@ -592,7 +596,7 @@ try {
         select procedure.proname::text
         from pg_proc procedure
         join pg_namespace namespace on namespace.oid=procedure.pronamespace
-        where namespace.nspname in ('app','auth')
+        where namespace.nspname in ('app','career_identity')
           and has_function_privilege(role_name,procedure.oid,'execute')
         order by procedure.proname
       ) executable
@@ -662,7 +666,105 @@ try {
     4,
   );
 
-  console.log('durable reviewer security tests passed');
+  // Remote costs share the existing atomic/fenced ledger; no external provider is called.
+  const priced = await seedPage('Remote cost ledger');
+  await target.query(
+    'update app.workflow_runs set cost_budget_micros=500 where id=$1',
+    [priced.runId],
+  );
+  await startReviews(app, priced);
+  const pricedStep = (await claim(workers.recruiter, 'recruiter')).rows[0];
+  const markRemote = (client, reviewer, step, cost) =>
+    client.query(
+      `select app.mark_${reviewer}_reviewer_in_flight($1,$2,'openai-compatible-remote','priced-fixture',100,$3)`,
+      [step.step_id, step.lease_token, cost],
+    );
+  await assert.rejects(
+    markRemote(workers.recruiter, 'recruiter', pricedStep, 501),
+    /budget rejected/,
+  );
+  await markRemote(workers.recruiter, 'recruiter', pricedStep, 500);
+  const pricedOutput = reviewOutput(pricedStep.input, 'recruiter');
+  const finishPriced = (cost) =>
+    workers.recruiter.query(
+      `select app.complete_recruiter_reviewer_step($1,$2,$3,40,20,$4,5,false,'priced-request') artifact_id`,
+      [
+        pricedStep.step_id,
+        pricedStep.lease_token,
+        JSON.stringify(pricedOutput),
+        cost,
+      ],
+    );
+  await assert.rejects(finishPriced(501), /reservation rejected/);
+  const pricedResult = await finishPriced(100);
+  assert.deepEqual(
+    await finishPriced(100).then((result) => result.rows),
+    pricedResult.rows,
+  );
+  await assert.rejects(finishPriced(101), /completion conflict/);
+  const nextPriced = (await claim(workers.hiring, 'hiring_manager')).rows[0];
+  await assert.rejects(
+    markRemote(workers.hiring, 'hiring_manager', nextPriced, 401),
+    /budget rejected/,
+  );
+  await markRemote(workers.hiring, 'hiring_manager', nextPriced, 400);
+  await workers.hiring.query(
+    'select app.fail_hiring_manager_reviewer_step($1,$2,$3)',
+    [nextPriced.step_id, nextPriced.lease_token, 'provider_unavailable'],
+  );
+  assert.deepEqual(
+    (
+      await target.query(
+        'select used_cost_micros::text used, reserved_cost_micros::text reserved from app.workflow_runs where id=$1',
+        [priced.runId],
+      )
+    ).rows[0],
+    { used: '500', reserved: '0' },
+  );
+  assert.deepEqual(
+    (
+      await target.query(
+        'select cost_micros::text cost, cost_basis from app.model_usage where workflow_run_id=$1 order by cost_micros',
+        [priced.runId],
+      )
+    ).rows,
+    [
+      { cost: '100', cost_basis: 'configured_rate_estimate' },
+      { cost: '400', cost_basis: 'reserved_upper_bound' },
+    ],
+  );
+
+  const expiredPriced = await seedPage('Remote unknown cost');
+  await target.query(
+    'update app.workflow_runs set cost_budget_micros=600 where id=$1',
+    [expiredPriced.runId],
+  );
+  await startReviews(app, expiredPriced);
+  const expiredStep = (await claim(workers.recruiter, 'recruiter')).rows[0];
+  await markRemote(workers.recruiter, 'recruiter', expiredStep, 600);
+  await target.query(
+    "update app.workflow_steps set lease_expires_at=clock_timestamp()-interval '1 second' where id=$1",
+    [expiredStep.step_id],
+  );
+  assert.equal(
+    (
+      await workers.recruiter.query(
+        'select app.reap_expired_recruiter_reviewer_step() step_id',
+      )
+    ).rows[0].step_id,
+    expiredStep.step_id,
+  );
+  assert.deepEqual(
+    (
+      await target.query(
+        'select used_cost_micros::text used, reserved_cost_micros::text reserved from app.workflow_runs where id=$1',
+        [expiredPriced.runId],
+      )
+    ).rows[0],
+    { used: '600', reserved: '0' },
+  );
+
+  console.log('durable reviewer security and remote cost tests passed');
 } finally {
   await Promise.allSettled(clients.map((client) => client.end()));
   await target.end().catch(() => undefined);

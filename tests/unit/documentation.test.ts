@@ -62,12 +62,26 @@ test('the documented security gate covers every launch boundary', () => {
     'safe-http.test.ts',
     'profile-import.test.ts',
     'publication-security.test.ts',
-    'tenant_isolation.sql',
-    'auth_security.sql',
-    'capability_security.sql',
+    'pnpm db:test',
     'test:integration:http',
   ])
     assert.match(command, new RegExp(evidence.replace('.', '\\.')));
+  assert.match(
+    packageJson.scripts['db:test'],
+    /scripts\/run-database-tests\.mjs/,
+  );
+  const runner = readFileSync('scripts/run-database-tests.mjs', 'utf8');
+  for (const name of [
+    'tenant_isolation',
+    'auth_security',
+    'capability_security',
+  ]) {
+    assert.ok(
+      runner.includes(`'${name}'`),
+      `Security gate must execute ${name}`,
+    );
+    assert.ok(existsSync(`supabase/tests/${name}.sql`));
+  }
 });
 
 const README = docs['README.md'];

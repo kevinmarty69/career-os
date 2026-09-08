@@ -1,6 +1,6 @@
+import { applyTestMigrations } from './database-fixtures';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import test from 'node:test';
 import { Client } from 'pg';
@@ -94,12 +94,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
     await admin.connect();
     await admin.query(`create database ${databaseName}`);
     await target.connect();
-    for (const migration of (await readdir('supabase/migrations'))
-      .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-      .sort())
-      await target.query(
-        await readFile(`supabase/migrations/${migration}`, 'utf8'),
-      );
+    await applyTestMigrations(target);
     await target.query(
       `create role ${workerLogin} login noinherit password '${workerPassword}'
        in role career_company_researcher`,
@@ -111,6 +106,11 @@ test('the durable worker dispatches one local call and stores one wrapped result
       /permission denied/,
     );
     await restricted.end();
+
+    await target.query('select pg_temp.seed_identity($1,$2)', [
+      tenantId,
+      ownerId,
+    ]);
 
     await target.query(
       `insert into app.tenants (id, owner_id, name)
@@ -355,7 +355,7 @@ test('the durable worker dispatches one local call and stores one wrapped result
 
     const artifacts = await target.query(
       `select id, kind, schema_version, body,
-        encode(digest(body::text, 'sha256'), 'hex') as artifact_hash
+        encode(extensions.digest(body::text, 'sha256'), 'hex') as artifact_hash
        from app.artifacts where workflow_run_id = $1 order by created_at, kind`,
       [runId],
     );

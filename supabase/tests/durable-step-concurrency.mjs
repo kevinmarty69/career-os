@@ -1,11 +1,12 @@
+import { randomUUID } from 'node:crypto';
+import { applyTestMigrations } from '../../tests/integration/database-fixtures.ts';
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
 import { Client } from 'pg';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required.');
 
-const testDatabase = 'career_os_durable_step_test';
+const testDatabase = `career_os_durable_step_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
 const admin = new Client({ connectionString: databaseUrl });
 const testUrl = new URL(databaseUrl);
 testUrl.pathname = `/${testDatabase}`;
@@ -54,14 +55,17 @@ try {
   target = new Client({ connectionString: testUrl.toString() });
   await target.connect();
 
-  const migrations = (await readdir('supabase/migrations'))
-    .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-    .sort();
-  assert.ok(migrations.includes('0012_global_company_researcher_worker.sql'));
-  for (const migration of migrations)
-    await target.query(
-      await readFile(`supabase/migrations/${migration}`, 'utf8'),
-    );
+  await applyTestMigrations(target);
+
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    tenantId,
+    ownerId,
+  ]);
+
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    otherTenantId,
+    otherOwnerId,
+  ]);
 
   await target.query(
     `insert into app.tenants (id, owner_id, name) values

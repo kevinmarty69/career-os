@@ -124,12 +124,12 @@ export type LocalCompanyResearchResult = {
   usage: {
     inputTokens: number;
     outputTokens: number;
-    costMicros: 0;
+    costMicros: number;
     latencyMs: number;
     reservedTokens: number;
-    reservedCostMicros: 0;
+    reservedCostMicros: number;
   };
-  provider: 'openai-compatible-local';
+  provider: 'openai-compatible-local' | 'openai-compatible-remote';
   model: string;
   providerRequestId?: string;
 };
@@ -141,7 +141,9 @@ export {
 } from './local-openai-transport';
 
 export class LocalOpenAICompanyResearchClient {
-  readonly provider = 'openai-compatible-local' as const;
+  get provider() {
+    return this.transport.provider;
+  }
   readonly model: string;
   private readonly transport: LocalOpenAITransport;
 
@@ -155,10 +157,7 @@ export class LocalOpenAICompanyResearchClient {
     maxOutputTokens = COMPANY_RESEARCH_MAX_OUTPUT_TOKENS,
   ) {
     const body = this.requestBody(rawOffer, maxOutputTokens);
-    return {
-      tokens: utf8Bytes(body) + maxOutputTokens + 256,
-      costMicros: 0 as const,
-    };
+    return this.transport.reserve(body, maxOutputTokens);
   }
 
   async generate(

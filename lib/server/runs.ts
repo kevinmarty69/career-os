@@ -1,4 +1,5 @@
 import 'server-only';
+import { modelRunCostBudget } from './local-openai-transport';
 import { createHash, randomUUID } from 'node:crypto';
 import type postgres from 'postgres';
 import { database, authorize } from './database';
@@ -187,7 +188,7 @@ export async function createPersistedRun(
         ${runId}, ${session.tenantId}, ${opportunityId}, ${snapshot.id},
         ${living.id}, ${living.revision}, ${key}, 'research', 'running',
         ${COMPANY_RESEARCH_RUN_TOKEN_BUDGET + RECRUITER_STRATEGY_RUN_TOKEN_BUDGET + REVIEW_RUN_TOKEN_BUDGET * 2},
-        0, now() + interval '1 hour', ${inputHash}
+        ${modelRunCostBudget()}, now() + interval '1 hour', ${inputHash}
       )`;
     const researchInput = {
       schemaVersion: 2,

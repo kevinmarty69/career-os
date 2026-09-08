@@ -1,6 +1,6 @@
+import { applyTestMigrations } from '../../tests/integration/database-fixtures.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
 import { Client } from 'pg';
 
@@ -59,15 +59,12 @@ try {
   await admin.query(`create database ${databaseName}`);
   await target.connect();
 
-  const migrations = (await readdir('supabase/migrations'))
-    .filter((name) => /^\d{4}_.*\.sql$/.test(name))
-    .sort();
-  assert.ok(migrations.includes('0045_scheduled_job_discovery.sql'));
-  assert.ok(migrations.includes('0047_harden_job_discovery_claim.sql'));
-  for (const migration of migrations)
-    await target.query(
-      await readFile(`supabase/migrations/${migration}`, 'utf8'),
-    );
+  await applyTestMigrations(target);
+
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    tenantId,
+    ownerId,
+  ]);
 
   await target.query(
     `insert into app.tenants (id, owner_id, name)

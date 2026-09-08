@@ -93,40 +93,27 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
   const largeLogo = `data:image/svg+xml,${'x'.repeat(70_000)}`;
   try {
     await sql.begin(async (transaction) => {
-      await transaction`insert into auth."user" (id, name, email, "emailVerified") values
+      await transaction`insert into career_identity."user" (id, name, email, "emailVerified") values
         (${ownerId}, 'Export Owner', ${`${ownerId}@example.test`}, true),
         (${memberId}, 'Export Member', ${`${memberId}@example.test`}, true),
         (${otherOwnerId}, 'Other Owner', ${`${otherOwnerId}@example.test`}, true)`;
-      await transaction`insert into auth.organization (
+      await transaction`insert into career_identity.organization (
         id, name, slug, metadata, "createdAt"
       ) values
         (${tenantId}, 'Export workspace', ${`export-${tenantId}`}, ${secret}, now()),
         (${otherTenantId}, ${secret}, ${`other-${otherTenantId}`}, null, now())`;
-      await transaction`update auth.organization set logo = ${largeLogo}
+      await transaction`update career_identity.organization set logo = ${largeLogo}
         where id = ${tenantId}`;
-      await transaction`insert into auth.member (
+      await transaction`insert into career_identity.member (
         id, "organizationId", "userId", role, "createdAt"
       ) values
         (${randomUUID()}, ${tenantId}, ${ownerId}, 'owner', now()),
         (${randomUUID()}, ${tenantId}, ${memberId}, 'member', now()),
         (${randomUUID()}, ${otherTenantId}, ${otherOwnerId}, 'owner', now())`;
-      await transaction`insert into auth.account (
-        id, issuer, "accountId", "providerId", "userId", "accessToken",
-        "refreshToken", "idToken", password, "createdAt", "updatedAt"
-      ) values (
-        ${randomUUID()}, 'career-os', ${ownerId}, 'credential', ${ownerId}, ${secret},
-        ${secret}, ${secret}, ${secret}, now(), now()
-      )`;
-      await transaction`insert into auth.session (
-        id, "expiresAt", token, "createdAt", "updatedAt", "ipAddress", "userAgent",
-        "userId", "activeOrganizationId"
-      ) values (
-        ${randomUUID()}, now() + interval '1 day', ${secret}, now(), now(), ${secret},
-        ${secret}, ${ownerId}, ${tenantId}
-      )`;
-      await transaction`insert into auth.verification (
-        id, identifier, value, "expiresAt", "createdAt", "updatedAt"
-      ) values (${randomUUID()}, ${ownerId}, ${secret}, now() + interval '1 day', now(), now())`;
+      await transaction`insert into auth.users(id, email, encrypted_password, confirmation_token)
+        values(${ownerId}, ${`${ownerId}@example.test`}, ${secret}, ${secret})`;
+      await transaction`insert into auth.sessions(id,user_id,created_at,updated_at,not_after,user_agent)
+        values(${randomUUID()},${ownerId},now(),now(),now()+interval '1 day',${secret})`;
       await transaction`insert into app.tenants (id, owner_id, name) values
         (${tenantId}, ${ownerId}, 'Export workspace'),
         (${otherTenantId}, ${otherOwnerId}, ${secret})`;
@@ -322,7 +309,7 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
       ) values (${publicationId}, ${tenantId}, ${pageSpecId}, '{"visible":true}')`;
       await transaction`insert into app.share_links (
         tenant_id, publication_id, token_hash, expires_at
-      ) values (${tenantId}, ${publicationId}, digest(${secret}, 'sha256'),
+      ) values (${tenantId}, ${publicationId}, extensions.digest(${secret}, 'sha256'),
         now() + interval '1 day')`;
       await transaction.unsafe('set local session_replication_role = origin');
       await transaction`insert into app.url_import_attempts (
@@ -539,9 +526,9 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
     );
   } finally {
     await sql`delete from app.tenants where id in (${tenantId}, ${otherTenantId})`;
-    await sql`delete from auth.organization where id in (${tenantId}, ${otherTenantId})`;
-    await sql`delete from auth."user" where id in (${ownerId}, ${memberId}, ${otherOwnerId})`;
-    await sql`delete from auth.verification where identifier = ${ownerId}`;
+    await sql`delete from career_identity.organization where id in (${tenantId}, ${otherTenantId})`;
+    await sql`delete from career_identity."user" where id in (${ownerId}, ${memberId}, ${otherOwnerId})`;
+    await sql`delete from auth.users where id = ${ownerId}`;
     await sql.end();
   }
 });

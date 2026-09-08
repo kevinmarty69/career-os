@@ -1,9 +1,8 @@
-import {
-  MAX_PAGE_COMPOSER_INPUT_BYTES,
-  composeApprovedStrategyPage,
-} from '../lib/page-composer';
-
 async function main() {
+  // Native Node strips the trusted source's erasable types; Docker's tsx loader
+  // accepts the same explicit URL. User input is JSON only, never module code.
+  const { MAX_PAGE_COMPOSER_INPUT_BYTES, composeApprovedStrategyPage } =
+    await import(new URL('../lib/page-composer.ts', import.meta.url).href);
   const chunks: Buffer[] = [];
   let bytes = 0;
   for await (const chunk of process.stdin) {

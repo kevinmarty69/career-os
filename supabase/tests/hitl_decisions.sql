@@ -2,11 +2,11 @@
 
 begin;
 
-insert into auth."user" (id, name, email, "emailVerified") values
+insert into career_identity."user" (id, name, email, "emailVerified") values
   ('18000000-0000-0000-0000-000000000001', 'Decision Owner', 'decision-owner@example.test', true);
-insert into auth.organization (id, name, slug, "createdAt") values
+insert into career_identity.organization (id, name, slug, "createdAt") values
   ('28000000-0000-0000-0000-000000000001', 'Decision Tenant', 'decision-tenant', now());
-insert into auth."member" (id, "organizationId", "userId", role, "createdAt") values
+insert into career_identity."member" (id, "organizationId", "userId", role, "createdAt") values
   ('38000000-0000-0000-0000-000000000001', '28000000-0000-0000-0000-000000000001', '18000000-0000-0000-0000-000000000001', 'owner', now());
 insert into app.tenants (id, owner_id, name) values
   ('28000000-0000-0000-0000-000000000001', '18000000-0000-0000-0000-000000000001', 'Decision Tenant');
@@ -152,7 +152,7 @@ insert into app.strategy_approvals (
 select 'aa000000-0000-0000-0000-000000000001',
   '28000000-0000-0000-0000-000000000001',
   '98000000-0000-0000-0000-000000000001', id,
-  encode(digest(body::text, 'sha256'), 'hex'),
+  encode(extensions.digest(body::text, 'sha256'), 'hex'),
   'aa000000-0000-0000-0000-000000000011',
   '18000000-0000-0000-0000-000000000001'
 from app.artifacts where id = 'a9000000-0000-0000-0000-000000000001';
@@ -164,14 +164,14 @@ select 'ab000000-0000-0000-0000-000000000001',
   '28000000-0000-0000-0000-000000000001',
   '98000000-0000-0000-0000-000000000001', 'page-composer', 'completed',
   'hitl-page-composer', fixture.input,
-  encode(digest(fixture.input::text, 'sha256'), 'hex'),
+  encode(extensions.digest(fixture.input::text, 'sha256'), 'hex'),
   'a9000000-0000-0000-0000-000000000002', now(),
   'a8000000-0000-0000-0000-000000000001'
 from (
   select jsonb_build_object(
     'schemaVersion', 1,
     'strategyArtifactId', 'a9000000-0000-0000-0000-000000000001',
-    'strategyArtifactHash', encode(digest(body::text, 'sha256'), 'hex'),
+    'strategyArtifactHash', encode(extensions.digest(body::text, 'sha256'), 'hex'),
     'strategyApprovalId', 'aa000000-0000-0000-0000-000000000001'
   ) input
   from app.artifacts where id = 'a9000000-0000-0000-0000-000000000001'

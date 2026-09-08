@@ -75,15 +75,20 @@ function semanticError(error: unknown) {
   if (error instanceof SemanticAnalysisInputUnavailableError)
     return response('Exact semantic analysis input is unavailable.', 409);
   if (error instanceof SemanticAnalysisModelNotConfiguredError)
-    return response('Local semantic model is not configured.', 503);
+    return response('Semantic model is not configured.', 503);
   if (error instanceof LocalModelClientError) {
     if (
       error.code === 'PROVIDER_UNAVAILABLE' ||
       error.code === 'TIMEOUT' ||
       error.code === 'ABORTED'
     )
-      return response('Local semantic model is unavailable.', 503);
-    return response('Local semantic model returned an invalid response.', 502);
+      return response('Semantic model is unavailable.', 503);
+    if (error.code === 'INVALID_CONFIG')
+      return response(
+        'Semantic model configuration or budget is unavailable.',
+        503,
+      );
+    return response('Semantic model returned an invalid response.', 502);
   }
   if (error instanceof ZodError)
     return response('Semantic analysis request rejected.', 400);

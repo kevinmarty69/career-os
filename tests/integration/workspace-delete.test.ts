@@ -19,17 +19,17 @@ test('workspace deletion accepts the explicit UI confirmation and derives its te
   };
   try {
     await sql.begin(async (transaction) => {
-      await transaction`insert into auth."user" (
+      await transaction`insert into career_identity."user" (
         id, name, email, "emailVerified"
       ) values (
         ${userId}, 'Delete owner', ${`${userId}@example.test`}, true
       )`;
-      await transaction`insert into auth.organization (
+      await transaction`insert into career_identity.organization (
         id, name, slug, "createdAt"
       ) values (
         ${tenantId}, 'Disposable workspace', ${`delete-${tenantId}`}, now()
       )`;
-      await transaction`insert into auth.member (
+      await transaction`insert into career_identity.member (
         id, "organizationId", "userId", role, "createdAt"
       ) values (
         ${randomUUID()}, ${tenantId}, ${userId}, 'owner', now()
@@ -44,10 +44,10 @@ test('workspace deletion accepts the explicit UI confirmation and derives its te
     await deleteWorkspace(session, { confirmation: 'SUPPRIMER' });
 
     const [remaining] = await sql<[{ count: string }]>`
-      select count(*) from auth.organization where id = ${tenantId}`;
+      select count(*) from career_identity.organization where id = ${tenantId}`;
     assert.equal(remaining.count, '0');
   } finally {
-    await sql`delete from auth."user" where id = ${userId}`;
+    await sql`delete from career_identity."user" where id = ${userId}`;
     await sql.end();
   }
 });

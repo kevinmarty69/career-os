@@ -1,3 +1,8 @@
+import { migrationSql } from '../../lib/migration-sql.ts';
+import {
+  bootstrapTestAuth,
+  fixtureIdentitySql,
+} from '../../tests/integration/database-fixtures.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
@@ -54,7 +59,7 @@ async function restrictedWorker() {
 
 async function digestArtifact(id) {
   const result = await target.query(
-    `select encode(digest(body::text, 'sha256'), 'hex') hash
+    `select encode(extensions.digest(body::text, 'sha256'), 'hex') hash
      from app.artifacts where id = $1`,
     [id],
   );
@@ -65,6 +70,7 @@ try {
   await admin.connect();
   await admin.query(`create database ${databaseName}`);
   await target.connect();
+  await bootstrapTestAuth(target);
   const migrations = (await readdir('supabase/migrations'))
     .filter((name) => /^\d{4}_.*\.sql$/.test(name))
     .sort();
@@ -72,8 +78,22 @@ try {
   assert.ok(migrations.includes(composerMigration));
   for (const migration of migrations.filter((name) => name < composerMigration))
     await target.query(
-      await readFile(`supabase/migrations/${migration}`, 'utf8'),
+      migrationSql(
+        migration,
+        await readFile(`supabase/migrations/${migration}`, 'utf8'),
+      ),
     );
+  await target.query(fixtureIdentitySql);
+
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    tenantId,
+    ownerId,
+  ]);
+
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    otherTenantId,
+    ownerId,
+  ]);
 
   await target.query(
     `insert into app.tenants (id, owner_id, name) values
@@ -202,12 +222,15 @@ try {
   await target.query(
     `insert into app.share_links
       (tenant_id,publication_id,token_hash,expires_at)
-     values ($1,$2,digest('legacy-token','sha256'),now()+interval '1 day')`,
+     values ($1,$2,extensions.digest('legacy-token','sha256'),now()+interval '1 day')`,
     [tenantId, legacyPublicationId],
   );
 
   await target.query(
-    await readFile(`supabase/migrations/${composerMigration}`, 'utf8'),
+    migrationSql(
+      composerMigration,
+      await readFile(`supabase/migrations/${composerMigration}`, 'utf8'),
+    ),
   );
   assert.equal(
     (
@@ -250,7 +273,7 @@ try {
        exists (
          select 1 from pg_class relation
          join pg_namespace namespace on namespace.oid=relation.relnamespace
-         where namespace.nspname in ('app','auth')
+         where namespace.nspname in ('app','career_identity')
            and relation.relkind in ('r','p','v','m','f')
            and (has_table_privilege('career_page_composer', relation.oid,
              'select,insert,update,delete,truncate,references,trigger')
@@ -463,7 +486,7 @@ try {
   const strategyHash = await digestArtifact(strategyId);
   const strategyInputHash = (
     await target.query(
-      `select encode(digest($1::jsonb::text,'sha256'),'hex') hash`,
+      `select encode(extensions.digest($1::jsonb::text,'sha256'),'hex') hash`,
       [strategyInput],
     )
   ).rows[0].hash;
@@ -713,7 +736,7 @@ try {
     `insert into app.workflow_steps
       (tenant_id,workflow_run_id,stage,status,idempotency_key,input,input_hash)
      values ($1,$2,'page-composer','pending','forged-lineage',$3,
-       encode(digest($3::jsonb::text,'sha256'),'hex'))`,
+       encode(extensions.digest($3::jsonb::text,'sha256'),'hex'))`,
     [tenantId, forgedRun, storedStep.rows[0].input],
   );
   const forgedLease = (
@@ -758,7 +781,7 @@ try {
     `insert into app.workflow_steps
       (tenant_id,workflow_run_id,stage,status,idempotency_key,input,input_hash)
      values ($1,$2,'page-composer','pending','expired',$3,
-       encode(digest($3::jsonb::text,'sha256'),'hex'))`,
+       encode(extensions.digest($3::jsonb::text,'sha256'),'hex'))`,
     [tenantId, expiredRun, storedStep.rows[0].input],
   );
   const reaped = await Promise.all([

@@ -319,9 +319,11 @@ test('renders the persisted application instead of the Nimbus fixture', async ({
     page.getByRole('heading', { name: 'Staff Platform Engineer' }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Signal Forge', exact: true }),
+    page.locator('#main-content').getByText('Signal Forge', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('Revision')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: application.url }),
+  ).toHaveAttribute('href', application.url);
   await expect(page.getByText('Nimbus Robotics')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Start agent workflow' }),
@@ -380,7 +382,9 @@ test('starts and restores the persisted workflow for this application', async ({
 
   await page.goto(`/applications/${applicationId}`);
   await page.getByRole('button', { name: 'Start agent workflow' }).click();
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText('Company research', { exact: true }),
   ).toBeVisible();
@@ -405,7 +409,9 @@ test('starts and restores the persisted workflow for this application', async ({
     }),
   );
   await page.reload();
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Start agent workflow' }),
   ).toHaveCount(0);
@@ -417,10 +423,14 @@ test('distinguishes a worker outage from a general workflow failure', async ({
 }) => {
   await context.clearCookies();
   await mockApplication(page);
-  let workerFailure = true;
-  await page.route('**/api/runs', (route) =>
-    route.fulfill(
-      workerFailure
+  const attempts: { body: unknown; key?: string }[] = [];
+  await page.route('**/api/runs', (route) => {
+    attempts.push({
+      body: route.request().postDataJSON(),
+      key: route.request().headers()['idempotency-key'],
+    });
+    return route.fulfill(
+      attempts.length === 1
         ? {
             status: 503,
             contentType: 'application/json',
@@ -429,14 +439,20 @@ test('distinguishes a worker outage from a general workflow failure', async ({
               service: 'company-researcher',
             }),
           }
-        : { status: 503, body: 'Run unavailable.' },
-    ),
-  );
+        : attempts.length === 2
+          ? { status: 503, body: 'Run unavailable.' }
+          : {
+              status: 202,
+              contentType: 'application/json',
+              body: JSON.stringify(savedRun()),
+            },
+    );
+  });
 
   await page.goto(`/applications/${applicationId}`);
   await page.getByRole('button', { name: 'Start agent workflow' }).click();
   await expect(page.locator('p[role="alert"]')).toHaveText(
-    'The research worker is unavailable. Check your instance.',
+    'The research worker is unavailable. Check your instance. Check worker availability',
   );
   await expect(
     page.getByRole('link', { name: 'Check worker availability' }),
@@ -447,13 +463,28 @@ test('distinguishes a worker outage from a general workflow failure', async ({
       fullPage: true,
     });
 
-  workerFailure = false;
-  await page.reload();
+  // The existing start action is also the retry action; no reload is necessary.
   await page.getByRole('button', { name: 'Start agent workflow' }).click();
   await expect(page.locator('p[role="alert"]')).toHaveText(
     'The workflow is temporarily unavailable.',
   );
-  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Check worker availability' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Start agent workflow' }).click();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('p[role="alert"]')).toHaveCount(0);
+  expect(attempts).toHaveLength(3);
+  expect(attempts[0].body).toEqual({
+    applicationId,
+    applicationRevision: 2,
+    profileRevision: 3,
+  });
+  expect(attempts[0].key).toMatch(/^[0-9a-f-]{36}$/);
+  expect(attempts[1]).toEqual(attempts[0]);
+  expect(attempts[2]).toEqual(attempts[0]);
 });
 
 test('refreshes an active workflow until its persisted status changes', async ({
@@ -480,11 +511,30 @@ test('refreshes an active workflow until its persisted status changes', async ({
   });
 
   await page.goto(`/applications/${applicationId}`);
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
-  await expect(page.getByText('Completed', { exact: true })).toBeVisible({
-    timeout: 5_000,
-  });
-  expect(reads).toBeGreaterThanOrEqual(2);
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Research', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('progressbar')).toHaveAttribute(
+    'aria-valuenow',
+    '50',
+  );
+  await expect.poll(() => reads, { timeout: 5_000 }).toBeGreaterThanOrEqual(2);
+  // A completed individual step already exists in the initial fixture. Only
+  // the dossier-level status and transition away from the live stage prove polling.
+  await expect(
+    page.locator('.co-dossier-top').getByText('Completed', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: 'The run is ready for your final review',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
 });
 
 test('requires a human selection before evidence matching continues', async ({
@@ -529,7 +579,9 @@ test('requires a human selection before evidence matching continues', async ({
   await expect(signals.nth(1)).toBeChecked();
   await signals.nth(1).uncheck();
   await page.getByRole('button', { name: 'Confirm 1 signal' }).click();
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
   expect(request?.body).toEqual({
     researchArtifactId: paused.research.artifactId,
     selectedSignalIds: ['signal-1'],
@@ -577,7 +629,9 @@ test('shows eligible evidence and requires confirmation before strategy', async 
   await page
     .getByRole('button', { name: 'Start application strategy' })
     .click();
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
   expect(request?.body).toEqual({
     evidenceArtifactId: paused.evidenceArchive.artifactId,
     evidenceArtifactHash: paused.evidenceArchive.artifactHash,
@@ -627,6 +681,28 @@ test('shows the grounded strategy and requires human approval before drafting', 
     ),
   ).toBeVisible();
   await expect(page.getByText('Topics to address honestly')).toBeVisible();
+  // The decision screen stays focused on approval; the kit is shown afterwards.
+  await expect(page.locator('.co-application-kit')).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Approve application strategy' })
+    .click();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
+  expect(request?.body).toEqual({
+    strategyArtifactId: paused.strategy.artifactId,
+    strategyArtifactHash: paused.strategy.artifactHash,
+  });
+  expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('shows the approved application kit in English and French', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockApplication(page, pageDraftRun());
+  await page.goto(`/applications/${applicationId}`);
   await expect(
     page.getByRole('heading', {
       name: 'Turn the approved strategy into the next conversation.',
@@ -635,21 +711,40 @@ test('shows the grounded strategy and requires human approval before drafting', 
   await expect(page.getByText('Interview questions')).toBeVisible();
   await expect(page.getByText('Short messages')).toBeVisible();
   if (process.env.CAREER_OS_APPLICATION_KIT_SCREENSHOT)
-    await page.locator('.co-application-kit').screenshot({
-      path: process.env.CAREER_OS_APPLICATION_KIT_SCREENSHOT,
-    });
-  await page.getByRole('button', { name: 'FR' }).click();
-  await expect(page.getByText('Kit de candidature')).toBeVisible();
-  await page.getByRole('button', { name: 'EN' }).click();
-  await page
-    .getByRole('button', { name: 'Approve application strategy' })
-    .click();
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
-  expect(request?.body).toEqual({
-    strategyArtifactId: paused.strategy.artifactId,
-    strategyArtifactHash: paused.strategy.artifactHash,
-  });
-  expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+    await page
+      .locator('.co-application-kit')
+      .screenshot({ path: process.env.CAREER_OS_APPLICATION_KIT_SCREENSHOT });
+  await context.addCookies([
+    { name: 'career-os-locale', value: 'fr', url: 'http://localhost:3117' },
+  ]);
+  await page.reload();
+  await expect(
+    page.getByText('Kit de candidature', { exact: true }),
+  ).toBeVisible();
+});
+
+test('a failed run never looks ready to publish and offers explicit recovery', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockApplication(page, { ...pageDraftRun(), status: 'failed' });
+  await page.goto(`/applications/${applicationId}/page`);
+  await expect(
+    page.getByRole('heading', { name: 'Failed', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Check worker availability' }),
+  ).toHaveAttribute('href', '/settings/models');
+  await expect(
+    page.getByRole('button', { name: 'Start a new run', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('The run is ready for your final review'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: /Publish|Create.*link/i }),
+  ).toHaveCount(0);
 });
 
 test('shows the structured draft and starts all reviews only after confirmation', async ({
@@ -692,9 +787,53 @@ test('shows the structured draft and starts all reviews only after confirmation'
   await expect(page.locator('.co-page-draft-preview')).toHaveClass(/mobile/);
   await page.getByRole('button', { name: 'Desktop' }).click();
   await page.getByRole('button', { name: 'Start the three reviews' }).click();
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
   expect(request?.body).toEqual({});
   expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+test('a review without a run never implies that checks passed or offers publication', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  await mockApplication(page);
+  const runRead = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/applications/${applicationId}/run`) &&
+      response.status() === 204,
+  );
+  await page.goto(`/applications/${applicationId}/review`);
+  await runRead;
+  await expect(
+    page.getByRole('main').getByText('Signal Forge', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      level: 1,
+      name: 'No reviews yet.',
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'No objections', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText('All checks are resolved. Ready for your final approval.'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: /Publish|Create.*link/i }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('link', {
+      name: /Final human approval|Publish|Create.*link/i,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Back to applications', exact: true }),
+  ).toHaveAttribute('href', `/applications/${applicationId}`);
 });
 
 test('keeps review objections visible until the human decides', async ({
@@ -828,7 +967,10 @@ for (const [status, message] of [
       route.fulfill({ status, body: 'Rejected' }),
     );
 
-    await page.goto(`/applications/${applicationId}`);
+    await page.goto(`/applications/${applicationId}/published`);
+    await expect(
+      page.getByRole('heading', { name: 'Publish only what you approved' }),
+    ).toBeVisible();
     await page
       .getByRole('button', { name: 'Approve and create private link' })
       .click();
@@ -870,19 +1012,28 @@ test('starts a fresh run while the published version remains available', async (
     });
   });
 
-  await page.goto(`/applications/${applicationId}`);
+  await page.goto(`/applications/${applicationId}/published`);
+  await expect(
+    page.getByRole('heading', { name: 'Publish only what you approved' }),
+  ).toBeVisible();
   await page
     .getByRole('button', { name: 'Approve and create private link' })
     .click();
   await expect(page.getByText('Version 1')).toBeVisible();
   await page.getByRole('button', { name: 'Prepare a new version' }).click();
-  await expect(page.getByText('Running', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.co-dossier-top').getByText('Running', { exact: true }),
+  ).toBeVisible();
   await expect
     .poll(() => replacementRequest?.applicationId)
     .toBe(applicationId);
 });
 
-test('keeps the persisted dossier readable on mobile', async ({ page }) => {
+test('keeps the persisted dossier readable on mobile', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
   await mockApplication(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`/applications/${applicationId}`);

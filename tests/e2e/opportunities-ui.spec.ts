@@ -12,12 +12,19 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
 
   await page.goto('/applications');
   await expect(
-    page.getByRole('heading', { name: 'Opportunités découvertes' }),
+    page.getByRole('heading', { name: 'Candidatures', level: 1, exact: true }),
+  ).toBeVisible();
+  const applications = page.getByRole('region', {
+    name: 'Candidatures par étape',
+  });
+  await expect(
+    applications.getByRole('link', {
+      name: 'Existing Application Inc Staff Engineer',
+    }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Aucune opportunité enregistrée' }),
-  ).toBeVisible();
-  await expect(page.getByText('Existing Application Inc')).toBeVisible();
+    page.getByRole('heading', { name: 'Opportunités découvertes' }),
+  ).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Coller une offre' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Coller une offre' });
@@ -26,6 +33,9 @@ test('imports a sourced opportunity, keeps it after reload and separates applica
     .fill('https://jobs.example.test/product-engineer');
   await dialog.getByRole('button', { name: 'Importer l’offre' }).click();
 
+  await expect(
+    page.getByRole('heading', { name: 'Opportunités découvertes' }),
+  ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Product Engineer' }),
   ).toBeVisible();
@@ -191,8 +201,11 @@ test('reuses related human decisions to rank future opportunities', async ({
   await expect(page.getByLabel('Ranking profile')).toHaveValue(
     searchProfile.searchProfileId,
   );
-  const active = page.getByRole('region', {
-    name: 'Opportunities and applications',
+  const active = page.locator('section').filter({
+    has: page.getByRole('heading', {
+      name: 'Discovered opportunities',
+      exact: true,
+    }),
   });
   await expect(active.locator('article').first()).toContainText('Future Labs');
   await expect(active.locator('article').first()).toContainText(
@@ -211,10 +224,10 @@ test('reuses related human decisions to rank future opportunities', async ({
       path: process.env.CAREER_OS_RANKING_SCREENSHOT,
       fullPage: true,
     });
-  await page
-    .getByRole('group', { name: 'Language' })
-    .getByRole('button', { name: 'FR' })
-    .click();
+  await page.goto('/settings/profile');
+  await page.getByLabel('Interface language').selectOption('fr');
+  await page.goto('/applications');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
   await expect(
     page.locator('article').filter({ hasText: 'Future Labs' }).first(),
   ).toContainText('Remontée par 1 décision liée · même rôle');

@@ -17,6 +17,7 @@ import {
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { Translator } from '@/lib/i18n/messages';
 import styles from './application-flow.module.css';
+import { ContactResearchPanel } from './contact-research-panel';
 
 export function ApplicationContactsPanel({
   applicationId,
@@ -144,6 +145,17 @@ export function ApplicationContactsPanel({
         </header>
 
         <div className={styles.contactsDrawerBody}>
+          {contacts && open && (
+            <ContactResearchPanel
+              applicationId={applicationId}
+              contacts={contacts}
+              onAccepted={(contact) =>
+                setContacts((current) =>
+                  [...(current ?? []), contact].sort((a, b) => a.rank - b.rank),
+                )
+              }
+            />
+          )}
           {error ? (
             <p role="alert">{t('dossier.contacts.could.not.be.loaded')}</p>
           ) : !contacts ? (
@@ -257,6 +269,7 @@ function ContactCard({ initial }: { initial: ApplicationContact }) {
                   dateStyle: 'medium',
                 }).format(new Date(source.collectedAt))}
               </time>
+              {source.excerpt && <blockquote>{source.excerpt}</blockquote>}
             </li>
           ))}
         </ul>

@@ -5,31 +5,26 @@ import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Client } from 'pg';
 
-const adminDatabaseUrl =
-  process.env.DATABASE_URL ??
-  'postgresql://career_os:career_os@127.0.0.1:54329/career_os';
+const adminDatabaseUrl = process.env.DATABASE_URL;
+if (process.env.CAREER_OS_NATIVE_TEST !== '1' || !adminDatabaseUrl)
+  throw new Error('Run HTTP tests with pnpm test:native.');
 const adminUrl = new URL(adminDatabaseUrl);
 if (
   !['postgres:', 'postgresql:'].includes(adminUrl.protocol) ||
   !['127.0.0.1', 'localhost', '[::1]'].includes(adminUrl.hostname) ||
-  adminUrl.pathname !== '/career_os'
+  !/^\/career_os_test_[a-f0-9]{12}$/.test(adminUrl.pathname)
 )
   throw new Error(
     'HTTP integration tests require the local disposable career_os database.',
   );
 
 const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
-const databaseName = `career_os_http_${suffix}`;
 const targetDatabaseUrl = new URL(adminUrl);
-targetDatabaseUrl.pathname = `/${databaseName}`;
 const port = await freePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const environment = {
   ...process.env,
-  BETTER_AUTH_URL: baseUrl,
-  BETTER_AUTH_SECRET:
-    process.env.BETTER_AUTH_SECRET ??
-    'career-os-http-integration-secret-at-least-32-characters',
+  CAREER_OS_APP_URL: baseUrl,
   CAREER_OS_DEPLOYMENT_MODE: 'self-hosted',
   CAREER_OS_E2E: '1',
   CAREER_OS_HTTP_TEST_SUFFIX: suffix,
@@ -52,11 +47,15 @@ const workerLogins = [
   `publication_hiring_${suffix}`,
   `publication_factuality_${suffix}`,
 ];
+const webLogin = `http_web_${suffix}`;
+const webPassword = randomUUID();
+const webDatabaseUrl = new URL(targetDatabaseUrl);
+webDatabaseUrl.username = webLogin;
+webDatabaseUrl.password = webPassword;
 
 const admin = new Client({ connectionString: adminUrl.toString() });
 const children = new Set();
 let adminConnected = false;
-let databaseCreated = false;
 let server;
 let cleanupPromise;
 
@@ -71,19 +70,17 @@ for (const [signal, code] of [
 try {
   await admin.connect();
   adminConnected = true;
-  databaseCreated = true;
-  try {
-    await admin.query(`create database ${databaseName}`);
-  } catch (error) {
-    databaseCreated = false;
-    throw error;
-  }
-  await run('pnpm', ['db:migrate'], environment);
-  server = spawnTracked(
-    'pnpm',
-    ['exec', 'next', 'start', '-p', String(port)],
-    environment,
+  await admin.query(
+    `create role ${webLogin} login noinherit password '${webPassword}' in role career_web`,
   );
+  server = spawnTracked('pnpm', ['exec', 'next', 'start', '-p', String(port)], {
+    ...environment,
+    DATABASE_URL: webDatabaseUrl.toString(),
+    MIGRATION_DATABASE_URL: '',
+    SUPABASE_SECRET_KEY: '',
+    CAREER_OS_TEST_DATABASE_URL: '',
+    LOCAL_POSTGRES_URL: '',
+  });
   await waitForServer();
   for (const test of tests)
     await run(
@@ -163,11 +160,7 @@ function cleanup() {
   cleanupPromise ??= (async () => {
     await stopChildren();
     if (!adminConnected) return;
-    if (databaseCreated)
-      await admin
-        .query(`drop database if exists ${databaseName} with (force)`)
-        .catch(() => undefined);
-    for (const login of workerLogins)
+    for (const login of [...workerLogins, webLogin])
       await admin.query(`drop role if exists ${login}`).catch(() => undefined);
     await admin.end();
     adminConnected = false;

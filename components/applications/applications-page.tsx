@@ -13,6 +13,7 @@ import { LoadingRows } from '@/components/applications/pipeline-empty-state';
 import { type Application } from '@/lib/application-contract';
 import { applicationsMessages } from '@/lib/i18n/dictionaries/applications';
 import { initials } from '@/lib/initials';
+import { matchesSearchTerms } from '@/lib/global-search';
 import { rankOpportunitiesByHumanFeedback } from '@/lib/opportunity-ranking';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -36,6 +37,9 @@ export function ApplicationsPage({
   const pipeline = useApplicationsPipeline();
   const memory = useCareerMemory();
   const [importOpen, setImportOpen] = useState(initialImportUrl !== undefined);
+  const [query, setQuery] = useState('');
+  const [type, setType] = useState('all');
+  const [stageFilter, setStageFilter] = useState('all');
   const empty =
     pipeline.loadState === 'ready' &&
     !pipeline.applications.length &&
@@ -44,6 +48,27 @@ export function ApplicationsPage({
   const decisionsByOpportunity = new Map(
     pipeline.decisions.map((decision) => [decision.opportunityId, decision]),
   );
+  const filteredApplications = pipeline.applications.filter(
+    (application) =>
+      (stageFilter === 'all' || application.stage === stageFilter) &&
+      matchesSearchTerms(
+        query,
+        application.company,
+        application.role,
+        application.description,
+      ),
+  );
+  const matchesOpportunity = (
+    opportunity: (typeof pipeline.opportunities)[number],
+  ) =>
+    matchesSearchTerms(
+      query,
+      opportunity.company ?? '',
+      opportunity.role ?? '',
+      opportunity.location ?? '',
+      opportunity.description ?? '',
+      opportunity.sourceUrl,
+    );
   const activeOpportunities = pipeline.opportunities.filter((opportunity) => {
     const disposition = decisionsByOpportunity.get(
       opportunity.opportunityId,
@@ -55,15 +80,30 @@ export function ApplicationsPage({
       const disposition = decisionsByOpportunity.get(
         opportunity.opportunityId,
       )?.disposition;
-      return disposition === 'ignored' || disposition === 'archived';
+      return (
+        (disposition === 'ignored' || disposition === 'archived') &&
+        matchesOpportunity(opportunity)
+      );
     },
   );
   const rankedOpportunities = rankOpportunitiesByHumanFeedback(
-    activeOpportunities,
+    activeOpportunities.filter(matchesOpportunity),
     pipeline.opportunities,
     pipeline.decisions,
     pipeline.rankingProfileId,
   );
+  const alertThreshold =
+    pipeline.searchProfiles.find(
+      ({ searchProfileId }) => searchProfileId === pipeline.rankingProfileId,
+    )?.alertThreshold ?? null;
+  const alertCount =
+    alertThreshold === null
+      ? 0
+      : rankedOpportunities.filter(
+          ({ humanFeedbackSignal }) =>
+            humanFeedbackSignal !== null &&
+            humanFeedbackSignal >= alertThreshold,
+        ).length;
   const reusableClaims = memory.profile.claims
     .filter((claim) => claim.level === 'verified' || claim.level === 'declared')
     .sort((a, b) => b.evidenceIds.length - a.evidenceIds.length)
@@ -117,50 +157,130 @@ export function ApplicationsPage({
         ) : null}
         {pipeline.loadState === 'ready' && !empty ? (
           <>
-            <section
-              className={styles.board}
-              aria-label={t('applications.pipeline.board')}
+            <form
+              className={styles.filters}
+              role="search"
+              aria-label={t('applications.search.the.pipeline')}
+              onSubmit={(event) => event.preventDefault()}
             >
-              {stages.map(({ stage, icon }) => {
-                const items = pipeline.applications.filter(
-                  (application) => application.stage === stage,
-                );
-                return (
-                  <section className={styles.column} key={stage}>
-                    <header>
-                      <span>
-                        <Icon>{icon}</Icon>
-                        {stageLabel(stage, locale)}
-                      </span>
-                      <b>{items.length}</b>
-                    </header>
-                    <div>
-                      {items.map((application) => (
-                        <Link
-                          className={styles.applicationCard}
-                          href={`/applications/${application.applicationId}`}
-                          key={application.applicationId}
-                        >
-                          <i aria-hidden="true">
-                            {initials(application.company)}
-                          </i>
+              <label className={styles.searchField}>
+                <span>{t('applications.search.the.pipeline')}</span>
+                <Icon>search</Icon>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t(
+                    'applications.search.a.company.role.or.location',
+                  )}
+                />
+              </label>
+              <label>
+                {t('applications.type')}
+                <select
+                  value={type}
+                  onChange={(event) => setType(event.target.value)}
+                >
+                  <option value="all">
+                    {t('applications.entire.pipeline')}
+                  </option>
+                  <option value="applications">
+                    {t('applications.applications')}
+                  </option>
+                  <option value="opportunities">
+                    {t('applications.opportunities')}
+                  </option>
+                </select>
+              </label>
+              <label>
+                {t('applications.application.stage')}
+                <select
+                  value={stageFilter}
+                  onChange={(event) => setStageFilter(event.target.value)}
+                  disabled={type === 'opportunities'}
+                >
+                  <option value="all">{t('applications.all.stages')}</option>
+                  {stages.map(({ stage }) => (
+                    <option key={stage} value={stage}>
+                      {stageLabel(stage, locale)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {t('applications.ranking.profile')}
+                <select
+                  value={pipeline.rankingProfileId}
+                  onChange={(event) =>
+                    pipeline.setRankingProfileId(event.target.value)
+                  }
+                  disabled={type === 'applications'}
+                >
+                  <option value="">{t('applications.discovery.order')}</option>
+                  {pipeline.searchProfiles.map((profile) => (
+                    <option
+                      key={profile.searchProfileId}
+                      value={profile.searchProfileId}
+                    >
+                      {profile.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </form>
+            {type !== 'opportunities' ? (
+              <>
+                <section
+                  className={styles.board}
+                  aria-label={t('applications.pipeline.board')}
+                >
+                  {stages.map(({ stage, icon }) => {
+                    const items = filteredApplications.filter(
+                      (application) => application.stage === stage,
+                    );
+                    return (
+                      <section className={styles.column} key={stage}>
+                        <header>
                           <span>
-                            <small>{application.company}</small>
-                            <strong>{application.role}</strong>
+                            <Icon>{icon}</Icon>
+                            {stageLabel(stage, locale)}
                           </span>
-                          <Icon>chevron_right</Icon>
-                        </Link>
-                      ))}
-                      {pipeline.loadState === 'ready' && !items.length ? (
-                        <p className={styles.emptyColumn}>
-                          {t('applications.pipeline.empty.stage')}
-                        </p>
-                      ) : null}
-                    </div>
-                  </section>
-                );
-              })}
-            </section>
+                          <b>{items.length}</b>
+                        </header>
+                        <div>
+                          {items.map((application) => (
+                            <Link
+                              className={styles.applicationCard}
+                              href={`/applications/${application.applicationId}`}
+                              key={application.applicationId}
+                            >
+                              <i aria-hidden="true">
+                                {initials(application.company)}
+                              </i>
+                              <span>
+                                <small>{application.company}</small>
+                                <strong>{application.role}</strong>
+                              </span>
+                              <Icon>chevron_right</Icon>
+                            </Link>
+                          ))}
+                          {pipeline.loadState === 'ready' && !items.length ? (
+                            <p className={styles.emptyColumn}>
+                              {t('applications.pipeline.empty.stage')}
+                            </p>
+                          ) : null}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </section>
+                {!filteredApplications.length ? (
+                  <p role="status">
+                    {t('applications.no.application.matches.these.filters')}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
 
             <section className={styles.reusable}>
               <header>
@@ -198,15 +318,32 @@ export function ApplicationsPage({
           </>
         ) : null}
 
-        {activeOpportunities.length ? (
+        {activeOpportunities.length && type !== 'applications' ? (
           <section className={styles.savedJobs}>
             <header>
               <div>
                 <p>{t('applications.opportunities')}</p>
                 <h2>{t('applications.discovered.opportunities')}</h2>
               </div>
-              <span>{activeOpportunities.length}</span>
+              <span>{rankedOpportunities.length}</span>
             </header>
+            {alertCount > 0 ? (
+              <div className={styles.alertSummary} role="status">
+                <Icon>notifications_active</Icon>
+                <div>
+                  <strong>
+                    {locale === 'fr'
+                      ? `${alertCount} opportunité${alertCount > 1 ? 's ont' : ' a'} atteint votre seuil d’alerte de ${alertThreshold} % fondé sur vos décisions.`
+                      : `${alertCount} opportunit${alertCount > 1 ? 'ies have' : 'y has'} reached your ${alertThreshold}% human-feedback alert threshold.`}
+                  </strong>
+                  <span>
+                    {locale === 'fr'
+                      ? 'Ce signal utilise vos décisions liées à ce profil, pas une probabilité d’embauche.'
+                      : 'This signal uses your related decisions for this profile, not a hiring probability.'}
+                  </span>
+                </div>
+              </div>
+            ) : null}
             <div className={styles.opportunityList}>
               {rankedOpportunities.map(({ opportunity, ...ranking }) => (
                 <OpportunityCard
@@ -220,11 +357,16 @@ export function ApplicationsPage({
                   searchProfiles={pipeline.searchProfiles}
                 />
               ))}
+              {!rankedOpportunities.length ? (
+                <p className={styles.emptyEvidence} role="status">
+                  {t('applications.no.opportunity.matches.these.filters')}
+                </p>
+              ) : null}
             </div>
           </section>
         ) : null}
 
-        {processedOpportunities.length ? (
+        {processedOpportunities.length && type !== 'applications' ? (
           <ProcessedOpportunities
             decisionsByOpportunity={decisionsByOpportunity}
             onDecisionSaved={pipeline.decisionSaved}

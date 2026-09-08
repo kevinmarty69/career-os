@@ -513,6 +513,10 @@ export const dossierMessages = {
     fr: 'Aucune objection.',
     en: 'No objections.',
   },
+  'dossier.no.reviews.yet': {
+    en: 'No reviews yet.',
+    fr: 'Aucune review pour le moment.',
+  },
   'dossier.the.decision.was.not.saved.you.can.retry.without': {
     fr: 'La décision n’a pas été enregistrée. Vous pouvez réessayer sans risque de doublon.',
     en: 'The decision was not saved. You can retry without creating a duplicate.',

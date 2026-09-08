@@ -1,3 +1,4 @@
+import { serverModelConfig } from '../lib/server/local-openai-transport';
 import { reviewerSchema, type Reviewer } from '../lib/reviewer';
 import { LocalOpenAIReviewClient } from '../lib/server/local-openai-review-client';
 import { processReviewerStep } from '../lib/server/reviewer-worker';
@@ -40,9 +41,7 @@ function qualitativeClient(reviewer: Reviewer) {
   if (reviewer === 'factuality') return undefined;
   return new LocalOpenAIReviewClient({
     reviewer,
-    baseUrl: required('CAREER_OS_LOCAL_MODEL_BASE_URL'),
-    apiKey: process.env.CAREER_OS_LOCAL_MODEL_API_KEY ?? 'local-only',
-    model: required('CAREER_OS_LOCAL_MODEL'),
+    ...serverModelConfig(),
   });
 }
 

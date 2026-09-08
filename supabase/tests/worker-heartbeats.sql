@@ -228,7 +228,7 @@ begin
       from worker_roles worker
       cross join pg_proc procedure
       join pg_namespace namespace on namespace.oid = procedure.pronamespace
-      where namespace.nspname in ('app', 'auth')
+      where namespace.nspname in ('app', 'career_identity')
         and has_function_privilege(worker.role_name, procedure.oid, 'execute')
     )
     select 1

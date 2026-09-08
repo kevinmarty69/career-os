@@ -1,3 +1,4 @@
+import { serverModelConfig } from '../lib/server/local-openai-transport';
 import { LocalOpenAICompanyResearchClient } from '../lib/server/local-openai-client';
 import { processCompanyResearchStep } from '../lib/server/run-worker';
 import { runWorkerLoop } from './worker-loop';
@@ -5,9 +6,7 @@ import { runWorkerLoop } from './worker-loop';
 async function main() {
   const databaseUrl = required('CAREER_OS_WORKER_DATABASE_URL');
   const client = new LocalOpenAICompanyResearchClient({
-    baseUrl: required('CAREER_OS_LOCAL_MODEL_BASE_URL'),
-    apiKey: process.env.CAREER_OS_LOCAL_MODEL_API_KEY ?? 'local-only',
-    model: required('CAREER_OS_LOCAL_MODEL'),
+    ...serverModelConfig(),
   });
   const once = process.argv.includes('--once');
 

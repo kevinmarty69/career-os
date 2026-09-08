@@ -542,6 +542,12 @@ Le MVP avancé est une première version commercialisable. Il couvre le parcours
 
 ### Définition de terminé
 
+Point de validation du 8 septembre 2026 : les cases ci-dessous décrivent
+l'implémentation, pas une recette intégrale en conditions réelles. Le parcours
+authentification, import CV, contacts, export et isolation est testé sur Supabase.
+La chaîne de génération/review avec un vrai modèle reste à valider une fois un
+endpoint explicitement autorisé configuré. Le lot cloud commercial reste ouvert.
+
 Le MVP est atteint lorsqu'un nouvel utilisateur peut, sans intervention de l'équipe :
 
 1. créer un espace sécurisé ;
@@ -643,9 +649,9 @@ Critères d'acceptation :
 - [x] Identification honnête des écarts et objections.
 - [x] Questions d'entretien recommandées.
 - [x] Messages courts pour prise de contact et candidature.
-- [ ] Recherche sourcée de trois contacts pertinents au maximum.
-- [ ] Classement explicable avec rôle, raison et niveau de confiance.
-- [ ] Notes de connexion et messages soumis à validation humaine.
+- [x] Recherche sourcée de trois contacts pertinents au maximum.
+- [x] Classement explicable avec rôle, raison et niveau de confiance.
+- [x] Notes de connexion et messages soumis à validation humaine.
 - [x] Suggestion facultative d'une preuve de travail proportionnée.
 - [x] Versionnement de la stratégie validée.
 
@@ -656,6 +662,10 @@ Critères d'acceptation :
 - la stratégie n'utilise que des affirmations autorisées ;
 - aucun contact n'est présenté comme hiring manager sans preuve suffisante ;
 - aucune connexion ni aucun message n'est envoyé automatiquement.
+
+La recherche contacts est implémentée avec sources publiques bornées, citations,
+budget et validation humaine avant ajout. Contrats et interface testés ; qualité
+des suggestions avec un vrai modèle non validée dans l'environnement actuel.
 
 ### Lot 5 - Orchestration et review agentiques
 
@@ -707,7 +717,7 @@ Critères d'acceptation :
 - [x] File des arbitrages humains.
 - [x] Gestion des liens privés actifs.
 - [x] Ajout des contacts, entretiens, réponses et résultats.
-- [ ] Suivi des personnes suggérées, contactées, acceptées et à relancer.
+- [x] Suivi des personnes suggérées, contactées, acceptées et à relancer.
 - [x] Tâches et relances datées.
 - [x] Recherche et filtres globaux.
 - [x] Historique des versions et décisions.

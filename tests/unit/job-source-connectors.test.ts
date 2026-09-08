@@ -110,6 +110,58 @@ test('selects and normalizes exactly one Ashby job from the public board fixture
   });
 });
 
+test('accepts Ashby equity summaries without a currency and preserves the salary', () => {
+  const target = resolveJobConnector(
+    'https://jobs.ashbyhq.com/nimbus/123e4567-e89b-12d3-a456-426614174000',
+  );
+  const boardTarget = resolveJobBoard('https://jobs.ashbyhq.com/nimbus');
+  assert.ok(target);
+  assert.ok(boardTarget);
+  const board = JSON.parse(fixture('ashby-job-board.json'));
+  // Observed in the official n8n board: "Offers Equity" is not a salary amount.
+  const equity = {
+    compensationType: 'EquityCashValue',
+    interval: '1 YEAR',
+    minValue: null,
+    maxValue: null,
+  };
+  board.jobs[0].compensation.summaryComponents[1] = equity;
+  // A valid summary on another posting must not make the selected job unusable.
+  board.jobs[1].compensation = { summaryComponents: [equity] };
+  const payload = JSON.stringify(board);
+  const result = parseJobConnector(target, payload);
+  assert.equal(result.extraction.role, 'Founding Product Engineer');
+  assert.equal(result.normalized.salaryMin, 80000);
+  assert.equal(result.normalized.salaryMax, 110000);
+  assert.equal(result.normalized.salaryCurrency, 'EUR');
+  assert.equal(result.normalized.salaryPeriod, 'year');
+  const jobs = parseJobBoard(boardTarget, payload);
+  assert.equal(jobs.length, 2);
+  assert.equal(jobs[1].normalized.salaryCurrency, null);
+  assert.equal(jobs[1].normalized.salaryMin, null);
+  assert.equal(jobs[1].normalized.salaryMax, null);
+});
+
+test('does not invent a currency for Ashby salary summaries with an absent currency', () => {
+  const target = resolveJobConnector(
+    'https://jobs.ashbyhq.com/nimbus/123e4567-e89b-12d3-a456-426614174000',
+  );
+  assert.ok(target);
+  const board = JSON.parse(fixture('ashby-job-board.json'));
+  delete board.jobs[0].compensation.summaryComponents[0].currencyCode;
+  const result = parseJobConnector(target, JSON.stringify(board));
+  assert.equal(result.normalized.salaryCurrency, null);
+  assert.equal(result.normalized.salaryMin, null);
+  assert.equal(result.normalized.salaryMax, null);
+  assert.equal(result.normalized.salaryPeriod, 'unknown');
+
+  board.jobs[0].compensation.summaryComponents[0].currencyCode = 42;
+  assert.throws(
+    () => parseJobConnector(target, JSON.stringify(board)),
+    JobConnectorError,
+  );
+});
+
 test('fails closed on an ambiguous Ashby match and keeps generic absences explicit', () => {
   const target = resolveJobConnector(
     'https://jobs.ashbyhq.com/nimbus/missing-posting',

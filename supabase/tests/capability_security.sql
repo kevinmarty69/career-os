@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 
 begin;
+select pg_temp.seed_identity('22000000-0000-0000-0000-000000000001','12000000-0000-0000-0000-000000000001');
 set local role career_publisher;
 do $$ begin
   begin
@@ -13,7 +14,7 @@ end $$;
 do $$ begin
   begin
     insert into app.share_links (tenant_id, publication_id, token_hash, expires_at)
-    values (gen_random_uuid(), gen_random_uuid(), digest('forged', 'sha256'), now() + interval '1 day');
+    values (gen_random_uuid(), gen_random_uuid(), extensions.digest('forged', 'sha256'), now() + interval '1 day');
     raise exception 'publisher wrote a raw share link';
   exception when insufficient_privilege then null;
   end;
@@ -76,7 +77,7 @@ insert into app.strategy_approvals (
 select '84000000-0000-0000-0000-000000000001',
   '22000000-0000-0000-0000-000000000001',
   '82000000-0000-0000-0000-000000000001', id,
-  encode(digest(body::text, 'sha256'), 'hex'),
+  encode(extensions.digest(body::text, 'sha256'), 'hex'),
   '84000000-0000-0000-0000-000000000011',
   '12000000-0000-0000-0000-000000000001'
 from app.artifacts where id = '83000000-0000-0000-0000-000000000001';
@@ -88,14 +89,14 @@ select '85000000-0000-0000-0000-000000000001',
   '22000000-0000-0000-0000-000000000001',
   '82000000-0000-0000-0000-000000000001', 'page-composer', 'completed',
   'capability-page-composer', fixture.input,
-  encode(digest(fixture.input::text, 'sha256'), 'hex'),
+  encode(extensions.digest(fixture.input::text, 'sha256'), 'hex'),
   '83000000-0000-4000-8000-000000000002', now(),
   '92000000-0000-4000-8000-000000000001'
 from (
   select jsonb_build_object(
     'schemaVersion', 1,
     'strategyArtifactId', '83000000-0000-0000-0000-000000000001',
-    'strategyArtifactHash', encode(digest(body::text, 'sha256'), 'hex'),
+    'strategyArtifactHash', encode(extensions.digest(body::text, 'sha256'), 'hex'),
     'strategyApprovalId', '84000000-0000-0000-0000-000000000001'
   ) input
   from app.artifacts where id = '83000000-0000-0000-0000-000000000001'
@@ -151,7 +152,7 @@ select app.approve_page_spec('92000000-0000-4000-8000-000000000001');
 set local role career_publisher;
 do $$ begin
   begin
-    perform app.mint_publication('92000000-0000-4000-8000-000000000001', digest('mixed-token', 'sha256'), now() + interval '1 day');
+    perform app.mint_publication('92000000-0000-4000-8000-000000000001', extensions.digest('mixed-token', 'sha256'), now() + interval '1 day');
     raise exception 'mixed restricted evidence published';
   exception when others then
     if sqlerrm = 'mixed restricted evidence published' then raise; end if;
@@ -166,12 +167,12 @@ delete from app.claim_evidence
 where claim_id = '62000000-0000-4000-8000-000000000001'
   and evidence_id = '52000000-0000-0000-0000-000000000002';
 set local role career_publisher;
-select app.mint_publication('92000000-0000-4000-8000-000000000001', digest('safe-token', 'sha256'), now() + interval '1 day') as audit_publication_id \gset
-select app.mint_publication('92000000-0000-4000-8000-000000000001', digest('safe-token', 'sha256'), now() + interval '1 day') as retry_publication_id \gset
+select app.mint_publication('92000000-0000-4000-8000-000000000001', extensions.digest('safe-token', 'sha256'), now() + interval '1 day') as audit_publication_id \gset
+select app.mint_publication('92000000-0000-4000-8000-000000000001', extensions.digest('safe-token', 'sha256'), now() + interval '1 day') as retry_publication_id \gset
 
 do $$ begin
   begin
-    perform app.mint_publication('92000000-0000-4000-8000-000000000001', digest('different-token', 'sha256'), now() + interval '1 day');
+    perform app.mint_publication('92000000-0000-4000-8000-000000000001', extensions.digest('different-token', 'sha256'), now() + interval '1 day');
     raise exception 'publication capability rotated during retry';
   exception when others then
     if sqlerrm = 'publication capability rotated during retry' then raise; end if;
@@ -189,7 +190,7 @@ select 1 / (((select count(*) from app.share_links
   where publication_id = :'audit_publication_id'::uuid and revoked_at is null) = 1)::integer)
   as retry_kept_one_capability;
 select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid,
-  digest('safe-token', 'sha256')) is not null)::integer)
+  extensions.digest('safe-token', 'sha256')) is not null)::integer)
   as retry_kept_previous_capability;
 
 set local role career_app;
@@ -210,11 +211,11 @@ reset role;
 insert into app.page_spec_claims (tenant_id, page_spec_id, claim_id) values
   ('22000000-0000-0000-0000-000000000001', '92000000-0000-4000-8000-000000000001', '62000000-0000-0000-0000-000000000002');
 set local role career_reader;
-select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256')) is not null
-  and position('Allowed claim' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) > 0
-  and position('Changed after publication' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) = 0
-  and position('SECRET-RESTRICTED-EVIDENCE' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) = 0
-  and position('Restricted late claim' in app.read_shared_publication(:'audit_publication_id'::uuid, digest('safe-token', 'sha256'))::text) = 0)::integer)
+select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid, extensions.digest('safe-token', 'sha256')) is not null
+  and position('Allowed claim' in app.read_shared_publication(:'audit_publication_id'::uuid, extensions.digest('safe-token', 'sha256'))::text) > 0
+  and position('Changed after publication' in app.read_shared_publication(:'audit_publication_id'::uuid, extensions.digest('safe-token', 'sha256'))::text) = 0
+  and position('SECRET-RESTRICTED-EVIDENCE' in app.read_shared_publication(:'audit_publication_id'::uuid, extensions.digest('safe-token', 'sha256'))::text) = 0
+  and position('Restricted late claim' in app.read_shared_publication(:'audit_publication_id'::uuid, extensions.digest('safe-token', 'sha256'))::text) = 0)::integer)
   as restricted_evidence_not_served;
 
 set local role career_app;
@@ -222,7 +223,7 @@ update app.applications set deleted_at = now(), revision = revision + 1
 where id = '72000000-0000-0000-0000-000000000001';
 set local role career_reader;
 select 1 / ((app.read_shared_publication(:'audit_publication_id'::uuid,
-  digest('safe-token', 'sha256')) is null)::integer)
+  extensions.digest('safe-token', 'sha256')) is null)::integer)
   as application_deletion_revoked_capability;
 rollback;
 select 'capability writer and immutable publication snapshot ok' as result;

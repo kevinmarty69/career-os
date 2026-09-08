@@ -199,7 +199,7 @@ async function markInFlight(
   reviewer: QualitativeReviewer,
   step: ClaimedStep,
   client: LocalOpenAIReviewClient,
-  reservation: { tokens: number; costMicros: 0 },
+  reservation: { tokens: number; costMicros: number },
 ) {
   if (reviewer === 'recruiter') {
     await tx`select app.mark_recruiter_reviewer_in_flight(

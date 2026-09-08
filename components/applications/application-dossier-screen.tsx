@@ -12,6 +12,7 @@ import {
   actorLabel,
   runStageLabel,
   runStatusLabel,
+  runStatusTone,
   stepStatusLabel,
   workflowErrorLabel,
 } from '@/components/applications/workflow-labels';
@@ -147,6 +148,47 @@ export function DynamicDossierScreen({
   }
 
   const run = workflow.run;
+  const stopped =
+    run &&
+    ['failed', 'blocked', 'budget_exhausted', 'cancelled'].includes(run.status);
+  if (run && (run.status === 'running' || stopped)) {
+    return (
+      <DossierShell
+        active=""
+        identity={identity}
+        state={
+          <Badge tone={runStatusTone(run.status)}>
+            {runStatusLabel(run.status, locale)}
+          </Badge>
+        }
+      >
+        <RunningScreen run={run} />
+        {stopped ? (
+          <div className={styles.flow}>
+            <p role="status">
+              {locale === 'en'
+                ? 'This run stopped. Its evidence and history are preserved; no page was published by this action. Check the instance before starting a new run.'
+                : 'Ce run est arrêté. Ses preuves et son historique sont conservés ; cette action n’a publié aucune page. Vérifiez l’instance avant de lancer un nouveau run.'}
+            </p>
+            {workflow.error ? (
+              <p role="alert">{workflowErrorLabel(t, workflow.error)}</p>
+            ) : null}
+            <footer className={styles.actionBar}>
+              <Link href="/settings/models">
+                {t('dossier.check.worker.availability')}
+              </Link>
+              <Button
+                disabled={workflow.starting}
+                onClick={() => void workflow.start(application, true)}
+              >
+                {locale === 'en' ? 'Start a new run' : 'Lancer un nouveau run'}
+              </Button>
+            </footer>
+          </div>
+        ) : null}
+      </DossierShell>
+    );
+  }
   const checkpoint =
     run?.research && run.status === 'paused' && !run.evidenceArchive
       ? 'research'
@@ -267,7 +309,7 @@ export function DynamicDossierScreen({
           ) : null}
           {!checkpoint && !run?.reviews.length ? (
             <section className={styles.panel}>
-              <h1>{t('dossier.no.objections')}</h1>
+              <h1>{t('dossier.no.reviews.yet')}</h1>
               <Link
                 className="co-button"
                 href={`/applications/${applicationId}`}
@@ -281,7 +323,13 @@ export function DynamicDossierScreen({
     );
   }
 
-  if (route === 'preview' && run?.spec) {
+  if (
+    route === 'preview' &&
+    run?.spec &&
+    (run.stage === 'page_spec_review' ||
+      run.publicationEligible ||
+      workflow.publication)
+  ) {
     const preview = run.stage !== 'page_spec_review';
     if (workflow.publication) {
       return (
@@ -381,8 +429,6 @@ export function DynamicDossierScreen({
           onStart={() => void workflow.start(application)}
           starting={workflow.starting}
         />
-      ) : run.status === 'running' ? (
-        <RunningScreen run={run} />
       ) : (
         <RunSummary application={application} run={run} />
       )}
@@ -497,7 +543,19 @@ function FramingScreen({
           ) : null}
         </section>
       </div>
-      {error ? <p role="alert">{workflowErrorLabel(t, error)}</p> : null}
+      {error ? (
+        <p role="alert">
+          {workflowErrorLabel(t, error)}
+          {error === 'worker-unavailable' ? (
+            <>
+              {' '}
+              <Link href="/settings/models">
+                {t('dossier.check.worker.availability')}
+              </Link>
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <footer className={styles.actionBar}>
         <span>
           {t('dossier.no.run.yet.the.button.starts.a.bounded.persisted')}
@@ -528,10 +586,12 @@ function RunningScreen({ run }: { run: Run }) {
     <div aria-live="polite" className={styles.flow}>
       <header className={styles.hero}>
         <p className={styles.eyebrow}>{run.runId.slice(0, 8)}</p>
-        <h1>{runStageLabel(run.stage, locale)}</h1>
-        <p>
-          {t('dossier.this.application.is.ready.for.company.research.and.the')}
-        </p>
+        <h1>
+          {run.status === 'running'
+            ? runStageLabel(run.stage, locale)
+            : runStatusLabel(run.status, locale)}
+        </h1>
+        <p>{runStageLabel(run.stage, locale)}</p>
         <div
           aria-label={`${percent}%`}
           aria-valuemax={100}
@@ -547,7 +607,9 @@ function RunningScreen({ run }: { run: Run }) {
         <section className={styles.runPanel}>
           <div className={styles.runHeader}>
             <h2>{t('active-routes.progress')}</h2>
-            <Badge tone="accent">{runStatusLabel(run.status, locale)}</Badge>
+            <Badge tone={runStatusTone(run.status)}>
+              {runStatusLabel(run.status, locale)}
+            </Badge>
           </div>
           <ol className={styles.stepList}>
             {run.steps.map((step) => (

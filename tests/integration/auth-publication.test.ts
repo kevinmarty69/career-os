@@ -1,3 +1,4 @@
+import { BrowserSession } from './supabase-browser-session';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
@@ -9,7 +10,6 @@ import type { PersistedRun } from '../../lib/run-contract';
 
 const baseUrl = process.env.TEST_BASE_URL ?? 'http://127.0.0.1:3019';
 const authOrigin = process.env.TEST_AUTH_ORIGIN ?? baseUrl;
-const requestOrigin = process.env.TEST_REQUEST_ORIGIN ?? baseUrl;
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is required.');
 const suffix = randomUUID();
@@ -29,79 +29,6 @@ livingProfile.publicLinks = {
   email: 'alex@example.test',
   github: 'https://github.com/alex',
 };
-
-class BrowserSession {
-  private readonly cookies = new Map<string, string>();
-
-  async post(path: string, body: unknown, headers = {}) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        origin: path.startsWith('/api/auth/') ? authOrigin : requestOrigin,
-        ...(this.cookieHeader() ? { cookie: this.cookieHeader() } : {}),
-        ...headers,
-      },
-      body: JSON.stringify(body),
-    });
-    this.captureCookies(response);
-    return response;
-  }
-
-  async get(path: string) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      headers: this.cookieHeader() ? { cookie: this.cookieHeader() } : {},
-    });
-    this.captureCookies(response);
-    return response;
-  }
-
-  async put(path: string, body: unknown) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: 'PUT',
-      headers: {
-        'content-type': 'application/json',
-        origin: requestOrigin,
-        ...(this.cookieHeader() ? { cookie: this.cookieHeader() } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-    this.captureCookies(response);
-    return response;
-  }
-
-  async delete(path: string) {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: 'DELETE',
-      headers: {
-        origin: requestOrigin,
-        ...(this.cookieHeader() ? { cookie: this.cookieHeader() } : {}),
-      },
-    });
-    this.captureCookies(response);
-    return response;
-  }
-
-  private cookieHeader() {
-    return [...this.cookies.entries()]
-      .map(([name, value]) => `${name}=${value}`)
-      .join('; ');
-  }
-
-  private captureCookies(response: Response) {
-    const headers = response.headers as Headers & {
-      getSetCookie?: () => string[];
-    };
-    const setCookies = headers.getSetCookie?.() ?? [headers.get('set-cookie')];
-    for (const setCookie of setCookies) {
-      if (!setCookie) continue;
-      const [pair] = setCookie.split(';');
-      const separator = pair.indexOf('=');
-      if (separator < 1) continue;
-      this.cookies.set(pair.slice(0, separator), pair.slice(separator + 1));
-    }
-  }
-}
 
 async function expectStatus(
   response: Response,
@@ -189,7 +116,7 @@ async function makeRunPublishable(run: PersistedRun, tenantId: string) {
       `insert into app.artifacts (
          id, tenant_id, workflow_run_id, kind, version, body, created_by
        ) values ($1, $2, $3, 'strategy', 1, '{}'::jsonb, 'recruiter')
-       returning encode(digest(body::text, 'sha256'), 'hex') artifact_hash`,
+       returning encode(extensions.digest(body::text, 'sha256'), 'hex') artifact_hash`,
       [strategyArtifactId, tenantId, run.runId],
     );
     await client.query(
@@ -246,7 +173,7 @@ async function makeRunPublishable(run: PersistedRun, tenantId: string) {
          tenant_id, workflow_run_id, stage, status, idempotency_key,
          input, input_hash, output_artifact_id, page_spec_id, completed_at
        ) values ($1, $2, 'page-composer', 'completed', 'publication-fixture',
-         $3, encode(digest($3::jsonb::text, 'sha256'), 'hex'), $4, $5, now())`,
+         $3, encode(extensions.digest($3::jsonb::text, 'sha256'), 'hex'), $4, $5, now())`,
       [
         tenantId,
         run.runId,
@@ -407,15 +334,11 @@ async function main() {
 
   const owner = new BrowserSession();
   await expectStatus(
-    await owner.post(
-      '/api/auth/sign-up/email',
-      {
-        name: 'Owner',
-        email: ownerEmail,
-        password: 'safe-local-password',
-      },
-      { origin: authOrigin },
-    ),
+    await owner.signUp({
+      name: 'Owner',
+      email: ownerEmail,
+      password: 'safe-local-password',
+    }),
     200,
     'owner sign-up',
   );
@@ -425,7 +348,7 @@ async function main() {
     'session without active organization',
   );
   const organizationResponse = await owner.post(
-    '/api/auth/organization/create',
+    '/api/auth/workspaces',
     {
       name: 'HTTP Organization',
       slug: `http-organization-${suffix}`,
@@ -689,38 +612,24 @@ async function main() {
   assert.ok(inventory.publications[0].lastOpenedAt);
   const invitee = new BrowserSession();
   await expectStatus(
-    await invitee.post(
-      '/api/auth/sign-up/email',
-      {
-        name: 'Invitee',
-        email: inviteeEmail,
-        password: 'safe-local-password',
-      },
-      { origin: authOrigin },
-    ),
+    await invitee.signUp({
+      name: 'Invitee',
+      email: inviteeEmail,
+      password: 'safe-local-password',
+    }),
     200,
     'invitee sign-up',
   );
-  const invitationResponse = await owner.post(
-    '/api/auth/organization/invite-member',
-    {
-      organizationId: organization.id,
-      email: inviteeEmail,
-      role: 'member',
-    },
-  );
-  await expectStatus(invitationResponse, 200, 'invitation creation');
-  const invitation = (await invitationResponse.json()) as { id: string };
   await expectStatus(
-    await invitee.post('/api/auth/organization/accept-invitation', {
-      invitationId: invitation.id,
+    await invitee.request('/api/auth/workspaces', 'PATCH', {
+      id: organization.id,
     }),
     403,
-    'unverified invitation acceptance',
+    'non-member cannot select another workspace',
   );
 
   const otherTenantResponse = await invitee.post(
-    '/api/auth/organization/create',
+    '/api/auth/workspaces',
     { name: 'Other Tenant', slug: `other-tenant-${suffix}` },
     { origin: authOrigin },
   );
@@ -745,8 +654,8 @@ async function main() {
   const database = new Pool({ connectionString: databaseUrl });
   try {
     await database.query(
-      `delete from auth."session" where "userId" = (
-       select id from auth."user" where email = $1
+      `delete from auth.sessions where user_id = (
+       select id from auth.users where email = $1
      )`,
       [ownerEmail],
     );
@@ -757,29 +666,26 @@ async function main() {
     );
 
     await expectStatus(
-      await owner.post(
-        '/api/auth/sign-in/email',
-        {
-          email: ownerEmail,
-          password: 'safe-local-password',
-        },
-        { origin: authOrigin },
-      ),
+      await owner.signIn({
+        email: ownerEmail,
+        password: 'safe-local-password',
+      }),
       200,
       'owner sign-in',
     );
     await expectStatus(
-      await owner.post(
-        '/api/auth/organization/set-active',
-        { organizationId: organization.id },
+      await owner.request(
+        '/api/auth/workspaces',
+        'PATCH',
+        { id: organization.id },
         { origin: authOrigin },
       ),
       200,
       'restore active organization',
     );
     await database.query(
-      `update auth."session" set "expiresAt" = now() - interval '1 minute'
-     where "userId" = (select id from auth."user" where email = $1)`,
+      `update auth.sessions set not_after = now() - interval '1 minute'
+     where user_id = (select id from auth.users where email = $1)`,
       [ownerEmail],
     );
     await expectStatus(

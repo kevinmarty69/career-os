@@ -701,7 +701,7 @@ pre {
 
 .co-badge.ok,
 [data-proof-status='verified'] {
-  color: var(--color-green-text);
+  color: var(--color-green-strong);
   background: var(--color-green-tint);
 }
 
@@ -709,13 +709,13 @@ pre {
 [data-proof-status='declared'],
 [data-proof-status='conflicted'],
 [data-proof-status='stale'] {
-  color: var(--color-amber-text);
+  color: var(--color-amber-strong);
   background: var(--color-amber-tint);
 }
 
 .co-badge.crit,
 [data-proof-status='unsourced'] {
-  color: var(--color-clay-text);
+  color: var(--color-clay-strong);
   background: var(--color-clay-tint);
 }
 

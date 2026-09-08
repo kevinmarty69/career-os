@@ -12,6 +12,9 @@ test('keeps the English dashboard keyboard and screen-reader navigable', async (
   await context.clearCookies();
   await mockPersistedWorkspace(page);
   await page.goto('/');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Hello Alex' }),
+  ).toBeVisible();
 
   await page.keyboard.press('Tab');
   const skipLink = page.getByRole('link', { name: 'Skip to main content' });
@@ -20,18 +23,21 @@ test('keeps the English dashboard keyboard and screen-reader navigable', async (
   await expect(page.locator('#main-content')).toBeFocused();
 
   const tree = await page.locator('#main-content').ariaSnapshot();
+  expect(tree).toContain('- heading "Hello Alex" [level=1]');
   expect(tree).toContain(
-    '- heading "Start the evidence workflow for Signal Forge." [level=1]',
+    '- heading "Start the evidence workflow for Signal Forge." [level=2]',
   );
-  expect(tree).toContain('- region "Key metrics"');
+  expect(tree).toContain('- heading "Your applications" [level=2]');
   expect(tree).toContain('- link "Open application');
 });
 
 // Check rendered styles after the entire CSS cascade, with actual loaded data.
 // API mocking isolates UI behavior; persistence and RLS have separate SQL/HTTP tests.
 test('rendered status labels and primary actions meet AA text contrast', async ({
+  context,
   page,
 }) => {
+  await context.clearCookies();
   await mockPersistedWorkspace(page, pendingReviewRun);
   for (const path of [
     '/applications',
@@ -39,18 +45,53 @@ test('rendered status labels and primary actions meet AA text contrast', async (
     `/applications/${applicationId}/review`,
   ]) {
     await page.goto(path);
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     if (path === '/memory') {
       await expect(
-        page.getByRole('textbox', { name: 'Affirmation', exact: true }),
-      ).toHaveValue('Reduced build p50 from 11 to 7 minutes.');
-    } else {
+        page.getByRole('heading', {
+          level: 1,
+          name: 'Career memory',
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', {
+          name: /Reduced build p50 from 11 to 7 minutes/,
+        }),
+      ).toBeVisible();
+    } else if (path === '/applications') {
+      await expect(
+        page.getByRole('heading', {
+          level: 1,
+          name: 'Applications',
+          exact: true,
+        }),
+      ).toBeVisible();
       await expect(
         page
           .locator('#main-content')
           .getByText('Signal Forge', { exact: true })
           .first(),
       ).toBeVisible();
+    } else {
+      // The review identity lives in the fullscreen header, outside the skip-link target.
+      await expect(
+        page
+          .getByRole('main')
+          .getByText('Review · Signal Forge', { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.locator('#main-content').getByRole('heading', {
+          level: 1,
+          name: pendingReviewRun.reviews[0].issues[0].message,
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(page.locator('#main-content .co-badge')).toContainText(
+        'Blocking',
+      );
+      await expect(
+        page.getByRole('button', { name: 'Correct section', exact: true }),
+      ).toBeEnabled();
     }
     const labels = await page
       .locator('.co-badge, [data-proof-status], .co-button:not(:disabled)')

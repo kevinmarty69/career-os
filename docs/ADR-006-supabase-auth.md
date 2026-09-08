@@ -59,11 +59,11 @@ workspace ownership need an explicit identity migration, not a destructive reset
 The old environment can be restored to use the old code; no legacy local data was
 copied into the fresh managed project.
 
-The historical PostgreSQL/Better Auth HTTP integration harness is **not compatible**
-with this auth change and must be ported to a disposable Supabase stack before
-merging this branch. `pnpm check` and `pnpm build` passing are not evidence that
-the legacy full CI suite passes. Do not use `pnpm db:up` or `db:test` from that
-harness against a live Supabase project.
+The Better Auth harness is replaced by `pnpm test:native pnpm verify:persisted`:
+native PostgreSQL plus a checksum-pinned official GoTrue binary, a disposable
+database and real sessions. No Docker is required. Fixtures use `career_identity`
+memberships and the real managed Auth schema. Never run them against a live
+project. Code checks remain distinct from SMTP delivery or deployment proof.
 
 ## Repeatable live smoke
 

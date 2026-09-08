@@ -7,6 +7,7 @@ test-results
 .env.*
 !.env.example
 .firecrawl
+.cache/
 *.key
 *.p12
 *.pfx
@@ -21,3 +22,5 @@ dump.sql
 *.tsbuildinfo
 .DS_Store
 supabase/.temp/
+deploy/local/supabase/.temp/
+deploy/local/supabase/.branches/

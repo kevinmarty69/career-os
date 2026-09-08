@@ -478,6 +478,11 @@
     border-radius: 0;
   }
 
+  .co-dossier-shell > section {
+    /* Every dossier flow must leave room for the fixed mobile navigation. */
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+
   .co-home-topbar,
   .co-settings-shell > section > header {
     position: sticky;

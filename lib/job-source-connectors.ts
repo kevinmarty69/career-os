@@ -75,7 +75,8 @@ const ashbySalarySchema = z
   .object({
     compensationType: z.string(),
     interval: z.string(),
-    currencyCode: z.string().nullable(),
+    // Ashby omits the currency for non-monetary/undisclosed equity summaries.
+    currencyCode: z.string().nullable().optional(),
     minValue: z.number().nonnegative().nullable(),
     maxValue: z.number().nonnegative().nullable(),
   })

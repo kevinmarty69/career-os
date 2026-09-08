@@ -1,6 +1,8 @@
 \set ON_ERROR_STOP on
 
 begin;
+select pg_temp.seed_identity('d1000000-0000-4000-8000-000000000001','e1000000-0000-4000-8000-000000000001');
+select pg_temp.seed_identity('d1000000-0000-4000-8000-000000000002','e1000000-0000-4000-8000-000000000002');
 
 insert into app.tenants (id, owner_id, name) values
   ('d1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000001', 'Inventory tenant'),
@@ -87,7 +89,7 @@ insert into app.share_links (
 select ('b1000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
   'd1000000-0000-4000-8000-000000000001',
   ('a1000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
-  digest('inventory-' || n, 'sha256'),
+  extensions.digest('inventory-' || n, 'sha256'),
   case when n = 1 then clock_timestamp() - interval '1 day'
     else clock_timestamp() + interval '1 day' end,
   case when n = 2 then clock_timestamp() else null end
@@ -105,7 +107,7 @@ insert into app.share_links (
   'b1000000-0000-4000-8000-999999999999',
   'd1000000-0000-4000-8000-000000000002',
   'a1000000-0000-4000-8000-999999999999',
-  digest('other-inventory', 'sha256'), clock_timestamp() + interval '1 day'
+  extensions.digest('other-inventory', 'sha256'), clock_timestamp() + interval '1 day'
 );
 
 set local session_replication_role = origin;

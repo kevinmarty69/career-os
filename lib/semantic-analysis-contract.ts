@@ -49,14 +49,17 @@ export const persistedSemanticAnalysisSchema = z
     proofIndex: semanticProofIndexSchema,
     usage: z
       .object({
-        provider: z.literal('openai-compatible-local'),
+        provider: z.enum([
+          'openai-compatible-local',
+          'openai-compatible-remote',
+        ]),
         model: z.string().min(1).max(200),
         providerRequestId: z.string().min(1).max(200).optional(),
         reservedTokens: z.number().int().nonnegative(),
         inputTokens: z.number().int().nonnegative().max(1_000_000),
         outputTokens: z.number().int().nonnegative().max(1_000_000),
-        costBudgetMicros: z.literal(0),
-        costMicros: z.literal(0),
+        costBudgetMicros: z.number().int().nonnegative(),
+        costMicros: z.number().int().nonnegative(),
         latencyMs: z.number().int().nonnegative(),
       })
       .strict(),

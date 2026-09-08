@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { lookup } from 'node:dns/promises';
+import { request as httpsRequest } from 'node:https';
+import { Readable } from 'node:stream';
+import { isForbiddenAddress, normalizeImportUrl } from './safe-http';
 
 const MAX_BASE_URL_CHARS = 2_048;
 const MAX_API_KEY_CHARS = 4_096;
@@ -30,6 +34,10 @@ export type LocalOpenAIClientConfig = {
   model: string;
   timeoutMs?: number;
   maxResponseBytes?: number;
+  remote?: boolean;
+  inputMicrosPerToken?: number;
+  outputMicrosPerToken?: number;
+  maxRequestCostMicros?: number;
 };
 
 export const localModelConfigSchema = (maxResponseBytes: number) =>
@@ -46,6 +54,15 @@ export const localModelConfigSchema = (maxResponseBytes: number) =>
         .min(1)
         .max(MAX_MODEL_CHARS)
         .refine((value) => !/[\r\n]/.test(value)),
+      remote: z.boolean().default(false),
+      inputMicrosPerToken: z.number().min(0).max(1_000_000).optional(),
+      outputMicrosPerToken: z.number().min(0).max(1_000_000).optional(),
+      maxRequestCostMicros: z
+        .number()
+        .int()
+        .min(0)
+        .max(1_000_000_000)
+        .optional(),
       timeoutMs: z.number().int().min(10).max(120_000).default(30_000),
       maxResponseBytes: z
         .number()
@@ -86,12 +103,12 @@ export const localModelResponseSchema = (policy: {
                     ? z.null().optional()
                     : z.string().max(2_000).nullable().optional(),
                 })
-                .strict(),
+                .strip(),
               finish_reason: policy.requireStop
                 ? z.literal('stop')
                 : z.string().min(1).max(50).nullable().optional(),
             })
-            .strict(),
+            .strip(),
         )
         .length(1),
       usage: z
@@ -113,16 +130,20 @@ export const localModelResponseSchema = (policy: {
             .max(MAX_REPORTED_TOKENS)
             .optional(),
         })
-        .strict(),
+        .strip(),
     })
-    .strict();
+    .strip();
 
 export class LocalOpenAITransport {
   readonly model: string;
+  readonly provider: 'openai-compatible-local' | 'openai-compatible-remote';
   private readonly endpoint: URL;
   readonly #apiKey: string;
   private readonly timeoutMs: number;
   private readonly maxResponseBytes: number;
+  private readonly inputRate: number;
+  private readonly outputRate: number;
+  private readonly maxRequestCost: number;
 
   constructor(
     rawConfig: LocalOpenAIClientConfig,
@@ -131,11 +152,43 @@ export class LocalOpenAITransport {
     const parsed =
       localModelConfigSchema(maximumResponseBytes).safeParse(rawConfig);
     if (!parsed.success) throw new LocalModelClientError('INVALID_CONFIG');
-    this.endpoint = localChatCompletionsUrl(parsed.data.baseUrl);
+    const config = parsed.data;
+    this.endpoint = localChatCompletionsUrl(config.baseUrl, config.remote);
+    this.provider = config.remote
+      ? 'openai-compatible-remote'
+      : 'openai-compatible-local';
+    if (
+      config.remote &&
+      (config.inputMicrosPerToken === undefined ||
+        config.outputMicrosPerToken === undefined ||
+        config.maxRequestCostMicros === undefined ||
+        config.apiKey === 'local-only')
+    )
+      throw new LocalModelClientError('INVALID_CONFIG');
+    this.inputRate = config.inputMicrosPerToken ?? 0;
+    this.outputRate = config.outputMicrosPerToken ?? 0;
+    this.maxRequestCost = config.maxRequestCostMicros ?? 0;
     this.#apiKey = parsed.data.apiKey;
     this.model = parsed.data.model;
     this.timeoutMs = parsed.data.timeoutMs;
     this.maxResponseBytes = parsed.data.maxResponseBytes;
+  }
+
+  reserve(body: string, maxOutputTokens: number) {
+    if (
+      !Number.isSafeInteger(maxOutputTokens) ||
+      maxOutputTokens < 1 ||
+      maxOutputTokens > 1_000_000
+    )
+      throw new LocalModelClientError('INVALID_INPUT');
+    const tokens = utf8Bytes(body) + maxOutputTokens + 256;
+    // A byte is an intentionally conservative token ceiling, shared with the ledger.
+    const costMicros = Math.ceil(
+      tokens * Math.max(this.inputRate, this.outputRate),
+    );
+    if (!Number.isSafeInteger(costMicros) || costMicros > this.maxRequestCost)
+      throw new LocalModelClientError('INVALID_CONFIG');
+    return { tokens, costMicros };
   }
 
   async request(
@@ -147,7 +200,8 @@ export class LocalOpenAITransport {
     },
   ) {
     const { maxOutputTokens } = options;
-    const reservedTokens = utf8Bytes(body) + maxOutputTokens + 256;
+    const reservation = this.reserve(body, maxOutputTokens);
+    const reservedTokens = reservation.tokens;
     const started = performance.now();
     const timeout = new AbortController();
     const timeoutId = setTimeout(() => timeout.abort(), this.timeoutMs);
@@ -156,17 +210,21 @@ export class LocalOpenAITransport {
       : timeout.signal;
 
     try {
-      const response = await fetch(this.endpoint, {
-        method: 'POST',
-        redirect: 'error',
-        signal,
-        headers: {
-          authorization: `Bearer ${this.#apiKey}`,
-          'content-type': 'application/json',
-          accept: 'application/json',
-        },
-        body,
-      });
+      const headers = {
+        authorization: `Bearer ${this.#apiKey}`,
+        'content-type': 'application/json',
+        accept: 'application/json',
+      };
+      const response =
+        this.provider === 'openai-compatible-remote'
+          ? await remoteRequest(this.endpoint, headers, body, signal)
+          : await fetch(this.endpoint, {
+              method: 'POST',
+              redirect: 'error',
+              signal,
+              headers,
+              body,
+            });
       try {
         validateHeaders(response.headers, this.maxResponseBytes);
       } catch (error) {
@@ -201,10 +259,13 @@ export class LocalOpenAITransport {
         usage: {
           inputTokens: usage.prompt_tokens,
           outputTokens: usage.completion_tokens,
-          costMicros: 0 as const,
+          costMicros: Math.ceil(
+            usage.prompt_tokens * this.inputRate +
+              usage.completion_tokens * this.outputRate,
+          ),
           latencyMs: Math.max(0, Math.round(performance.now() - started)),
           reservedTokens,
-          reservedCostMicros: 0 as const,
+          reservedCostMicros: reservation.costMicros,
         },
       };
     } catch (error) {
@@ -218,7 +279,7 @@ export class LocalOpenAITransport {
   }
 }
 
-function localChatCompletionsUrl(rawBaseUrl: string): URL {
+function localChatCompletionsUrl(rawBaseUrl: string, remote = false): URL {
   let url: URL;
   try {
     url = new URL(rawBaseUrl);
@@ -231,11 +292,134 @@ function localChatCompletionsUrl(rawBaseUrl: string): URL {
     url.password ||
     url.search ||
     url.hash ||
-    !isLoopbackHost(url.hostname)
+    (!remote && !isLoopbackHost(url.hostname)) ||
+    (remote && url.protocol !== 'https:')
   )
     throw new LocalModelClientError('INVALID_CONFIG');
+  if (remote) {
+    try {
+      normalizeImportUrl(url.href);
+    } catch {
+      throw new LocalModelClientError('INVALID_CONFIG');
+    }
+  }
   url.pathname = `${url.pathname.replace(/\/+$/, '')}/chat/completions`;
   return url;
+}
+
+async function remoteRequest(
+  url: URL,
+  headers: Record<string, string>,
+  body: string,
+  signal: AbortSignal,
+) {
+  // Resolve once, reject the complete set, and pin TLS to that address. Never follow redirects with a key.
+  signal.throwIfAborted();
+  let abort: () => void = () => undefined;
+  const addresses = await Promise.race([
+    lookup(url.hostname, { all: true, verbatim: true }),
+    new Promise<never>((_, reject) => {
+      abort = () => reject(signal.reason);
+      signal.addEventListener('abort', abort, { once: true });
+    }),
+  ]).finally(() => signal.removeEventListener('abort', abort));
+  signal.throwIfAborted();
+  if (
+    !addresses.length ||
+    addresses.some(({ address }) => isForbiddenAddress(address))
+  )
+    throw new LocalModelClientError('INVALID_CONFIG');
+  const target = addresses.find(({ family }) => family === 4) ?? addresses[0];
+  return new Promise<Response>((resolve, reject) => {
+    const request = httpsRequest(
+      url,
+      {
+        method: 'POST',
+        headers: { ...headers, 'accept-encoding': 'identity' },
+        signal,
+        agent: false,
+        maxHeaderSize: MAX_RESPONSE_HEADER_BYTES,
+        lookup: (_hostname, options, callback) =>
+          callback(
+            null,
+            options.all ? [target] : target.address,
+            options.all ? undefined : target.family,
+          ),
+      },
+      (response) => {
+        if (
+          response.headers['content-encoding'] &&
+          response.headers['content-encoding'] !== 'identity'
+        ) {
+          response.destroy();
+          reject(new LocalModelClientError('INVALID_RESPONSE'));
+          return;
+        }
+        const responseHeaders = new Headers();
+        for (let i = 0; i < response.rawHeaders.length; i += 2)
+          responseHeaders.append(
+            response.rawHeaders[i],
+            response.rawHeaders[i + 1],
+          );
+        if (
+          (response.statusCode ?? 0) < 200 ||
+          (response.statusCode ?? 0) >= 300
+        ) {
+          response.destroy();
+          reject(new LocalModelClientError('PROVIDER_UNAVAILABLE'));
+          return;
+        }
+        try {
+          resolve(
+            new Response(
+              Readable.toWeb(response) as ReadableStream<Uint8Array>,
+              {
+                status: response.statusCode ?? 502,
+                headers: responseHeaders,
+              },
+            ),
+          );
+        } catch {
+          response.destroy();
+          reject(new LocalModelClientError('INVALID_RESPONSE'));
+        }
+      },
+    );
+    request.on('error', reject);
+    request.end(body);
+  });
+}
+
+/** Operator-only environment; never derive provider URLs or credentials from a user request. */
+export function serverModelConfig(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): LocalOpenAIClientConfig {
+  const remote = env.CAREER_OS_MODEL_MODE === 'remote';
+  if (
+    env.CAREER_OS_MODEL_MODE &&
+    !['local', 'remote'].includes(env.CAREER_OS_MODEL_MODE)
+  )
+    throw new LocalModelClientError('INVALID_CONFIG');
+  const value = (name: string) =>
+    env[name] === undefined || env[name] === '' ? undefined : Number(env[name]);
+  return {
+    baseUrl: env.CAREER_OS_LOCAL_MODEL_BASE_URL ?? '',
+    model: env.CAREER_OS_LOCAL_MODEL ?? '',
+    apiKey: env.CAREER_OS_LOCAL_MODEL_API_KEY ?? (remote ? '' : 'local-only'),
+    remote,
+    inputMicrosPerToken: value('CAREER_OS_MODEL_INPUT_MICROS_PER_TOKEN'),
+    outputMicrosPerToken: value('CAREER_OS_MODEL_OUTPUT_MICROS_PER_TOKEN'),
+    maxRequestCostMicros: value('CAREER_OS_MODEL_MAX_REQUEST_COST_MICROS'),
+  };
+}
+
+export function modelRunCostBudget(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const value = Number(env.CAREER_OS_MODEL_RUN_COST_BUDGET_MICROS ?? 0);
+  if (!Number.isSafeInteger(value) || value < 0 || value > 1_000_000_000)
+    throw new LocalModelClientError('INVALID_CONFIG');
+  return value;
 }
 
 function isLoopbackHost(hostname: string): boolean {

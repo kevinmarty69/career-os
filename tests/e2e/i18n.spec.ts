@@ -8,11 +8,11 @@ import {
 } from './persisted-workspace';
 
 const englishScreens = [
-  ['/', 'Start the evidence workflow for Signal Forge.'],
+  ['/', 'Hello Alex'],
   ['/memory', 'Career memory'],
   ['/memory/audit', 'Align your evidence before editing your profile.'],
   ['/applications', 'Applications'],
-  [`/applications/${applicationId}/review`, 'Staff Platform Engineer'],
+  [`/applications/${applicationId}/review`, 'No reviews yet.'],
   ['/memory/import', 'Add your background'],
   [`/applications/${applicationId}/page`, 'Staff Platform Engineer'],
   ['/links', 'Private links'],
@@ -35,7 +35,8 @@ const englishScreens = [
   ['/inbox', 'Needs review'],
   ['/settings/billing', 'Subscription'],
   ['/settings/integrations', 'Integrations'],
-  ['/settings/data', 'Export & deletion'],
+  ['/settings/data', 'Your data belongs to you'],
+  ['/settings/profile', 'Profile settings'],
 ] as const;
 
 test('renders every active route in English without a locale cookie', async ({
@@ -56,15 +57,10 @@ test('renders every active route in English without a locale cookie', async ({
   }
 
   await page.goto('/memory');
-  for (const label of [
-    'Experiences',
-    'Projects',
-    'Skills',
-    'Results',
-    'Preferences',
-    'Coverage',
-  ])
-    await expect(page.getByText(label, { exact: true })).toBeVisible();
+  for (const label of ['Graph', 'Claims', 'Documents', 'Skills', 'Privacy'])
+    await expect(
+      page.getByRole('tab', { name: label, exact: true }),
+    ).toBeVisible();
   if (process.env.CAREER_OS_I18N_SCREENSHOT)
     await page.screenshot({
       path: process.env.CAREER_OS_I18N_SCREENSHOT,
@@ -83,16 +79,20 @@ test('switches from English to French and persists after reload', async ({
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(
     page.getByRole('heading', {
-      name: 'Start the evidence workflow for Signal Forge.',
+      name: 'Hello Alex',
     }),
   ).toBeVisible();
 
-  const switcher = page.getByRole('group', { name: 'Language' });
-  await switcher.getByRole('button', { name: 'FR' }).click();
+  await page.locator('summary[aria-label^="My account"]:visible').click();
+  await page
+    .getByRole('link', { name: 'Profile settings', exact: true })
+    .click();
+  await expect(page).toHaveURL('/settings/profile');
+  await page.getByLabel('Interface language').selectOption('fr');
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
   await expect(
     page.getByRole('heading', {
-      name: 'Lancez le workflow de preuves pour Signal Forge.',
+      name: 'Paramètres du profil',
     }),
   ).toBeVisible();
 
@@ -100,11 +100,13 @@ test('switches from English to French and persists after reload', async ({
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
   await expect(
     page.getByRole('heading', {
-      name: 'Lancez le workflow de preuves pour Signal Forge.',
+      name: 'Paramètres du profil',
     }),
   ).toBeVisible();
+  await expect(page.getByLabel('Langue de l’interface')).toHaveValue('fr');
+  await page.goto('/');
   await expect(
-    page.getByRole('button', { name: 'FR', pressed: true }),
+    page.getByRole('heading', { level: 1, name: 'Bonjour Alex', exact: true }),
   ).toBeVisible();
 
   await page.goto('/applications');
@@ -138,15 +140,14 @@ test('separates persisted opportunities from started applications', async ({
   ).toBeVisible();
   await expect(page.getByText('Northstar Labs', { exact: true })).toBeVisible();
   const applications = page.getByRole('region', {
-    name: 'Started applications',
+    name: 'Applications by stage',
   });
-  await expect(
-    applications.getByRole('heading', { name: 'Applications' }),
-  ).toBeVisible();
   await expect(
     applications.getByText('Signal Forge', { exact: true }),
   ).toBeVisible();
-  await expect(applications.getByText('Draft', { exact: true })).toBeVisible();
+  await expect(
+    applications.locator('header').filter({ hasText: 'To prepare' }),
+  ).toBeVisible();
 });
 
 test('searches the persisted workspace and filters the application pipeline', async ({
@@ -175,19 +176,54 @@ test('searches the persisted workspace and filters the application pipeline', as
 
   await page.goto('/applications');
   const pipeline = page.getByRole('search');
+  const content = page.locator('#main-content');
   await pipeline
     .getByPlaceholder('Search a company, role, or location…')
     .fill('Signal Forge');
-  await expect(page.getByText('Signal Forge', { exact: true })).toBeVisible();
-  await expect(page.getByText('Northstar Labs', { exact: true })).toHaveCount(
+  await expect(
+    content.getByText('Signal Forge', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    content.getByText('Northstar Labs', { exact: true }),
+  ).toHaveCount(0);
+  await pipeline
+    .getByRole('combobox', { name: 'Application stage', exact: true })
+    .selectOption('interview');
+  await expect(content.getByText('Signal Forge', { exact: true })).toHaveCount(
     0,
   );
-  await pipeline.getByLabel('Type').selectOption('opportunities');
-  await expect(page.getByText('Signal Forge', { exact: true })).toHaveCount(0);
+  await expect(
+    content
+      .getByRole('status')
+      .filter({ hasText: 'No application matches these filters.' }),
+  ).toBeVisible();
+  await pipeline
+    .getByRole('combobox', { name: 'Application stage', exact: true })
+    .selectOption('draft');
+  await expect(
+    content.getByText('Signal Forge', { exact: true }),
+  ).toBeVisible();
+  await pipeline
+    .getByRole('combobox', { name: 'Type', exact: true })
+    .selectOption('opportunities');
+  await expect(
+    pipeline.getByRole('combobox', { name: 'Application stage', exact: true }),
+  ).toBeDisabled();
+  await expect(content.getByText('Signal Forge', { exact: true })).toHaveCount(
+    0,
+  );
   await pipeline
     .getByPlaceholder('Search a company, role, or location…')
     .fill('Northstar');
-  await expect(page.getByText('Northstar Labs', { exact: true })).toBeVisible();
+  await expect(
+    content.getByText('Northstar Labs', { exact: true }),
+  ).toBeVisible();
+  await pipeline
+    .getByRole('combobox', { name: 'Ranking profile', exact: true })
+    .selectOption('');
+  await expect(
+    content.getByText('Northstar Labs', { exact: true }),
+  ).toBeVisible();
 });
 
 test('shows persisted publication versions and human decisions', async ({
@@ -275,7 +311,11 @@ test('audits positioning from persisted sources, goals and application claims', 
   await mockPositioningAuditWorkspace(page);
   await page.goto('/memory/audit');
 
-  await expect(page.getByText('Staff Platform Engineer')).toBeVisible();
+  await expect(
+    page.locator('.co-audit-targets > div > span', {
+      hasText: 'Staff Platform Engineer',
+    }),
+  ).toBeVisible();
   await expect(
     page.locator('.co-audit-targets > div > span', {
       hasText: 'Kubernetes',
@@ -292,10 +332,9 @@ test('audits positioning from persisted sources, goals and application claims', 
       path: process.env.CAREER_OS_POSITIONING_SCREENSHOT,
       fullPage: true,
     });
-  await page
-    .getByRole('group', { name: 'Language' })
-    .getByRole('button', { name: 'FR' })
-    .click();
+  await page.goto('/settings/profile');
+  await page.getByLabel('Interface language').selectOption('fr');
+  await page.goto('/memory/audit');
   await expect(
     page.getByRole('heading', {
       name: 'Alignez vos preuves avant de modifier votre profil.',
@@ -425,8 +464,10 @@ test('locale changes translate labels without translating saved application data
     }),
   );
   await page.goto(`/applications/${applicationId}`);
-  for (const language of ['FR', 'EN']) {
-    await page.getByRole('button', { name: language, exact: true }).click();
+  for (const language of ['fr', 'en']) {
+    await page.goto('/settings/profile');
+    await page.locator('#interface-language').selectOption(language);
+    await page.goto(`/applications/${applicationId}`);
     await expect(
       page.getByRole('heading', {
         level: 1,
@@ -435,7 +476,7 @@ test('locale changes translate labels without translating saved application data
       }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Accueil', exact: true }),
+      page.locator('#main-content').getByText('Accueil', { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText('Conserver cette formulation utilisateur.', {

@@ -2,7 +2,7 @@
 
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { CommandPalette } from '@/components/search/command-palette';
-import { Icon } from '@/components/ui/primitives';
+import { Button, Icon } from '@/components/ui/primitives';
 import { ProfileMenu } from './profile-menu';
 import profileMenuStyles from './profile-menu.module.css';
 import {
@@ -114,6 +114,10 @@ export function AppShell({
             </Link>
           ))}
         </nav>
+        <Button quiet onClick={() => setPalette(true)}>
+          <Icon>search</Icon>
+          {t('shell.global.search')}
+        </Button>
         {sidebarContext ?? (
           <CurrentApplications
             applications={sidebar?.applications ?? []}
@@ -129,6 +133,10 @@ export function AppShell({
       </aside>
       <section className="co-surface">
         <div className={profileMenuStyles.mobile}>
+          <Button quiet onClick={() => setPalette(true)}>
+            <Icon>search</Icon>
+            {t('shell.global.search')}
+          </Button>
           <ProfileMenu placement="below" />
         </div>
         <div className="co-content" id="main-content" tabIndex={-1}>

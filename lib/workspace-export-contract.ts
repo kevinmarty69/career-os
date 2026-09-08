@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 12;
+export const workspaceExportVersion = 13;
 
 export const workspaceExportTables = [
   {
@@ -137,6 +137,26 @@ export const workspaceExportTables = [
       'actor_id',
       'created_at',
       'updated_at',
+    ],
+    orderBy: ['id'],
+  },
+  {
+    type: 'contact_research_runs',
+    table: 'contact_research_runs',
+    columns: [
+      'id',
+      'tenant_id',
+      'application_id',
+      'input_hash',
+      'status',
+      'attempt_count',
+      'dispatched_at',
+      'sources',
+      'drafts',
+      'usage',
+      'created_at',
+      'updated_at',
+      'completed_at',
     ],
     orderBy: ['id'],
   },
@@ -549,6 +569,7 @@ export const workspaceExportTables = [
       'created_at',
       'workflow_step_id',
       'usage_basis',
+      'cost_basis',
       'provider_request_id',
     ],
     orderBy: ['id'],

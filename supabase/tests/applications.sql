@@ -2,13 +2,13 @@
 
 begin;
 
-insert into auth."user" (id, name, email, "emailVerified") values
+insert into career_identity."user" (id, name, email, "emailVerified") values
   ('19000000-0000-0000-0000-000000000001', 'Application Owner', 'application-owner@example.test', true),
   ('19000000-0000-0000-0000-000000000002', 'Other Owner', 'application-other@example.test', true);
-insert into auth.organization (id, name, slug, "createdAt") values
+insert into career_identity.organization (id, name, slug, "createdAt") values
   ('29000000-0000-0000-0000-000000000001', 'Application Tenant', 'application-tenant', now()),
   ('29000000-0000-0000-0000-000000000002', 'Other Tenant', 'application-other', now());
-insert into auth."member" (id, "organizationId", "userId", role, "createdAt") values
+insert into career_identity."member" (id, "organizationId", "userId", role, "createdAt") values
   ('39000000-0000-0000-0000-000000000001', '29000000-0000-0000-0000-000000000001', '19000000-0000-0000-0000-000000000001', 'owner', now()),
   ('39000000-0000-0000-0000-000000000002', '29000000-0000-0000-0000-000000000002', '19000000-0000-0000-0000-000000000002', 'owner', now());
 insert into app.tenants (id, owner_id, name) values

@@ -1,3 +1,9 @@
+import {
+  bootstrapTestAuth,
+  fixtureIdentitySql,
+} from '../../tests/integration/database-fixtures.ts';
+import { migrationSql } from '../../lib/migration-sql.ts';
+import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
@@ -13,7 +19,7 @@ const migrationsAfterBaseline = migrationNames.filter(
   (name) => name.slice(0, 4) > '0022',
 ).length;
 
-const testDatabase = 'career_os_migration_test';
+const testDatabase = `career_os_migration_${randomUUID().replaceAll('-', '').slice(0, 12)}`;
 const admin = new Client({ connectionString: databaseUrl });
 const testUrl = new URL(databaseUrl);
 testUrl.pathname = `/${testDatabase}`;
@@ -27,6 +33,7 @@ try {
   await admin.query(`create database ${testDatabase}`);
   target = new Client({ connectionString: testUrl.toString() });
   await target.connect();
+  await bootstrapTestAuth(target);
 
   for (let index = 1; index <= 8; index += 1) {
     const prefix = String(index).padStart(4, '0');
@@ -34,7 +41,9 @@ try {
       name.startsWith(`${prefix}_`),
     );
     assert.ok(file, `migration ${prefix} is missing`);
-    await target.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
+    await target.query(
+      migrationSql(file, await readFile(`supabase/migrations/${file}`, 'utf8')),
+    );
   }
 
   const tenantId = '00000000-0000-4000-8000-000000000001';
@@ -63,7 +72,9 @@ try {
       name.startsWith(`${prefix}_`),
     );
     assert.ok(file, `migration ${prefix} is missing`);
-    await target.query(await readFile(`supabase/migrations/${file}`, 'utf8'));
+    await target.query(
+      migrationSql(file, await readFile(`supabase/migrations/${file}`, 'utf8')),
+    );
   }
 
   const { rows } = await target.query(
@@ -92,7 +103,11 @@ try {
 
   const refused = spawnSync('pnpm', ['exec', 'tsx', 'scripts/migrate.ts'], {
     cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: testUrl.toString() },
+    env: {
+      ...process.env,
+      DATABASE_URL: testUrl.toString(),
+      MIGRATION_DATABASE_URL: testUrl.toString(),
+    },
     encoding: 'utf8',
   });
   assert.equal(refused.status, 1);
@@ -102,7 +117,11 @@ try {
     ['exec', 'tsx', 'scripts/migrate.ts', '--baseline', '0024'],
     {
       cwd: process.cwd(),
-      env: { ...process.env, DATABASE_URL: testUrl.toString() },
+      env: {
+        ...process.env,
+        DATABASE_URL: testUrl.toString(),
+        MIGRATION_DATABASE_URL: testUrl.toString(),
+      },
       encoding: 'utf8',
     },
   );
@@ -119,7 +138,11 @@ try {
     ['exec', 'tsx', 'scripts/migrate.ts', '--baseline', '0022'],
     {
       cwd: process.cwd(),
-      env: { ...process.env, DATABASE_URL: testUrl.toString() },
+      env: {
+        ...process.env,
+        DATABASE_URL: testUrl.toString(),
+        MIGRATION_DATABASE_URL: testUrl.toString(),
+      },
       encoding: 'utf8',
     },
   );
@@ -133,7 +156,11 @@ try {
     ['exec', 'tsx', 'scripts/migrate.ts', '--baseline', '0022'],
     {
       cwd: process.cwd(),
-      env: { ...process.env, DATABASE_URL: testUrl.toString() },
+      env: {
+        ...process.env,
+        DATABASE_URL: testUrl.toString(),
+        MIGRATION_DATABASE_URL: testUrl.toString(),
+      },
       encoding: 'utf8',
     },
   );
@@ -146,7 +173,11 @@ try {
   );
   const rerun = spawnSync('pnpm', ['exec', 'tsx', 'scripts/migrate.ts'], {
     cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: testUrl.toString() },
+    env: {
+      ...process.env,
+      DATABASE_URL: testUrl.toString(),
+      MIGRATION_DATABASE_URL: testUrl.toString(),
+    },
     encoding: 'utf8',
   });
   assert.equal(rerun.status, 0, rerun.stderr || rerun.stdout);
@@ -174,6 +205,11 @@ try {
     discovery_tables: 7,
   });
 
+  await target.query(fixtureIdentitySql);
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    tenantId,
+    '00000000-0000-4000-8000-000000000002',
+  ]);
   await target.query(
     `select set_config('request.jwt.claim.sub', $1, false),
       set_config('request.jwt.claim.tenant_id', $2, false)`,
@@ -209,6 +245,10 @@ try {
   await target.query('reset role');
 
   const secondTenantId = '00000000-0000-4000-8000-000000000003';
+  await target.query('select pg_temp.seed_identity($1,$2)', [
+    secondTenantId,
+    '00000000-0000-4000-8000-000000000002',
+  ]);
   await target.query(
     `insert into app.tenants (id, owner_id, name) values ($1, $2, 'Second workspace')`,
     [secondTenantId, '00000000-0000-4000-8000-000000000002'],
@@ -230,6 +270,7 @@ try {
     const suffix = String(index).padStart(12, '0');
     const owner = `10000000-0000-4000-8000-${suffix}`;
     const tenant = `20000000-0000-4000-8000-${suffix}`;
+    await target.query('select pg_temp.seed_identity($1,$2)', [tenant, owner]);
     await target.query(
       `insert into app.tenants (id, owner_id, name) values ($1, $2, $3)`,
       [tenant, owner, `Global ${index}`],
