@@ -323,8 +323,12 @@ test('tenant context is local on pooled connections, including rollback and leas
     Array.from({ length: 12 }, () =>
       sql.begin(async (tx) => {
         const [clean] =
-          await tx`select current_user role, current_setting('request.jwt.claim.tenant_id', true) tenant`;
-        assert.equal(clean.role, 'career_os');
+          await tx`select current_user role, session_user login, current_setting('request.jwt.claim.tenant_id', true) tenant`;
+        assert.equal(
+          clean.role,
+          clean.login,
+          'Transaction-local role returns to the connection login',
+        );
         assert.ok(!clean.tenant);
         await authorize(tx, wrongSession);
         const [{ count, pid }] =
