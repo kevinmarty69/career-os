@@ -54,7 +54,7 @@ test('renders route headings with mocked persisted data', async ({ page }) => {
 test('keeps sidebar labels and counters on one line in both languages', async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await mockPersistedWorkspace(page);
   await page.route('**/api/profile', (route) =>
@@ -88,9 +88,20 @@ test('keeps sidebar labels and counters on one line in both languages', async ({
     ).toBe(true);
     const labelBounds = await label.boundingBox();
     const countBounds = await link.locator('b').boundingBox();
+    const linkBounds = await link.boundingBox();
+    const navBounds = await page.locator('.co-sidebar nav').boundingBox();
+    expect(linkBounds!.x + linkBounds!.width).toBeLessThanOrEqual(
+      navBounds!.x + navBounds!.width,
+    );
+    expect(countBounds!.x + countBounds!.width).toBeLessThanOrEqual(
+      linkBounds!.x + linkBounds!.width - 12,
+    );
     expect(labelBounds!.x + labelBounds!.width).toBeLessThanOrEqual(
       countBounds!.x,
     );
+    await page.locator('.co-sidebar nav').screenshot({
+      path: testInfo.outputPath(`sidebar-${locale}.png`),
+    });
   }
 });
 
