@@ -8,12 +8,99 @@ import {
   detectProfileFileType,
   extractProfileSuggestions,
   guardDocxArchive,
+  readLinkedInPositions,
   MAX_PROFILE_CANDIDATES,
   ProfileImportError,
 } from '../../lib/profile-import-core';
 import { importProfileText } from '../../lib/profile-import';
+import { importLinkedInPositions } from '../../lib/linkedin-import';
 
 const encoder = new TextEncoder();
+
+test('LinkedIn archive reads only Positions.csv, preserves quoted fields and ignores sensitive files', async () => {
+  const csv =
+    '\ufeffCompany Name,Title,Description,Started On,Finished On,Location\r\n"Signal, Forge",Engineer,"Built tooling\nwith ""review"".",Jan 2020,Feb 2024,Paris';
+  const contents = await readLinkedInPositions(
+    zip([
+      { name: 'export/Positions.csv', content: csv, compressed: true },
+      { name: 'messages.csv', content: 'SECRET MESSAGE' },
+      { name: 'Connections.csv', content: 'PRIVATE CONTACT' },
+    ]),
+  );
+  const result = importLinkedInPositions(contents, {
+    displayName: 'linkedin.zip',
+    type: 'zip',
+    sha256: 'a'.repeat(64),
+    trust: 'untrusted-data',
+  });
+  assert.equal(result.candidates.length, 1);
+  assert.deepEqual(result.candidates[0], {
+    statement:
+      'Engineer — Signal, Forge\nJan 2020 — Feb 2024\nBuilt tooling\nwith "review".',
+    excerpt:
+      'Engineer — Signal, Forge\nJan 2020 — Feb 2024\nBuilt tooling\nwith "review".',
+    locator: 'Positions.csv, record 2',
+    group: 'experience',
+    provenance: 'declared',
+    trust: 'untrusted-data',
+  });
+  assert.equal(result.suggestedName, null);
+  assert.equal(result.suggestedHeadline, null);
+  assert.doesNotMatch(JSON.stringify(result), /SECRET|PRIVATE|Paris/);
+});
+
+test('LinkedIn archive rejects unsafe, missing, duplicate and oversized contents', async () => {
+  for (const inputs of [
+    [{ name: '../Positions.csv', content: 'x' }],
+    [{ name: 'messages.csv', content: 'x' }],
+    [
+      { name: 'Positions.csv', content: 'x' },
+      { name: 'copy/Positions.csv', content: 'x' },
+    ],
+    [{ name: 'Positions.csv', content: 'x', unixSymlink: true }],
+    [
+      {
+        name: 'Positions.csv',
+        content: 'x'.repeat(4096),
+        compressed: true,
+        declaredUncompressedSize: 128,
+      },
+    ],
+  ])
+    await assert.rejects(readLinkedInPositions(zip(inputs)), (error) =>
+      hasCode(error, 'invalid_linkedin'),
+    );
+});
+
+test('LinkedIn CSV rejects ambiguous and excessive input without silently changing a position', () => {
+  const header = 'Company Name,Title,Description,Started On,Finished On\n';
+  const source = {
+    displayName: 'Positions.csv',
+    type: 'csv' as const,
+    sha256: 'a'.repeat(64),
+    trust: 'untrusted-data' as const,
+  };
+  for (const csv of [
+    'Name,Email\nSomeone,private@example.com',
+    header + 'Forge,Engineer,"unclosed,2020,2024',
+    header + 'Forge,Engineer,"closed"bad,2020,2024',
+    header + 'Forge,Engineer,one field too few,2020',
+    header + 'Forge,,No title,2020,2024',
+    header + `Forge,Engineer,${'x'.repeat(1001)},2020,2024`,
+    header +
+      Array(41).fill('Forge,Engineer,Worked on tooling,2020,2024').join('\n'),
+    header + 'Forge,Engineer,\0binary,2020,2024',
+  ])
+    assert.throws(
+      () => importLinkedInPositions(csv, source),
+      (error) => hasCode(error, 'invalid_linkedin'),
+    );
+  const result = importLinkedInPositions(
+    header + 'Forge,Engineer,=1+1,2020,',
+    source,
+  );
+  assert.equal(result.candidates[0].statement.includes('Present'), false);
+});
 
 test('file detection requires matching extension, MIME and signature', () => {
   const pdf = encoder.encode('%PDF-1.7\n');

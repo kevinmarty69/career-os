@@ -37,8 +37,12 @@ export const memoryMessages = {
     en: 'This file exceeds the 4 MB limit.',
   },
   'memory.choose.a.valid.pdf.docx.or.txt.file': {
-    fr: 'Choisissez un fichier PDF, DOCX ou TXT valide.',
-    en: 'Choose a valid PDF, DOCX, or TXT file.',
+    fr: 'Choisissez un PDF, DOCX, TXT ou un export LinkedIn ZIP / Positions.csv valide.',
+    en: 'Choose a valid PDF, DOCX, TXT or LinkedIn ZIP / Positions.csv export.',
+  },
+  'memory.invalid.linkedin.archive': {
+    fr: 'Importez Positions.csv ou un ZIP contenant ce fichier. Colonnes attendues : Company Name, Title, Description, Started On, Finished On. Maximum 40 postes, 1 000 caractères par poste. Pour une archive trop volumineuse, extrayez Positions.csv sur votre ordinateur.',
+    en: 'Import Positions.csv or a ZIP containing it. Required columns: Company Name, Title, Description, Started On, Finished On. Maximum 40 positions, 1,000 characters per position. For a large archive, extract Positions.csv on your computer.',
   },
   'memory.this.pdf.is.password.protected.export.an.unprotected.copy': {
     fr: 'Ce PDF est protégé. Exportez une copie sans mot de passe puis réessayez.',
@@ -465,8 +469,8 @@ export const memoryMessages = {
     en: 'Drop your resume here',
   },
   'memory.pdf.docx.or.txt.4.mb.maximum': {
-    fr: 'PDF, DOCX ou TXT · 4 Mo maximum',
-    en: 'PDF, DOCX, or TXT · 4 MB maximum',
+    fr: 'PDF, DOCX, TXT ou export LinkedIn ZIP / CSV · 4 Mo maximum',
+    en: 'PDF, DOCX, TXT or LinkedIn ZIP / CSV export · 4 MB maximum',
   },
   'memory.choose.a.file': {
     fr: 'Choisir un fichier',

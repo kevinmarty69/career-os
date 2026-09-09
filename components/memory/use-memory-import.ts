@@ -192,9 +192,10 @@ export function useMemoryImport() {
     setStage('reading');
     setError('');
     try {
+      const imported = await importProfileFile(file, controller.signal);
       prepareReview(
-        await importProfileFile(file, controller.signal),
-        'document',
+        imported,
+        ['zip', 'csv'].includes(imported.source.type) ? 'linkedin' : 'document',
       );
     } catch (caught) {
       if (controller.signal.aborted) return;
@@ -477,6 +478,8 @@ function importErrorMessage(error: unknown): ImportMessageKey {
       return 'memory.this.file.exceeds.the.4.mb.limit';
     if (error.code === 'unsupported_type' || error.code === 'type_mismatch')
       return 'memory.choose.a.valid.pdf.docx.or.txt.file';
+    if (error.code === 'invalid_linkedin')
+      return 'memory.invalid.linkedin.archive';
     if (error.code === 'pdf_encrypted')
       return 'memory.this.pdf.is.password.protected.export.an.unprotected.copy';
     if (error.code === 'pdf_attachments')

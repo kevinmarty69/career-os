@@ -216,8 +216,8 @@ export function IntegrationsScreen() {
             'badge',
             'LinkedIn',
             fr
-              ? 'Import manuel uniquement. Collez votre parcours ou importez un document PDF ; aucune synchronisation de compte n’est active.'
-              : 'Manual import only. Paste your experience or import a PDF; no account synchronization is active.',
+              ? 'Import local de votre archive ZIP ou de Positions.csv : postes, dates et descriptions uniquement. Ni messages ni contacts. Revue humaine avant enregistrement ; aucune synchronisation de compte.'
+              : 'Import your ZIP archive or Positions.csv locally: positions, dates and descriptions only. No messages or contacts. Human review before saving; no account synchronization.',
           ],
           [
             'cloud_upload',
@@ -249,8 +249,8 @@ export function IntegrationsScreen() {
                   : 'Public only · human review required'
                 : title === 'LinkedIn'
                   ? fr
-                    ? 'Manuel · PDF, DOCX ou texte'
-                    : 'Manual · PDF, DOCX or text'
+                    ? 'Local · ZIP, Positions.csv, PDF ou texte'
+                    : 'Local · ZIP, Positions.csv, PDF or text'
                   : fr
                     ? 'Non configuré · aucun accès accordé'
                     : 'Not configured · no access granted'}

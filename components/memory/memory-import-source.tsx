@@ -69,7 +69,7 @@ export function SourceStep({ controller }: { controller: Controller }) {
               <Icon>arrow_forward</Icon>
             </button>
             <input
-              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              accept=".pdf,.docx,.txt,.zip,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,application/zip,text/csv"
               className={styles.fileInput}
               onChange={(event) => chooseFile(event.currentTarget.files)}
               ref={inputRef}
@@ -119,6 +119,19 @@ export function SourceStep({ controller }: { controller: Controller }) {
           </div>
         </section>
         <aside className={styles.privacyPanel}>
+          <div className={styles.pasteFields}>
+            <h2>LinkedIn</h2>
+            <p>
+              {fr
+                ? 'Dans les paramètres LinkedIn, demandez une copie de vos données. Déposez l’archive ZIP ici, ou son fichier Positions.csv. Seuls les postes, dates et descriptions sont lus ; ni messages, ni contacts, ni autres fichiers.'
+                : 'Request a copy of your data in LinkedIn settings. Drop the ZIP archive here, or its Positions.csv file. Only positions, dates and descriptions are read; not messages, contacts or other files.'}
+            </p>
+            <p>
+              {fr
+                ? '4 Mo maximum. Pour une archive plus lourde, extrayez Positions.csv sur votre ordinateur avant de l’importer.'
+                : '4 MB maximum. For a larger archive, extract Positions.csv on your computer before importing it.'}
+            </p>
+          </div>
           <div className={`${styles.pasteFields} ${styles.githubFields}`}>
             <h2>GitHub</h2>
             <p>

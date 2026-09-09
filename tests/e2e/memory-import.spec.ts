@@ -10,6 +10,90 @@ Reduced a deployment workflow from eleven minutes to seven minutes.
 Projects
 Created a private portfolio for evidence-backed applications.`;
 
+// Synthetic ZIP: deflated Positions.csv plus a messages.csv that must stay unread.
+const linkedinArchive = Buffer.from(
+  'UEsDBBQAAAAIAAAAAAAAAAAAcQAAAIEAAAANAAAAUG9zaXRpb25zLmNzdh3LPQrDMAxA4b2n0AFECaEn6E/GdkgvIBJhC2zZyHJCbl/S5fEt71FyJT3gTZnxK54Yn9wWk+pSFGcnc17hoziJSot/X2YJSgmmYoHxpUGU2fDeJTlUK2tfzhva0Zxzg108QuyZFIw34f2K4zAOZ24/UEsDBBQAAAAAAAAAAAAAAAAAJgAAACYAAAAMAAAAbWVzc2FnZXMuY3N2UFJJVkFURSBDT05URU5UIE1VU1QgTkVWRVIgQkUgSU1QT1JURURQSwECFAAUAAAACAAAAAAAAAAAAHEAAACBAAAADQAAAAAAAAAAAAAAAAAAAAAAUG9zaXRpb25zLmNzdlBLAQIUABQAAAAAAAAAAAAAAAAAJgAAACYAAAAMAAAAAAAAAAAAAAAAAJwAAABtZXNzYWdlcy5jc3ZQSwUGAAAAAAIAAgB1AAAA7AAAAAAA',
+  'base64',
+);
+
+test('imports only LinkedIn positions locally and persists the human-approved source', async ({
+  page,
+}) => {
+  const savedBodies: unknown[] = [];
+  const posted: string[] = [];
+  page.on('request', (request) => {
+    if (request.postData()) posted.push(request.postData()!);
+  });
+  await mockProfilePort(page, savedBodies);
+  await page.goto('/memory/import');
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'linkedin.zip',
+    mimeType: 'application/zip',
+    buffer: linkedinArchive,
+  });
+  await expect(
+    page.getByRole('heading', { name: 'Relisez ce qui a été extrait' }),
+  ).toBeVisible();
+  expect(savedBodies).toHaveLength(0);
+  await expect(
+    page.getByRole('textbox', { name: 'Formulation', exact: true }),
+  ).toHaveValue(
+    'Engineer — Signal Forge\n2020 — 2024\nBuilt production systems with human review.',
+  );
+  await expect(
+    page.getByRole('button', {
+      name: /Déclaré par vous Positions.csv, record 2/,
+    }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Statut')).toHaveValue('declared');
+  await page.getByLabel('Nom complet').fill('Alex Morgan');
+  await page.getByLabel('Positionnement').fill('Product engineer');
+  await expectNoHorizontalOverflow(page);
+  await page
+    .getByLabel('J’ai relu cette sélection et j’autorise les usages indiqués.')
+    .check();
+  await page.getByRole('button', { name: 'Valider et enregistrer' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Votre sélection est enregistrée.' }),
+  ).toBeVisible();
+  expect(savedBodies).toHaveLength(1);
+  expect(savedBodies[0]).toMatchObject({
+    profile: {
+      sources: [{ kind: 'linkedin', title: 'linkedin.zip' }],
+      claims: [{ kind: 'experience', level: 'declared' }],
+    },
+  });
+  expect(posted.join('\n')).not.toContain('PRIVATE CONTENT');
+  expect(posted.join('\n')).not.toContain(linkedinArchive.toString('base64'));
+});
+
+test('rejects an unrelated CSV and lets the user retry with Positions.csv', async ({
+  page,
+}) => {
+  const savedBodies: unknown[] = [];
+  await mockProfilePort(page, savedBodies);
+  await page.goto('/memory/import');
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'Contacts.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('Name,Email\nAlex,private@example.com'),
+  });
+  await expect(
+    page.getByText(/Importez Positions.csv ou un ZIP contenant ce fichier/),
+  ).toBeVisible();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'Positions.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'Company Name,Title,Description,Started On,Finished On\nSignal Forge,Engineer,Implemented review workflows.,2020,2024',
+    ),
+  });
+  await expect(
+    page.getByRole('heading', { name: 'Relisez ce qui a été extrait' }),
+  ).toBeVisible();
+  expect(savedBodies).toHaveLength(0);
+});
+
 test('keeps the desktop sidebar viewport-sized while the import content scrolls', async ({
   page,
 }) => {

@@ -44,7 +44,7 @@ Each durable worker has its own non-owner database login and a narrow function s
 
 ## What is implemented
 
-- local PDF, DOCX, TXT, and pasted-text import in a Web Worker;
+- local PDF, DOCX, TXT, pasted-text and LinkedIn ZIP / Positions.csv import in a Web Worker (positions only, followed by human review);
 - explicit review of provenance, sensitivity, and allowed uses;
 - versioned Career Memory and application dossiers;
 - SSRF-resistant job URL previews that remain untrusted until confirmed;

@@ -35,7 +35,7 @@ export const profileImportCandidateSchema = z
 export const profileImportSourceSchema = z
   .object({
     displayName: z.string().min(1).max(255),
-    type: z.enum(['txt', 'pdf', 'docx']),
+    type: z.enum(['txt', 'pdf', 'docx', 'csv', 'zip']),
     sha256: z.string().regex(/^[0-9a-f]{64}$/),
     trust: z.literal('untrusted-data'),
   })
@@ -57,7 +57,7 @@ export const profileImportResultSchema = z
   })
   .strict();
 
-export type ProfileImportFileType = 'txt' | 'pdf' | 'docx';
+export type ProfileImportFileType = ProfileImportSource['type'];
 export type ProfileImportSuggestion = z.infer<typeof declaredSuggestionSchema>;
 export type ProfileImportSource = z.infer<typeof profileImportSourceSchema>;
 export type ProfileImportCandidate = z.infer<
@@ -75,6 +75,7 @@ export type ProfileImportErrorCode =
   | 'invalid_docx'
   | 'invalid_pdf'
   | 'invalid_utf8'
+  | 'invalid_linkedin'
   | 'pdf_attachments'
   | 'pdf_encrypted'
   | 'pdf_too_many_pages'
@@ -152,9 +153,34 @@ export function detectProfileFileType(
     if (isPdf || isZip) typeMismatch();
     return 'txt';
   }
+  if (extension === 'zip') {
+    assertMime(
+      mimeType,
+      new Set([
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/octet-stream',
+      ]),
+    );
+    if (!isZip) typeMismatch();
+    return 'zip';
+  }
+  if (extension === 'csv') {
+    assertMime(
+      mimeType,
+      new Set([
+        'text/csv',
+        'text/plain',
+        'application/vnd.ms-excel',
+        'application/octet-stream',
+      ]),
+    );
+    if (isPdf || isZip) typeMismatch();
+    return 'csv';
+  }
   throw new ProfileImportError(
     'unsupported_type',
-    'Only TXT, PDF and DOCX profile files are supported.',
+    'Use TXT, PDF, DOCX or a LinkedIn Positions.csv / ZIP export.',
   );
 }
 
@@ -284,6 +310,26 @@ type ZipEntry = {
   uncompressedSize: number;
   dataOffset: number;
 };
+
+/** Inspect directory metadata only; never decompress unrelated archive contents. */
+export async function readLinkedInPositions(
+  bytes: Uint8Array,
+): Promise<string> {
+  try {
+    if (bytes.byteLength > MAX_PROFILE_FILE_BYTES)
+      throw new Error('Archive too large');
+    const entries = readZipCentralDirectory(bytes).filter(
+      ({ name }) => name.split('/').at(-1)?.toLowerCase() === 'positions.csv',
+    );
+    if (entries.length !== 1) throw new Error('Expected one Positions.csv');
+    return decodeUtf8Text(await readZipEntry(bytes, entries[0]));
+  } catch {
+    throw new ProfileImportError(
+      'invalid_linkedin',
+      'Use a valid LinkedIn archive containing one Positions.csv, or import that CSV directly.',
+    );
+  }
+}
 
 export async function guardDocxArchive(bytes: Uint8Array): Promise<void> {
   const entries = readZipCentralDirectory(bytes);

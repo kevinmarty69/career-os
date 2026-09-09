@@ -4,11 +4,13 @@ import {
   decodeUtf8Text,
   detectProfileFileType,
   guardDocxArchive,
+  readLinkedInPositions,
   ProfileImportError,
   type ProfileImportErrorCode,
   type ProfileImportResult,
   validateProfileText,
 } from './profile-import-core';
+import { importLinkedInPositions } from './linkedin-import';
 
 type WorkerRequest = {
   file: File;
@@ -41,6 +43,23 @@ workerScope.onmessage = async ({ data }) => {
       bytes,
     );
     const sha256 = await digestSha256(bytes);
+    if (type === 'zip' || type === 'csv') {
+      workerScope.postMessage({
+        ok: true,
+        result: importLinkedInPositions(
+          type === 'zip'
+            ? await readLinkedInPositions(bytes)
+            : decodeUtf8Text(bytes),
+          {
+            displayName: data.file.name.slice(0, 255),
+            type,
+            sha256,
+            trust: 'untrusted-data',
+          },
+        ),
+      });
+      return;
+    }
     const sections = await extractSections(type, bytes);
     workerScope.postMessage({
       ok: true,
