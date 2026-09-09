@@ -9,12 +9,23 @@ import { Card, Panel } from '@/components/ui/surfaces';
 import { SkeletonBlock, useDelayedPending } from '@/components/ui/feedback';
 import { useCareerMemory } from './use-career-memory';
 import { memoryConflicts, resolveMemoryConflict } from '@/lib/memory-conflicts';
+import { Checkbox, Field, TextArea } from '@/components/ui/form';
+import { useUnsavedChanges } from '@/components/use-unsaved-changes';
 
 export function MemoryConflictsScreen() {
   const memory = useCareerMemory();
   const fr = useI18n().locale === 'fr';
   const [index, setIndex] = useState(0);
   const [error, setError] = useState(false);
+  const [contexts, setContexts] = useState<Record<string, string>>({});
+  const [contextMode, setContextMode] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  useUnsavedChanges(
+    contextMode && Object.values(contexts).some(Boolean),
+    fr
+      ? 'Quitter sans enregistrer les contextes ?'
+      : 'Leave without saving these contexts?',
+  );
   const groups = memoryConflicts(memory.profile);
   const group = groups[index % Math.max(groups.length, 1)];
   const pending = useDelayedPending(memory.state === 'loading');
@@ -105,7 +116,9 @@ export function MemoryConflictsScreen() {
                   )}
                   <Button
                     disabled={
-                      memory.state === 'saving' || !claim.evidenceIds.length
+                      contextMode ||
+                      memory.state === 'saving' ||
+                      !claim.evidenceIds.length
                     }
                     onClick={async () => {
                       setError(false);
@@ -139,9 +152,122 @@ export function MemoryConflictsScreen() {
                   : 'Neither version is selected automatically. Your decision remains declared by you; the other wording is retained but blocked from publication. Previously shared pages are unchanged.'}
               </p>
             </Panel>
+            {contextMode && (
+              <Panel>
+                <h2 className="m-0 text-section">
+                  {fr
+                    ? 'Deux faits, deux contextes'
+                    : 'Two facts, two contexts'}
+                </h2>
+                <p className="m-0 text-body-sm">
+                  {fr
+                    ? 'Précisez la période, l’équipe ou le périmètre de chaque version. Les formulations ambiguës restent bloquées ; les nouvelles sont déclarées par vous et gardent leurs restrictions.'
+                    : 'Specify the period, team or scope for each version. Ambiguous wording stays blocked; new statements are declared by you and retain their restrictions.'}
+                </p>
+                {group.map((claim, i) => (
+                  <Field
+                    key={claim.id}
+                    htmlFor={`context-${i}`}
+                    label={claim.statement}
+                  >
+                    <TextArea
+                      id={`context-${i}`}
+                      value={contexts[claim.id] ?? ''}
+                      maxLength={500}
+                      disabled={memory.state === 'saving'}
+                      onChange={(value) => {
+                        setContexts({ ...contexts, [claim.id]: value });
+                        setConfirmed(false);
+                      }}
+                    />
+                  </Field>
+                ))}
+                <Checkbox
+                  checked={confirmed}
+                  disabled={memory.state === 'saving'}
+                  onChange={setConfirmed}
+                  label={
+                    fr
+                      ? 'Je confirme l’exactitude de ces contextes.'
+                      : 'I confirm these contexts are accurate.'
+                  }
+                />
+                <Button
+                  variant="primary"
+                  disabled={
+                    !confirmed ||
+                    memory.state === 'saving' ||
+                    group.some(
+                      (claim) =>
+                        (contexts[claim.id] ?? '').trim().length < 8 ||
+                        !claim.evidenceIds.length,
+                    )
+                  }
+                  onClick={async () => {
+                    setError(false);
+                    try {
+                      if (
+                        await memory.save(
+                          resolveMemoryConflict(
+                            memory.profile,
+                            group[0].id,
+                            {
+                              source: crypto.randomUUID(),
+                              evidence: crypto.randomUUID(),
+                            },
+                            new Date().toISOString(),
+                            contexts,
+                          ),
+                        )
+                      ) {
+                        setContexts({});
+                        setConfirmed(false);
+                        setContextMode(false);
+                      }
+                    } catch {
+                      setError(true);
+                    }
+                  }}
+                >
+                  {fr
+                    ? 'Conserver les deux avec leur contexte'
+                    : 'Keep both with context'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={memory.state === 'saving'}
+                  onClick={() => {
+                    if (
+                      Object.values(contexts).some(Boolean) &&
+                      !window.confirm(
+                        fr
+                          ? 'Abandonner ces contextes non enregistrés ?'
+                          : 'Discard these unsaved contexts?',
+                      )
+                    )
+                      return;
+                    setContexts({});
+                    setConfirmed(false);
+                    setContextMode(false);
+                  }}
+                >
+                  {fr ? 'Annuler' : 'Cancel'}
+                </Button>
+              </Panel>
+            )}
             <div className="flex flex-wrap gap-4">
               <Link href="/memory">{fr ? 'Reporter' : 'Later'}</Link>
-              <Button onClick={() => setIndex(index + 1)}>
+              {!contextMode && (
+                <Button onClick={() => setContextMode(true)}>
+                  {fr
+                    ? 'Garder les deux avec un contexte'
+                    : 'Add context to keep both'}
+                </Button>
+              )}
+              <Button
+                disabled={contextMode}
+                onClick={() => setIndex(index + 1)}
+              >
                 {fr ? 'Conflit suivant' : 'Next conflict'}
               </Button>
             </div>

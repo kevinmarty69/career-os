@@ -161,6 +161,10 @@ test('debrief retains failed input and persists in the application timeline', as
 
 test('unknown routes return an actual 404', async ({ page }) => {
   await mockPersistedWorkspace(page);
+  await page.goto('/memory/skills');
+  await expect(
+    page.getByRole('button', { name: /^(Skills|Compétences)$/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
   const response = await page.goto('/not-a-career-os-route');
   expect(response?.status()).toBe(404);
 });
@@ -196,6 +200,7 @@ test('source arbitration persists without deleting the conflicting version', asy
       },
     ],
   };
+  const unresolved = structuredClone(profile);
   await page.route('**/api/profile', async (route) => {
     if (route.request().method() === 'PUT')
       profile = profileSchema.parse(
@@ -218,6 +223,35 @@ test('source arbitration persists without deleting the conflicting version', asy
   expect(profile.claims).toHaveLength(2);
   expect(profile.claims[0].level).toBe('declared');
   expect(profile.claims[1].level).toBe('unsupported');
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'No numeric conflicts detected' }),
+  ).toBeVisible();
+  profile = unresolved;
+  await page.reload();
+  await page.getByRole('button', { name: 'Add context to keep both' }).click();
+  await page
+    .getByLabel('I led a team of 6 engineers.', { exact: true })
+    .fill('Direct reports during 2021');
+  await page
+    .getByLabel('I led a team of 9 engineers.', { exact: true })
+    .fill('Wider delivery team during 2023');
+  await page
+    .getByRole('checkbox', { name: 'I confirm these contexts are accurate.' })
+    .check();
+  await page
+    .getByRole('button', { name: 'Keep both with context', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'No numeric conflicts detected' }),
+  ).toBeVisible();
+  expect(profile.claims).toHaveLength(4);
+  expect(profile.claims.map((claim) => claim.level)).toEqual([
+    'unsupported',
+    'unsupported',
+    'declared',
+    'declared',
+  ]);
   await page.reload();
   await expect(
     page.getByRole('heading', { name: 'No numeric conflicts detected' }),

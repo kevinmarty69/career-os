@@ -119,7 +119,7 @@ export function SourceStep({ controller }: { controller: Controller }) {
           </div>
         </section>
         <aside className={styles.privacyPanel}>
-          <div className={styles.pasteFields}>
+          <div className={`${styles.pasteFields} ${styles.githubFields}`}>
             <h2>GitHub</h2>
             <p>
               {fr

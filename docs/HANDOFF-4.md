@@ -32,6 +32,7 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 - Structured interview debriefs use the existing private application timeline: questions, answers, evidence gaps, next step and notes. Save failures preserve input; reloading restores the last saved debrief.
 - Unknown routes now use native Next.js `notFound()` and return HTTP 404. Sourced-memory counters exclude blocked/inferred claims. Shared checkbox layout is isolated from legacy form styles.
 - Public GitHub README import is connected to the existing local review flow. Fixed public REST endpoints, authenticated/rate-limited requests, no token or private repository access, bounded UTF-8 content, original repository/blob reference retained. Candidates start unchecked; no ownership is inferred. A failed fetch preserves the URL for retry.
+- Source arbitration can retain both versions with distinct, explicitly attested contexts. Ambiguous originals remain blocked; contextual statements remain declared, preserve restrictive source permissions and survive database ID remapping. The Skills route opens the existing skill view directly.
 
 ### Remaining before claiming the complete handoff
 
@@ -47,6 +48,8 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 - 16 focused browser checks pass on desktop/mobile: guided interview, debrief persistence/failure, conflict arbitration, notification preferences/failure, native 404 and existing handoff regressions.
 - Browser fixtures intercept API/Supabase responses using synthetic records. This validates the UI contracts, not real email delivery, model calls, billing or production deployment.
 - GitHub follow-up: 237 unit checks pass (2 skipped); 22 browser import/regression checks pass. The actual HTTP handler rejects anonymous/cross-origin requests. A credential-free live read of `kevinmarty69/career-os` returned a valid 8,452-character README and public language metadata; no workspace write occurred during that live read.
+- Completion regression: all 182 desktop/mobile browser checks pass after fixing the GitHub import tablet overflow and localized Skills heading. The tablet fix addresses the two failures in the preceding GitHub CI run.
+- Real Supabase development smoke passes: contextual arbitration and two independent signed interviews survive four profile revisions and regenerated IDs; another user cannot read the workspace. Only the synthetic workspace/account created by the test is deleted through the guarded workspace-deletion path. Run explicitly with `ALLOW_HANDOFF_MEMORY_SMOKE=1 NODE_OPTIONS=--conditions=react-server node --env-file=.env.local --env-file=.env.supabase.local --import tsx --test tests/integration/handoff-memory.test.ts`. No Docker, model call or email is involved.
 
 GitHub connector follows the [official public README endpoint](https://docs.github.com/en/rest/repos/contents#get-a-repository-readme); no SDK or OAuth scope is added.
 

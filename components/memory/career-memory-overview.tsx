@@ -14,13 +14,17 @@ import styles from './career-memory-overview.module.css';
 
 type View = 'claims' | 'skills';
 
-export function CareerMemoryOverview() {
+export function CareerMemoryOverview({
+  initialView = 'claims',
+}: {
+  initialView?: View;
+}) {
   const router = useRouter();
   const { locale } = useI18n();
   const t = useTranslations([memoryOverviewMessages]);
   const memory = useCareerMemory();
   const interviews = listInterviews(memory.profile);
-  const [view, setView] = useState<View>('claims');
+  const [view, setView] = useState<View>(initialView);
   const visibleClaims = useMemo(
     () =>
       memory.profile.claims.filter((claim) =>

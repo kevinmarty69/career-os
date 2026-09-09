@@ -460,7 +460,11 @@
   font-size: var(--text-label);
   font-weight: 600;
 }
-.pasteFields :where(select, textarea),
+.pasteFields.githubFields {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 0 var(--space-7);
+}
+.pasteFields :where(input, select, textarea),
 .identityFields input,
 .candidateDetails textarea,
 .editorGrid select {

@@ -26,7 +26,6 @@ import { NotificationSettingsScreen } from '@/components/settings/notification-s
 import { InterviewDebriefScreen } from '@/components/applications/interview-debrief-screen';
 
 const unavailableRoutes: Record<string, [string, string, string]> = {
-  '/memory/skills': ['Compétences', 'Skills', '/memory'],
   '/assets': ['Assets', 'Assets', '/applications'],
   '/messages': ['Messages', 'Messages', '/applications'],
   '/onboarding/hosting': ['Hébergement', 'Hosting', '/settings/models'],
@@ -51,6 +50,7 @@ export function KitRoutePage({
   if (path === '/settings/profile') return <ProfileSettingsScreen />;
   if (path === '/settings/notifications') return <NotificationSettingsScreen />;
   if (path === '/memory') return <MemoryScreen />;
+  if (path === '/memory/skills') return <MemoryScreen initialView="skills" />;
   if (path === '/applications') return <ApplicationsPage />;
   if (path === '/applications/new')
     return (

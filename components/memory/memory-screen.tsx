@@ -11,7 +11,11 @@ import { Icon, PageHeader } from '@/components/ui/primitives';
 import { CareerMemoryOverview } from '@/components/memory/career-memory-overview';
 import { memoryOverviewMessages } from '@/lib/i18n/dictionaries/memory-overview';
 
-export function MemoryScreen() {
+export function MemoryScreen({
+  initialView = 'claims',
+}: {
+  initialView?: 'claims' | 'skills';
+}) {
   const fr = useI18n().locale === 'fr';
   const t = useTranslations([
     memoryMessages,
@@ -54,7 +58,11 @@ export function MemoryScreen() {
       }
     >
       <PageHeader
-        title={t('demo.career.memory')}
+        title={
+          initialView === 'skills'
+            ? t('memory.overview.skills')
+            : t('demo.career.memory')
+        }
         copy={t('memory.overview.copy')}
         actions={
           <>
@@ -69,7 +77,7 @@ export function MemoryScreen() {
           </>
         }
       />
-      <CareerMemoryOverview />
+      <CareerMemoryOverview key={initialView} initialView={initialView} />
     </AppShell>
   );
 }
