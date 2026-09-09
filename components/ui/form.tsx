@@ -141,7 +141,7 @@ export function Checkbox({
   return (
     <label
       className={cn(
-        'relative flex items-center gap-3 min-w-0',
+        'co-kit-checkbox-label relative flex items-center gap-3 min-w-0',
         disabled ? 'opacity-55' : 'cursor-pointer',
         className,
       )}

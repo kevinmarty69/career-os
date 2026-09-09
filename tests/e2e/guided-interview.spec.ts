@@ -99,16 +99,24 @@ test('guided interview resumes, preserves failed saves and signs only a private 
     fullPage: true,
     animations: 'disabled',
   });
-  await page.getByRole('checkbox').check();
+  await page
+    .getByRole('checkbox', { name: 'I confirm these statements are accurate.' })
+    .check();
   await page
     .getByLabel('Your testimony', { exact: true })
     .fill('Built a deployment cache. Reviewed.');
-  await expect(page.getByRole('checkbox')).not.toBeChecked();
+  await expect(
+    page.getByRole('checkbox', {
+      name: 'I confirm these statements are accurate.',
+    }),
+  ).not.toBeChecked();
   await expect(sign).toBeDisabled();
   await page
     .getByLabel('Your testimony', { exact: true })
     .fill('Built a deployment cache.');
-  await page.getByRole('checkbox').check();
+  await page
+    .getByRole('checkbox', { name: 'I confirm these statements are accurate.' })
+    .check();
   await sign.click();
   await expect(
     page.getByRole('heading', {

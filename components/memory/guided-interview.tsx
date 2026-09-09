@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useUnsavedChanges } from '@/components/use-unsaved-changes';
+
+import { useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { useCareerMemory } from '@/components/memory/use-career-memory';
 import { AppShell } from '@/components/layout/app-shell';
@@ -15,9 +18,19 @@ import {
 import { Card, Panel, ActionBar } from '@/components/ui/surfaces';
 import { CharCount, Checkbox, Field, TextArea } from '@/components/ui/form';
 import { SkeletonBlock, useDelayedPending } from '@/components/ui/feedback';
-import { readInterview, saveInterview } from '@/lib/guided-interview';
+import {
+  listInterviews,
+  readInterview,
+  saveInterview,
+} from '@/lib/guided-interview';
 
-export function GuidedInterviewScreen() {
+export function GuidedInterviewScreen({
+  sessionId,
+  claimId,
+}: {
+  sessionId?: string;
+  claimId?: string;
+}) {
   const memory = useCareerMemory();
   const fr = useI18n().locale === 'fr';
   const showSkeleton = useDelayedPending(memory.state === 'loading');
@@ -27,7 +40,14 @@ export function GuidedInterviewScreen() {
     memory.profile.name.length >= 2 &&
     memory.profile.headline.length >= 2
   )
-    return <Interview memory={memory} />;
+    return (
+      <Interview
+        key={sessionId ?? claimId ?? 'default'}
+        memory={memory}
+        sessionId={sessionId}
+        claimId={claimId}
+      />
+    );
   return (
     <AppShell path="/memory">
       <div className="co-kit flex flex-col gap-[22px]">
@@ -68,45 +88,47 @@ export function GuidedInterviewScreen() {
   );
 }
 
-function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
+function Interview({
+  memory,
+  sessionId,
+  claimId,
+}: {
+  memory: ReturnType<typeof useCareerMemory>;
+  sessionId?: string;
+  claimId?: string;
+}) {
+  const router = useRouter();
   const fr = useI18n().locale === 'fr';
-  const [draft, setDraft] = useState(() => readInterview(memory.profile));
+  const [draft, setDraft] = useState(() => ({
+    ...readInterview(memory.profile, sessionId),
+    ...(sessionId ? { sessionId } : {}),
+    ...(claimId
+      ? {
+          targetStatement: memory.profile.claims.find(
+            (claim) => claim.id === claimId,
+          )?.statement,
+        }
+      : {}),
+  }));
   const [started, setStarted] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState('');
   const inFlight = useRef(false);
   const dirty =
-    JSON.stringify(draft) !== JSON.stringify(readInterview(memory.profile));
-  useEffect(() => {
-    if (!dirty) return;
-    const preventLoss = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    const confirmNavigation = (event: MouseEvent) => {
-      const link =
-        event.target instanceof Element
-          ? event.target.closest('a[href]')
-          : null;
-      if (
-        link &&
-        !window.confirm(
-          fr
-            ? 'Quitter sans sauvegarder cette réponse ?'
-            : 'Leave without saving this answer?',
-        )
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    window.addEventListener('beforeunload', preventLoss);
-    document.addEventListener('click', confirmNavigation, true);
-    return () => {
-      window.removeEventListener('beforeunload', preventLoss);
-      document.removeEventListener('click', confirmNavigation, true);
-    };
-  }, [dirty, fr]);
+    JSON.stringify(draft) !==
+    JSON.stringify({
+      ...readInterview(memory.profile, sessionId),
+      ...(sessionId ? { sessionId } : {}),
+      ...(draft.targetStatement
+        ? { targetStatement: draft.targetStatement }
+        : {}),
+    });
+  useUnsavedChanges(
+    dirty,
+    fr
+      ? 'Quitter sans sauvegarder cette réponse ?'
+      : 'Leave without saving this answer?',
+  );
   const questions = fr
     ? [
         'Qu’avez-vous changé exactement ?',
@@ -193,13 +215,29 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
             </p>
           </Card>
           <p className="m-0 text-body-sm">
-            {fr
-              ? 'Conservé comme déclaré par vous, jamais comme documenté. Son usage reste limité à l’entretien. Aucune candidature publiée n’a été modifiée.'
-              : 'Kept as declared by you, never as documented. Usage remains limited to interviews. No published application was changed.'}
+            {draft.shareStatement
+              ? fr
+                ? 'Seul le témoignage relu peut être sélectionné pour vos prochaines candidatures. Les réponses et les références restent privées. L’ancienne formulation reste sans source ; aucune page publiée n’a changé.'
+                : 'Only the reviewed statement can be selected for future applications. Answers and references stay private. The old wording remains unsupported; no published page has changed.'
+              : fr
+                ? 'Conservé comme déclaré par vous, jamais comme documenté. Son usage reste limité à l’entretien. Aucune candidature publiée n’a été modifiée.'
+                : 'Kept as declared by you, never as documented. Usage remains limited to interviews. No published application was changed.'}
           </p>
           <Link href="/memory">
             {fr ? 'Voir dans ma mémoire' : 'Open career memory'}
           </Link>
+          <Link href="/applications">
+            {fr
+              ? 'Choisir une candidature à enrichir'
+              : 'Choose an application to strengthen'}
+          </Link>
+          <Button
+            onClick={() => {
+              router.push(`/memory/interview?session=${crypto.randomUUID()}`);
+            }}
+          >
+            {fr ? 'Combler le suivant' : 'Start another interview'}
+          </Button>
           {notice}
         </Panel>
       </AppShell>
@@ -219,6 +257,17 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
               ? 'Retrouvons ce que vous avez réellement fait'
               : 'Recover the facts behind your work'}
           </h2>
+          {draft.targetStatement && (
+            <Card>
+              <StatusChip status="unsourced" />
+              <p className="m-0 text-body-sm">{draft.targetStatement}</p>
+              <span className="text-caption text-ink-600">
+                {fr
+                  ? 'Formulation à reprendre, pas une réponse suggérée.'
+                  : 'Wording to revisit, not a suggested answer.'}
+              </span>
+            </Card>
+          )}
           <div className="grid gap-[18px] lg:grid-cols-2">
             <Card>
               <h3 className="m-0 text-section">
@@ -275,6 +324,37 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
             }
           />
           {notice}
+          {!sessionId && listInterviews(memory.profile).length > 0 && (
+            <Card>
+              <Overline>{fr ? 'Vos entretiens' : 'Your interviews'}</Overline>
+              {listInterviews(memory.profile)
+                .filter(({ draft: item }) => item.sessionId)
+                .map(({ source, draft: item }) => (
+                  <Link
+                    key={source.id}
+                    href={`/memory/interview?session=${item.sessionId}`}
+                  >
+                    {item.targetStatement ?? source.title} ·{' '}
+                    {item.signedAt
+                      ? fr
+                        ? 'Signé'
+                        : 'Signed'
+                      : fr
+                        ? 'Reprendre'
+                        : 'Resume'}
+                  </Link>
+                ))}
+              <Button
+                onClick={() =>
+                  router.push(
+                    `/memory/interview?session=${crypto.randomUUID()}`,
+                  )
+                }
+              >
+                {fr ? 'Nouvel entretien' : 'New interview'}
+              </Button>
+            </Card>
+          )}
         </Panel>
       </AppShell>
     );
@@ -375,6 +455,18 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
                   />
                 </Field>
                 <Checkbox
+                  checked={draft.shareStatement ?? false}
+                  disabled={saving}
+                  onChange={(value) =>
+                    setDraft({ ...draft, shareStatement: value })
+                  }
+                  label={
+                    fr
+                      ? 'Autoriser uniquement ce texte relu pour mes candidatures et mon CV. Mes réponses restent privées.'
+                      : 'Allow only this reviewed text in applications and my resume. My answers stay private.'
+                  }
+                />
+                <Checkbox
                   checked={confirmed}
                   disabled={saving}
                   onChange={setConfirmed}
@@ -454,7 +546,15 @@ function Interview({ memory }: { memory: ReturnType<typeof useCareerMemory> }) {
           <Button
             variant="ghost"
             disabled={saving}
-            onClick={() => void persist({ ...draft, step: draft.step + 1 })}
+            onClick={() =>
+              void persist({
+                ...draft,
+                answers: draft.answers.map((answer, index) =>
+                  index === draft.step ? '' : answer,
+                ),
+                step: draft.step + 1,
+              })
+            }
           >
             {fr ? 'Je ne sais pas' : 'I don’t know'}
           </Button>

@@ -268,7 +268,8 @@ export function CurrentApplications({
 function SidebarProfile({ profile }: { profile?: Profile }) {
   const { locale } = useI18n();
   const sourced = profile?.claims.filter(
-    ({ evidenceIds }) => evidenceIds.length,
+    ({ evidenceIds, level }) =>
+      evidenceIds.length && (level === 'declared' || level === 'verified'),
   ).length;
   const total = profile?.claims.length ?? 0;
   const coverage = total ? Math.round(((sourced ?? 0) / total) * 100) : 0;

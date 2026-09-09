@@ -5,8 +5,9 @@ import { OnboardingEmptyState } from '@/components/onboarding/empty-states';
 import { Badge, Icon } from '@/components/ui/primitives';
 import { memoryOverviewMessages } from '@/lib/i18n/dictionaries/memory-overview';
 import { type Profile } from '@/lib/schemas';
-import { interviewSourceLocator, readInterview } from '@/lib/guided-interview';
+import { listInterviews } from '@/lib/guided-interview';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useCareerMemory } from './use-career-memory';
 import styles from './career-memory-overview.module.css';
@@ -14,13 +15,11 @@ import styles from './career-memory-overview.module.css';
 type View = 'claims' | 'skills';
 
 export function CareerMemoryOverview() {
+  const router = useRouter();
   const { locale } = useI18n();
   const t = useTranslations([memoryOverviewMessages]);
   const memory = useCareerMemory();
-  const interview = readInterview(memory.profile);
-  const interviewSourceId = memory.profile.sources.find(
-    (source) => source.locator === interviewSourceLocator,
-  )?.id;
+  const interviews = listInterviews(memory.profile);
   const [view, setView] = useState<View>('claims');
   const visibleClaims = useMemo(
     () =>
@@ -157,9 +156,16 @@ export function CareerMemoryOverview() {
                 </span>
                 <blockquote>
                   “
-                  {item.sourceId === interviewSourceId
-                    ? interview.statement ||
-                      interview.answers.filter(Boolean).join('\n\n')
+                  {interviews.some(({ source }) => source.id === item.sourceId)
+                    ? (() => {
+                        const interview = interviews.find(
+                          ({ source }) => source.id === item.sourceId,
+                        )!.draft;
+                        return (
+                          interview.statement ||
+                          interview.answers.filter(Boolean).join('\n\n')
+                        );
+                      })()
                     : item.excerpt}
                   ”
                 </blockquote>
@@ -168,6 +174,21 @@ export function CareerMemoryOverview() {
             {!evidence.length ? (
               <p>{t('memory.overview.no.evidence')}</p>
             ) : null}
+            {selected && selected.level !== 'verified' && (
+              <button
+                type="button"
+                className="co-button quiet"
+                onClick={() =>
+                  router.push(
+                    `/memory/interview?session=${crypto.randomUUID()}&claim=${encodeURIComponent(selected.id)}`,
+                  )
+                }
+              >
+                {locale === 'fr'
+                  ? 'La sourcer par un entretien'
+                  : 'Support this claim with an interview'}
+              </button>
+            )}
           </div>
         </section>
       </div>

@@ -27,6 +27,7 @@ import {
   type WorkerService,
 } from '../run-contract';
 import { pageSpecSchema, profileSchema, type Profile } from '../schemas';
+import { blockConflictedClaims } from '../memory-conflicts';
 import { COMPANY_RESEARCH_RUN_TOKEN_BUDGET } from './local-openai-client';
 import { REVIEW_RUN_TOKEN_BUDGET } from './local-openai-review-client';
 import { RECRUITER_STRATEGY_RUN_TOKEN_BUDGET } from './local-openai-strategy-client';
@@ -166,7 +167,7 @@ export async function createPersistedRun(
     const snapshot = await cloneProfileSnapshot(
       tx,
       session.tenantId,
-      living.profile,
+      blockConflictedClaims(living.profile),
       living.revision,
     );
     const opportunityId = randomUUID();

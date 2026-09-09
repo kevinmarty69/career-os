@@ -22,13 +22,37 @@ Source: designer kit v2.4, 8 September 2026. Approved visual direction; copy rem
 
 Designer defaults do not override PRODUCT-REFERENCE.md or existing security boundaries. In particular an attestation does not automatically upgrade a claim to verified, and the UI must not promise offline delivery without durable synchronization.
 
-## Deliberate boundaries
+## Completion work — 9 September 2026
 
-- The guided interview is a factual questionnaire, **not a live model conversation**. A single resumable testimony uses existing versioned profile persistence; signing creates a private, declared claim with interview-only permission. No automatic claim repair, independent verification, market-impact calculation or publication is implied. Additional interview sessions and model-led follow-ups are not implemented by this lot.
-- Notifications read the eight recent applications and stored link activity. They are not an email delivery system and do not persist read/unread preferences.
+This is a progress ledger, not a claim that the whole handoff is complete.
+
+- Multiple independent guided interviews, including an entry point from a selected claim. Signing retains a private transcript; a separate, explicit permission can make the reviewed statement available to applications/resumes. The original unsupported wording remains blocked and published pages never change automatically.
+- Numeric source conflicts: side-by-side source excerpts and a saved human arbitration. All unresolved variants are excluded from new deterministic strategy/review paths and run snapshots; no variant is silently promoted to verified.
+- Notification read state and the five product-email preferences persist in Supabase account metadata. Failed writes retain the saved choice. Email delivery is still disabled.
+- Structured interview debriefs use the existing private application timeline: questions, answers, evidence gaps, next step and notes. Save failures preserve input; reloading restores the last saved debrief.
+- Unknown routes now use native Next.js `notFound()` and return HTTP 404. Sourced-memory counters exclude blocked/inferred claims. Shared checkbox layout is isolated from legacy form styles.
+
+### Remaining before claiming the complete handoff
+
+- Model-led adaptive interviews, evidence-backed claim repair in specific application drafts, and source conflict detection beyond identical numeric wording. No automatic market-impact statistics.
+- Full notification event coverage and configured product-email delivery; current read state does not create a durable outgoing queue.
+- GitHub/Drive connectors, personal API tokens, editable per-stage model and budget controls, instance first-run setup.
+- Private cloud trial, checkout and pause integration. Existing private cloud code must be reconciled with current Supabase identity before activation; no payment authorization is implied.
+- A durable offline decision queue and complete populated-state visual parity across every supplied screen.
+
+### Validation for this milestone
+
+- Lint, TypeScript and production build pass; 236 unit checks pass, 2 existing checks skipped.
+- 16 focused browser checks pass on desktop/mobile: guided interview, debrief persistence/failure, conflict arbitration, notification preferences/failure, native 404 and existing handoff regressions.
+- Browser fixtures intercept API/Supabase responses using synthetic records. This validates the UI contracts, not real email delivery, model calls, billing or production deployment.
+
+## Original delivery boundaries — 8 September 2026
+
+- At the initial checkpoint, the guided interview was one factual questionnaire, **not a live model conversation**. See the 9 September ledger for multiple sessions and explicit statement-sharing permissions.
+- Notifications read the eight recent applications and stored link activity. They are not an email delivery system; read state and preferences were added on 9 September.
 - Models are configured by the instance administrator. OAuth integrations, personal API keys, cloud checkout, trials, billing pause and email preferences remain inactive; these screens explain that state rather than simulating a working service.
 - Offline mode preserves the current screen, not a durable outgoing queue. Reloading can discard unsaved input.
-- Unknown workspace routes show the kit's not-found state through the existing catch-all; this is not an HTTP routing rewrite.
+- Native HTTP 404 handling replaced the initial catch-all fallback on 9 September.
 - Existing populated screens retain their business logic and shell. Importing the primitive library is not a claim that every old component or every state in the designer's 13 documents has been migrated. This log covers the **new handoff surfaces**, not full pixel certification of the entire app.
 
 ## Validation — 8 September 2026

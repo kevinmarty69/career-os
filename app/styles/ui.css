@@ -10,6 +10,11 @@
   outline-offset: 3px;
 }
 
+.co-kit label.co-kit-checkbox-label {
+  display: flex;
+  align-items: center;
+}
+
 .co-kit-control {
   min-height: 42px;
   border: 0;

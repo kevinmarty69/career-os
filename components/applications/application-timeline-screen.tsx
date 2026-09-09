@@ -24,6 +24,8 @@ import {
   readApplicationTimeline,
 } from '@/lib/career-api';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { readDebrief } from '@/lib/interview-debrief';
 
 export function ApplicationTimelineScreen({
   applicationId,
@@ -149,6 +151,12 @@ export function ApplicationTimelineScreen({
             <section className="co-panel co-timeline-intro">
               <p>{t('dossier.application.activity')}</p>
               <h1>{t('dossier.contacts.interviews.and.outcomes')}</h1>
+              <Link
+                className="co-button quiet"
+                href={`/applications/${applicationId}/debrief`}
+              >
+                {locale === 'fr' ? 'Débrief d’entretien' : 'Interview debrief'}
+              </Link>
               <span>
                 {t(
                   'dossier.keep.important.interactions.in.a.factual.log.nothing.is',
@@ -231,7 +239,17 @@ export function ApplicationTimelineScreen({
                           timeStyle: 'short',
                         }).format(new Date(event.occurredAt))}
                       </time>
-                      {event.note ? <span>{event.note}</span> : null}
+                      {event.note ? (
+                        readDebrief(event.note) ? (
+                          <Link href={`/applications/${applicationId}/debrief`}>
+                            {locale === 'fr'
+                              ? 'Ouvrir le débrief privé'
+                              : 'Open private debrief'}
+                          </Link>
+                        ) : (
+                          <span>{event.note}</span>
+                        )
+                      ) : null}
                     </div>
                   </article>
                 ))

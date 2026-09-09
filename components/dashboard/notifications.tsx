@@ -12,9 +12,15 @@ import {
 } from '@/components/ui/feedback';
 import { Button, Icon, Overline } from '@/components/ui/controls';
 import { Card } from '@/components/ui/surfaces';
+import { useNotificationPreferences } from '@/components/settings/use-notification-preferences';
+import { markEventsRead } from '@/lib/notification-preferences';
 
-export function NotificationsButton() {
-  const [open, setOpen] = useState(false);
+export function NotificationsButton({
+  initiallyOpen = false,
+}: {
+  initiallyOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(initiallyOpen);
   return (
     <>
       <Button
@@ -30,6 +36,7 @@ export function NotificationsButton() {
 
 function Notifications({ onClose }: { onClose: () => void }) {
   const fr = useI18n().locale === 'fr';
+  const receipt = useNotificationPreferences();
   const { dashboard, error, refresh } = useWorkflowDashboard();
   const showSkeleton = useDelayedPending(!dashboard && !error);
   const decisions = dashboardActions(dashboard?.items ?? []).filter((item) =>
@@ -39,6 +46,16 @@ function Notifications({ onClose }: { onClose: () => void }) {
     .filter((item) => item.lastOpenedAt)
     .sort((a, b) => b.lastOpenedAt!.localeCompare(a.lastOpenedAt!))
     .slice(0, 8);
+  const decisionKey = (item: (typeof decisions)[number]) =>
+    `${item.application.applicationId}:${item.run?.runId ?? 'none'}:${item.kind}:${item.pendingDecisions}:${item.application.updatedAt}`;
+  const publicationKey = (item: (typeof publications)[number]) =>
+    `${item.publicationId}:${item.lastOpenedAt}`;
+  const eventIds = [
+    ...decisions.map(decisionKey),
+    ...publications.map(publicationKey),
+  ];
+  const isRead = (id: string) =>
+    receipt.preferences?.readEvents.includes(id) ?? false;
   return (
     <Drawer
       open
@@ -51,15 +68,44 @@ function Notifications({ onClose }: { onClose: () => void }) {
           : 'Decisions and activity from recent applications'
       }
       footer={
-        <Link
-          className="text-label font-semibold text-ink-900 underline"
-          href="/inbox"
-        >
-          {fr ? 'Tous les arbitrages' : 'All decisions'}
-        </Link>
+        <div className="flex flex-wrap gap-4">
+          <Button
+            disabled={
+              !receipt.preferences ||
+              receipt.saving ||
+              !eventIds.length ||
+              eventIds.every(isRead)
+            }
+            onClick={() =>
+              receipt.preferences &&
+              void receipt.save(markEventsRead(receipt.preferences, eventIds))
+            }
+          >
+            {fr ? 'Tout marquer comme lu' : 'Mark all as read'}
+          </Button>
+          <Link
+            className="text-label font-semibold text-ink-900 underline"
+            href="/inbox"
+          >
+            {fr ? 'Tous les arbitrages' : 'All decisions'}
+          </Link>
+          <Link
+            className="text-label text-ink-900 underline"
+            href="/settings/notifications"
+          >
+            {fr ? 'Réglages' : 'Settings'}
+          </Link>
+        </div>
       }
     >
       <div className="flex flex-col gap-[18px]">
+        {receipt.error && (
+          <p role="alert" className="text-caption text-ink-600">
+            {fr
+              ? 'État de lecture indisponible. Les événements restent consultables.'
+              : 'Read status unavailable. Events remain available.'}
+          </p>
+        )}
         {error ? (
           <>
             <p role="alert" className="text-body-sm text-ink-700">
@@ -84,7 +130,7 @@ function Notifications({ onClose }: { onClose: () => void }) {
                   key={item.application.applicationId}
                   radius={16}
                   padding={16}
-                  selected={index === 0}
+                  selected={!isRead(decisionKey(item)) && index === 0}
                   bordered
                 >
                   <div className="flex gap-3">
@@ -93,6 +139,11 @@ function Notifications({ onClose }: { onClose: () => void }) {
                       <strong className="text-ui">
                         {item.application.company}
                       </strong>
+                      {isRead(decisionKey(item)) && (
+                        <span className="text-caption text-ink-600">
+                          {fr ? 'Lu' : 'Read'}
+                        </span>
+                      )}
                       <span className="text-caption text-ink-600">
                         {item.kind === 'review'
                           ? fr
@@ -135,6 +186,11 @@ function Notifications({ onClose }: { onClose: () => void }) {
                   <span className="flex flex-col gap-1 text-label">
                     {item.company} · {item.opens}{' '}
                     {fr ? 'ouverture(s)' : 'open(s)'}
+                    {isRead(publicationKey(item)) && (
+                      <span className="text-caption text-ink-600">
+                        {fr ? 'Lu' : 'Read'}
+                      </span>
+                    )}
                     <time
                       className="text-caption text-ink-600"
                       dateTime={item.lastOpenedAt!}

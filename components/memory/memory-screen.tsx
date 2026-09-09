@@ -35,6 +35,10 @@ export function MemoryScreen() {
               <Icon>fact_check</Icon>
               <span>{t('memory.positioning.audit')}</span>
             </Link>
+            <Link href="/memory/conflicts">
+              <Icon>rule</Icon>
+              <span>{fr ? 'Conflits entre sources' : 'Source conflicts'}</span>
+            </Link>
           </div>
         </>
       }

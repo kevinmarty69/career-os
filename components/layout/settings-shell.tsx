@@ -24,6 +24,7 @@ export function SettingsNav({ active }: { active: string }) {
       </Link>
       <p>{t('shell.settings')}</p>
       {[
+        ['notifications', 'Notifications', '/settings/notifications'],
         ['memory', t('active-routes.models.agents'), '/settings/models'],
         ['shield', t('search-profiles.privacy'), '/settings/privacy'],
         ['hub', t('active-routes.integrations'), '/settings/integrations'],

@@ -18,7 +18,11 @@ import { initials } from '@/lib/initials';
 import Link from 'next/link';
 import { NotificationsButton } from '@/components/dashboard/notifications';
 
-export function HomeScreen() {
+export function HomeScreen({
+  initiallyOpenNotifications = false,
+}: {
+  initiallyOpenNotifications?: boolean;
+}) {
   const { locale } = useI18n();
   const { dashboard, error: dashboardError } = useWorkflowDashboard();
   const memory = useCareerMemory();
@@ -34,7 +38,10 @@ export function HomeScreen() {
     (item) => item.stage !== 'closed',
   );
   const evidenceGaps = memory.profile.claims.filter(
-    (claim) => claim.level === 'unsupported' || claim.evidenceIds.length === 0,
+    (claim) =>
+      claim.level === 'unsupported' ||
+      claim.level === 'inferred' ||
+      claim.evidenceIds.length === 0,
   );
   const firstName = memory.profile.name.trim().split(/\s+/)[0];
   const today = new Intl.DateTimeFormat(locale, {
@@ -87,7 +94,9 @@ export function HomeScreen() {
       <AppShell path="/">
         <div className="co-home-v2">
           <PageHeader
-            actions={<NotificationsButton />}
+            actions={
+              <NotificationsButton initiallyOpen={initiallyOpenNotifications} />
+            }
             title={
               locale === 'fr'
                 ? `Bienvenue${firstName ? ` ${firstName}` : ''}`
@@ -132,7 +141,7 @@ export function HomeScreen() {
               {firstName ? ` ${firstName}` : ''}
             </h1>
           </div>
-          <NotificationsButton />
+          <NotificationsButton initiallyOpen={initiallyOpenNotifications} />
           <Link className="co-home-import" href="/applications/new">
             <Icon>link</Icon>
             <span>

@@ -56,7 +56,7 @@ test('notifications use real workspace activity and restore focus on close', asy
   ).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(
-    dialog.getByRole('link', { name: 'All decisions' }),
+    dialog.getByRole('link', { name: 'Settings', exact: true }),
   ).toBeFocused();
   await page.screenshot({
     path: testInfo.outputPath('notifications-en.png'),

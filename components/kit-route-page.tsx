@@ -18,16 +18,14 @@ import {
 } from '@/components/settings/service-settings-screen';
 import { UnavailableScreen } from '@/components/layout/unavailable-screen';
 import { GuidedInterviewScreen } from '@/components/memory/guided-interview';
-import { SystemState } from '@/components/layout/system-state';
-import { AppShell } from '@/components/layout/app-shell';
+import { notFound } from 'next/navigation';
 import { LandingScreen } from '@/components/onboarding/welcome-screen';
+import { z } from 'zod';
+import { MemoryConflictsScreen } from '@/components/memory/memory-conflicts-screen';
+import { NotificationSettingsScreen } from '@/components/settings/notification-settings-screen';
+import { InterviewDebriefScreen } from '@/components/applications/interview-debrief-screen';
 
 const unavailableRoutes: Record<string, [string, string, string]> = {
-  '/memory/conflicts': [
-    'Conflits entre sources',
-    'Source conflicts',
-    '/memory',
-  ],
   '/memory/skills': ['Compétences', 'Skills', '/memory'],
   '/assets': ['Assets', 'Assets', '/applications'],
   '/messages': ['Messages', 'Messages', '/applications'],
@@ -42,8 +40,16 @@ export function KitRoutePage({
   query: Record<string, string | string[] | undefined>;
 }) {
   if (path === '/welcome') return <LandingScreen />;
-  if (path === '/memory/interview') return <GuidedInterviewScreen />;
+  if (path === '/memory/conflicts') return <MemoryConflictsScreen />;
+  if (path === '/memory/interview')
+    return (
+      <GuidedInterviewScreen
+        sessionId={z.uuid().safeParse(query.session).data}
+        claimId={typeof query.claim === 'string' ? query.claim : undefined}
+      />
+    );
   if (path === '/settings/profile') return <ProfileSettingsScreen />;
+  if (path === '/settings/notifications') return <NotificationSettingsScreen />;
   if (path === '/memory') return <MemoryScreen />;
   if (path === '/applications') return <ApplicationsPage />;
   if (path === '/applications/new')
@@ -53,10 +59,17 @@ export function KitRoutePage({
       />
     );
   const application = path.match(
-    /^\/applications\/([^/]+)(?:\/(run|review|preview|publish|page|published|versions|company|timeline))?$/,
+    /^\/applications\/([^/]+)(?:\/(run|review|preview|publish|page|published|versions|company|timeline|debrief))?$/,
   );
   if (application) {
     const applicationId = application[1];
+    if (application[2] === 'debrief')
+      return (
+        <InterviewDebriefScreen
+          key={applicationId}
+          applicationId={applicationId}
+        />
+      );
     if (application[2] === 'versions')
       return (
         <VersionsScreen key={applicationId} applicationId={applicationId} />
@@ -102,9 +115,5 @@ export function KitRoutePage({
         href="/applications"
       />
     );
-  return (
-    <AppShell path={path}>
-      <SystemState kind="not-found" />
-    </AppShell>
-  );
+  notFound();
 }

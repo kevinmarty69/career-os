@@ -7,6 +7,7 @@ import {
 } from './schemas';
 import type { Application } from './application-contract';
 import { accessibleAccent } from './accent';
+import { blockConflictedClaims } from './memory-conflicts';
 
 export type Opportunity = {
   company: string;
@@ -86,10 +87,12 @@ export function buildStrategy(
   profileInput: Profile,
   opportunity: Opportunity,
 ): Strategy {
-  const profile = profileSchema.parse(profileInput);
+  const profile = blockConflictedClaims(profileSchema.parse(profileInput));
   const eligible = profile.claims.filter(
     (claim) =>
       claim.allowedUses.includes('application') &&
+      claim.level !== 'unsupported' &&
+      claim.level !== 'inferred' &&
       claim.sensitivity !== 'restricted' &&
       claim.evidenceIds.some((id) => {
         const evidence = profile.evidence.find((item) => item.id === id);
@@ -248,6 +251,7 @@ export function buildPageSpec(
 }
 
 export function runReviews(profile: Profile, spec: PageSpec): Review[] {
+  profile = blockConflictedClaims(profile);
   const publishedClaims = spec.blocks.flatMap((block) =>
     'claimIds' in block ? block.claimIds : [],
   );
@@ -267,6 +271,8 @@ export function runReviews(profile: Profile, spec: PageSpec): Review[] {
       );
     });
     if (
+      claim.level === 'unsupported' ||
+      claim.level === 'inferred' ||
       claim.sensitivity === 'restricted' ||
       !claim.allowedUses.includes('application') ||
       !eligibleEvidence

@@ -17,3 +17,6 @@
 @source '../components/dashboard/notifications.tsx';
 @source '../components/layout/system-state.tsx';
 @source '../components/settings/service-settings-screen.tsx';
+@source '../components/settings/notification-settings-screen.tsx';
+@source '../components/memory/memory-conflicts-screen.tsx';
+@source '../components/applications/interview-debrief-screen.tsx';

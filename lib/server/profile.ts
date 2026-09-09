@@ -1,5 +1,6 @@
 import 'server-only';
 import { database, authorize } from './database';
+import { blockConflictedClaims } from '../memory-conflicts';
 import {
   livingProfileInputSchema,
   profileSchema,
@@ -150,7 +151,7 @@ export async function saveLivingProfile(
   input: unknown,
   expectedRevision: number,
 ) {
-  const profile = livingProfileInputSchema.parse(input);
+  const profile = blockConflictedClaims(livingProfileInputSchema.parse(input));
   const sql = database();
 
   return await sql.begin(async (tx) => {
