@@ -25,6 +25,7 @@ import { deleteWorkspace } from '../../lib/server/workspace';
 import { selectInterviewQuestion } from '../../lib/server/interview-question';
 import { exportWorkspace } from '../../lib/server/workspace-export';
 import { readNotificationContext } from '../../lib/server/notification-context';
+import { readNotificationHistory } from '../../lib/server/notification-history';
 import {
   createApplicationTask,
   updateApplicationTask,
@@ -212,9 +213,40 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
         values (${session.tenantId},${snapshotId},'Old synthetic wording','unsupported','private',array['application'])`;
       await tx`insert into app.opportunities (id,tenant_id,application_id,application_revision,company,role,raw_text,extraction_status)
         values (${opportunityId},${session.tenantId},${application.applicationId},${application.revision},'Synthetic','Synthetic','Synthetic','ready')`;
-      await tx`insert into app.workflow_runs (tenant_id,opportunity_id,profile_id,state,status,token_budget,cost_budget_micros,deadline_at)
-        values (${session.tenantId},${opportunityId},${snapshotId},'research','cancelled',1,0,now())`;
+      const [run] =
+        await tx`insert into app.workflow_runs (tenant_id,opportunity_id,profile_id,state,status,token_budget,cost_budget_micros,deadline_at)
+        values (${session.tenantId},${opportunityId},${snapshotId},'research','cancelled',1,0,now()) returning id`;
+      await tx`insert into app.workflow_events (tenant_id, workflow_run_id, actor, event_type, summary, created_at)
+        select ${session.tenantId}, ${run.id}, 'system', 'synthetic_history', 'Synthetic event ' || n,
+          '2026-01-01T00:00:00.123456Z'::timestamptz from generate_series(1, 51) n`;
     });
+    const firstHistory = await readNotificationHistory(session);
+    assert.equal(firstHistory.events.length, 50);
+    assert.ok(firstHistory.nextCursor);
+    assert.equal(firstHistory.nextCursor.at, '2026-01-01T00:00:00.123456Z');
+    const olderHistory = await readNotificationHistory(
+      session,
+      firstHistory.nextCursor,
+    );
+    assert.equal(olderHistory.events.length, 1);
+    assert.equal(olderHistory.nextCursor, null);
+    assert.equal(
+      new Set(
+        [...firstHistory.events, ...olderHistory.events].map(
+          (event) => event.id,
+        ),
+      ).size,
+      51,
+    );
+    assert.deepEqual(
+      (
+        await readNotificationHistory(
+          { ...session, userId: randomUUID() },
+          firstHistory.nextCursor,
+        )
+      ).events,
+      [],
+    );
     assert.equal(
       (await readAffectedApplications(session, 'Old synthetic wording'))[0]
         ?.applicationId,

@@ -5,6 +5,63 @@ import {
   pendingReviewRun,
 } from './persisted-workspace';
 
+test('notification history paginates and preserves loaded events on failure', async ({
+  page,
+  context,
+}) => {
+  await context.clearCookies();
+  await mockPersistedWorkspace(page);
+  await page.route('**/api/notifications', (route) =>
+    route.fulfill({ json: { conflict: null, tasks: [], moreTasks: false } }),
+  );
+  const cursor = { at: '2026-01-01T00:00:00.123456Z', kind: 'run', id: '2' };
+  let fail = true;
+  let receivedCursor: unknown;
+  await page.route('**/api/notifications/history**', (route) => {
+    const raw = new URL(route.request().url()).searchParams.get('cursor');
+    receivedCursor = raw ? JSON.parse(raw) : undefined;
+    if (raw && fail) return route.fulfill({ status: 503 });
+    return route.fulfill({
+      json: {
+        events: [
+          {
+            id: raw ? 'run:1' : 'run:2',
+            kind: 'run',
+            at: cursor.at,
+            company: 'Synthetic history',
+            applicationId,
+            summary: raw ? 'Earlier saved decision' : 'Latest saved decision',
+          },
+        ],
+        nextCursor: raw ? null : cursor,
+      },
+    });
+  });
+  await page.goto('/');
+  await page
+    .getByRole('button', { name: 'Notifications', exact: true })
+    .click();
+  const drawer = page.getByRole('dialog', { name: 'Notifications' });
+  await drawer.getByRole('button', { name: 'Show history' }).click();
+  await expect(drawer.getByText('Latest saved decision')).toBeVisible();
+  await drawer.getByRole('button', { name: 'Load older events' }).click();
+  await expect(
+    drawer.getByText('Could not load history.', { exact: false }),
+  ).toBeVisible();
+  await expect(drawer.getByText('Latest saved decision')).toBeVisible();
+  expect(receivedCursor).toEqual(cursor);
+  fail = false;
+  await drawer.getByRole('button', { name: 'Retry history' }).click();
+  await expect(drawer.getByText('Earlier saved decision')).toBeVisible();
+  await expect(drawer.getByText('Latest saved decision')).toBeVisible();
+  await expect(
+    drawer.getByRole('button', { name: 'Load older events' }),
+  ).toHaveCount(0);
+  await expect(
+    drawer.getByRole('link', { name: /Earlier saved decision/ }),
+  ).toHaveAttribute('href', `/applications/${applicationId}/versions`);
+});
+
 test('notifications expose sourced conflicts, due reminders, expiry and completed runs with recovery', async ({
   page,
   context,

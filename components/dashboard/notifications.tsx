@@ -14,6 +14,7 @@ import { Button, Icon, Overline } from '@/components/ui/controls';
 import { Card } from '@/components/ui/surfaces';
 import { useNotificationPreferences } from '@/components/settings/use-notification-preferences';
 import { markEventsRead } from '@/lib/notification-preferences';
+import { NotificationHistory } from './notification-history';
 import {
   notificationContextSchema,
   type NotificationContext,
@@ -384,6 +385,7 @@ function Notifications({ onClose }: { onClose: () => void }) {
                 ? 'Vue des huit candidatures récentes. Les ouvertures sont anonymes ; elles n’identifient pas le lecteur. Aucun email n’est envoyé.'
                 : 'View of eight recent applications. Openings are anonymous and do not identify the reader. No email is sent.'}
             </p>
+            <NotificationHistory />
           </>
         )}
       </div>

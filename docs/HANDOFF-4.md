@@ -39,13 +39,18 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 
 ### Remaining before claiming the complete handoff
 
+- Selected correction milestone: a hero can now use a different human-selected proof already approved and still present in its draft. The review shows the actual source excerpt. The immutable child run carries this selection; both application messages derive from the current draft instead of stale editorial strategy. Historical default corrections remain reproducible. Arbitrary replacement from newly imported memory still requires a new analysis and approval; this milestone does not claim that broader repair.
+- Notification history now pages through persisted workflow and anonymous publication events across the workspace. Fifty events per page, stable microsecond timestamps plus event IDs, cross-user isolation, and retry without losing loaded history. This is an event history, not an email delivery service.
+
 - In-place evidence-backed claim repair in application drafts and source conflict detection beyond identical numeric wording. Affected-draft navigation is delivered; automatic repair and market-impact estimates are not. Adaptive selection from factual questions is delivered, not unrestricted generated conversation.
-- Historical notification pagination and configured product-email delivery; current read state does not create a durable outgoing email queue. Conflict, due reminder, expiry and completed-run categories are delivered.
+- Configured product-email delivery; current read state does not create a durable outgoing email queue. Historical event pagination and conflict, due reminder, expiry and completed-run categories are delivered.
 - Drive OAuth, GitHub account-wide synchronization, personal API tokens, editable per-stage model and budget controls, instance first-run setup. Single public GitHub README import is delivered.
 - Private cloud trial, checkout and pause integration. Existing private cloud code must be reconciled with current Supabase identity before activation; no payment authorization is implied.
 - Complete populated-state visual parity across every supplied screen. Offline review arbitration is delivered; arbitrary offline edits and offline app-shell caching are not.
 
 ### Validation for this milestone
+
+- Selected corrections and history: formatting/lint/types and 239 unit checks pass (2 existing skips); production build and 48 focused desktop/mobile checks pass. Migration 0055 is applied to the Supabase development project. A read-only check compares historical and explicit correction outputs between PostgreSQL and TypeScript. The synthetic Supabase smoke verifies 51 same-microsecond events page without omissions/duplicates and remain isolated from another user; fixture cleanup uses the guarded deletion service. No model, email or payment provider was called.
 
 - Adaptive interviews now select from ten factual EN/FR questions, preserve five-step save/resume, and require consent before sending previous answers to the configured model. Selection cannot generate numbers or testimony. The optional mode is disabled by default, with committed request reservations, a per-workspace daily ceiling, 20-request limit, completed-result reuse and unknown-outcome fencing. Manual interviews remain available without provider configuration.
 - Adaptive validation: 239 unit checks pass (2 existing skips), production build passes, and all 188 desktop/mobile browser checks pass. The Supabase development smoke verifies durable selection reuse and ambiguous-outcome fencing with an intercepted provider; no real model was called. Synthetic workspace cleanup was verified: zero remaining records.
