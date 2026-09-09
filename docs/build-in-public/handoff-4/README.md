@@ -17,3 +17,11 @@ These are real rendered interfaces with **synthetic test data**, not live custom
 
 Validation and deliberate limits: [handoff integration log](../../HANDOFF-4.md).
 Do not describe inactive cloud billing, connectors or the questionnaire as live agent services.
+
+## 9 September — optional adaptive questions
+
+The rendered interview can now select a factual question from a fixed catalogue after explicit consent. Manual answers and save/resume remain available on provider failure. The screenshot below uses synthetic answers and an intercepted provider response, not a real model call. The displayed zero ceiling belongs to that test configuration, not a provider pricing claim.
+
+![Adaptive interview with synthetic data](./adaptive-interview-en.png)
+
+Also delivered: a durable browser outbox for review decisions and additional in-app notifications. Neither feature sends email or publishes a page automatically.

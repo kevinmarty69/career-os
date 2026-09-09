@@ -23,6 +23,12 @@ import {
 } from '../../lib/server/applications';
 import { deleteWorkspace } from '../../lib/server/workspace';
 import { selectInterviewQuestion } from '../../lib/server/interview-question';
+import { exportWorkspace } from '../../lib/server/workspace-export';
+import { readNotificationContext } from '../../lib/server/notification-context';
+import {
+  createApplicationTask,
+  updateApplicationTask,
+} from '../../lib/server/application-tasks';
 
 test('handoff decisions and multiple interviews survive real SQL ID remapping', async (t) => {
   if (process.env.ALLOW_HANDOFF_MEMORY_SMOKE !== '1')
@@ -80,6 +86,14 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
       ['unsupported', 'unsupported'],
     );
     const group = memoryConflicts(stored.profile)[0];
+    const conflictNotification = (await readNotificationContext(session))
+      .conflict;
+    assert.equal(conflictNotification?.count, 1);
+    assert.equal(
+      (await readNotificationContext({ ...session, userId: randomUUID() }))
+        .conflict,
+      null,
+    );
     const contexts = {
       [group[0].id]: 'Direct reports during 2021',
       [group[1].id]: 'Wider delivery group during 2023',
@@ -121,6 +135,7 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
     stored = (await readLivingProfile(session))!;
     assert.equal(stored.revision, 4);
     assert.equal(memoryConflicts(stored.profile).length, 0);
+    assert.equal((await readNotificationContext(session)).conflict, null);
     assert.equal(listInterviews(stored.profile).length, 2);
     assert.equal(
       stored.profile.claims.filter((claim) => claim.level === 'declared')
@@ -157,6 +172,36 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
         randomUUID(),
       )
     ).application;
+    const due = await createApplicationTask(
+      session,
+      application.applicationId,
+      {
+        kind: 'follow_up',
+        title: 'Synthetic due reminder',
+        dueAt: '2020-01-01T00:00:00.000Z',
+      },
+    );
+    await createApplicationTask(session, application.applicationId, {
+      kind: 'task',
+      title: 'Synthetic future task',
+      dueAt: '2099-01-01T00:00:00.000Z',
+    });
+    assert.deepEqual(
+      (await readNotificationContext(session)).tasks.map((task) => task.id),
+      [due.taskId],
+    );
+    assert.deepEqual(
+      (await readNotificationContext({ ...session, userId: randomUUID() }))
+        .tasks,
+      [],
+    );
+    await updateApplicationTask(
+      session,
+      application.applicationId,
+      due.taskId,
+      { completed: true, expectedRevision: due.revision },
+    );
+    assert.deepEqual((await readNotificationContext(session)).tasks, []);
     // Inert historical fixture: no worker step, provider request or publication.
     await admin.begin(async (tx) => {
       const snapshotId = randomUUID(),
@@ -284,6 +329,20 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
       status: 409,
     });
     assert.equal(modelCalls, 2);
+    const exported = await exportWorkspace(session);
+    const records = (await new Response(exported.body).text())
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    const attempts = records.filter(
+      (record) => record.type === 'interview_question_attempts',
+    );
+    assert.equal(attempts.length, 2);
+    assert.deepEqual(attempts.map((record) => record.data.status).sort(), [
+      'completed',
+      'unknown',
+    ]);
+    assert.equal(records.at(-1).type, 'complete');
   } finally {
     for (const [key, value] of Object.entries(previousEnv)) {
       if (value === undefined) delete process.env[key];

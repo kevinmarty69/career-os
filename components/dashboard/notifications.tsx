@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { useWorkflowDashboard } from '@/components/dashboard/use-workflow-dashboard';
@@ -14,6 +14,10 @@ import { Button, Icon, Overline } from '@/components/ui/controls';
 import { Card } from '@/components/ui/surfaces';
 import { useNotificationPreferences } from '@/components/settings/use-notification-preferences';
 import { markEventsRead } from '@/lib/notification-preferences';
+import {
+  notificationContextSchema,
+  type NotificationContext,
+} from '@/lib/notification-context';
 
 export function NotificationsButton({
   initiallyOpen = false,
@@ -38,6 +42,29 @@ function Notifications({ onClose }: { onClose: () => void }) {
   const fr = useI18n().locale === 'fr';
   const receipt = useNotificationPreferences();
   const { dashboard, error, refresh } = useWorkflowDashboard();
+  const [context, setContext] = useState<NotificationContext>();
+  const [contextError, setContextError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [now] = useState(() => Date.now());
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/notifications', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const data = notificationContextSchema.parse(await response.json());
+        if (!controller.signal.aborted) {
+          setContext(data);
+          setContextError(false);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setContextError(true);
+      });
+    return () => controller.abort();
+  }, [attempt]);
   const showSkeleton = useDelayedPending(!dashboard && !error);
   const decisions = dashboardActions(dashboard?.items ?? []).filter((item) =>
     ['review', 'decision', 'recover'].includes(item.kind),
@@ -50,9 +77,30 @@ function Notifications({ onClose }: { onClose: () => void }) {
     `${item.application.applicationId}:${item.run?.runId ?? 'none'}:${item.kind}:${item.pendingDecisions}:${item.application.updatedAt}`;
   const publicationKey = (item: (typeof publications)[number]) =>
     `${item.publicationId}:${item.lastOpenedAt}`;
+  const expiring = (dashboard?.publications ?? []).filter(
+    (item) =>
+      item.status === 'active' &&
+      item.isCurrent &&
+      item.expiresAt &&
+      Date.parse(item.expiresAt) > now &&
+      Date.parse(item.expiresAt) <= now + 2 * 86400000,
+  );
+  const completed = (dashboard?.items ?? []).filter(
+    (item) => item.run?.status === 'completed',
+  );
+  const taskKey = (task: NonNullable<typeof context>['tasks'][number]) =>
+    `task:${task.id}:${task.dueAt}`;
+  const expiryKey = (item: (typeof expiring)[number]) =>
+    `expiry:${item.publicationId}:${item.expiresAt}`;
+  const completeKey = (item: (typeof completed)[number]) =>
+    `complete:${item.run!.runId}`;
   const eventIds = [
     ...decisions.map(decisionKey),
     ...publications.map(publicationKey),
+    ...expiring.map(expiryKey),
+    ...completed.map(completeKey),
+    ...(context?.tasks.map(taskKey) ?? []),
+    ...(context?.conflict ? [context.conflict.id] : []),
   ];
   const isRead = (id: string) =>
     receipt.preferences?.readEvents.includes(id) ?? false;
@@ -124,6 +172,38 @@ function Notifications({ onClose }: { onClose: () => void }) {
             <Overline>
               {fr ? 'ATTEND VOTRE DÉCISION' : 'WAITING FOR YOUR DECISION'}
             </Overline>
+            {contextError && (
+              <>
+                <p role="alert" className="m-0 text-caption text-ink-600">
+                  {fr
+                    ? 'Conflits et rappels indisponibles. Les autres événements restent consultables.'
+                    : 'Conflicts and reminders unavailable. Other events remain available.'}
+                </p>
+                <Button onClick={() => setAttempt((value) => value + 1)}>
+                  {fr ? 'Réessayer les rappels' : 'Retry reminders'}
+                </Button>
+              </>
+            )}
+            {context?.conflict && (
+              <Card radius={16} padding={16} bordered>
+                <Icon name="rule" className="text-amber-strong" />
+                <strong className="text-ui">
+                  {context.conflict.count}{' '}
+                  {fr ? 'conflit(s) entre sources' : 'source conflict(s)'}
+                </strong>
+                {isRead(context.conflict.id) && (
+                  <span className="text-caption text-ink-600">
+                    {fr ? 'Lu' : 'Read'}
+                  </span>
+                )}
+                <Link
+                  href="/memory/conflicts"
+                  className="text-label font-semibold text-ink-900 underline"
+                >
+                  {fr ? 'Voir les sources' : 'View sources'}
+                </Link>
+              </Card>
+            )}
             {decisions.length ? (
               decisions.map((item, index) => (
                 <Card
@@ -174,6 +254,98 @@ function Notifications({ onClose }: { onClose: () => void }) {
                   : 'No pending decisions in recent applications.'}
               </p>
             )}
+            <Overline>
+              {fr ? 'ÉVÉNEMENTS ET RAPPELS' : 'EVENTS AND REMINDERS'}
+            </Overline>
+            {context?.tasks.map((task) => (
+              <Link
+                key={task.id}
+                href={`/applications/${task.applicationId}/timeline`}
+                className="flex gap-3 border-b border-panel py-[13px] text-ink-800 no-underline"
+              >
+                <Icon name="schedule" />
+                <span className="flex flex-col gap-1 text-label">
+                  <strong>
+                    {task.company} ·{' '}
+                    {task.kind === 'follow_up'
+                      ? fr
+                        ? 'Relance à faire'
+                        : 'Follow-up due'
+                      : fr
+                        ? 'Tâche à faire'
+                        : 'Task due'}
+                  </strong>
+                  {task.title}
+                  <time
+                    className="text-caption text-ink-600"
+                    dateTime={task.dueAt}
+                  >
+                    {task.dueAt.slice(0, 10)}
+                  </time>
+                  {isRead(taskKey(task)) && (
+                    <span className="text-caption text-ink-600">
+                      {fr ? 'Lu' : 'Read'}
+                    </span>
+                  )}
+                </span>
+              </Link>
+            ))}
+            {context?.moreTasks && (
+              <p className="m-0 text-caption text-ink-600">
+                {fr
+                  ? '50 premiers rappels. Les autres restent dans vos dossiers.'
+                  : 'First 50 reminders. Others remain in your application dossiers.'}
+              </p>
+            )}
+            {expiring.map((item) => (
+              <Link
+                key={expiryKey(item)}
+                href="/links"
+                className="flex gap-3 border-b border-panel py-[13px] text-ink-800 no-underline"
+              >
+                <Icon name="schedule" />
+                <span className="flex flex-col gap-1 text-label">
+                  {item.company} ·{' '}
+                  {fr
+                    ? 'Lien expirant sous 48 h'
+                    : 'Link expires within 48 hours'}
+                  <time
+                    dateTime={item.expiresAt!}
+                    className="text-caption text-ink-600"
+                  >
+                    {item.expiresAt!.slice(0, 10)}
+                  </time>
+                  {isRead(expiryKey(item)) && (
+                    <span className="text-caption text-ink-600">
+                      {fr ? 'Lu' : 'Read'}
+                    </span>
+                  )}
+                </span>
+              </Link>
+            ))}
+            {completed.map((item) => (
+              <Link
+                key={completeKey(item)}
+                href={`/applications/${item.application.applicationId}`}
+                className="flex gap-3 border-b border-panel py-[13px] text-ink-800 no-underline"
+              >
+                <Icon name="bolt" />
+                <span className="flex flex-col gap-1 text-label">
+                  {item.application.company} ·{' '}
+                  {fr ? 'Run terminé' : 'Run completed'}
+                  <span className="text-caption text-ink-600">
+                    {fr
+                      ? 'La publication reste une décision distincte.'
+                      : 'Publication remains a separate decision.'}
+                  </span>
+                  {isRead(completeKey(item)) && (
+                    <span className="text-caption text-ink-600">
+                      {fr ? 'Lu' : 'Read'}
+                    </span>
+                  )}
+                </span>
+              </Link>
+            ))}
             <Overline>{fr ? 'ACTIVITÉ DES LIENS' : 'LINK ACTIVITY'}</Overline>
             {publications.length ? (
               publications.map((item) => (

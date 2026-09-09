@@ -40,6 +40,9 @@ test('notifications use real workspace activity and restore focus on close', asy
   await page.route(`**/api/applications/${applicationId}/run`, (route) =>
     route.fulfill({ json: pendingReviewRun }),
   );
+  await page.route('**/api/notifications', (route) =>
+    route.fulfill({ json: { conflict: null, tasks: [], moreTasks: false } }),
+  );
   await page.goto('/');
   const trigger = page.getByRole('button', {
     name: 'Notifications',
