@@ -1,7 +1,22 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 13;
+export const workspaceExportVersion = 14;
 
 export const workspaceExportTables = [
+  {
+    type: 'interview_question_attempts',
+    table: 'interview_question_attempts',
+    columns: [
+      'tenant_id',
+      'input_hash',
+      'session_id',
+      'status',
+      'question_id',
+      'reserved_cost_micros',
+      'cost_micros',
+      'created_at',
+    ],
+    orderBy: ['input_hash'],
+  },
   {
     type: 'publication_events',
     table: 'publication_events',
