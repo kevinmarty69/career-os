@@ -499,6 +499,12 @@
   padding-left: 16px;
 }
 
+.reviewExcerpt small {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .reviewReplacement select {
   width: 100%;
   min-width: 0;

@@ -957,6 +957,11 @@ test('shows the source excerpt and submits the chosen approved replacement', asy
   await expect(page.getByLabel('Use this approved evidence')).toHaveValue(
     replacement.id,
   );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
   if (process.env.CAREER_OS_SELECTED_CORRECTION_SCREENSHOT)
     await page.screenshot({
       path: process.env.CAREER_OS_SELECTED_CORRECTION_SCREENSHOT.replace(
