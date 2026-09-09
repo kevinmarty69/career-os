@@ -11,6 +11,7 @@ import { initials } from '@/lib/initials';
 import Link from 'next/link';
 import { type ReactNode } from 'react';
 import flowStyles from '@/components/applications/application-flow.module.css';
+import { OfflineNotice } from './system-state';
 
 export function DossierNav({
   active,
@@ -98,6 +99,7 @@ export function DossierShell({
           {actions}
         </header>
         <section id="main-content" tabIndex={-1}>
+          <OfflineNotice />
           {children}
         </section>
       </main>
@@ -133,6 +135,7 @@ export function DossierShell({
           {state ?? <Badge tone="warn">{t('dossier.needs.review')}</Badge>}
           {actions}
         </header>
+        <OfflineNotice />
         {children}
       </section>
       <nav

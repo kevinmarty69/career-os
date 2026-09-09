@@ -8,6 +8,7 @@ import { Badge, Icon } from '@/components/ui/primitives';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
 import type { PersistedRun } from '@/lib/run-contract';
 import styles from './application-flow.module.css';
+import { useDecisionOutbox } from '@/components/decision-outbox-provider';
 
 export type ReviewDecision = 'keep' | 'correct';
 
@@ -29,6 +30,11 @@ export function ApplicationReviewIssueActions({
   review: PersistedRun['reviews'][number];
 }) {
   const { locale } = useI18n();
+  const queued = useDecisionOutbox().items.some(
+    (item) =>
+      item.input.reviewId === review.reviewId &&
+      item.input.issueIndex === issueIndex,
+  );
   const key = `${review.reviewId}:${issueIndex}`;
   const removesClaim = issue.section === 'relevant_experience';
   return (
@@ -54,17 +60,21 @@ export function ApplicationReviewIssueActions({
         onClick={() => onDecide(review.reviewId, issueIndex, 'correct')}
         type="button"
       >
-        {pending === key
+        {queued
           ? locale === 'en'
-            ? 'Correcting…'
-            : 'Correction…'
-          : removesClaim
+            ? 'Waiting to sync'
+            : 'En attente d’envoi'
+          : pending === key
             ? locale === 'en'
-              ? 'Remove claim'
-              : 'Supprimer l’affirmation'
-            : locale === 'en'
-              ? 'Correct section'
-              : 'Corriger la section'}
+              ? 'Correcting…'
+              : 'Correction…'
+            : removesClaim
+              ? locale === 'en'
+                ? 'Remove claim'
+                : 'Supprimer l’affirmation'
+              : locale === 'en'
+                ? 'Correct section'
+                : 'Corriger la section'}
       </button>
     </div>
   );

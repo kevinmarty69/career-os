@@ -27,6 +27,13 @@ export function applyRunPoll(
 }
 
 export function useApplicationRun(applicationId: string) {
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    const update = () => setRefresh((value) => value + 1);
+    window.addEventListener('career-os:decisions-synced', update);
+    return () =>
+      window.removeEventListener('career-os:decisions-synced', update);
+  }, []);
   const [result, setResult] = useState<ApplicationRunState>();
   const current = result?.applicationId === applicationId ? result : undefined;
   useEffect(() => {
@@ -92,7 +99,7 @@ export function useApplicationRun(applicationId: string) {
           });
       });
     return () => controller.abort();
-  }, [applicationId]);
+  }, [applicationId, refresh]);
 
   useEffect(() => {
     if (current?.run?.status !== 'running') return;

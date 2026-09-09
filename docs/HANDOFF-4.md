@@ -34,6 +34,7 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 - Public GitHub README import is connected to the existing local review flow. Fixed public REST endpoints, authenticated/rate-limited requests, no token or private repository access, bounded UTF-8 content, original repository/blob reference retained. Candidates start unchecked; no ownership is inferred. A failed fetch preserves the URL for retry.
 - Source arbitration can retain both versions with distinct, explicitly attested contexts. Ambiguous originals remain blocked; contextual statements remain declared, preserve restrictive source permissions and survive database ID remapping. The Skills route opens the existing skill view directly.
 - A shared, signed testimony names draft applications whose analysis history contains the exact previous statement. The authenticated, workspace-scoped lookup is read-only, bounded to 100 drafts and keeps the private wording out of URLs. Dossier links reuse the existing explicit new-analysis flow; no agent run starts automatically and sent applications remain excluded. This is historical exact matching, not a claim of semantic relevance or that the statement appeared on a published page.
+- Offline review decisions now have a bounded browser outbox: 50 choices per account/workspace, no proofs or credentials, stable server idempotency keys, cross-tab replay locking and a fresh authenticated scope check on reconnect. Stale/rejected choices stay visible for review/discard; transient failures are retained. Only review arbitration is queued, not publication, model starts or arbitrary edits. Reloading while offline still requires the app shell to be available; there is no service-worker cache.
 
 ### Remaining before claiming the complete handoff
 
@@ -41,7 +42,7 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 - Full notification event coverage and configured product-email delivery; current read state does not create a durable outgoing queue.
 - Drive OAuth, GitHub account-wide synchronization, personal API tokens, editable per-stage model and budget controls, instance first-run setup. Single public GitHub README import is delivered.
 - Private cloud trial, checkout and pause integration. Existing private cloud code must be reconciled with current Supabase identity before activation; no payment authorization is implied.
-- A durable offline decision queue and complete populated-state visual parity across every supplied screen.
+- Complete populated-state visual parity across every supplied screen. Offline review arbitration is delivered; arbitrary offline edits and offline app-shell caching are not.
 
 ### Validation for this milestone
 

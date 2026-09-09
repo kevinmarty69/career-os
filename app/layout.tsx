@@ -4,6 +4,7 @@ import { Geist_Mono, Instrument_Sans, Space_Grotesk } from 'next/font/google';
 import { I18nProvider } from '@/components/i18n/i18n-provider';
 import { localeCookieName, resolveLocale } from '@/lib/i18n/locale';
 import './globals.css';
+import { DecisionOutboxProvider } from '@/components/decision-outbox-provider';
 
 const sans = Instrument_Sans({
   subsets: ['latin'],
@@ -42,7 +43,9 @@ export default async function RootLayout({
       lang={locale}
     >
       <body>
-        <I18nProvider initialLocale={locale}>{children}</I18nProvider>
+        <I18nProvider initialLocale={locale}>
+          <DecisionOutboxProvider>{children}</DecisionOutboxProvider>
+        </I18nProvider>
       </body>
     </html>
   );

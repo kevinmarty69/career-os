@@ -20,6 +20,13 @@ export async function POST(
   if (!isSameOrigin(request)) return new Response('Forbidden', { status: 403 });
   const session = await authenticate(request);
   if (session instanceof Response) return session;
+  if (
+    (request.headers.has('x-career-user') &&
+      request.headers.get('x-career-user') !== session.userId) ||
+    (request.headers.has('x-career-workspace') &&
+      request.headers.get('x-career-workspace') !== session.tenantId)
+  )
+    return new Response('Workspace changed', { status: 403 });
   try {
     const { runId } = await context.params;
     const result = await decideReviewIssue(

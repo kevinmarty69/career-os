@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useI18n } from '@/components/i18n/i18n-provider';
 import { Button, Icon, Mono } from '@/components/ui/controls';
+import { useDecisionOutbox } from '@/components/decision-outbox-provider';
 
 export function SystemState({
   kind,
@@ -77,6 +78,7 @@ export function SystemState({
 }
 
 export function OfflineNotice() {
+  const outbox = useDecisionOutbox();
   const [offline, setOffline] = useState(false);
   const fr = useI18n().locale === 'fr';
   useEffect(() => {
@@ -89,7 +91,7 @@ export function OfflineNotice() {
       window.removeEventListener('offline', update);
     };
   }, []);
-  if (!offline) return null;
+  if (!offline && !outbox.items.length) return null;
   return (
     <div
       role="status"
@@ -97,12 +99,63 @@ export function OfflineNotice() {
     >
       <Icon name="cloud_off" />
       <div>
-        <strong>{fr ? 'Vous êtes hors connexion.' : 'You are offline.'}</strong>
+        <strong>
+          {offline
+            ? fr
+              ? 'Vous êtes hors connexion.'
+              : 'You are offline.'
+            : fr
+              ? 'Décisions en attente d’envoi'
+              : 'Decisions waiting to sync'}
+        </strong>
         <p className="m-0">
           {fr
-            ? 'Gardez cette page ouverte. Les nouvelles saisies ne sont pas sauvegardées automatiquement ; réessayez à la reconnexion.'
-            : 'Keep this page open. New input is not saved automatically; retry once reconnected.'}
+            ? 'Les décisions d’arbitrage mises en file restent dans ce navigateur et partiront à la reconnexion avec le même compte et espace. Les autres saisies ne sont pas mises en file. Nouveaux runs impossibles hors ligne.'
+            : 'Queued review decisions stay in this browser and sync on reconnection with the same account and workspace. Other edits are not queued. New runs cannot start offline.'}
         </p>
+        {outbox.items.map((item) => (
+          <div key={item.key} className="flex flex-wrap items-center gap-3">
+            <span>
+              {item.blocked
+                ? fr
+                  ? 'Décision périmée ou refusée — à revoir'
+                  : 'Stale or rejected decision — review required'
+                : fr
+                  ? 'Décision gardée localement'
+                  : 'Decision saved locally'}
+            </span>
+            <Link href={`/applications/${item.applicationId}`}>
+              {fr ? 'Ouvrir le dossier' : 'Open dossier'}
+            </Link>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    fr
+                      ? 'Retirer cette décision locale ? Elle ne sera pas envoyée.'
+                      : 'Discard this local decision? It will not be sent.',
+                  )
+                )
+                  outbox.discard(item.key);
+              }}
+            >
+              {fr ? 'Retirer' : 'Discard'}
+            </Button>
+          </div>
+        ))}
+        {outbox.items.length > 0 && !offline && (
+          <Button onClick={outbox.retry}>
+            {fr ? 'Réessayer la synchronisation' : 'Retry sync'}
+          </Button>
+        )}
+        {outbox.unavailable && (
+          <p role="alert">
+            {fr
+              ? 'La synchronisation est indisponible. Aucune décision locale n’a été effacée.'
+              : 'Sync is unavailable. No local decision has been erased.'}
+          </p>
+        )}
       </div>
     </div>
   );

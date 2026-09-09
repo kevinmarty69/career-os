@@ -15,11 +15,13 @@ import {
 } from '@/lib/run-contract';
 import { persistedRunOperation } from '@/lib/run-operation';
 import { useState } from 'react';
+import { useDecisionOutbox } from '@/components/decision-outbox-provider';
 import { useApplicationPublication } from './use-application-publication';
 import { useApplicationRun } from './use-application-run';
 export type { PublicationActionError } from './use-application-publication';
 
 export function useApplicationWorkflow(applicationId: string) {
+  const outbox = useDecisionOutbox();
   const { current, setResult } = useApplicationRun(applicationId);
   const [starting, setStarting] = useState(false);
   const [decisionPending, setDecisionPending] = useState(false);
@@ -241,7 +243,12 @@ export function useApplicationWorkflow(applicationId: string) {
     issueIndex: number,
     decision: 'keep' | 'correct',
   ) {
-    if (!current?.run || reviewPending) return;
+    if (
+      !current?.run ||
+      reviewPending ||
+      outbox.items.some((item) => item.runId === current.run?.runId)
+    )
+      return;
     const key = `${reviewId}:${issueIndex}`;
     setReviewPending(key);
     setReviewError(false);
@@ -252,6 +259,15 @@ export function useApplicationWorkflow(applicationId: string) {
         `career-os-review-decision:${current.run.runId}:${key}:${decision}`,
         input,
       );
+      if (!navigator.onLine) {
+        await outbox.enqueue({
+          key: operation.key,
+          runId: current.run.runId,
+          applicationId,
+          input: { reviewId, issueIndex, decision },
+        });
+        return;
+      }
       const response = await decideRunReviewIssue(
         current.run.runId,
         input,
@@ -308,7 +324,16 @@ export function useApplicationWorkflow(applicationId: string) {
     decisionPending,
     loading: !current,
     reviewError,
-    reviewPending,
+    reviewPending:
+      reviewPending ??
+      (() => {
+        const queued = outbox.items.find(
+          (item) => item.runId === current?.run?.runId,
+        );
+        return queued
+          ? `${queued.input.reviewId}:${queued.input.issueIndex}`
+          : undefined;
+      })(),
     start,
     startReviews,
     startStrategy,
