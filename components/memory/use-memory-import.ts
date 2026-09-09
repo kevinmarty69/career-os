@@ -14,6 +14,7 @@ import {
   type ProfileImportResult,
 } from '@/lib/profile-import';
 import { profileSchema, type Profile } from '@/lib/schemas';
+import { githubSourceSchema } from '@/lib/github-source';
 
 export const importCandidateGroupLabels = {
   summary: 'Profil et synthèse',
@@ -48,7 +49,7 @@ export type AllowedUse = keyof typeof allowedUseLabels;
 export type Sensitivity = keyof typeof sensitivityLabels;
 export type CandidateGroup = keyof typeof importCandidateGroupLabels;
 export type ProvenanceLevel = keyof typeof provenanceLabels;
-export type ReviewSourceKind = 'document' | 'linkedin' | 'manual';
+export type ReviewSourceKind = 'document' | 'linkedin' | 'manual' | 'web';
 
 export type ReviewCandidate = ProfileImportCandidate & {
   id: string;
@@ -64,6 +65,7 @@ export type ImportReview = Omit<ProfileImportResult, 'candidates'> & {
   candidates: ReviewCandidate[];
   permissionsConfirmed: boolean;
   sourceKind: ReviewSourceKind;
+  sourceUrl?: string;
   expiresAt: number;
 };
 
@@ -76,9 +78,13 @@ export function useMemoryImport() {
   const [stage, setStage] = useState<ImportStage>('source');
   const [review, setReview] = useState<ImportReview>();
   const [pasteText, setPasteText] = useState('');
+  const [githubRepository, setGithubRepository] = useState('');
   const [pasteSourceKind, setPasteSourceKind] =
     useState<ReviewSourceKind>('linkedin');
   const [sourceName, setSourceName] = useState('');
+  const [readingLocation, setReadingLocation] = useState<'browser' | 'github'>(
+    'browser',
+  );
   const [error, setError] = useState<ImportMessageKey | ''>('');
   const [revision, setRevision] = useState(0);
   const [existingProfile, setExistingProfile] = useState<Profile | null>(null);
@@ -152,6 +158,7 @@ export function useMemoryImport() {
   function prepareReview(
     result: ProfileImportResult,
     sourceKind: ReviewSourceKind,
+    sourceUrl?: string,
   ) {
     const next: ImportReview = {
       ...result,
@@ -161,13 +168,14 @@ export function useMemoryImport() {
       candidates: result.candidates.map((candidate) => ({
         ...candidate,
         id: crypto.randomUUID(),
-        selected: true,
+        selected: sourceKind !== 'web',
         sensitivity: 'private',
         allowedUses: ['application'],
         level: 'declared',
       })),
       permissionsConfirmed: false,
       sourceKind,
+      sourceUrl,
       expiresAt: Date.now() + REVIEW_TTL_MS,
     };
     persistReview(next);
@@ -176,6 +184,7 @@ export function useMemoryImport() {
   }
 
   async function importFile(file: File) {
+    setReadingLocation('browser');
     pendingImport.current?.abort();
     const controller = new AbortController();
     pendingImport.current = controller;
@@ -198,6 +207,7 @@ export function useMemoryImport() {
   }
 
   async function importPastedText() {
+    setReadingLocation('browser');
     setSourceName('Texte collé');
     setStage('reading');
     setError('');
@@ -215,6 +225,45 @@ export function useMemoryImport() {
     } catch (caught) {
       setStage('source');
       setError(importErrorMessage(caught));
+    }
+  }
+
+  async function importGitHub(repository: string) {
+    setReadingLocation('github');
+    pendingImport.current?.abort();
+    const controller = new AbortController();
+    pendingImport.current = controller;
+    setSourceName(repository);
+    setStage('reading');
+    setError('');
+    try {
+      const response = await fetch('/api/profile/import-github', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repository }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error();
+      const source = githubSourceSchema.parse(await response.json());
+      const result = await importProfileText(
+        source.readme,
+        `${source.repository} · README · ${source.fetchedAt.slice(0, 10)}`,
+      );
+      if (controller.signal.aborted) return;
+      // A repository's claims are not automatically the candidate's contributions.
+      prepareReview(
+        { ...result, suggestedName: null, suggestedHeadline: null },
+        'web',
+        `${source.url}#readme-${source.sha}`,
+      );
+    } catch {
+      if (!controller.signal.aborted) {
+        setStage('source');
+        setError('memory.github.import.unavailable');
+      }
+    } finally {
+      if (pendingImport.current === controller)
+        pendingImport.current = undefined;
     }
   }
 
@@ -343,12 +392,16 @@ export function useMemoryImport() {
     error,
     importFile,
     importPastedText,
+    importGitHub,
+    githubRepository,
+    setGithubRepository,
     pasteText,
     pasteSourceKind,
     review,
     setPasteText,
     setPasteSourceKind,
     sourceName,
+    readingLocation,
     stage,
     updateCandidate,
     updateReview,
@@ -382,7 +435,7 @@ function buildProfile(review: ImportReview, existing: Profile | null): Profile {
         id: sourceId,
         kind: review.sourceKind,
         title: review.source.displayName,
-        locator: `sha256:${review.source.sha256}`,
+        locator: review.sourceUrl ?? `sha256:${review.source.sha256}`,
         sensitivity: sourceSensitivity,
         allowedUses,
         trust: 'untrusted-data',
@@ -456,7 +509,14 @@ function restoreReview(raw: string | null): ImportReview | undefined {
       !Array.isArray(stored.candidates) ||
       typeof stored.permissionsConfirmed !== 'boolean' ||
       !stored.sourceKind ||
-      !['document', 'linkedin', 'manual'].includes(stored.sourceKind)
+      !['document', 'linkedin', 'manual', 'web'].includes(stored.sourceKind)
+    )
+      return;
+    if (
+      stored.sourceUrl &&
+      !/^https:\/\/github\.com\/[\w-]+\/[\w.-]+#readme-[a-f0-9]{40,64}$/.test(
+        stored.sourceUrl,
+      )
     )
       return;
     const parsed = profileImportResultSchema.safeParse({
@@ -503,6 +563,7 @@ function restoreReview(raw: string | null): ImportReview | undefined {
       })),
       permissionsConfirmed: stored.permissionsConfirmed,
       sourceKind: stored.sourceKind,
+      sourceUrl: stored.sourceUrl,
       expiresAt: stored.expiresAt,
     };
   } catch {

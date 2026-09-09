@@ -1,6 +1,7 @@
 'use client';
 
-import { useTranslations } from '@/components/i18n/i18n-provider';
+import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
+import { githubRepositorySchema } from '@/lib/github-source';
 import { memoryMessages } from '@/lib/i18n/dictionaries/memory';
 import styles from './memory-import-flow.module.css';
 import Link from 'next/link';
@@ -13,6 +14,8 @@ import {
 } from './memory-import-presentation';
 export function SourceStep({ controller }: { controller: Controller }) {
   const t = useTranslations([memoryMessages]);
+  const fr = useI18n().locale === 'fr';
+  const repository = controller.githubRepository;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const canReadPaste = controller.pasteText.trim().length > 0;
@@ -116,6 +119,37 @@ export function SourceStep({ controller }: { controller: Controller }) {
           </div>
         </section>
         <aside className={styles.privacyPanel}>
+          <div className={styles.pasteFields}>
+            <h2>GitHub</h2>
+            <p>
+              {fr
+                ? 'Importez le README d’un dépôt public. Le serveur lit uniquement sa présentation et ses métadonnées publiques, sans clé ni code privé. Aucune contribution ne vous est attribuée automatiquement.'
+                : 'Import a public repository README. The server reads only its overview and public metadata, without a key or private code. No contribution is automatically attributed to you.'}
+            </p>
+            <label htmlFor="github-repository">
+              {fr ? 'Dépôt public' : 'Public repository'}
+              <input
+                id="github-repository"
+                value={repository}
+                onChange={(event) =>
+                  controller.setGithubRepository(event.target.value)
+                }
+                placeholder="https://github.com/owner/repository"
+                maxLength={2048}
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              disabled={!githubRepositorySchema.safeParse(repository).success}
+              onClick={() => void controller.importGitHub(repository)}
+            >
+              {fr ? 'Lire le README public' : 'Read public README'}
+              <Icon>arrow_forward</Icon>
+            </button>
+          </div>
           <div className={styles.panelHeading}>
             <span className={styles.safeIcon}>
               <Icon>shield</Icon>
@@ -163,12 +197,19 @@ function PrivacyItem({ title, body }: { title: string; body: string }) {
 
 export function ReadingStep({ controller }: { controller: Controller }) {
   const t = useTranslations([memoryMessages]);
+  const fr = useI18n().locale === 'fr';
   return (
     <div className={styles.flowStep} data-motion="enter">
       <PageHeading
         copy={t('memory.reading.resume.intro')}
         eyebrow={t('memory.step.1.of.3')}
-        title={t('memory.reading.your.resume')}
+        title={
+          controller.readingLocation === 'github'
+            ? fr
+              ? 'Lecture du README public'
+              : 'Reading the public README'
+            : t('memory.reading.your.resume')
+        }
         action={
           <button
             className={styles.ghostButton}
@@ -187,7 +228,13 @@ export function ReadingStep({ controller }: { controller: Controller }) {
             </span>
             <div>
               <h2>{controller.sourceName}</h2>
-              <p>{t('memory.local.source.processed.in.browser')}</p>
+              <p>
+                {controller.readingLocation === 'github'
+                  ? fr
+                    ? 'Lecture publique par le serveur, puis revue locale.'
+                    : 'Public server fetch, followed by local review.'
+                  : t('memory.local.source.processed.in.browser')}
+              </p>
             </div>
           </header>
           <div className={styles.progressMeta}>

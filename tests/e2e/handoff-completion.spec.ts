@@ -11,6 +11,89 @@ import {
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
+test('GitHub import HTTP boundary rejects anonymous and cross-origin requests', async ({
+  request,
+}) => {
+  const input = { repository: 'synthetic/project' };
+  const anonymous = await request.post('/api/profile/import-github', {
+    data: input,
+    headers: { origin: 'http://localhost:3117' },
+  });
+  expect(anonymous.status()).toBe(401);
+  const foreign = await request.post('/api/profile/import-github', {
+    data: input,
+    headers: { origin: 'https://foreign.example.test' },
+  });
+  expect(foreign.status()).toBe(403);
+});
+
+test('public README is reviewed with no automatic attribution or workspace write', async ({
+  page,
+  context,
+}, info) => {
+  await context.addCookies([
+    { name: 'career-os-locale', value: 'en', domain: 'localhost', path: '/' },
+  ]);
+  await mockPersistedWorkspace(page);
+  let writes = 0;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/profile') && request.method() === 'PUT')
+      writes++;
+  });
+  let failed = true;
+  await page.route('**/api/profile/import-github', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      repository: 'https://github.com/synthetic/project',
+    });
+    if (failed)
+      return route.fulfill({
+        status: 503,
+        json: { error: 'Synthetic rate limit' },
+      });
+    await route.fulfill({
+      json: {
+        repository: 'synthetic/project',
+        url: 'https://github.com/synthetic/project',
+        readme:
+          'Projects\nBuilt a bounded source parser for public career documents.\nAdded explicit human review before publishing any application.',
+        sha: 'a'.repeat(40),
+        stars: 2,
+        languages: ['TypeScript'],
+        updatedAt: '2026-09-09T10:00:00.000Z',
+        fetchedAt: '2026-09-09T10:00:00.000Z',
+      },
+    });
+  });
+  await page.goto('/memory/import');
+  await page
+    .getByLabel('Public repository', { exact: true })
+    .fill('https://github.com/synthetic/project');
+  await page.getByRole('button', { name: 'Read public README' }).click();
+  await expect(
+    page.getByText('Public README unavailable.', { exact: false }),
+  ).toBeVisible();
+  failed = false;
+  await page.getByRole('button', { name: 'Read public README' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Review what was extracted' }),
+  ).toBeVisible();
+  const selections = page.locator('article > header input[type="checkbox"]');
+  await expect(selections.first()).not.toBeChecked();
+  await expect(page.getByLabel('Full name', { exact: true })).toHaveValue(
+    'Alex Morgan',
+  );
+  expect(writes).toBe(0);
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Review what was extracted' }),
+  ).toBeVisible();
+  await expect(selections.first()).not.toBeChecked();
+  await page.screenshot({
+    path: info.outputPath('github-review-en.png'),
+    fullPage: true,
+  });
+});
+
 test('debrief retains failed input and persists in the application timeline', async ({
   page,
   context,

@@ -31,12 +31,13 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 - Notification read state and the five product-email preferences persist in Supabase account metadata. Failed writes retain the saved choice. Email delivery is still disabled.
 - Structured interview debriefs use the existing private application timeline: questions, answers, evidence gaps, next step and notes. Save failures preserve input; reloading restores the last saved debrief.
 - Unknown routes now use native Next.js `notFound()` and return HTTP 404. Sourced-memory counters exclude blocked/inferred claims. Shared checkbox layout is isolated from legacy form styles.
+- Public GitHub README import is connected to the existing local review flow. Fixed public REST endpoints, authenticated/rate-limited requests, no token or private repository access, bounded UTF-8 content, original repository/blob reference retained. Candidates start unchecked; no ownership is inferred. A failed fetch preserves the URL for retry.
 
 ### Remaining before claiming the complete handoff
 
 - Model-led adaptive interviews, evidence-backed claim repair in specific application drafts, and source conflict detection beyond identical numeric wording. No automatic market-impact statistics.
 - Full notification event coverage and configured product-email delivery; current read state does not create a durable outgoing queue.
-- GitHub/Drive connectors, personal API tokens, editable per-stage model and budget controls, instance first-run setup.
+- Drive OAuth, GitHub account-wide synchronization, personal API tokens, editable per-stage model and budget controls, instance first-run setup. Single public GitHub README import is delivered.
 - Private cloud trial, checkout and pause integration. Existing private cloud code must be reconciled with current Supabase identity before activation; no payment authorization is implied.
 - A durable offline decision queue and complete populated-state visual parity across every supplied screen.
 
@@ -45,6 +46,9 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 - Lint, TypeScript and production build pass; 236 unit checks pass, 2 existing checks skipped.
 - 16 focused browser checks pass on desktop/mobile: guided interview, debrief persistence/failure, conflict arbitration, notification preferences/failure, native 404 and existing handoff regressions.
 - Browser fixtures intercept API/Supabase responses using synthetic records. This validates the UI contracts, not real email delivery, model calls, billing or production deployment.
+- GitHub follow-up: 237 unit checks pass (2 skipped); 22 browser import/regression checks pass. The actual HTTP handler rejects anonymous/cross-origin requests. A credential-free live read of `kevinmarty69/career-os` returned a valid 8,452-character README and public language metadata; no workspace write occurred during that live read.
+
+GitHub connector follows the [official public README endpoint](https://docs.github.com/en/rest/repos/contents#get-a-repository-readme); no SDK or OAuth scope is added.
 
 ## Original delivery boundaries — 8 September 2026
 

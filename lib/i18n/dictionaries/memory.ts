@@ -1,5 +1,9 @@
 import type { MessageDictionary } from '../messages';
 export const memoryMessages = {
+  'memory.github.import.unavailable': {
+    fr: 'README public indisponible. Vérifiez le dépôt et votre connexion ; réessayez plus tard si la limite GitHub est atteinte. Aucun accès aux dépôts privés.',
+    en: 'Public README unavailable. Check the repository and your connection; retry later if GitHub is rate-limited. Private repositories cannot be accessed.',
+  },
   'memory.this.review.expired.read.the.source.again.to.continue': {
     fr: 'Cette revue a expiré. Relancez la lecture pour continuer.',
     en: 'This review expired. Read the source again to continue.',

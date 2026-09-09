@@ -209,8 +209,8 @@ export function IntegrationsScreen() {
             'code',
             'GitHub',
             fr
-              ? 'Connecteur non configuré. Vous pouvez importer manuellement un README ou la description de votre contribution.'
-              : 'Connector not configured. Manually import a README or a description of your contribution.',
+              ? 'Import d’un README public par URL, sans clé. Aucun code privé, issue ou accès organisation ; vous relisez votre contribution avant de l’enregistrer.'
+              : 'Import a public README by URL, without a key. No private code, issues or organization access; review your own contribution before saving.',
           ],
           [
             'badge',
@@ -243,13 +243,17 @@ export function IntegrationsScreen() {
             </div>
             <p className="m-0 text-body-sm text-ink-700">{description}</p>
             <div className="rounded-control bg-panel p-4 text-label text-ink-600">
-              {title === 'LinkedIn'
+              {title === 'GitHub'
                 ? fr
-                  ? 'Manuel · PDF, DOCX ou texte'
-                  : 'Manual · PDF, DOCX or text'
-                : fr
-                  ? 'Non configuré · aucun accès accordé'
-                  : 'Not configured · no access granted'}
+                  ? 'Public uniquement · revue humaine obligatoire'
+                  : 'Public only · human review required'
+                : title === 'LinkedIn'
+                  ? fr
+                    ? 'Manuel · PDF, DOCX ou texte'
+                    : 'Manual · PDF, DOCX or text'
+                  : fr
+                    ? 'Non configuré · aucun accès accordé'
+                    : 'Not configured · no access granted'}
             </div>
             {icon === 'terminal' ? (
               <Button disabled>{fr ? 'Indisponible' : 'Unavailable'}</Button>
@@ -258,7 +262,13 @@ export function IntegrationsScreen() {
                 className="text-label text-ink-900 font-semibold underline"
                 href="/memory/import"
               >
-                {fr ? 'Importer un document' : 'Import a document'}
+                {title === 'GitHub'
+                  ? fr
+                    ? 'Importer un README public'
+                    : 'Import a public README'
+                  : fr
+                    ? 'Importer un document'
+                    : 'Import a document'}
               </Link>
             )}
           </Card>
