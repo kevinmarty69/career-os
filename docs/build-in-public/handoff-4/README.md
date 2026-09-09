@@ -25,3 +25,9 @@ The rendered interview can now select a factual question from a fixed catalogue 
 ![Adaptive interview with synthetic data](./adaptive-interview-en.png)
 
 Also delivered: a durable browser outbox for review decisions and additional in-app notifications. Neither feature sends email or publishes a page automatically.
+
+## 9 September — chosen evidence, consistent drafts
+
+Human review shows the source excerpt and lets the user choose another approved proof for the opening. Both application messages follow the current draft, not the original strategy. Previous versions stay immutable. This synthetic browser capture does not demonstrate a model call or a publication.
+
+![Selected evidence correction](./selected-correction-desktop.png)

@@ -8,12 +8,14 @@ import type { PersistedRun } from '@/lib/run-contract';
 export function ApplicationKitPanel({
   company,
   profile,
+  spec,
   research,
   role,
   strategy,
 }: {
   company: string;
   profile: PersistedRun['profile'];
+  spec: PersistedRun['spec'];
   research: NonNullable<PersistedRun['research']>;
   role: string;
   strategy: NonNullable<PersistedRun['strategy']>;
@@ -24,6 +26,7 @@ export function ApplicationKitPanel({
     company,
     locale,
     profile,
+    spec,
     research,
     role,
     strategy,
@@ -91,6 +94,13 @@ export function ApplicationKitPanel({
         </section>
         <section>
           <h3>{copy.messages}</h3>
+          {!kit.messages.length ? (
+            <p>
+              {locale === 'en'
+                ? 'Messages will be available when the current draft has a sourced opening.'
+                : 'Les messages seront disponibles lorsque le brouillon courant aura une ouverture sourcée.'}
+            </p>
+          ) : null}
           {kit.messages.map((message) => (
             <article key={message.kind}>
               <small>

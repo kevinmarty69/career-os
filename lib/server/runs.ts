@@ -482,7 +482,8 @@ export async function decideReviewIssue(
         const [correction] = await tx<Array<{ run_id: string }>>`
           select app.start_page_spec_correction(
             ${session.tenantId}, ${runId}, ${pageSpec.id}, ${review.id},
-            ${input.issueIndex}, ${decisionId}, ${key}, ${inputHash}
+            ${input.issueIndex}, ${decisionId}, ${key}, ${inputHash},
+            ${input.replacementClaimId ?? null}::uuid
           ) as run_id`;
         correctedRunId = correction.run_id;
       }

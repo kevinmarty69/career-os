@@ -484,6 +484,30 @@
   text-decoration: none;
 }
 
+.reviewExcerpt,
+.reviewComparison article > .reviewReplacement {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+}
+
+.reviewExcerpt p {
+  max-height: 180px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  border-left: 3px solid var(--color-green-text);
+  padding-left: 16px;
+}
+
+.reviewReplacement select {
+  width: 100%;
+  min-width: 0;
+}
+
+.reviewComparison .reviewReplacement small {
+  white-space: normal;
+}
+
 .reviewConstraint {
   display: flex;
   gap: 18px;

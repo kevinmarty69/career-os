@@ -242,6 +242,7 @@ export function useApplicationWorkflow(applicationId: string) {
     reviewId: string,
     issueIndex: number,
     decision: 'keep' | 'correct',
+    replacementClaimId?: string,
   ) {
     if (
       !current?.run ||
@@ -253,7 +254,13 @@ export function useApplicationWorkflow(applicationId: string) {
     setReviewPending(key);
     setReviewError(false);
     try {
-      const input = JSON.stringify({ reviewId, issueIndex, decision });
+      const choice = {
+        reviewId,
+        issueIndex,
+        decision,
+        ...(replacementClaimId ? { replacementClaimId } : {}),
+      };
+      const input = JSON.stringify(choice);
       const operation = persistedRunOperation(
         localStorage,
         `career-os-review-decision:${current.run.runId}:${key}:${decision}`,
@@ -264,7 +271,7 @@ export function useApplicationWorkflow(applicationId: string) {
           key: operation.key,
           runId: current.run.runId,
           applicationId,
-          input: { reviewId, issueIndex, decision },
+          input: choice,
         });
         return;
       }

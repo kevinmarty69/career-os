@@ -205,6 +205,46 @@ test('corrects only the immutable targeted section from approved proofs', () => 
   assert.equal(heroCorrection.hero.thesis, input.supports[0].statement);
   assert.deepEqual(heroCorrection.blocks, source.blocks);
   assert.deepEqual(heroCorrection.company, source.company);
+  const alternative = {
+    ...input.supports[0],
+    signalId: 'signal-3',
+    claimId: '60000000-0000-4000-8000-000000000003',
+    statement: 'Maintained a documented on-call handover.',
+  };
+  const selectedInput = {
+    ...input,
+    schemaVersion: 2,
+    supports: [...input.supports, alternative],
+    correction: {
+      ...correction,
+      replacementClaimId: alternative.claimId,
+      pageSpec: composeApprovedStrategyPage({
+        ...input,
+        supports: [...input.supports, alternative],
+      }),
+    },
+  };
+  assert.equal(
+    composeApprovedStrategyPage(selectedInput).hero.thesis,
+    alternative.statement,
+  );
+  for (const replacementClaimId of [
+    input.lead.claimId,
+    '60000000-0000-4000-8000-000000000099',
+  ]) {
+    assert.throws(() =>
+      composeApprovedStrategyPage({
+        ...selectedInput,
+        correction: { ...selectedInput.correction, replacementClaimId },
+      }),
+    );
+  }
+  assert.throws(() =>
+    composeApprovedStrategyPage({
+      ...selectedInput,
+      correction: { ...selectedInput.correction, pageSpec: source },
+    }),
+  );
 
   const chainedCorrection = composeApprovedStrategyPage({
     ...input,

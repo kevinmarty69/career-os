@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useI18n, useTranslations } from '@/components/i18n/i18n-provider';
 import { Badge, Icon } from '@/components/ui/primitives';
 import { dossierMessages } from '@/lib/i18n/dictionaries/dossier';
@@ -18,6 +18,7 @@ export function ApplicationReviewIssueActions({
   onDecide,
   pending,
   review,
+  replacementClaimId,
 }: {
   issue: PersistedRun['reviews'][number]['issues'][number];
   issueIndex: number;
@@ -25,9 +26,11 @@ export function ApplicationReviewIssueActions({
     reviewId: string,
     issueIndex: number,
     decision: ReviewDecision,
+    replacementClaimId?: string,
   ) => void;
   pending?: string;
   review: PersistedRun['reviews'][number];
+  replacementClaimId?: string;
 }) {
   const { locale } = useI18n();
   const queued = useDecisionOutbox().items.some(
@@ -41,6 +44,7 @@ export function ApplicationReviewIssueActions({
     <div className="co-review-actions">
       {review.reviewer !== 'factuality' ? (
         <button
+          className="co-button quiet"
           disabled={Boolean(pending)}
           onClick={() => onDecide(review.reviewId, issueIndex, 'keep')}
           type="button"
@@ -57,7 +61,9 @@ export function ApplicationReviewIssueActions({
       <button
         className="co-button"
         disabled={Boolean(pending)}
-        onClick={() => onDecide(review.reviewId, issueIndex, 'correct')}
+        onClick={() =>
+          onDecide(review.reviewId, issueIndex, 'correct', replacementClaimId)
+        }
         type="button"
       >
         {queued
@@ -93,6 +99,7 @@ export function ApplicationReviewCheckpoint({
     reviewId: string,
     issueIndex: number,
     decision: ReviewDecision,
+    replacementClaimId?: string,
   ) => void;
   pending?: string;
   run: PersistedRun;
@@ -100,6 +107,10 @@ export function ApplicationReviewCheckpoint({
   const router = useRouter();
   const { locale } = useI18n();
   const t = useTranslations([dossierMessages]);
+  const [selection, setSelection] = useState<{
+    issue: string;
+    claimId: string;
+  }>();
   const decisions = new Map(
     run.reviewDecisions.map((decision) => [
       `${decision.reviewId}:${decision.issueIndex}`,
@@ -127,6 +138,38 @@ export function ApplicationReviewCheckpoint({
         !decisions.has(`${review.reviewId}:${issueIndex}`),
     );
   const current = Math.min(issueCount, issueCount - unresolved + 1);
+  const activeKey = active
+    ? `${active.review.reviewId}:${active.issueIndex}`
+    : '';
+  const replacements =
+    active?.issue.section === 'hero'
+      ? (run.strategy?.supports ?? [])
+          .flatMap(({ claimId }) => {
+            const claim = run.profile.claims.find(
+              (item) => item.id === claimId,
+            );
+            return claim &&
+              claimId !== active.issue.claimId &&
+              run.spec?.blocks.some(
+                (block) =>
+                  'claimIds' in block && block.claimIds.includes(claimId),
+              )
+              ? [claim]
+              : [];
+          })
+          .filter(
+            (claim, index, claims) =>
+              claims.findIndex((item) => item.id === claim.id) === index,
+          )
+      : [];
+  const replacement =
+    replacements.find(
+      (claim) =>
+        selection?.issue === activeKey && selection.claimId === claim.id,
+    ) ?? replacements[0];
+  const attachedEvidence = run.profile.evidence.filter((evidence) =>
+    active?.issue.evidenceIds?.includes(evidence.id),
+  );
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -138,7 +181,12 @@ export function ApplicationReviewCheckpoint({
         router.push(`/applications/${applicationId}`);
       } else if (event.key === 'Enter') {
         event.preventDefault();
-        onDecide(active.review.reviewId, active.issueIndex, 'correct');
+        onDecide(
+          active.review.reviewId,
+          active.issueIndex,
+          'correct',
+          replacement?.id,
+        );
       } else if (
         event.key === 'Backspace' &&
         active.review.reviewer !== 'factuality'
@@ -149,7 +197,7 @@ export function ApplicationReviewCheckpoint({
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [active, applicationId, onDecide, pending, router]);
+  }, [active, applicationId, onDecide, pending, replacement?.id, router]);
 
   return (
     <section className={styles.reviewWizard}>
@@ -184,22 +232,27 @@ export function ApplicationReviewCheckpoint({
                 </strong>
                 <small>{active.issue.section}</small>
               </div>
-              <p>
-                {(active.issue.evidenceIds?.length ?? 0) > 0
-                  ? locale === 'en'
-                    ? `${active.issue.evidenceIds?.length ?? 0} supporting source${active.issue.evidenceIds?.length === 1 ? '' : 's'}`
-                    : `${active.issue.evidenceIds?.length ?? 0} source${active.issue.evidenceIds?.length === 1 ? '' : 's'} justificative${active.issue.evidenceIds?.length === 1 ? '' : 's'}`
-                  : locale === 'en'
+              {attachedEvidence.map((evidence) => (
+                <blockquote className={styles.reviewExcerpt} key={evidence.id}>
+                  <small>
+                    {
+                      run.profile.sources.find(
+                        (source) => source.id === evidence.sourceId,
+                      )?.title
+                    }{' '}
+                    · {evidence.label}
+                  </small>
+                  <p>{evidence.excerpt}</p>
+                </blockquote>
+              ))}
+              {!attachedEvidence.length ? (
+                <p>
+                  {locale === 'en'
                     ? 'No supporting evidence is attached.'
                     : 'Aucune preuve justificative n’est rattachée.'}
-              </p>
-              <Link
-                href={
-                  active.issue.claimId
-                    ? `/memory#claim-${active.issue.claimId}`
-                    : '/memory'
-                }
-              >
+                </p>
+              ) : null}
+              <Link href="/memory">
                 <Icon>visibility</Icon>
                 {locale === 'en' ? 'Open career memory' : 'Ouvrir la mémoire'}
               </Link>
@@ -226,6 +279,38 @@ export function ApplicationReviewCheckpoint({
                     ? 'You retain final authority over this reviewer suggestion.'
                     : 'Vous gardez l’autorité finale sur cette suggestion du reviewer.'}
               </p>
+              {replacement ? (
+                <div className={styles.reviewReplacement}>
+                  <label htmlFor="review-replacement">
+                    {locale === 'en'
+                      ? 'Use this approved evidence'
+                      : 'Utiliser cette preuve validée'}
+                  </label>
+                  <select
+                    id="review-replacement"
+                    disabled={Boolean(pending)}
+                    value={replacement.id}
+                    onChange={(event) =>
+                      setSelection({
+                        issue: activeKey,
+                        claimId: event.target.value,
+                      })
+                    }
+                  >
+                    {replacements.map((claim) => (
+                      <option key={claim.id} value={claim.id}>
+                        {claim.statement}
+                      </option>
+                    ))}
+                  </select>
+                  <p>{replacement.statement}</p>
+                  <small>
+                    {locale === 'en'
+                      ? 'Updates the draft opening and both application messages. Published versions do not change.'
+                      : 'Met à jour l’ouverture et les deux messages du brouillon. Les versions publiées ne changent pas.'}
+                  </small>
+                </div>
+              ) : null}
             </article>
           </div>
 
@@ -252,6 +337,7 @@ export function ApplicationReviewCheckpoint({
               onDecide={onDecide}
               pending={pending}
               review={active.review}
+              replacementClaimId={replacement?.id}
             />
           </footer>
         </div>

@@ -349,7 +349,16 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
         reviewId: ids.review,
         issueIndex: 0,
         decision: 'correct' as const,
+        replacementClaimId: ids.supportClaim,
       };
+      await assert.rejects(
+        decideReviewIssue(
+          session,
+          ids.run,
+          { ...input, replacementClaimId: ids.leadClaim },
+          randomUUID(),
+        ),
+      );
       const created = await decideReviewIssue(
         session,
         ids.run,
@@ -388,7 +397,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
         decideReviewIssue(
           session,
           ids.run,
-          { ...input, decision: 'keep' },
+          { reviewId: ids.review, issueIndex: 0, decision: 'keep' },
           ids.decisionKey,
         ),
         RunConflictError,
@@ -630,6 +639,7 @@ test('a correction creates one child PageSpec without rerunning upstream stages'
           reviewId: ids.review,
           issueIndex: 0,
           decision: 'correct',
+          replacementClaimId: ids.supportClaim,
         },
         ids.decisionKey,
       );

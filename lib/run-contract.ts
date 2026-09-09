@@ -346,8 +346,16 @@ export const reviewIssueDecisionInputSchema = z
     reviewId: z.string().uuid(),
     issueIndex: z.number().int().min(0).max(4),
     decision: z.enum(['keep', 'correct']),
+    replacementClaimId: z.string().uuid().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (input) => !input.replacementClaimId || input.decision === 'correct',
+    {
+      message: 'A replacement requires a correction decision.',
+      path: ['replacementClaimId'],
+    },
+  );
 
 export const reviewIssueDecisionResultSchema = z
   .object({

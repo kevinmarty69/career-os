@@ -72,6 +72,7 @@ const correctionSchema = z
     issueIndex: z.number().int().min(0).max(4),
     issue: correctionIssueSchema,
     pageSpec: z.lazy(() => pageComposerOutputSchema),
+    replacementClaimId: uuidSchema.optional(),
   })
   .strict();
 
@@ -87,6 +88,22 @@ const pageComposerV2InputSchema = z
     const source = input.correction.pageSpec;
     const expectedTitle = `${input.candidateName} × ${input.company.name}`;
     const selected = [input.lead, ...input.supports];
+    if (
+      input.correction.replacementClaimId &&
+      (input.correction.issue.section !== 'hero' ||
+        !input.supports.some(
+          (proof) =>
+            proof.claimId === input.correction.replacementClaimId &&
+            proof.claimId !== input.correction.issue.claimId &&
+            source.blocks[0].claimIds.includes(proof.claimId),
+        ))
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['correction', 'replacementClaimId'],
+        message:
+          'Choose a different approved proof still present in the draft.',
+      });
     const selectedClaimIds = new Set(selected.map((proof) => proof.claimId));
     if (
       JSON.stringify(source.company) !== JSON.stringify(input.company) ||
@@ -225,7 +242,10 @@ function composeCorrection(
   let output: PageComposerOutput;
   if (target.section === 'hero') {
     const replacement = input.supports.find(
-      (support) => support.claimId !== target.claimId,
+      (support) =>
+        support.claimId !== target.claimId &&
+        (!input.correction.replacementClaimId ||
+          support.claimId === input.correction.replacementClaimId),
     );
     if (!replacement)
       throw new Error('No different approved support can replace the hero.');

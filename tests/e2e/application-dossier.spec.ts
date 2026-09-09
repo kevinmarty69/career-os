@@ -894,6 +894,95 @@ test('keeps review objections visible until the human decides', async ({
   expect(request?.key).toMatch(/^[0-9a-f-]{36}$/);
 });
 
+test('shows the source excerpt and submits the chosen approved replacement', async ({
+  context,
+  page,
+}) => {
+  await context.clearCookies();
+  const base = reviewedRun();
+  const lead = base.profile.claims[0];
+  const replacement = {
+    ...lead,
+    id: '988c0a00-0000-4000-8000-000000000051',
+    statement: 'Documented the incident response process.',
+  };
+  const run = {
+    ...base,
+    profile: { ...base.profile, claims: [lead, replacement] },
+    strategy: {
+      ...base.strategy,
+      supports: [
+        {
+          ...base.strategy.lead,
+          signalId: 'signal-2',
+          claimId: replacement.id,
+        },
+      ],
+      gaps: [],
+    },
+    spec: {
+      ...base.spec,
+      hero: { ...base.spec.hero, thesis: lead.statement },
+      blocks: [
+        {
+          type: 'fit',
+          title: 'Experience',
+          claimIds: [lead.id, replacement.id],
+        },
+      ],
+    },
+    reviews: [
+      {
+        ...base.reviews[0],
+        issues: [
+          {
+            ...base.reviews[0].issues[0],
+            claimId: lead.id,
+            evidenceIds: lead.evidenceIds,
+          },
+        ],
+      },
+    ],
+  };
+  let submitted: unknown;
+  await mockApplication(page, run);
+  await page.route(`**/api/runs/${run.runId}/review-decisions`, (route) => {
+    submitted = route.request().postDataJSON();
+    return route.fulfill({ status: 409, json: { error: 'stale_review' } });
+  });
+  await page.goto(`/applications/${applicationId}/review`);
+  await expect(
+    page.getByText(base.profile.evidence[0].excerpt, { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Use this approved evidence')).toHaveValue(
+    replacement.id,
+  );
+  if (process.env.CAREER_OS_SELECTED_CORRECTION_SCREENSHOT)
+    await page.screenshot({
+      path: process.env.CAREER_OS_SELECTED_CORRECTION_SCREENSHOT.replace(
+        '-desktop',
+        (page.viewportSize()?.width ?? 1280) < 600 ? '-mobile' : '-desktop',
+      ),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  await page.getByRole('button', { name: 'Correct section' }).click();
+  await expect
+    .poll(() => submitted)
+    .toEqual({
+      reviewId: run.reviews[0].reviewId,
+      issueIndex: 0,
+      decision: 'correct',
+      replacementClaimId: replacement.id,
+    });
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'The decision was not saved.' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Use this approved evidence')).toHaveValue(
+    replacement.id,
+  );
+});
+
 test('publishes the approved snapshot and can revoke its private link', async ({
   context,
   page,

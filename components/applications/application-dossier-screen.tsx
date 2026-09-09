@@ -300,8 +300,13 @@ export function DynamicDossierScreen({
             <ApplicationReviewCheckpoint
               applicationId={applicationId}
               error={workflow.reviewError}
-              onDecide={(reviewId, issueIndex, decision) =>
-                void workflow.decideReview(reviewId, issueIndex, decision)
+              onDecide={(reviewId, issueIndex, decision, replacementClaimId) =>
+                void workflow.decideReview(
+                  reviewId,
+                  issueIndex,
+                  decision,
+                  replacementClaimId,
+                )
               }
               pending={workflow.reviewPending}
               run={run}
@@ -730,6 +735,7 @@ function RunSummary({
         <ApplicationKitPanel
           company={application.company}
           profile={run.profile}
+          spec={run.spec}
           research={run.research}
           role={application.role}
           strategy={run.strategy}
