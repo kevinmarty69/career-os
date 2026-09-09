@@ -207,6 +207,7 @@ try {
     DATABASE_CA_CERT_PATH: '',
     CAREER_OS_TEST_DATABASE_URL: targetUrl.toString(),
     CAREER_OS_NATIVE_TEST: '1',
+    ALLOW_HANDOFF_MEMORY_SMOKE: '1',
     CAREER_OS_DEPLOYMENT_MODE: 'self-hosted',
     CAREER_OS_APP_URL: `http://127.0.0.1:${appPort}`,
     TEST_BASE_URL: `http://127.0.0.1:${appPort}`,

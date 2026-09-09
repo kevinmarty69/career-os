@@ -16,7 +16,7 @@
     "test:load": "pnpm benchmark:mvp && pnpm test:integration:discovery-concurrency && node --import tsx supabase/tests/durable-step-concurrency.mjs",
     "test:integration:worker": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/integration/*worker.test.ts",
     "test:integration:correction": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/integration/page-correction-worker.test.ts",
-    "test:integration:export": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/integration/workspace-*.test.ts",
+    "test:integration:export": "NODE_OPTIONS=--conditions=react-server tsx --test --test-concurrency=1 tests/integration/workspace-*.test.ts tests/integration/selected-correction.test.ts tests/integration/handoff-memory.test.ts",
     "test:integration:discovery-concurrency": "node --import tsx supabase/tests/scheduled-discovery-concurrency.mjs",
     "test:integration:http": "node scripts/run-http-integration-tests.mjs",
     "test:security": "tsx --test tests/unit/safe-http.test.ts tests/unit/profile-import.test.ts tests/unit/publication-security.test.ts && pnpm db:test && pnpm test:integration:http",
