@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { syntheticProfile } from '../../lib/fixture';
 import { profileSchema } from '../../lib/schemas';
+import { emptyInterview, saveInterview } from '../../lib/guided-interview';
 import { applicationId, mockPersistedWorkspace } from './persisted-workspace';
 import { type ApplicationTimelineEvent } from '../../lib/application-timeline';
 import {
@@ -10,6 +11,73 @@ import {
 } from '../../lib/notification-preferences';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
+
+test('signed testimony names related drafts without starting an agent run', async ({
+  page,
+  context,
+}) => {
+  await context.addCookies([
+    { name: 'career-os-locale', value: 'en', domain: 'localhost', path: '/' },
+  ]);
+  await mockPersistedWorkspace(page);
+  const sessionId = '988c0a00-0000-4000-8000-000000000077';
+  const profile = saveInterview(
+    syntheticProfile,
+    {
+      ...emptyInterview,
+      sessionId,
+      targetStatement: 'Old synthetic wording',
+      answers: ['Synthetic answer', '', '', '', ''],
+      statement: 'Reviewed synthetic statement',
+      shareStatement: true,
+    },
+    { source: 'test-source', evidence: 'test-evidence', claim: 'test-claim' },
+    '2026-09-09T10:00:00.000Z',
+  );
+  await page.route('**/api/profile', (route) =>
+    route.fulfill({ json: { profile, revision: 2 } }),
+  );
+  let fail = true;
+  let starts = 0;
+  page.on('request', (request) => {
+    if (
+      request.method() === 'POST' &&
+      /\/api\/runs(?:\/|$)/.test(request.url())
+    )
+      starts++;
+  });
+  await page.route('**/api/profile/affected-applications', (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      statement: 'Old synthetic wording',
+    });
+    return fail
+      ? route.fulfill({ status: 503 })
+      : route.fulfill({
+          json: {
+            applications: [
+              {
+                applicationId,
+                company: 'Synthetic related company',
+                role: 'Product Engineer',
+              },
+            ],
+          },
+        });
+  });
+  await page.goto(`/memory/interview?session=${sessionId}`);
+  await expect(
+    page.getByText('List unavailable. Your testimony is saved.'),
+  ).toBeVisible();
+  fail = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(
+    page.getByRole('link', { name: /Synthetic related company/ }),
+  ).toHaveAttribute('href', `/applications/${applicationId}`);
+  await expect(
+    page.getByText('Sent applications and published pages remain unchanged.'),
+  ).toBeVisible();
+  expect(starts).toBe(0);
+});
 
 test('GitHub import HTTP boundary rejects anonymous and cross-origin requests', async ({
   request,

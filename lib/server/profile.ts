@@ -15,6 +15,27 @@ type ProfileSession = {
 
 export class ProfileConflictError extends Error {}
 
+export async function readAffectedApplications(
+  session: ProfileSession,
+  statement: string,
+) {
+  return database().begin(async (tx) => {
+    await authorize(tx, session);
+    // ponytail: exact historical snapshot matching, not a semantic impact estimate.
+    return tx<{ applicationId: string; company: string; role: string }[]>`
+      select a.id as "applicationId", a.company, a.role
+      from app.applications a
+      where a.tenant_id = ${session.tenantId} and a.deleted_at is null and a.stage = 'draft'
+        and exists (
+          select 1 from app.opportunities o
+          join app.workflow_runs r on r.tenant_id = o.tenant_id and r.opportunity_id = o.id
+          join app.claims c on c.tenant_id = r.tenant_id and c.profile_id = r.profile_id
+          where o.tenant_id = a.tenant_id and o.application_id = a.id and c.statement = ${statement}
+        )
+      order by a.updated_at desc, a.id limit 100`;
+  });
+}
+
 export type ProfileRevisionSummary = {
   revision: number;
   createdAt: string;

@@ -2,7 +2,8 @@
 
 import { useUnsavedChanges } from '@/components/use-unsaved-changes';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/i18n-provider';
@@ -231,6 +232,9 @@ function Interview({
               ? 'Choisir une candidature à enrichir'
               : 'Choose an application to strengthen'}
           </Link>
+          {draft.shareStatement && draft.targetStatement && (
+            <AffectedApplications statement={draft.targetStatement} />
+          )}
           <Button
             onClick={() => {
               router.push(`/memory/interview?session=${crypto.randomUUID()}`);
@@ -591,5 +595,105 @@ function Interview({
         </Button>
       </footer>
     </main>
+  );
+}
+
+const affectedApplicationsSchema = z.object({
+  applications: z
+    .array(
+      z.object({
+        applicationId: z.uuid(),
+        company: z.string().max(200),
+        role: z.string().max(200),
+      }),
+    )
+    .max(100),
+});
+
+function AffectedApplications({ statement }: { statement: string }) {
+  const fr = useI18n().locale === 'fr';
+  const [result, setResult] =
+    useState<z.infer<typeof affectedApplicationsSchema>>();
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/profile/affected-applications', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ statement }),
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const parsed = affectedApplicationsSchema.parse(await response.json());
+        if (!controller.signal.aborted) {
+          setResult(parsed);
+          setFailed(false);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true);
+      });
+    return () => controller.abort();
+  }, [statement, attempt]);
+  return (
+    <Card>
+      <h3 className="m-0 text-section">
+        {fr ? 'Candidatures à reprendre' : 'Applications to revisit'}
+      </h3>
+      {failed ? (
+        <>
+          <p role="alert" className="m-0 text-body-sm">
+            {fr
+              ? 'Liste indisponible. Votre témoignage est sauvegardé.'
+              : 'List unavailable. Your testimony is saved.'}
+          </p>
+          <Button onClick={() => setAttempt((value) => value + 1)}>
+            {fr ? 'Réessayer' : 'Retry'}
+          </Button>
+        </>
+      ) : !result ? (
+        <p role="status" className="m-0 text-body-sm">
+          {fr ? 'Recherche des brouillons liés…' : 'Finding related drafts…'}
+        </p>
+      ) : (
+        <>
+          <p className="m-0 text-label text-ink-600">
+            {fr
+              ? 'Brouillons dont un historique d’analyse contient exactement l’ancienne formulation. Ouvrez le dossier pour décider d’une nouvelle analyse ; aucune relance automatique.'
+              : 'Drafts with an analysis history containing the exact old wording. Open a dossier to decide on a new analysis; nothing restarts automatically.'}
+          </p>
+          {result.applications.length ? (
+            result.applications.map((application) => (
+              <Link
+                key={application.applicationId}
+                href={`/applications/${application.applicationId}`}
+                className="flex min-h-[42px] flex-wrap items-center justify-between gap-3 rounded-tile bg-panel px-4 py-3 text-body-sm"
+              >
+                <span className="min-w-0">
+                  {application.company} · {application.role}
+                </span>
+                <span className="shrink-0">
+                  {fr ? 'Ouvrir le dossier' : 'Open dossier'} →
+                </span>
+              </Link>
+            ))
+          ) : (
+            <p className="m-0 text-body-sm">
+              {fr
+                ? 'Aucun brouillon associé à cette formulation.'
+                : 'No draft is linked to this wording.'}
+            </p>
+          )}
+          <p className="m-0 text-label text-ink-600">
+            {fr
+              ? 'Les candidatures envoyées et les pages publiées restent inchangées.'
+              : 'Sent applications and published pages remain unchanged.'}
+          </p>
+        </>
+      )}
+    </Card>
   );
 }

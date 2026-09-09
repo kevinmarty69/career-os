@@ -12,7 +12,15 @@ import {
   resolveMemoryConflict,
 } from '../../lib/memory-conflicts';
 import { closeApplicationDatabases, database } from '../../lib/server/database';
-import { readLivingProfile, saveLivingProfile } from '../../lib/server/profile';
+import {
+  readAffectedApplications,
+  readLivingProfile,
+  saveLivingProfile,
+} from '../../lib/server/profile';
+import {
+  createApplication,
+  updateApplication,
+} from '../../lib/server/applications';
 import { deleteWorkspace } from '../../lib/server/workspace';
 
 test('handoff decisions and multiple interviews survive real SQL ID remapping', async () => {
@@ -122,6 +130,61 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
     assert.equal(
       await readLivingProfile({ ...session, userId: randomUUID() }),
       null,
+    );
+    const application = (
+      await createApplication(
+        session,
+        {
+          company: 'Synthetic related company',
+          role: 'Synthetic engineer',
+          description: 'Synthetic role for a read-only impact test.',
+          accent: '#16211F',
+        },
+        randomUUID(),
+      )
+    ).application;
+    // Inert historical fixture: no worker step, provider request or publication.
+    await admin.begin(async (tx) => {
+      const snapshotId = randomUUID(),
+        opportunityId = randomUUID();
+      await tx`insert into app.profiles (id,tenant_id,name,headline,profile_kind)
+        values (${snapshotId},${session.tenantId},'Synthetic','Synthetic snapshot','snapshot')`;
+      await tx`insert into app.claims (tenant_id,profile_id,statement,level,sensitivity,allowed_uses)
+        values (${session.tenantId},${snapshotId},'Old synthetic wording','unsupported','private',array['application'])`;
+      await tx`insert into app.opportunities (id,tenant_id,application_id,application_revision,company,role,raw_text,extraction_status)
+        values (${opportunityId},${session.tenantId},${application.applicationId},${application.revision},'Synthetic','Synthetic','Synthetic','ready')`;
+      await tx`insert into app.workflow_runs (tenant_id,opportunity_id,profile_id,state,status,token_budget,cost_budget_micros,deadline_at)
+        values (${session.tenantId},${opportunityId},${snapshotId},'research','cancelled',1,0,now())`;
+    });
+    assert.equal(
+      (await readAffectedApplications(session, 'Old synthetic wording'))[0]
+        ?.applicationId,
+      application.applicationId,
+    );
+    assert.equal(
+      (await readAffectedApplications(session, 'Different wording')).length,
+      0,
+    );
+    assert.equal(
+      (
+        await readAffectedApplications(
+          { ...session, userId: randomUUID() },
+          'Old synthetic wording',
+        )
+      ).length,
+      0,
+    );
+    await updateApplication(session, application.applicationId, {
+      company: application.company,
+      role: application.role,
+      description: application.description,
+      accent: application.accent,
+      stage: 'applied',
+      expectedRevision: application.revision,
+    });
+    assert.equal(
+      (await readAffectedApplications(session, 'Old synthetic wording')).length,
+      0,
     );
   } finally {
     try {
