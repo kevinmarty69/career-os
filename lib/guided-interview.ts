@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { profileSchema, type Profile } from './schemas';
+import { interviewQuestionIdSchema } from './interview-questions';
 
 export const interviewSourceLocator = 'career-os:guided-interview:v1';
 export const interviewDraftSchema = z
@@ -12,6 +13,7 @@ export const interviewDraftSchema = z
     sessionId: z.uuid().optional(),
     targetStatement: z.string().min(1).max(5000).optional(),
     shareStatement: z.boolean().optional(),
+    questionIds: z.array(interviewQuestionIdSchema).length(5).optional(),
   })
   .strict();
 export type InterviewDraft = z.infer<typeof interviewDraftSchema>;

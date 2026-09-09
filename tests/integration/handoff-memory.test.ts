@@ -22,8 +22,9 @@ import {
   updateApplication,
 } from '../../lib/server/applications';
 import { deleteWorkspace } from '../../lib/server/workspace';
+import { selectInterviewQuestion } from '../../lib/server/interview-question';
 
-test('handoff decisions and multiple interviews survive real SQL ID remapping', async () => {
+test('handoff decisions and multiple interviews survive real SQL ID remapping', async (t) => {
   if (process.env.ALLOW_HANDOFF_MEMORY_SMOKE !== '1')
     throw new Error('Explicit synthetic workspace smoke opt-in required.');
   if (!process.env.DATABASE_URL || !process.env.MIGRATION_DATABASE_URL)
@@ -38,6 +39,19 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
     sessionCreatedAt: new Date(),
   };
   let created = false;
+  const modelEnv = {
+    CAREER_OS_INTERVIEW_ENABLED: '1',
+    CAREER_OS_MODEL_MODE: 'local',
+    CAREER_OS_LOCAL_MODEL_BASE_URL: 'http://127.0.0.1:9999/v1',
+    CAREER_OS_LOCAL_MODEL: 'synthetic-question-selector',
+    CAREER_OS_MODEL_INPUT_MICROS_PER_TOKEN: '0',
+    CAREER_OS_MODEL_OUTPUT_MICROS_PER_TOKEN: '0',
+    CAREER_OS_MODEL_MAX_REQUEST_COST_MICROS: '0',
+    CAREER_OS_INTERVIEW_DAILY_BUDGET_MICROS: '0',
+  };
+  const previousEnv = Object.fromEntries(
+    Object.keys(modelEnv).map((key) => [key, process.env[key]]),
+  );
   try {
     await database().begin(async (tx) => {
       await tx.unsafe('set local role career_app');
@@ -186,7 +200,95 @@ test('handoff decisions and multiple interviews survive real SQL ID remapping', 
       (await readAffectedApplications(session, 'Old synthetic wording')).length,
       0,
     );
+    Object.assign(process.env, modelEnv);
+    let modelCalls = 0;
+    let invalid = false;
+    t.mock.method(
+      globalThis,
+      'fetch',
+      async (url: string, options: RequestInit) => {
+        assert.equal(String(url), 'http://127.0.0.1:9999/v1/chat/completions');
+        assert.equal(
+          String(options.body).includes('PRIVATE TARGET DO NOT SEND'),
+          false,
+        );
+        modelCalls++;
+        return Response.json({
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: JSON.stringify({
+                  questionId: invalid ? 'Invent a 42% result' : 'ownership',
+                }),
+              },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 30, completion_tokens: 10, total_tokens: 40 },
+        });
+      },
+    );
+    const adaptiveId = randomUUID();
+    stored = (await readLivingProfile(session))!;
+    await saveLivingProfile(
+      session,
+      saveInterview(
+        stored.profile,
+        {
+          ...emptyInterview,
+          sessionId: adaptiveId,
+          step: 1,
+          answers: ['I built an internal tool.', '', '', '', ''],
+          targetStatement: 'PRIVATE TARGET DO NOT SEND',
+        },
+        { source: randomUUID(), evidence: randomUUID(), claim: randomUUID() },
+      ),
+      stored.revision,
+    );
+    stored = (await readLivingProfile(session))!;
+    let request = {
+      sessionId: adaptiveId,
+      expectedRevision: stored.revision,
+      consent: true,
+    };
+    assert.deepEqual(await selectInterviewQuestion(session, request), {
+      questionId: 'ownership',
+    });
+    assert.deepEqual(await selectInterviewQuestion(session, request), {
+      questionId: 'ownership',
+    });
+    assert.equal(modelCalls, 1);
+    const changed = {
+      ...emptyInterview,
+      sessionId: adaptiveId,
+      step: 1,
+      answers: ['I built a different tool.', '', '', '', ''],
+    };
+    await saveLivingProfile(
+      session,
+      saveInterview(stored.profile, changed, {
+        source: randomUUID(),
+        evidence: randomUUID(),
+        claim: randomUUID(),
+      }),
+      stored.revision,
+    );
+    stored = (await readLivingProfile(session))!;
+    request = { ...request, expectedRevision: stored.revision };
+    invalid = true;
+    await assert.rejects(selectInterviewQuestion(session, request), {
+      status: 503,
+    });
+    await assert.rejects(selectInterviewQuestion(session, request), {
+      status: 409,
+    });
+    assert.equal(modelCalls, 2);
   } finally {
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
     try {
       if (created) {
         await deleteWorkspace(session, { confirmation: 'DELETE' });

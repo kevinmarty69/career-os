@@ -4,6 +4,11 @@ import { useUnsavedChanges } from '@/components/use-unsaved-changes';
 
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
+import {
+  adaptInterviewQuestions,
+  defaultInterviewQuestions,
+  interviewQuestions,
+} from '@/lib/interview-questions';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/components/i18n/i18n-provider';
@@ -130,22 +135,11 @@ function Interview({
       ? 'Quitter sans sauvegarder cette réponse ?'
       : 'Leave without saving this answer?',
   );
-  const questions = fr
-    ? [
-        'Qu’avez-vous changé exactement ?',
-        'Sur quelle période et dans quel contexte ?',
-        'Quel était le résultat avant votre intervention ?',
-        'Qu’avez-vous mesuré après votre intervention ?',
-        'Quel document ou quelle personne pourrait le confirmer ?',
-      ]
-    : [
-        'What exactly did you change?',
-        'Over what period and in what context?',
-        'What was the outcome before your work?',
-        'What did you measure after your work?',
-        'Which document or person could confirm it?',
-      ];
-  const saving = memory.state === 'saving';
+  const questions = (draft.questionIds ?? defaultInterviewQuestions).map(
+    (id) => interviewQuestions[id][fr ? 0 : 1],
+  );
+  const [selecting, setSelecting] = useState(false);
+  const saving = memory.state === 'saving' || selecting;
   async function persist(next = draft, sign = false) {
     if (inFlight.current) return false;
     inFlight.current = true;
@@ -304,8 +298,8 @@ function Interview({
               </h3>
               <p className="m-0 text-body-sm text-ink-700">
                 {fr
-                  ? 'Si vous ne savez pas, passez la question. Ce questionnaire n’exécute aucun modèle. Vos réponses sont sauvegardées à chaque étape.'
-                  : 'If you do not know, skip the question. This questionnaire does not run a model. Your answers are saved at each step.'}
+                  ? 'Si vous ne savez pas, passez la question. Le parcours manuel n’exécute aucun modèle ; l’adaptation est facultative. Vos réponses sont sauvegardées à chaque étape.'
+                  : 'If you do not know, skip the question. The manual path does not run a model; adaptation is optional. Your answers are saved at each step.'}
               </p>
             </Card>
           </div>
@@ -489,6 +483,28 @@ function Interview({
             )}
           </Card>
           <aside className="flex flex-col gap-4">
+            {sessionId &&
+              draft.step > 0 &&
+              draft.step < 5 &&
+              !draft.answers[draft.step].trim() && (
+                <AdaptiveQuestion
+                  key={`${sessionId}:${draft.step}`}
+                  sessionId={sessionId}
+                  revision={memory.revision}
+                  disabled={saving || dirty}
+                  onBusy={setSelecting}
+                  onSelected={async (selection) => {
+                    await persist({
+                      ...draft,
+                      questionIds: adaptInterviewQuestions(
+                        draft.questionIds ?? defaultInterviewQuestions,
+                        draft.step,
+                        selection,
+                      ),
+                    });
+                  }}
+                />
+              )}
             <Card padding={22}>
               <Overline>{fr ? 'DÉJÀ RÉPONDU' : 'YOUR ANSWERS'}</Overline>
               {draft.answers.some(Boolean) ? (
@@ -595,6 +611,121 @@ function Interview({
         </Button>
       </footer>
     </main>
+  );
+}
+
+function AdaptiveQuestion({
+  sessionId,
+  revision,
+  disabled,
+  onBusy,
+  onSelected,
+}: {
+  sessionId: string;
+  revision: number;
+  disabled: boolean;
+  onBusy: (busy: boolean) => void;
+  onSelected: (value: unknown) => Promise<void>;
+}) {
+  const fr = useI18n().locale === 'fr';
+  const [settings, setSettings] = useState<{
+    available: boolean;
+    maxCostMicros: number;
+  }>();
+  const [consent, setConsent] = useState(false);
+  const [error, setError] = useState(false);
+  const pending = useRef(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/profile/interview-question', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const parsed = z
+          .object({
+            available: z.boolean(),
+            maxCostMicros: z.number().int().nonnegative(),
+          })
+          .parse(await response.json());
+        if (!controller.signal.aborted) setSettings(parsed);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  return (
+    <Card>
+      <Overline>{fr ? 'ENTRETIEN ADAPTATIF' : 'ADAPTIVE INTERVIEW'}</Overline>
+      <p className="m-0 text-body-sm text-ink-600">
+        {fr
+          ? 'L’agent choisit une question factuelle selon vos réponses précédentes. Il ne propose aucun chiffre et ne rédige pas votre témoignage.'
+          : 'The agent selects a factual question based on your previous answers. It never suggests numbers or writes your testimony.'}
+      </p>
+      {settings?.available ? (
+        <>
+          <p className="m-0 text-caption text-ink-600">
+            {fr ? 'Plafond par demande' : 'Per-request ceiling'} :{' '}
+            {(settings.maxCostMicros / 1_000_000).toFixed(4)} USD · ≤ 30 s
+          </p>
+          <Checkbox
+            checked={consent}
+            onChange={setConsent}
+            disabled={disabled}
+            label={
+              fr
+                ? 'Autoriser l’envoi de mes réponses précédentes au modèle configuré. Elles ne contiennent aucun document interne ni donnée confidentielle de tiers.'
+                : 'Allow my previous answers to be sent to the configured model. They contain no internal documents or confidential third-party data.'
+            }
+          />
+          <Button
+            disabled={disabled || !consent}
+            onClick={async () => {
+              if (pending.current) return;
+              pending.current = true;
+              onBusy(true);
+              setError(false);
+              try {
+                const response = await fetch(
+                  '/api/profile/interview-question',
+                  {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                      sessionId,
+                      expectedRevision: revision,
+                      consent: true,
+                    }),
+                  },
+                );
+                if (!response.ok) throw new Error();
+                await onSelected(await response.json());
+              } catch {
+                setError(true);
+              } finally {
+                pending.current = false;
+                onBusy(false);
+              }
+            }}
+          >
+            {fr ? 'Adapter cette question' : 'Adapt this question'}
+          </Button>
+        </>
+      ) : (
+        <p className="m-0 text-caption text-ink-600">
+          {fr
+            ? 'Mode modèle non disponible sur cette instance. Le questionnaire manuel reste utilisable.'
+            : 'Model mode is unavailable on this instance. The manual questionnaire remains available.'}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="m-0 text-body-sm">
+          {fr
+            ? 'Question non adaptée. Vos réponses sont conservées ; continuez avec la question affichée. Aucun nouvel appel automatique.'
+            : 'Question could not be adapted. Your answers are retained; continue with the displayed question. No automatic repeat call.'}
+        </p>
+      )}
+    </Card>
   );
 }
 

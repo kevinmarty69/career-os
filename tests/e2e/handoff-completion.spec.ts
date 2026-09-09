@@ -12,6 +12,95 @@ import {
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
+test('adaptive question requires consent and preserves the manual path after failure', async ({
+  page,
+  context,
+}, info) => {
+  await context.addCookies([
+    { name: 'career-os-locale', value: 'en', domain: 'localhost', path: '/' },
+  ]);
+  await mockPersistedWorkspace(page);
+  const sessionId = '988c0a00-0000-4000-8000-000000000088';
+  let profile = saveInterview(
+    syntheticProfile,
+    {
+      ...emptyInterview,
+      sessionId,
+      step: 1,
+      answers: ['I built the deployment tooling.', '', '', '', ''],
+    },
+    {
+      source: 'adaptive-source',
+      evidence: 'adaptive-evidence',
+      claim: 'adaptive-claim',
+    },
+  );
+  let revision = 1,
+    calls = 0,
+    fail = true;
+  await page.route('**/api/profile', async (route) => {
+    if (route.request().method() === 'PUT') {
+      profile = profileSchema.parse(route.request().postDataJSON().profile);
+      revision++;
+    }
+    await route.fulfill({ json: { profile, revision } });
+  });
+  await page.route('**/api/profile/interview-question', (route) => {
+    if (route.request().method() === 'GET')
+      return route.fulfill({ json: { available: true, maxCostMicros: 0 } });
+    calls++;
+    expect(route.request().postDataJSON()).toEqual({
+      sessionId,
+      expectedRevision: revision,
+      consent: true,
+    });
+    return fail
+      ? route.fulfill({ status: 503 })
+      : route.fulfill({ json: { questionId: 'ownership' } });
+  });
+  await page.goto(`/memory/interview?session=${sessionId}`);
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Adapt this question', exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole('checkbox', { name: /Allow my previous answers/ })
+    .check();
+  await page
+    .getByRole('button', { name: 'Adapt this question', exact: true })
+    .click();
+  await expect(page.locator('#main-content').getByRole('alert')).toContainText(
+    'Question could not be adapted',
+  );
+  expect(calls).toBe(1);
+  await expect(
+    page.getByRole('heading', {
+      name: 'Over what period and in what context?',
+    }),
+  ).toBeVisible();
+  fail = false;
+  await page
+    .getByRole('button', { name: 'Adapt this question', exact: true })
+    .click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Which part did you personally deliver, and which part belongs to the team?',
+    }),
+  ).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Resume', exact: true }).click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Which part did you personally deliver, and which part belongs to the team?',
+    }),
+  ).toBeVisible();
+  expect(calls).toBe(2);
+  await page.screenshot({
+    path: info.outputPath('adaptive-interview-en.png'),
+    fullPage: true,
+  });
+});
+
 test('signed testimony names related drafts without starting an agent run', async ({
   page,
   context,

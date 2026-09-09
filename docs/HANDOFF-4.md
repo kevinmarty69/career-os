@@ -38,13 +38,16 @@ This is a progress ledger, not a claim that the whole handoff is complete.
 
 ### Remaining before claiming the complete handoff
 
-- Model-led adaptive interviews, in-place evidence-backed claim repair in application drafts, and source conflict detection beyond identical numeric wording. Affected-draft navigation is delivered; automatic repair and market-impact estimates are not.
+- In-place evidence-backed claim repair in application drafts and source conflict detection beyond identical numeric wording. Affected-draft navigation is delivered; automatic repair and market-impact estimates are not. Adaptive selection from factual questions is delivered, not unrestricted generated conversation.
 - Full notification event coverage and configured product-email delivery; current read state does not create a durable outgoing queue.
 - Drive OAuth, GitHub account-wide synchronization, personal API tokens, editable per-stage model and budget controls, instance first-run setup. Single public GitHub README import is delivered.
 - Private cloud trial, checkout and pause integration. Existing private cloud code must be reconciled with current Supabase identity before activation; no payment authorization is implied.
 - Complete populated-state visual parity across every supplied screen. Offline review arbitration is delivered; arbitrary offline edits and offline app-shell caching are not.
 
 ### Validation for this milestone
+
+- Adaptive interviews now select from ten factual EN/FR questions, preserve five-step save/resume, and require consent before sending previous answers to the configured model. Selection cannot generate numbers or testimony. The optional mode is disabled by default, with committed request reservations, a per-workspace daily ceiling, 20-request limit, completed-result reuse and unknown-outcome fencing. Manual interviews remain available without provider configuration.
+- Adaptive validation: 239 unit checks pass (2 existing skips), production build passes, and all 188 desktop/mobile browser checks pass. The Supabase development smoke verifies durable selection reuse and ambiguous-outcome fencing with an intercepted provider; no real model was called. Synthetic workspace cleanup was verified: zero remaining records.
 
 - Lint, TypeScript and production build pass; 236 unit checks pass, 2 existing checks skipped.
 - 16 focused browser checks pass on desktop/mobile: guided interview, debrief persistence/failure, conflict arbitration, notification preferences/failure, native 404 and existing handoff regressions.

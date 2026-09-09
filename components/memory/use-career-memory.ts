@@ -120,6 +120,7 @@ export function useCareerMemory() {
           : 'Career memory is temporarily unavailable.'
       : message,
     profile,
+    revision,
     save,
     state,
   };

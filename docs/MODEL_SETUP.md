@@ -42,3 +42,11 @@ Estimates use your configured upper-bound rates and reported token counts, round
 Ledger `cost_basis` distinguishes `configured_rate_estimate`, `local_no_api_charge` and `reserved_upper_bound`. When a dispatched request fails ambiguously, the workflow consumes the reservation as an unknown upper bound and does not automatically retry. Semantic/contact unknown outcomes remain fenced. Costs are not verified invoices; extra provider fees, changed tariffs and account-level spending must also be limited with the provider's own controls. Restart model workers after changing configuration. A changed run budget applies only to newly created runs.
 
 Apply migrations through the documented migration runner before enabling remote mode. Migration0053 removes local-only zero-cost assumptions without removing lease, tenant, lineage or human-approval checks. No remote endpoint is contacted by the unit tests. Full inference validation still requires an operator-configured model.
+
+## Optional adaptive interview
+
+After migration0054, `CAREER_OS_INTERVIEW_ENABLED=1` enables selection of the next factual question from a fixed EN/FR catalogue using the same operator-configured transport. The manual questionnaire remains available without a model. The model cannot supply facts, numbers, a question outside that catalogue or a testimony.
+
+Each selection requires explicit user consent and displays the request ceiling before dispatch. Only previous interview answers and question labels are sent: no CV, source excerpts, target claim or identity. Users must exclude internal documents and confidential third-party data from these answers. Set `CAREER_OS_INTERVIEW_DAILY_BUDGET_MICROS` to the approved per-workspace rolling 24-hour ceiling; zero is the default. A second limit allows at most 20 reservations in that window. This budget is separate from workflow budgets.
+
+Reservations commit before dispatch. The same input reuses a completed selection; ambiguous outcomes retain their reservation and cannot dispatch again automatically. SQL stores an input hash and selected question identifier, never the prompt. Tests use an intercepted provider response, not a live model. No operator configuration or paid endpoint is enabled by installation.
