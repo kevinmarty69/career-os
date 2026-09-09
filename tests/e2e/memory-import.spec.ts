@@ -49,6 +49,35 @@ test('imports only LinkedIn positions locally and persists the human-approved so
   await page.getByLabel('Nom complet').fill('Alex Morgan');
   await page.getByLabel('Positionnement').fill('Product engineer');
   await expectNoHorizontalOverflow(page);
+  if (process.env.CAREER_OS_LINKEDIN_SCREENSHOT) {
+    for (const locale of ['en', 'fr']) {
+      await page.context().addCookies([
+        {
+          name: 'career-os-locale',
+          value: locale,
+          domain: 'localhost',
+          path: '/',
+        },
+      ]);
+      await page.reload();
+      await expect(
+        page.getByRole('heading', {
+          name:
+            locale === 'en'
+              ? 'Review what was extracted'
+              : 'Relisez ce qui a été extrait',
+        }),
+      ).toBeVisible();
+      if (locale === 'en')
+        await page.screenshot({
+          path: process.env.CAREER_OS_LINKEDIN_SCREENSHOT.replace(
+            '-desktop',
+            (page.viewportSize()?.width ?? 1440) < 600 ? '-mobile' : '-desktop',
+          ),
+          animations: 'disabled',
+        });
+    }
+  }
   await page
     .getByLabel('J’ai relu cette sélection et j’autorise les usages indiqués.')
     .check();

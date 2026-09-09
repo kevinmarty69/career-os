@@ -119,7 +119,7 @@ export function SourceStep({ controller }: { controller: Controller }) {
           </div>
         </section>
         <aside className={styles.privacyPanel}>
-          <div className={styles.pasteFields}>
+          <div className={`${styles.pasteFields} ${styles.sourceInstructions}`}>
             <h2>LinkedIn</h2>
             <p>
               {fr
@@ -132,7 +132,7 @@ export function SourceStep({ controller }: { controller: Controller }) {
                 : '4 MB maximum. For a larger archive, extract Positions.csv on your computer before importing it.'}
             </p>
           </div>
-          <div className={`${styles.pasteFields} ${styles.githubFields}`}>
+          <div className={`${styles.pasteFields} ${styles.sourceInstructions}`}>
             <h2>GitHub</h2>
             <p>
               {fr

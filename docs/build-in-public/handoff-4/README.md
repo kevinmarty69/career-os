@@ -31,3 +31,11 @@ Also delivered: a durable browser outbox for review decisions and additional in-
 Human review shows the source excerpt and lets the user choose another approved proof for the opening. Both application messages follow the current draft, not the original strategy. Previous versions stay immutable. This synthetic browser capture does not demonstrate a model call or a publication.
 
 ![Selected evidence correction](./selected-correction-desktop.png)
+
+## 9 September — local LinkedIn archive import
+
+A LinkedIn ZIP or `Positions.csv` enters the same human review as a resume. Only position fields are extracted; a synthetic messages file in this test archive is excluded. All claims remain declared and private until the user reviews their permissions. No LinkedIn API, model or raw-file upload is involved. The save endpoint is intercepted in this browser test.
+
+![LinkedIn positions review, desktop](./linkedin-import-desktop.png)
+
+![LinkedIn positions review, mobile](./linkedin-import-mobile.png)

@@ -460,7 +460,7 @@
   font-size: var(--text-label);
   font-weight: 600;
 }
-.pasteFields.githubFields {
+.pasteFields.sourceInstructions {
   grid-template-columns: minmax(0, 1fr);
   padding: 0 0 var(--space-7);
 }
