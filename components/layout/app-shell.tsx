@@ -93,44 +93,48 @@ export function AppShell({
           </span>
           <strong>Career OS</strong>
         </Link>
-        <nav aria-label={t('shell.main.navigation')}>
-          {nav.map(([href, icon, label, count]) => (
-            <Link
-              aria-current={
-                path === href || (href !== '/' && path.startsWith(href))
-                  ? 'page'
-                  : undefined
-              }
-              className={
-                path === href || (href !== '/' && path.startsWith(href))
-                  ? 'active'
-                  : ''
-              }
-              href={href}
-              key={href}
-            >
-              <Icon>{icon}</Icon>
-              <span>{label}</span>
-              {count ? <b>{count}</b> : null}
-            </Link>
-          ))}
-        </nav>
-        <Button quiet onClick={() => setPalette(true)}>
-          <Icon>search</Icon>
-          {t('shell.global.search')}
-        </Button>
-        {sidebarContext ?? (
-          <CurrentApplications
-            applications={sidebar?.applications ?? []}
-            locale={locale}
-          />
-        )}
-        {sidebarFooter === undefined ? (
-          <SidebarProfile profile={sidebar?.profile} />
-        ) : (
-          sidebarFooter
-        )}
-        <ProfileMenu />
+        <div className="co-sidebar-scroll">
+          <nav aria-label={t('shell.main.navigation')}>
+            {nav.map(([href, icon, label, count]) => (
+              <Link
+                aria-current={
+                  path === href || (href !== '/' && path.startsWith(href))
+                    ? 'page'
+                    : undefined
+                }
+                className={
+                  path === href || (href !== '/' && path.startsWith(href))
+                    ? 'active'
+                    : ''
+                }
+                href={href}
+                key={href}
+              >
+                <Icon>{icon}</Icon>
+                <span>{label}</span>
+                {count ? <b>{count}</b> : null}
+              </Link>
+            ))}
+          </nav>
+          <Button quiet onClick={() => setPalette(true)}>
+            <Icon>search</Icon>
+            {t('shell.global.search')}
+          </Button>
+          {sidebarContext ?? (
+            <CurrentApplications
+              applications={sidebar?.applications ?? []}
+              locale={locale}
+            />
+          )}
+        </div>
+        <div className="co-sidebar-footer">
+          {sidebarFooter === undefined ? (
+            <SidebarProfile profile={sidebar?.profile} />
+          ) : (
+            sidebarFooter
+          )}
+          <ProfileMenu />
+        </div>
       </aside>
       <section className="co-surface">
         <div className={profileMenuStyles.mobile}>

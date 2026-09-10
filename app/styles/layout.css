@@ -554,10 +554,31 @@
 }
 
 .co-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  min-height: 0;
+  align-self: start;
   padding: 24px 12px;
   border: 0;
   border-radius: 0;
   background: var(--color-canvas);
+}
+
+.co-sidebar > .co-brand,
+.co-sidebar-footer {
+  flex-shrink: 0;
+}
+
+.co-sidebar-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.co-sidebar-footer {
+  padding-top: 18px;
 }
 
 .co-brand {
