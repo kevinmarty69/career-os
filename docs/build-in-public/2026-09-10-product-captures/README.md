@@ -10,13 +10,13 @@ All PNGs are 3200 × 2000 pixels, from a 1600 × 1000 CSS-pixel viewport at 2× 
 
 ## Provenance
 
-- Product source checkpoint: `625b996f0b9c746bbc614b36b084d97c5e31405b`.
-- Fresh production build ID: `3uqvyrtT3Tvo8lMsU9SBf` (September 10, after the home correction).
+- Product source checkpoint: `e36bb8f`.
+- Fresh production build ID: `pRkyI1Q-JafaK69UKWArJ` (September 10, after the sidebar correction). The sidebar now stays within the viewport, with independently scrolling navigation and a visible memory/account footer.
 - Demo dataset: eight applications across all five pipeline stages (seven active), eight document sources/evidence excerpts, eleven claims (eight sourced, three to document), two pending review decisions and two running workflows. All counts derive from these fixtures, not DOM edits or invented customer metrics.
 - `capture.mts` reuses the existing persisted-workspace fixture and validates demo application/run payloads against the real schemas.
 - All API responses are intercepted in an isolated browser context. Non-local browser requests are blocked. Unconfigured `/api/auth/workspace-session` returns 204. No real identity, credential, database write, model call, payment or publication is involved.
 - Alex Morgan and all companies, sources, jobs, stages and review outcomes are synthetic. The captures demonstrate rendering, not actual customer usage, agent quality or a fully authenticated end-to-end workflow. No review action was submitted.
-- Capture run: three expected headings visible, English document locale verified, fonts loaded, zero browser page errors. All three PNGs visually inspected. Production build and 18 targeted desktop/mobile checks pass, including EN/FR home geometry at 390, 768, 1024, 1280, 1440 and 1600px, publication activity, empty/loading/error states and notifications. This is scoped validation, not a claim of whole-app visual certification.
+- Capture run: three expected headings visible, English document locale verified, fonts loaded, zero browser page errors. Sidebar footer bounds are checked before capture. All three PNGs visually inspected. Production build and 13 targeted desktop/mobile checks pass, including EN/FR home geometry, publication activity, empty/loading/error states, and the sidebar footer/menu at heights of 320, 400, 600, 768 and 1000px on home and memory pages. One desktop-only sidebar test is intentionally skipped on mobile, which uses bottom navigation. This is scoped validation, not a claim of whole-app visual certification.
 
 ## Reproduce
 

@@ -242,6 +242,14 @@ try {
     ).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
     await page.waitForLoadState('networkidle');
+    const footer = page.locator('.co-sidebar-footer');
+    if (await footer.count()) {
+      await expect(footer).toBeVisible();
+      const bounds = (await footer.boundingBox())!;
+      console.log(name, 'sidebar footer', bounds);
+      expect(bounds.y).toBeGreaterThanOrEqual(0);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(1000);
+    }
     await page.screenshot({
       path: fileURLToPath(new URL(`${name}.png`, import.meta.url)),
       animations: 'disabled',
