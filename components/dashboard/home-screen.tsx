@@ -234,21 +234,24 @@ export function HomeScreen({
             </aside>
           </section>
         ) : (
-          <section className="co-panel">
-            <p>{nextAction.eyebrow}</p>
-            <h2>{nextAction.title}</h2>
-            <p>{nextAction.detail}</p>
-            <Link
-              className="co-button"
-              href={
-                priority
-                  ? `/applications/${priority.application.applicationId}`
-                  : '/applications'
-              }
-            >
-              {nextAction.action}
-              <Icon>arrow_forward</Icon>
-            </Link>
+          <section className="co-home-signal is-priority">
+            <div>
+              <p>{nextAction.eyebrow}</p>
+              <h2>{nextAction.title}</h2>
+              <span>{nextAction.detail}</span>
+              <div>
+                <Link
+                  href={
+                    priority
+                      ? `/applications/${priority.application.applicationId}`
+                      : '/applications'
+                  }
+                >
+                  {nextAction.action}
+                  <Icon>arrow_forward</Icon>
+                </Link>
+              </div>
+            </div>
           </section>
         )}
 
@@ -260,7 +263,9 @@ export function HomeScreen({
               </h2>
               <span>
                 {activeApplications.length}{' '}
-                {locale === 'fr' ? 'active' : 'active'}
+                {locale === 'fr' && activeApplications.length > 1
+                  ? 'actives'
+                  : 'active'}
               </span>
             </header>
             {activeApplications.slice(0, 1).map((application) => (
@@ -457,7 +462,7 @@ export function homePriorityCopy(
   const detail = homePriorityRow(priority, locale);
   const titles: Record<DashboardAction['kind'], [string, string]> = {
     review: [
-      `${priority.pendingDecisions} decision${priority.pendingDecisions > 1 ? 's' : ''} need your review for ${company}.`,
+      `${priority.pendingDecisions} ${priority.pendingDecisions === 1 ? 'decision needs' : 'decisions need'} your review for ${company}.`,
       `${priority.pendingDecisions} décision${priority.pendingDecisions > 1 ? 's' : ''} à trancher pour ${company}.`,
     ],
     decision: [

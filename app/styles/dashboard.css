@@ -7,6 +7,7 @@
 .co-home-v2-header {
   display: flex;
   gap: 24px;
+  align-items: flex-start;
 }
 
 .co-home-v2-header > div {
@@ -63,11 +64,18 @@
 .co-home-signal {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 40px;
+  padding: 28px 32px;
   overflow: hidden;
   align-items: center;
   color: var(--color-card);
   border-radius: var(--radius-panel);
   background: var(--color-ink-900);
+}
+
+.co-home-signal.is-priority {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .co-home-signal::before {
@@ -115,6 +123,7 @@
 .co-home-signal h2 {
   max-width: 28ch;
   color: var(--color-card);
+  font-size: var(--text-hero);
   line-height: 1.26;
   letter-spacing: -0.032em;
 }
@@ -150,6 +159,11 @@
   color: rgb(255 255 255 / 82%);
   background: rgb(255 255 255 / 9%);
   font-weight: 500;
+}
+
+.co-home-signal a:focus-visible {
+  outline: 2px solid var(--color-card);
+  outline-offset: 3px;
 }
 
 .co-home-signal > aside {
@@ -207,6 +221,7 @@
 
 .co-home-v2-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
   min-height: 0;
   flex: 1;
   gap: 18px;
@@ -215,6 +230,7 @@
 .co-home-applications,
 .co-home-strengthen {
   display: flex;
+  min-width: 0;
   overflow: hidden;
   flex-direction: column;
   gap: 16px;
@@ -256,6 +272,9 @@
 
 .co-home-applications > a {
   display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 8px auto 20px;
+  gap: 18px;
+  padding: 18px 20px;
   align-items: center;
   color: var(--color-ink-800);
   border-radius: var(--radius-card);
@@ -265,6 +284,8 @@
 
 .co-home-applications > a > i {
   display: grid;
+  width: 44px;
+  height: 44px;
   color: var(--color-ink-600);
   border-radius: var(--radius-tile);
   background: var(--color-panel);
@@ -281,7 +302,10 @@
 }
 
 .co-home-applications > a strong {
+  overflow: hidden;
   font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .co-home-applications > a small,
@@ -359,6 +383,10 @@
 
 .co-home-strengthen > header {
   gap: 10px;
+}
+
+.co-home-strengthen h2 {
+  font-size: var(--text-section);
 }
 
 .co-home-strengthen > header > .co-icon {
@@ -488,8 +516,6 @@
   .co-home-v2 {
     min-height: auto;
   }
-  .co-home-v2-header {
-  }
   .co-home-import {
     margin-top: 0;
   }
@@ -504,10 +530,12 @@
 
 @media (max-width: 760px) {
   .co-home-v2-header {
-    align-items: stretch;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 18px;
   }
   .co-home-import {
+    grid-column: 1 / -1;
     width: 100%;
   }
   .co-home-import > span {
