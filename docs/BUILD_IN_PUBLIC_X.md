@@ -1,5 +1,13 @@
 # Career OS on X - September 7 to October 2, 2026
 
+## Active editorial policy — September 8
+
+This section supersedes older cadence and calendar instructions below. Check at 08:15, 09:15, 11:15, 12:15, 14:15, 15:15, 17:15, 18:15, 20:15 and 21:15 Europe/Paris. Up to ten original posts daily, never a quota. Start with incoming replies and relevant public conversations. At most two contextual public replies per check; stop when the exchange naturally ends. No DMs or bulk engagement.
+
+Milestones are evidence material, not mandatory FIFO posts. Aim for one or two milestone posts daily and at least half of weekly original posts about job-search questions, recruiting, observed discussions or follow-ups. Balance builders, job seekers and recruiters. Default to text; usually at most one polished visual daily. Read recent posts to avoid repeating ideas and phrasing.
+
+Never invent personal anecdotes, emotions, bugs, time spent or chronology. Commits prove changes, not 'yesterday this broke' or 'spent all night'. No forced lowercase, lol, self-deprecation, slogans or promotional conclusions. Ask specific questions and follow up on actual answers. Publish autonomously under the user's standing authorization; verify URLs and record outcomes in the editor state. Stay quiet on routine runs.
+
 Account: `@MankyRivet`
 
 Cadence: up to five posts every day. When a real queued milestone has proof and a distinct angle, publish it at the next run even if other posts went out recently. There is no daily cap or spacing rule. A slot stays optional only when there is genuinely nothing useful to say.
