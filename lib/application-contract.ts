@@ -42,6 +42,14 @@ export const applicationFieldsSchema = z
       .regex(/^#[0-9a-fA-F]{6}$/)
       .transform(accessibleAccent),
     stage: applicationStageSchema.default('draft'),
+    submittedOn: z.iso
+      .date()
+      .refine(
+        (value) => value <= new Date().toISOString().slice(0, 10),
+        'Submission date cannot be in the future.',
+      )
+      .nullable()
+      .optional(),
     companySources: applicationCompanySourcesSchema.optional(),
   })
   .strict();

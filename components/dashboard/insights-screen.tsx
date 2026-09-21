@@ -106,6 +106,51 @@ export function InsightsScreen() {
           label={copy.outcomes}
         />
       </div>
+      {insights ? (
+        <section className="co-panel" aria-labelledby="cohorts-heading">
+          <h2 id="cohorts-heading">
+            {locale === 'fr'
+              ? 'Réponses par ancienneté de candidature'
+              : 'Responses by application age'}
+          </h2>
+          <p>
+            {locale === 'fr'
+              ? 'Depuis la date réelle d’envoi, en jours UTC. Comparaison descriptive à ce jour, pas une probabilité de réponse. Une absence de réponse ne signifie pas un refus.'
+              : 'Since the actual submission date, in UTC calendar days. Descriptive comparison as of today, not a prediction. No recorded response does not mean rejection.'}
+          </p>
+          <dl className="co-cohorts">
+            {insights.ageCohorts.map((cohort) => (
+              <div key={cohort.age}>
+                <dt>
+                  {cohort.age === 'unknown'
+                    ? locale === 'fr'
+                      ? 'Date inconnue'
+                      : 'Unknown date'
+                    : `${cohort.age} ${locale === 'fr' ? 'jours' : 'days'}`}
+                </dt>
+                <dd>
+                  <strong>
+                    {cohort.responsePct === null
+                      ? '—'
+                      : `${cohort.responsePct}%`}
+                  </strong>{' '}
+                  · {cohort.responses}/{cohort.applications}{' '}
+                  {locale === 'fr' ? 'avec réponse' : 'with a response'} ·{' '}
+                  {cohort.withoutResponse}{' '}
+                  {locale === 'fr'
+                    ? 'sans réponse enregistrée'
+                    : 'without a recorded response'}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <p>
+            {locale === 'fr'
+              ? 'Ajoutez ou corrigez la date dans le journal du dossier. Les dates inconnues restent séparées, y compris pour les dossiers fermés.'
+              : 'Add or correct the date in the application timeline. Unknown dates stay separate, including closed dossiers.'}
+          </p>
+        </section>
+      ) : null}
       <div className="co-insights-grid">
         <section className="co-panel">
           <h2>{copy.trend}</h2>

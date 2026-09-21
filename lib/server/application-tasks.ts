@@ -25,6 +25,32 @@ type TaskRow = {
   updated_at: Date;
 };
 
+export async function listUpcomingTasks(session: PublicationSession) {
+  const sql = database();
+  return await sql.begin(async (tx) => {
+    await authorize(tx, session);
+    const rows = await tx<(TaskRow & { company: string; role: string })[]>`
+      select task.id, task.application_id, task.kind, task.title, task.due_at,
+        task.completed_at, task.revision, task.created_at, task.updated_at,
+        application.company, application.role
+      from app.application_tasks task
+      join app.applications application on application.tenant_id = task.tenant_id
+        and application.id = task.application_id
+      where task.tenant_id = ${session.tenantId} and task.completed_at is null
+        and application.deleted_at is null and application.stage <> 'closed'
+      order by task.due_at, task.created_at, task.id
+      limit 101`;
+    return {
+      tasks: rows.slice(0, 100).map((row) => ({
+        ...project(row),
+        company: row.company,
+        role: row.role,
+      })),
+      hasMore: rows.length > 100,
+    };
+  });
+}
+
 export async function listApplicationTasks(
   session: PublicationSession,
   rawApplicationId: string,

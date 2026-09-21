@@ -34,3 +34,17 @@ export const applicationTaskListSchema = z
 
 export type ApplicationTaskInput = z.infer<typeof applicationTaskInputSchema>;
 export type ApplicationTask = z.infer<typeof applicationTaskSchema>;
+
+export const upcomingTasksSchema = z
+  .object({
+    tasks: z.array(
+      applicationTaskSchema.extend({
+        company: z.string(),
+        role: z.string(),
+      }),
+    ),
+    hasMore: z.boolean(),
+  })
+  .strict();
+
+export type UpcomingTask = z.infer<typeof upcomingTasksSchema>['tasks'][number];

@@ -8,6 +8,7 @@ import type { PublicationSession } from './publications';
 type ApplicationRow = {
   application_id: string;
   stage: Application['stage'];
+  submitted_on: string | null;
 };
 
 type EventRow = {
@@ -22,7 +23,7 @@ export async function readApplicationInsights(session: PublicationSession) {
   return await sql.begin(async (tx) => {
     await authorize(tx, session);
     const applications = await tx<ApplicationRow[]>`
-        select id as application_id, stage
+        select id as application_id, stage, submitted_on::text
         from app.applications
         where tenant_id = ${session.tenantId} and deleted_at is null`;
     const events = await tx<EventRow[]>`
@@ -37,6 +38,7 @@ export async function readApplicationInsights(session: PublicationSession) {
       applications.map((row) => ({
         applicationId: row.application_id,
         stage: row.stage,
+        submittedOn: row.submitted_on,
       })),
       events.map((row) => ({
         applicationId: row.application_id,

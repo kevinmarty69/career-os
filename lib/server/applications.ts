@@ -32,6 +32,7 @@ type ApplicationRow = {
   logo_url: string | null;
   accent: string;
   stage: Application['stage'];
+  submitted_on: string | null;
   company_sources: unknown;
   discovered_job_id: string | null;
   revision: string;
@@ -67,7 +68,7 @@ export async function createApplication(
         )
         on conflict (id) do update set name = excluded.name`;
     const [existing] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
+        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources, submitted_on::text,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
@@ -86,14 +87,14 @@ export async function createApplication(
     const [created] = await tx<ApplicationRow[]>`
         insert into app.applications (
           id, tenant_id, company, role, raw_text, url, logo_url, accent, stage,
-          company_sources,
+          company_sources, submitted_on,
           create_idempotency_key, create_input_hash
         ) values (
           ${id}, ${session.tenantId}, ${input.company}, ${input.role},
           ${input.description}, ${input.url ?? null}, ${input.logoUrl ?? null},
-          ${input.accent}, ${input.stage}, ${tx.json(input.companySources ?? [])},
+          ${input.accent}, ${input.stage}, ${tx.json(input.companySources ?? [])}, ${input.submittedOn ?? null},
           ${idempotencyKey}, ${inputHash}
-        ) returning id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
+        ) returning id, company, role, raw_text, url, logo_url, accent, stage, company_sources, submitted_on::text,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
     return { created: true, application: projection(created) };
@@ -141,7 +142,7 @@ export async function promoteDiscoveredJobToApplication(
       throw new OpportunityApplicationExcludedError(decision.disposition);
 
     const [existing] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
+        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources, submitted_on::text,
           discovered_job_id, revision, create_input_hash, created_at, updated_at,
           deleted_at
         from app.applications
@@ -167,7 +168,7 @@ export async function promoteDiscoveredJobToApplication(
           ${session.tenantId}, ${jobId}, ${input.company}, ${input.role},
           ${input.description}, ${input.url ?? null}, ${input.accent}, ${input.stage},
           ${randomUUID()}, ${hashJson(input)}
-        ) returning id, company, role, raw_text, url, logo_url, accent, stage,
+        ) returning id, company, role, raw_text, url, logo_url, accent, stage, submitted_on::text,
           company_sources, discovered_job_id, revision, create_input_hash,
           created_at, updated_at, deleted_at`;
     await tx`select app.record_human_audit_event(
@@ -184,7 +185,7 @@ export async function listApplications(session: PublicationSession) {
   return await sql.begin(async (tx) => {
     await authorize(tx, session);
     const rows = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
+        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources, submitted_on::text,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
@@ -204,7 +205,7 @@ export async function readApplication(
   return await sql.begin(async (tx) => {
     await authorize(tx, session);
     const [row] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
+        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources, submitted_on::text,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
@@ -226,7 +227,7 @@ export async function updateApplication(
   return await sql.begin(async (tx) => {
     await authorize(tx, session);
     const [existing] = await tx<ApplicationRow[]>`
-        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
+        select id, company, role, raw_text, url, logo_url, accent, stage, company_sources, submitted_on::text,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at
         from app.applications
@@ -245,10 +246,11 @@ export async function updateApplication(
           raw_text = ${input.description}, url = ${input.url ?? null},
           logo_url = ${input.logoUrl ?? null}, accent = ${input.accent},
           stage = ${input.stage},
+          submitted_on = ${input.submittedOn === undefined ? existing.submitted_on : input.submittedOn},
           company_sources = ${tx.json(input.companySources ?? companySources(existing.company_sources))},
           revision = revision + 1
         where tenant_id = ${session.tenantId} and id = ${applicationId}
-        returning id, company, role, raw_text, url, logo_url, accent, stage, company_sources,
+        returning id, company, role, raw_text, url, logo_url, accent, stage, company_sources, submitted_on::text,
           discovered_job_id, revision,
           create_input_hash, created_at, updated_at, deleted_at`;
     return projection(updated);
@@ -297,6 +299,7 @@ function projection(row: ApplicationRow): Application {
     ...(row.logo_url ? { logoUrl: row.logo_url } : {}),
     accent: row.accent,
     stage: row.stage,
+    submittedOn: row.submitted_on ?? null,
     ...(sources.length ? { companySources: sources } : {}),
     revision: Number(row.revision),
     createdAt: row.created_at.toISOString(),
@@ -327,6 +330,8 @@ function sameFields(
     row.logo_url === (input.logoUrl ?? null) &&
     row.accent === input.accent &&
     row.stage === input.stage &&
+    (input.submittedOn === undefined ||
+      row.submitted_on === input.submittedOn) &&
     (input.companySources === undefined ||
       JSON.stringify(companySources(row.company_sources)) ===
         JSON.stringify(input.companySources))

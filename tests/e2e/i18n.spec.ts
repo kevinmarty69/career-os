@@ -276,7 +276,9 @@ test('shows descriptive response trends without claiming causality', async ({
   await expect(
     page.getByRole('heading', { name: 'Activity over 8 weeks' }),
   ).toBeVisible();
-  await expect(page.getByText('50%')).toBeVisible();
+  await expect(
+    page.locator('.co-stats').getByText('50%', { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText(/They do not attribute any response/),
   ).toBeVisible();

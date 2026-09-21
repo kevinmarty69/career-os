@@ -45,7 +45,11 @@ test('launch documentation matches the self-hosted product boundary', () => {
   }
 
   assert.match(env, /^CAREER_OS_DEPLOYMENT_MODE=self-hosted$/m);
-  assert.match(README, /managed service is a future deployment target/i);
+  assert.match(README, /self-hosted core.*not the managed Cloud distribution/i);
+  assert.match(
+    README,
+    /does not supply a hosted model, provider credits, billing/i,
+  );
   assert.match(
     docs['docs/SELF_HOSTING.md'],
     /does not provide managed backups, email delivery, billing/i,

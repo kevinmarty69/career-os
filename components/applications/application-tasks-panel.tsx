@@ -96,7 +96,7 @@ export function ApplicationTasksPanel({
   }
 
   return (
-    <section className="co-panel co-application-tasks">
+    <section className="co-panel co-application-tasks" id="tasks">
       <header>
         <div>
           <p>{t('dossier.next.actions')}</p>

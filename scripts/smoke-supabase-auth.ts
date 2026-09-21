@@ -14,6 +14,12 @@ import {
   applicationContactSchema,
 } from '../lib/application-contact';
 import { workspaceExportVersion } from '../lib/workspace-export-contract';
+import {
+  applicationSchema,
+  applicationFieldsSchema,
+} from '../lib/application-contract';
+import { applicationInsightsSchema } from '../lib/application-insights';
+import { upcomingTasksSchema } from '../lib/application-task';
 
 // Opt-in integration test. Only synthetic accounts created by this run are removed.
 async function main() {
@@ -85,6 +91,9 @@ async function main() {
       ]);
       const page = await context.newPage();
       await page.goto(`${base}/sign-in`);
+      await page
+        .getByRole('button', { name: 'Use a password', exact: true })
+        .click();
       await page.locator('input[name=email]').fill(identity.email);
       await page.locator('input[name=password]').fill(identity.password);
       await page.locator('form button[type=submit]').click();
@@ -212,6 +221,167 @@ async function main() {
       (await api(pageB, `/api/applications/${applicationId}`)).status,
       404,
       'Another account cannot read persisted application data',
+    );
+    const submittedOn = new Date(Date.now() - 10 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    await pageA.goto(`${base}/applications/${applicationId}/timeline`);
+    await pageA
+      .getByLabel('Submission date', { exact: true })
+      .fill(submittedOn);
+    await pageA
+      .getByRole('combobox', { name: 'Stage', exact: true })
+      .selectOption('applied');
+    await pageA
+      .getByRole('button', { name: 'Save tracking', exact: true })
+      .click();
+    await expect(pageA.getByRole('status')).toContainText('Tracking saved.');
+    await pageA.reload();
+    await expect(
+      pageA.getByLabel('Submission date', { exact: true }),
+    ).toHaveValue(submittedOn);
+    const tracking = applicationSchema.parse(
+      JSON.parse((await api(pageA, `/api/applications/${applicationId}`)).text),
+    );
+    assert.equal(tracking.stage, 'applied');
+    assert.equal(tracking.submittedOn, submittedOn);
+    const ageInsights = applicationInsightsSchema.parse(
+      JSON.parse((await api(pageA, '/api/insights')).text),
+    );
+    assert.deepEqual(
+      ageInsights.ageCohorts.find(({ age }) => age === '7-13'),
+      {
+        age: '7-13',
+        applications: 1,
+        responses: 0,
+        withoutResponse: 1,
+        responsePct: 0,
+      },
+    );
+    if (process.env.SMOKE_COHORT_SCREENSHOT_PATH) {
+      await pageA.goto(`${base}/insights`);
+      await expect(pageA.locator('.co-cohorts')).toContainText('0/1');
+      await pageA.screenshot({
+        path: process.env.SMOKE_COHORT_SCREENSHOT_PATH,
+        fullPage: true,
+      });
+    }
+    const taskCreated = await api(
+      pageA,
+      `/api/applications/${applicationId}/tasks`,
+      'POST',
+      {
+        kind: 'follow_up',
+        title: 'Synthetic follow-up, never send',
+        dueAt: new Date(Date.now() - 86_400_000).toISOString(),
+      },
+    );
+    assert.equal(taskCreated.status, 201);
+    const agenda = upcomingTasksSchema.parse(
+      JSON.parse((await api(pageA, '/api/tasks')).text),
+    );
+    assert.equal(agenda.tasks.length, 1);
+    assert.equal(agenda.tasks[0].applicationId, applicationId);
+    const trackingFields = applicationFieldsSchema.strip().parse(tracking);
+    assert.equal(
+      (
+        await api(pageB, `/api/applications/${applicationId}`, 'PATCH', {
+          ...trackingFields,
+          submittedOn: null,
+          expectedRevision: tracking.revision,
+        })
+      ).status,
+      404,
+      'Another tenant cannot edit submission dates',
+    );
+    assert.equal(
+      (
+        await api(pageA, `/api/applications/${applicationId}`, 'PATCH', {
+          ...trackingFields,
+          submittedOn: '2099-01-01',
+          expectedRevision: tracking.revision,
+        })
+      ).status,
+      400,
+      'Future submission date rejected',
+    );
+    const closed = await api(
+      pageA,
+      `/api/applications/${applicationId}`,
+      'PATCH',
+      {
+        ...trackingFields,
+        stage: 'closed',
+        expectedRevision: tracking.revision,
+      },
+    );
+    assert.equal(closed.status, 200);
+    assert.equal(
+      upcomingTasksSchema.parse(
+        JSON.parse((await api(pageA, '/api/tasks')).text),
+      ).tasks.length,
+      0,
+      'Closed dossiers do not create follow-up noise',
+    );
+    const reopened = await api(
+      pageA,
+      `/api/applications/${applicationId}`,
+      'PATCH',
+      {
+        ...trackingFields,
+        submittedOn: undefined,
+        expectedRevision: JSON.parse(closed.text).revision,
+      },
+    );
+    assert.equal(reopened.status, 200);
+    assert.equal(
+      JSON.parse(reopened.text).submittedOn,
+      submittedOn,
+      'Omitted date is preserved across stage changes',
+    );
+    assert.equal(
+      upcomingTasksSchema.parse(
+        JSON.parse((await api(pageB, '/api/tasks')).text),
+      ).tasks.length,
+      0,
+    );
+    await pageA.goto(base);
+    if (process.env.SMOKE_FOLLOWUP_SCREENSHOT_PATH) {
+      await expect(pageA.locator('.co-home-calendar')).toContainText(
+        'Synthetic follow-up, never send',
+      );
+      await pageA.screenshot({
+        path: process.env.SMOKE_FOLLOWUP_SCREENSHOT_PATH,
+        fullPage: true,
+      });
+    }
+    await pageA
+      .locator('.co-home-calendar a')
+      .filter({ hasText: 'Synthetic follow-up, never send' })
+      .click();
+    await expect(pageA).toHaveURL(
+      new RegExp(`/applications/${applicationId}/timeline#tasks$`),
+    );
+    await pageA
+      .getByRole('button', {
+        name: 'Complete: Synthetic follow-up, never send',
+        exact: true,
+      })
+      .click();
+    await expect(
+      pageA.getByRole('button', {
+        name: 'Reopen: Synthetic follow-up, never send',
+        exact: true,
+      }),
+    ).toBeVisible();
+    assert.equal(
+      upcomingTasksSchema.parse(
+        JSON.parse((await api(pageA, '/api/tasks')).text),
+      ).tasks.length,
+      0,
+    );
+    console.log(
+      'PASS: real submission-date UI save/reload, age cohorts, tenant-scoped Home follow-up and persisted completion. No messages sent.',
     );
     const contactsPath = `/api/applications/${applicationId}/contacts`;
     const initialContacts = await api(pageA, contactsPath);

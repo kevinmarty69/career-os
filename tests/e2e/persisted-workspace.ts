@@ -218,6 +218,9 @@ export async function mockPositioningAuditWorkspace(page: Page) {
 }
 
 export async function mockPersistedWorkspace(page: Page, run?: unknown) {
+  await page.route('**/api/tasks', (route) =>
+    route.fulfill({ json: { tasks: [], hasMore: false } }),
+  );
   const now = '2026-09-04T12:00:00.000Z';
   const sourceId = '988c0a00-0000-4000-8000-000000000042';
   const sourceUrl = 'https://jobs.example.test/platform-engineer';
@@ -255,6 +258,15 @@ export async function mockPersistedWorkspace(page: Page, run?: unknown) {
         sentOrLater: 2,
         applicationsWithResponse: 1,
         responseCoveragePct: 50,
+        ageCohorts: [
+          {
+            age: 'unknown',
+            applications: 2,
+            responses: 1,
+            withoutResponse: 1,
+            responsePct: 50,
+          },
+        ],
         interviews: 1,
         outcomes: 1,
         weekly: Array.from({ length: 8 }, (_, index) => ({

@@ -8,7 +8,9 @@ import {
   readApplicationRun,
   readApplications,
   readPublications,
+  readUpcomingTasks,
 } from '@/lib/career-api';
+import { upcomingTasksSchema } from '@/lib/application-task';
 import { type PersistedRun, persistedRunSchema } from '@/lib/run-contract';
 import {
   type PublicationSummary,
@@ -17,6 +19,9 @@ import {
 import { useEffect, useState } from 'react';
 
 export function useWorkflowDashboard() {
+  const [upcoming, setUpcoming] =
+    useState<ReturnType<typeof upcomingTasksSchema.parse>>();
+  const [tasksUnavailable, setTasksUnavailable] = useState(false);
   const [dashboard, setDashboard] = useState<{
     applications: Application[];
     items: Array<{
@@ -31,6 +36,18 @@ export function useWorkflowDashboard() {
 
   useEffect(() => {
     const controller = new AbortController();
+    void readUpcomingTasks(controller.signal)
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const parsed = upcomingTasksSchema.parse(await response.json());
+        if (!controller.signal.aborted) {
+          setUpcoming(parsed);
+          setTasksUnavailable(false);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setTasksUnavailable(true);
+      });
     void Promise.all([
       readApplications(controller.signal),
       readPublications(controller.signal),
@@ -55,21 +72,25 @@ export function useWorkflowDashboard() {
         const publications = publicationSummarySchema
           .array()
           .parse(publicationPayload.publications);
-        // ponytail: eight recent runs avoid an aggregate endpoint until dashboard latency warrants one.
-        const items = await Promise.all(
-          applications.slice(0, 8).map(async (application) => {
-            const response = await readApplicationRun(
-              application.applicationId,
-              controller.signal,
-            );
-            if (response.status === 204) return { application };
-            if (!response.ok) return { application, unavailable: true };
-            const run = persistedRunSchema.safeParse(await response.json());
-            return run.success
-              ? { application, run: run.data }
-              : { application, unavailable: true };
-          }),
-        );
+        const items = [];
+        // Bound concurrency without silently dropping older applications from the list.
+        for (let offset = 0; offset < applications.length; offset += 4) {
+          const batch = await Promise.all(
+            applications.slice(offset, offset + 4).map(async (application) => {
+              const response = await readApplicationRun(
+                application.applicationId,
+                controller.signal,
+              );
+              if (response.status === 204) return { application };
+              if (!response.ok) return { application, unavailable: true };
+              const run = persistedRunSchema.safeParse(await response.json());
+              return run.success
+                ? { application, run: run.data }
+                : { application, unavailable: true };
+            }),
+          );
+          items.push(...batch);
+        }
         setDashboard({ applications, items, publications });
         setError(undefined);
       })
@@ -88,6 +109,8 @@ export function useWorkflowDashboard() {
       : undefined);
   return {
     dashboard,
+    upcoming,
+    tasksUnavailable,
     error: unavailable,
     refresh: () => setReload((value) => value + 1),
   };

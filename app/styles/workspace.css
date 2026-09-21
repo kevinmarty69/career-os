@@ -69,6 +69,11 @@
 
 .co-timeline-form {
   grid-column: 2;
+  grid-row: 4;
+}
+
+.co-timeline-form.co-application-tracking {
+  grid-column: 1 / -1;
   grid-row: 3;
 }
 
@@ -124,7 +129,7 @@
 
 .co-timeline-list {
   grid-column: 1;
-  grid-row: 3;
+  grid-row: 4;
 }
 
 .co-contact-card > header,
@@ -1034,6 +1039,29 @@
   gap: 16px;
 }
 
+.co-cohorts {
+  display: grid;
+  gap: 12px;
+  margin-block: 20px;
+}
+
+.co-cohorts > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--co-border);
+}
+
+.co-cohorts dt {
+  font-weight: 600;
+}
+.co-cohorts dd {
+  margin: 0;
+  color: var(--co-text-3);
+}
+
 .co-insight-weeks {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -1578,6 +1606,7 @@
 
   .co-timeline-intro,
   .co-timeline-form,
+  .co-timeline-form.co-application-tracking,
   .co-timeline-list {
     grid-column: 1;
     grid-row: auto;

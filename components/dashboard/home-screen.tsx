@@ -1,4 +1,6 @@
 'use client';
+import { useState } from 'react';
+import { nextTasks } from '@/lib/dashboard-priority';
 
 import {
   runStageLabel,
@@ -24,7 +26,16 @@ export function HomeScreen({
   initiallyOpenNotifications?: boolean;
 }) {
   const { locale } = useI18n();
-  const { dashboard, error: dashboardError } = useWorkflowDashboard();
+  const {
+    dashboard,
+    upcoming,
+    tasksUnavailable,
+    error: dashboardError,
+  } = useWorkflowDashboard();
+  const [expanded, setExpanded] = useState(false);
+  const [now] = useState(() => Date.now());
+  const tasks = nextTasks(upcoming?.tasks ?? []);
+  const dueTask = tasks.find((task) => Date.parse(task.dueAt) <= now);
   const memory = useCareerMemory();
 
   const actions = dashboardActions(dashboard?.items ?? []);
@@ -126,7 +137,14 @@ export function HomeScreen({
       </AppShell>
     );
   }
-  const nextAction = homePriorityCopy(priority, locale, undefined);
+  const nextAction = dueTask
+    ? {
+        eyebrow: `${locale === 'fr' ? 'Tâche à traiter' : 'Task due'} · ${dueTask.company}`,
+        title: dueTask.title,
+        detail: `${dueTask.company} · ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(dueTask.dueAt))}`,
+        action: locale === 'fr' ? 'Ouvrir la tâche' : 'Open task',
+      }
+    : homePriorityCopy(priority, locale, undefined);
 
   return (
     <AppShell path="/">
@@ -153,7 +171,7 @@ export function HomeScreen({
           </Link>
         </header>
 
-        {latestSignal ? (
+        {latestSignal && !dueTask ? (
           <section className="co-home-signal">
             <div>
               <p>
@@ -242,9 +260,11 @@ export function HomeScreen({
               <div>
                 <Link
                   href={
-                    priority
-                      ? `/applications/${priority.application.applicationId}`
-                      : '/applications'
+                    dueTask
+                      ? `/applications/${dueTask.applicationId}/timeline#tasks`
+                      : priority
+                        ? `/applications/${priority.application.applicationId}`
+                        : '/applications'
                   }
                 >
                   {nextAction.action}
@@ -296,7 +316,52 @@ export function HomeScreen({
             ) : null}
             <h3>{locale === 'fr' ? 'Prochaines actions' : 'Next actions'}</h3>
             <div className="co-home-calendar">
-              {actions.slice(0, 3).map((action) => (
+              {tasksUnavailable ? (
+                <p role="alert">
+                  {locale === 'fr'
+                    ? 'Les relances ne peuvent pas être chargées. Réessayez en rechargeant la page.'
+                    : 'Follow-ups could not be loaded. Reload the page to try again.'}
+                </p>
+              ) : !upcoming ? (
+                <p role="status">
+                  {locale === 'fr'
+                    ? 'Chargement des relances…'
+                    : 'Loading follow-ups…'}
+                </p>
+              ) : null}
+              {(expanded ? tasks : tasks.slice(0, 3)).map((task) => (
+                <Link
+                  href={`/applications/${task.applicationId}/timeline#tasks`}
+                  key={task.taskId}
+                >
+                  <i>
+                    <Icon>event</Icon>
+                  </i>
+                  <span>
+                    <strong>
+                      {task.company} · {task.title}
+                    </strong>
+                    <small>
+                      {Date.parse(task.dueAt) < now
+                        ? locale === 'fr'
+                          ? 'En retard'
+                          : 'Overdue'
+                        : locale === 'fr'
+                          ? 'À venir'
+                          : 'Upcoming'}{' '}
+                      ·{' '}
+                      <time dateTime={task.dueAt}>
+                        {new Intl.DateTimeFormat(locale, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(task.dueAt))}
+                      </time>
+                    </small>
+                  </span>
+                  <b>{locale === 'fr' ? 'Ouvrir' : 'Open'}</b>
+                </Link>
+              ))}
+              {(expanded ? actions : actions.slice(0, 3)).map((action) => (
                 <Link
                   href={`/applications/${action.application.applicationId}`}
                   key={action.application.applicationId}
@@ -311,12 +376,38 @@ export function HomeScreen({
                   <b>{locale === 'fr' ? 'Ouvrir' : 'Open'}</b>
                 </Link>
               ))}
-              {!actions.length ? (
+              {!actions.length &&
+              !tasks.length &&
+              upcoming &&
+              !tasksUnavailable ? (
                 <div className="co-home-empty compact">
                   {locale === 'fr'
                     ? 'Aucune prochaine action.'
                     : 'No next action.'}
                 </div>
+              ) : null}
+              {tasks.length > 3 || actions.length > 3 ? (
+                <button
+                  className="co-button quiet"
+                  type="button"
+                  aria-expanded={expanded}
+                  onClick={() => setExpanded(!expanded)}
+                >
+                  {expanded
+                    ? locale === 'fr'
+                      ? 'Réduire'
+                      : 'Show less'
+                    : locale === 'fr'
+                      ? `Afficher les ${tasks.length + actions.length} actions`
+                      : `Show ${tasks.length + actions.length} actions`}
+                </button>
+              ) : null}
+              {upcoming?.hasMore ? (
+                <p>
+                  {locale === 'fr'
+                    ? 'Les 100 prochaines tâches sont affichées. Retrouvez les suivantes dans vos dossiers.'
+                    : 'Showing the next 100 tasks. Later tasks remain in their application dossiers.'}
+                </p>
               ) : null}
             </div>
           </section>

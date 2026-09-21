@@ -78,6 +78,33 @@ export function readApplicationTasks(
   });
 }
 
+export function readUpcomingTasks(signal: AbortSignal) {
+  return fetch('/api/tasks', { cache: 'no-store', signal });
+}
+
+export function saveApplicationTracking(
+  application: import('./application-contract').Application,
+  stage: import('./application-contract').Application['stage'],
+  submittedOn: string | null,
+) {
+  return fetch(`/api/applications/${application.applicationId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      company: application.company,
+      role: application.role,
+      description: application.description,
+      url: application.url,
+      logoUrl: application.logoUrl,
+      accent: application.accent,
+      companySources: application.companySources,
+      stage,
+      submittedOn,
+      expectedRevision: application.revision,
+    }),
+  });
+}
+
 export function createApplicationTask(
   applicationId: string,
   input: ApplicationTaskInput,

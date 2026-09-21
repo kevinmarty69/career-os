@@ -17,6 +17,36 @@ const application = {
   stage: 'draft' as const,
 };
 
+test('submission date is explicit, nullable, valid and never in the future', () => {
+  for (const submittedOn of [
+    undefined,
+    null,
+    '2024-02-29',
+    new Date().toISOString().slice(0, 10),
+  ])
+    assert.equal(
+      applicationFieldsSchema.safeParse({ ...application, submittedOn })
+        .success,
+      true,
+    );
+  for (const submittedOn of [
+    '2025-02-29',
+    '2026-13-01',
+    '2099-01-01',
+    'yesterday',
+    '2026-09-01T12:00:00Z',
+  ])
+    assert.equal(
+      applicationFieldsSchema.safeParse({ ...application, submittedOn })
+        .success,
+      false,
+    );
+  assert.equal(
+    applicationFieldsSchema.parse(application).submittedOn,
+    undefined,
+  );
+});
+
 test('application mutations are strict and bounded', () => {
   assert.deepEqual(applicationFieldsSchema.parse(application), application);
   assert.equal(

@@ -1,11 +1,22 @@
 import type { Application } from './application-contract';
 import type { PersistedRun } from './run-contract';
+import type { UpcomingTask } from './application-task';
+
+export function nextTasks(tasks: UpcomingTask[]) {
+  return tasks
+    .filter((task) => !task.completedAt)
+    .sort(
+      (left, right) =>
+        Date.parse(left.dueAt) - Date.parse(right.dueAt) ||
+        left.taskId.localeCompare(right.taskId),
+    );
+}
 
 export type DashboardItem = {
   application: Pick<
     Application,
     'applicationId' | 'company' | 'role' | 'updatedAt'
-  >;
+  > & { stage?: Application['stage'] };
   run?: Pick<
     PersistedRun,
     | 'runId'
@@ -34,7 +45,7 @@ const rank: Record<DashboardAction['kind'], number> = {
 
 export function dashboardActions(items: DashboardItem[]): DashboardAction[] {
   return items
-    .filter((item) => !item.unavailable)
+    .filter((item) => !item.unavailable && item.application.stage !== 'closed')
     .map((item) => {
       const decided = new Set(
         item.run?.reviewDecisions.map(
@@ -67,6 +78,10 @@ export function dashboardActions(items: DashboardItem[]): DashboardAction[] {
                 : 'start';
       return { ...item, kind, pendingDecisions };
     })
+    .filter(
+      ({ application, kind }) =>
+        kind !== 'start' || !application.stage || application.stage === 'draft',
+    )
     .sort(
       (left, right) =>
         rank[left.kind] - rank[right.kind] ||

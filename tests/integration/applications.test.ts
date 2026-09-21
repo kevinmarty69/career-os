@@ -72,6 +72,11 @@ async function main() {
     401,
     'anonymous application insights',
   );
+  await expectStatus(
+    await anonymous.request('/api/tasks'),
+    401,
+    'anonymous task agenda',
+  );
 
   const owner = await createWorkspace('ApplicationOwner');
   const key = randomUUID();
@@ -227,6 +232,13 @@ async function main() {
   };
   assert.equal(task.revision, 1);
   assert.equal(task.completedAt, null);
+  const agenda = await owner.request('/api/tasks');
+  await expectStatus(agenda, 200, 'task agenda');
+  assert.match(agenda.headers.get('cache-control') ?? '', /no-store/);
+  assert.equal(
+    ((await agenda.json()) as { tasks: { taskId: string }[] }).tasks[0]?.taskId,
+    task.taskId,
+  );
   const taskComplete = await owner.request(
     `/api/applications/${application.applicationId}/tasks/${task.taskId}`,
     'PATCH',
@@ -239,6 +251,11 @@ async function main() {
   };
   assert.equal(completedTask.revision, 2);
   assert.ok(completedTask.completedAt);
+  assert.equal(
+    ((await (await owner.request('/api/tasks')).json()) as { tasks: unknown[] })
+      .tasks.length,
+    0,
+  );
   const taskReplay = await owner.request(
     `/api/applications/${application.applicationId}/tasks/${task.taskId}`,
     'PATCH',
@@ -449,6 +466,11 @@ async function main() {
   }
 
   const other = await createWorkspace('ApplicationOther');
+  assert.equal(
+    ((await (await other.request('/api/tasks')).json()) as { tasks: unknown[] })
+      .tasks.length,
+    0,
+  );
   await expectStatus(
     await other.request(`/api/applications/${application.applicationId}`),
     404,
@@ -510,6 +532,75 @@ async function main() {
     ),
     400,
     'run after application deletion',
+  );
+
+  const trackingResponse = await owner.request(
+    '/api/applications',
+    'POST',
+    {
+      ...applicationInput,
+      stage: 'applied',
+      submittedOn: '2026-09-01',
+    },
+    { 'idempotency-key': randomUUID() },
+  );
+  await expectStatus(trackingResponse, 201, 'dated application');
+  const tracking = (await trackingResponse.json()) as {
+    applicationId: string;
+    submittedOn: string;
+  };
+  assert.equal(tracking.submittedOn, '2026-09-01');
+  const trackingPath = `/api/applications/${tracking.applicationId}`;
+  const stageChange = await owner.request(trackingPath, 'PATCH', {
+    ...applicationInput,
+    stage: 'interview',
+    expectedRevision: 1,
+  });
+  await expectStatus(stageChange, 200, 'stage change preserves date');
+  assert.equal(
+    ((await stageChange.json()) as { submittedOn: string }).submittedOn,
+    '2026-09-01',
+  );
+  const corrected = await owner.request(trackingPath, 'PATCH', {
+    ...applicationInput,
+    stage: 'interview',
+    submittedOn: '2026-09-02',
+    expectedRevision: 2,
+  });
+  await expectStatus(corrected, 200, 'correct submission date');
+  assert.equal(
+    (
+      (await (await owner.request(trackingPath)).json()) as {
+        submittedOn: string;
+      }
+    ).submittedOn,
+    '2026-09-02',
+  );
+  await expectStatus(
+    await owner.request(trackingPath, 'PATCH', {
+      ...applicationInput,
+      submittedOn: '2099-01-01',
+      expectedRevision: 3,
+    }),
+    400,
+    'future submission rejected',
+  );
+  await expectStatus(
+    await owner.request(trackingPath, 'PATCH', {
+      ...applicationInput,
+      submittedOn: null,
+      expectedRevision: 3,
+    }),
+    200,
+    'clear unknown submission date',
+  );
+  assert.equal(
+    (
+      (await (await owner.request(trackingPath)).json()) as {
+        submittedOn: null;
+      }
+    ).submittedOn,
+    null,
   );
 }
 

@@ -22,6 +22,7 @@ import {
   createApplicationTimelineEvent,
   readApplication,
   readApplicationTimeline,
+  saveApplicationTracking,
 } from '@/lib/career-api';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -43,6 +44,9 @@ export function ApplicationTimelineScreen({
   }>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [trackingState, setTrackingState] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
   const current = result?.applicationId === applicationId ? result : undefined;
   const application = current?.application;
   const events = current?.events ?? [];
@@ -114,6 +118,28 @@ export function ApplicationTimelineScreen({
     }
   }
 
+  async function saveTracking(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!application || trackingState === 'saving') return;
+    const form = new FormData(event.currentTarget);
+    setTrackingState('saving');
+    try {
+      const response = await saveApplicationTracking(
+        application,
+        String(form.get('stage')) as Application['stage'],
+        String(form.get('submittedOn') ?? '') || null,
+      );
+      if (!response.ok) throw new Error();
+      const saved = applicationSchema.parse(await response.json());
+      setResult((previous) =>
+        previous ? { ...previous, application: saved } : previous,
+      );
+      setTrackingState('saved');
+    } catch {
+      setTrackingState('error');
+    }
+  }
+
   const identity = application
     ? { applicationId, company: application.company, role: application.role }
     : {
@@ -167,6 +193,85 @@ export function ApplicationTimelineScreen({
               applicationId={applicationId}
               company={application.company}
             />
+            <section
+              className="co-panel co-timeline-form co-application-tracking"
+              aria-labelledby="tracking-heading"
+            >
+              <h2 id="tracking-heading">
+                {locale === 'fr'
+                  ? 'Suivi de candidature'
+                  : 'Application tracking'}
+              </h2>
+              <p>
+                {locale === 'fr'
+                  ? 'Renseignez la date réelle d’envoi. Laissez vide si elle est inconnue ; la création du dossier ne vaut pas envoi. Les dates sont regroupées en jours UTC dans Insights.'
+                  : 'Record the actual submission date. Leave it blank if unknown; creating a dossier does not mean it was sent. Insights groups dates by UTC calendar day.'}
+              </p>
+              <form onSubmit={saveTracking}>
+                <label>
+                  {locale === 'fr' ? 'Étape' : 'Stage'}
+                  <select name="stage" defaultValue={application.stage}>
+                    {(
+                      [
+                        'draft',
+                        'applied',
+                        'interview',
+                        'offer',
+                        'closed',
+                      ] as const
+                    ).map((stage, index) => (
+                      <option key={stage} value={stage}>
+                        {
+                          (locale === 'fr'
+                            ? [
+                                'Brouillon',
+                                'Envoyée',
+                                'Entretien',
+                                'Offre',
+                                'Fermée',
+                              ]
+                            : [
+                                'Draft',
+                                'Sent',
+                                'Interview',
+                                'Offer',
+                                'Closed',
+                              ])[index]
+                        }
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {locale === 'fr' ? 'Date d’envoi' : 'Submission date'}
+                  <input
+                    name="submittedOn"
+                    type="date"
+                    defaultValue={application.submittedOn ?? ''}
+                    max={new Date().toISOString().slice(0, 10)}
+                  />
+                </label>
+                <button
+                  className="co-button"
+                  type="submit"
+                  disabled={trackingState === 'saving'}
+                >
+                  {locale === 'fr' ? 'Enregistrer le suivi' : 'Save tracking'}
+                </button>
+                {trackingState === 'saved' ? (
+                  <p role="status">
+                    {locale === 'fr' ? 'Suivi enregistré.' : 'Tracking saved.'}
+                  </p>
+                ) : null}
+                {trackingState === 'error' ? (
+                  <p role="alert">
+                    {locale === 'fr'
+                      ? 'Enregistrement impossible. Rechargez le dossier puis réessayez ; vos données peuvent avoir changé.'
+                      : 'Could not save. Reload the dossier and try again; its data may have changed.'}
+                  </p>
+                ) : null}
+              </form>
+            </section>
             <section className="co-panel co-timeline-form">
               <h2>{t('dossier.add.an.event')}</h2>
               <form onSubmit={addEvent}>
