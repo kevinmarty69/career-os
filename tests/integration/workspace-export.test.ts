@@ -147,17 +147,15 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
       )`;
       await transaction`insert into app.applications (
         id, tenant_id, discovered_job_id, company, role, raw_text, accent,
-        create_idempotency_key, create_input_hash, created_at, deleted_at
+        create_idempotency_key, create_input_hash, created_at, deleted_at, submitted_on
       ) values
         (${applicationId}, ${tenantId}, ${discoveredJobId}, 'Visible Co',
           'Engineer', 'visible application', '#21504b', ${randomUUID()},
           ${'a'.repeat(64)},
-          '2026-01-02 03:04:05.123456+00'::timestamptz, now()),
+          '2026-01-02 03:04:05.123456+00'::timestamptz, now(), '2026-01-02'::date),
         (${otherApplicationId}, ${otherTenantId}, null, ${secret}, 'Engineer',
           ${secret}, '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
-          '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
-      await transaction`update app.applications set submitted_on = '2026-01-02'::date
-        where tenant_id = ${tenantId} and id = ${applicationId}`;
+          '2026-01-02 03:04:05.654321+00'::timestamptz, null, null)`;
       await transaction`insert into app.application_timeline_events (
         id, tenant_id, application_id, kind, title, note, occurred_at,
         actor_id
