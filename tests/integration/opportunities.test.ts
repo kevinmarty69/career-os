@@ -496,6 +496,7 @@ async function main() {
       url: 'https://job-boards.greenhouse.io/acme/jobs/101',
       accent: '#5847e8',
       stage: 'draft',
+      submittedOn: null,
       revision: 1,
       createdAt: undefined,
       updatedAt: undefined,
