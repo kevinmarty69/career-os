@@ -156,6 +156,8 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         (${otherApplicationId}, ${otherTenantId}, null, ${secret}, 'Engineer',
           ${secret}, '#21504b', ${randomUUID()}, ${'b'.repeat(64)},
           '2026-01-02 03:04:05.654321+00'::timestamptz, null)`;
+      await transaction`update app.applications set submitted_on = '2026-01-02'::date
+        where tenant_id = ${tenantId} and id = ${applicationId}`;
       await transaction`insert into app.application_timeline_events (
         id, tenant_id, application_id, kind, title, note, occurred_at,
         actor_id
@@ -475,6 +477,7 @@ test('fresh owners export an isolated, verifiable stream without secrets', async
         record.type === 'applications' && record.data.id === applicationId,
     );
     assert.match(exportedApplication.data.created_at, /\.\d{6}\+00$/);
+    assert.equal(exportedApplication.data.submitted_on, '2026-01-02');
     assert.equal(
       records.some(
         (record) =>

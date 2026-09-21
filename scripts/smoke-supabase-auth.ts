@@ -640,6 +640,11 @@ async function main() {
         .digest('hex'),
       'Export checksum verifies',
     );
+    const exportedApplication = records.find(
+      (record) =>
+        record.type === 'applications' && record.data.id === applicationId,
+    )?.data;
+    assert.equal(exportedApplication?.submitted_on, submittedOn);
     const exportedContact = records.find(
       (record) =>
         record.type === 'application_contacts' &&

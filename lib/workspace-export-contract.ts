@@ -1,5 +1,5 @@
 export const workspaceExportFormat = 'career-os.workspace-export';
-export const workspaceExportVersion = 14;
+export const workspaceExportVersion = 15;
 
 export const workspaceExportTables = [
   {
@@ -82,6 +82,7 @@ export const workspaceExportTables = [
       'logo_url',
       'accent',
       'stage',
+      'submitted_on',
       'revision',
       'create_idempotency_key',
       'create_input_hash',
