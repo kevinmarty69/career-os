@@ -5,22 +5,53 @@
 [![CI](https://github.com/kevinmarty69/career-os/actions/workflows/ci.yml/badge.svg)](https://github.com/kevinmarty69/career-os/actions/workflows/ci.yml)
 [![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-5847e8.svg)](LICENSE)
 
-Career OS turns real career evidence into private, role-specific applications. Every published statement stays attached to a source and carries an explicit status: `verified`, `declared`, or `inferred`.
+Career OS is an open-source workspace for evidence-backed job applications. Import your career history, find relevant opportunities, prepare a tailored application, and review what the agents propose before sharing it.
 
-It is deliberately not a generic AI resume generator. Models may research and suggest; typed contracts, PostgreSQL, deterministic checks, and human approval decide what can ship.
+Career Memory distinguishes `verified`, `declared`, `inferred`, and `unsupported` claims. Inferences are not publishable as facts, and unsupported claims cannot be included in a published page. Models research and suggest; you remain responsible for your claims, application strategy, and final approval.
 
-## Try the product in two minutes
+![Career OS home: next actions, evidence gaps, and application reviews](docs/build-in-public/2026-09-10-product-captures/01-home.png)
 
-The built-in demo uses synthetic data and a deterministic in-browser workflow. It needs no account, database, or model:
+Screenshots show the implemented interface in English with **synthetic data**, not customer activity or live agent results. [Capture provenance and reproduction](docs/build-in-public/2026-09-10-product-captures/README.md).
+
+## What you can do
+
+- **Build Career Memory.** Import PDF, DOCX, TXT, pasted text, or a LinkedIn export (ZIP / Positions.csv, positions only). Review extracted claims, their sources, sensitivity, and allowed uses before saving them. Raw document parsing runs in a browser Web Worker; accepted career data is persisted in your workspace.
+- **Find and assess opportunities.** Save search profiles with hard constraints and preferences, configure scheduled discovery from supported job boards, import a job URL, and compare the role against your evidence. Missing information stays unknown; model-backed semantic analysis requires a configured provider.
+- **Manage applications.** Track preparation, sent applications, interviews, offers, and closed dossiers in one pipeline, with contacts, tasks, a timeline, and interview debriefs.
+- **Prepare and review a private page.** Research the company, select evidence, approve the strategy, then resolve recruiter, hiring-manager, and factual reviews. Corrections produce new versions; publication remains a separate human decision.
+- **Share deliberately.** Publish an expiring, revocable private link and inspect recorded engagement. Contact research produces suggestions and drafts; Career OS does not send applications or messages for you.
+- **Work in English or French.** Change the interface language from your account menu → Profile settings. This does not translate your imported documents or application content.
+
+<details>
+<summary>Application pipeline</summary>
+
+![Application pipeline with synthetic applications, reusable evidence, and discovered opportunities](docs/build-in-public/2026-09-10-product-captures/02-applications.png)
+
+The five-stage pipeline is visible; the secondary Opportunities section continues below the captured viewport. Long labels use the interface's normal ellipses.
+
+</details>
+
+<details>
+<summary>Human review and source evidence</summary>
+
+![A factual review blocks an unsupported percentage and displays the original source](docs/build-in-public/2026-09-10-product-captures/03-evidence-review.png)
+
+</details>
+
+## Try the read-only demo
+
+Use Node.js 22+ and the pnpm version pinned in `package.json`. The `/demo` route is a **static, synthetic walkthrough**, not an executing agent workflow. It needs no account, database, or model:
 
 ```bash
+git clone https://github.com/kevinmarty69/career-os.git
+cd career-os
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open [localhost:3000/demo](http://localhost:3000/demo). The public journey explains how sourced career evidence becomes a tailored application, without authentication, state-changing requests, persistence, or publication.
+Open [localhost:3000/demo](http://localhost:3000/demo). It illustrates career evidence, opportunity matching, human review, and a private-page preview. It does not import files, run models, save data, or publish anything. The populated workspace screenshots above use separate browser-test fixtures; they are not the `/demo` screen.
 
-![Career OS evidence-backed application workspace](docs/career-os-workspace.jpg)
+For signup, CV import, and a persisted workspace, follow the real-workflow setup below.
 
 ## The trust boundary is the product
 
@@ -42,11 +73,9 @@ flowchart LR
 
 Each durable worker has its own non-owner database login and a narrow function set. Jobs are leased globally without a caller-supplied tenant ID. Model calls happen outside database transactions, under a reserved token budget; an unknown provider outcome fails closed instead of being replayed.
 
-## What is implemented
+## Runtime and scope
 
-- local PDF, DOCX, TXT, pasted-text and LinkedIn ZIP / Positions.csv import in a Web Worker (positions only, followed by human review);
-- explicit review of provenance, sensitivity, and allowed uses;
-- versioned Career Memory and application dossiers;
+- Supabase Auth sessions and tenant-scoped, versioned Career Memory;
 - SSRF-resistant job URL previews that remain untrusted until confirmed;
 - durable, resumable workflow steps with idempotency, leases, and admission limits;
 - human gates around research, evidence, strategy, review, and publication;
@@ -54,7 +83,9 @@ Each durable worker has its own non-owner database login and a narrow function s
 - revocable private capabilities exchanged for secure session cookies;
 - export, interruption, worker readiness, and conservative failure settlement.
 
-The repository currently proves the self-hosted implementation. A managed service is a future deployment target; billing, hosted operations, and cloud sandbox infrastructure are not included or claimed as implemented here.
+This repository contains the **self-hosted core**, not the managed Cloud distribution. It does not supply a hosted model, provider credits, billing, managed backups, or operated email delivery. Installation does not enable paid model calls.
+
+The [product reference](docs/PRODUCT-REFERENCE.md) describes the target scope, not a promise that every planned feature is finished. OAuth providers need operator configuration; discovery is limited to supported sources; placeholder routes are not delivered features. Configured code and synthetic tests are not proof of a live, fully validated deployment.
 
 ## Proof map
 
@@ -72,13 +103,22 @@ The repository currently proves the self-hosted implementation. A managed servic
 | Security boundaries fail closed as one executable gate          | [`SECURITY.md`](SECURITY.md), [`package.json`](package.json)                                                                                     |
 | The active front has keyboard, contrast and semantic-tree tests | [`accessibility.spec.ts`](tests/e2e/accessibility.spec.ts), [`design-system-v2.test.ts`](tests/unit/design-system-v2.test.ts)                    |
 
-CI runs formatting, zero-warning lint, TypeScript, unit tests, a production build, PostgreSQL isolation and concurrency tests, HTTP integration, page-correction worker integration, and a production-dependency audit. Chromium and mobile browser checks cover the application workflow, keyboard accessibility, computed contrast, and responsive layout. Browser workflow tests mock the API; SQL and HTTP tests independently verify persistence and authorization. The full worker suite can also be run locally with `pnpm test:integration:worker`.
+The [CI workflow](.github/workflows/ci.yml) is configured to run formatting, zero-warning lint, TypeScript, unit tests, a production build, PostgreSQL isolation and concurrency tests, HTTP integration, all worker integration tests, and a production-dependency audit. Chromium and mobile browser checks cover the application workflow, keyboard accessibility, computed contrast, and responsive layout. Browser workflow tests mock the API; SQL and HTTP tests independently verify persistence and authorization. See the linked CI run for its current result, not the presence of a test file alone.
 
 ## Run the real workflow
 
-The persisted workflow needs PostgreSQL, eight isolated worker credentials, and a loopback OpenAI-compatible model for the four model-backed roles.
+The persisted workflow needs:
+
+- **Supabase Auth + PostgreSQL 17**, either an existing Supabase project or an operator-managed Supabase instance;
+- a restricted application database login and **eight isolated worker credentials**, with workers supervised separately;
+- your own **OpenAI-compatible Chat Completions endpoint**, local or explicitly configured remote BYOK, for model-backed research, strategy, and qualitative reviews;
+- an isolated deterministic page composer: the native macOS adapter requires Node.js 24+; Linux uses the documented Docker adapter or a separately operated sandbox host.
+
+Evidence checks and page composition do not need a model. Remote processing sends permitted context to your chosen provider and requires explicit cost rates and limits. No model is downloaded or supplied by the open-source edition. See [Model setup](docs/MODEL_SETUP.md) for transport, privacy, budgets, and the optional adaptive interview.
 
 See **[Self-hosting Career OS](docs/SELF_HOSTING.md)** for the complete setup, least-privilege role creation, worker supervision, and verification commands.
+
+Use the documented migration runner, not raw historical SQL or `supabase db push`. Keep operator credentials separate from app credentials. Configure SMTP before inviting external users; email delivery and OAuth are not enabled merely by starting Next.js.
 
 ## Development
 
